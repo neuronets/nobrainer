@@ -93,8 +93,4 @@ if __name__ == '__main__':
     log_path = "/om/user/jakubk/neuro_nn/log_axial.csv"
     log_error_path = "om/user/jakubk/neuro_nn/errors_axial.log"
 
-    path = "./test.h5"
-    log_path = "./log.csv"
-    log_error_path = "./errors.log"
-
     main(path, slice_shape, views, log_path, log_error_path)
