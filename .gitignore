@@ -1,0 +1,12 @@
+.ipynb_checkpoints
+*.ipynb
+
+__pycache__
+*.pyc
+
+*.csv
+*.gz
+*.h5
+*.json
+*.log
+*.pkl
