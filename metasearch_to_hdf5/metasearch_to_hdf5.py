@@ -74,7 +74,7 @@ def main(path, slice_shape, views, log_path, log_error_path):
 
     logger.info('n,id')
 
-    for i, (index, entry) in enumerate(df.iloc[:5, :].iterrows()):
+    for i, (index, entry) in enumerate(df.iterrows()):
         try:
             anat_url = entry['MRIs']
             mask_url = entry['url_brainmask']
