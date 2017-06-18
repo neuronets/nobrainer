@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 #SBATCH -c1
-#SBATCH --mem=32GB
-#SBATCH -t2-00:00:00
+#SBATCH --mem=8GB
+#SBATCH -t1-10:00:00
 
 source activate tumseg
 
