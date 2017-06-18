@@ -41,8 +41,22 @@ def get_logger(name, path):
     return logger
 
 
-def _get_suffix(url):
-    """Return the suffix of a URL (either .nii.gz or .mgz)."""
+def _get_suffix(headers, url):
+    """Return suffix of downloaded file either from header of URL (either
+    .nii.gz or .mgz).
+    """
+    # This try-except block is necessary in cases where the extension is not
+    # present in the URL. Ideally, the file type would be determined by
+    # the content and not by the filename.
+    try:
+        if '.nii.gz' in headers['Content-Disposition']:
+            suffix = ".nii.gz"
+        elif '.mgz' in headers['Content-Disposition']:
+            suffix = ".mgz"
+        return suffix
+    except Exception:
+        pass
+
     if url.endswith('.nii.gz'):
         suffix = '.nii.gz'
     elif url.endswith('.mgz'):
@@ -52,7 +66,7 @@ def _get_suffix(url):
     return suffix
 
 
-def load_volume_from_url(url, suffix, **kwargs):
+def load_volume_from_url(url, **kwargs):
     """Return image object and image data from URL. Kwargs are for
     `nibabel.load()`.
     """
@@ -60,9 +74,11 @@ def load_volume_from_url(url, suffix, **kwargs):
     import nibabel as nib
     import requests
 
+    response = requests.get(url)
+    response.raise_for_status()
+    suffix = _get_suffix(response.headers, url)
+
     with tempfile.NamedTemporaryFile(suffix=suffix) as fp:
-        response = requests.get(url)
-        response.raise_for_status()
         fp.write(response.content)
         img = nib.load(fp.name, **kwargs)
         return img, img.get_data()

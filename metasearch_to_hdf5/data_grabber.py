@@ -159,8 +159,7 @@ class VolumeLoader:
 
     @staticmethod
     def _load(url):
-        suffix = utils._get_suffix(url)
-        return utils.load_volume_from_url(url, suffix)
+        return utils.load_volume_from_url(url)
 
 
 class HdfSinker:
