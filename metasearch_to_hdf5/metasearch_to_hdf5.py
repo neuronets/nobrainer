@@ -80,17 +80,16 @@ def main(path, slice_shape, views, log_path, log_error_path):
             mask_url = entry['url_brainmask']
             add_anat_mask(anat_url, mask_url, sinker, views, slice_shape)
             logger.info("{},{}".format(i, index))
-            t
         except Exception as e:
             logger_errors.error(str(index), exc_info=e)
 
 
 if __name__ == '__main__':
 
-    path = "/om/user/jakubk/neuro_nn/data/metasearch-anat-brainmask-slices.h5"
+    path = "/om/user/jakubk/neuro_nn/data/metasearch-anatomical-brainmask-slices.h5"
     slice_shape = (256, 256)  # Resize all slices to this shape.
     views = ['axial', 'coronal', 'sagittal']
-    log_path = "/om/user/jakubk/neuro_nn/log_axial.csv"
-    log_error_path = "om/user/jakubk/neuro_nn/errors_axial.log"
+    log_path = "/home/jakubk/neuro_nn/logs/log_axial.csv"
+    log_error_path = "/home/jakubk/neuro_nn/logs/errors_axial.log"
 
     main(path, slice_shape, views, log_path, log_error_path)
