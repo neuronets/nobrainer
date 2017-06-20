@@ -1,5 +1,7 @@
+.DS_Store
+
 .ipynb_checkpoints
-*.ipynb
+scratch.ipynb
 
 __pycache__
 *.pyc
