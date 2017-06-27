@@ -22,7 +22,6 @@ RUN locale-gen en_US.UTF-8 \
     && for n in *.$NV_DRIVER_VERSION; do \
           ln -v -s $n ${n%.${NV_DRIVER_VERSION}}; \
        done \
-    && ls \
     && ln -v -s libnvidia-ml.so.${NV_DRIVER_VERSION} libnvidia-ml.so.1 \
     && ln -v -s libcuda.so.${NV_DRIVER_VERSION} libcuda.so.1 \
     # Unset this variable. Otherwise, error is raised:
