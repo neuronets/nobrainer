@@ -7,6 +7,9 @@ Attempting to create a neural network to identify brains in structural magnetic 
 
 1. Using anatomical volumes and 3D brain masks from http://openneu.ro/metasearch/, construct an HDF5 file with anatomical and brain mask slices. Start with axial slices, but add more in the future.
 
+2. Modify the top layers of a pre-trained network to classify each pixel as brain or not brain.
+  - See [the related readme](/using_pretrained_models/README.md).
+
 
 # Commands
 
