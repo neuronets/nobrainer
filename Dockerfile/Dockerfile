@@ -10,9 +10,8 @@ ENV NV_DRIVER_VERSION=375.20 \
     LC_ALL=C
 
 WORKDIR /usr/local/
-RUN locale-gen en_US.UTF-8 \
-    # Install NVIDIA drivers.
-    && echo "Installing NVIDIA drivers ..." \
+# Install NVIDIA drivers.
+RUN echo "Installing NVIDIA drivers ..." \
     && NV_URL=http://us.download.nvidia.com/XFree86/Linux-x86_64/${NV_DRIVER_VERSION}/NVIDIA-Linux-x86_64-${NV_DRIVER_VERSION}.run \
     && curl -sSL -o /tmp/nvidia_installer_${NV_DRIVER_VERSION}.run $NV_URL \
     && sh /tmp/nvidia_installer_${NV_DRIVER_VERSION}.run -x \
