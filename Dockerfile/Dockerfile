@@ -3,7 +3,7 @@
 # The vast majority of this file is adapted from Satra's keras-gpu Singularity
 # file: https://singularity-hub.org/containers/849/
 
-FROM tensorflow/tensorflow:1.1.0-rc1-gpu-py3
+FROM tensorflow/tensorflow:1.2.0-gpu-py3
 
 ENV NV_DRIVER_VERSION=375.20 \
     NV_DRIVER_PATH=/usr/local/NVIDIA-Linux-x86_64 \
@@ -24,9 +24,6 @@ RUN locale-gen en_US.UTF-8 \
        done \
     && ln -v -s libnvidia-ml.so.${NV_DRIVER_VERSION} libnvidia-ml.so.1 \
     && ln -v -s libcuda.so.${NV_DRIVER_VERSION} libcuda.so.1 \
-    # Unset this variable. Otherwise, error is raised:
-    # PermissionError: [Errno 13] Permission denied: '/run/user'
-    && unset XDG_RUNTIME_DIR \
     # Install Python packages.
     && echo "Installing Python packages ..." \
     && pip install --no-cache-dir -U pip \
