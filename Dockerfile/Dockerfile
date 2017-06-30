@@ -26,7 +26,7 @@ RUN echo "Installing NVIDIA drivers ..." \
     # Install Python packages.
     && echo "Installing Python packages ..." \
     && pip install --no-cache-dir -U pip \
-    && pip install --no-cache-dir h5py keras nibabel \
+    && pip install --no-cache-dir h5py keras nibabel opencv-python \
     # Clean up.
     && rm -rf /tmp/*
 
