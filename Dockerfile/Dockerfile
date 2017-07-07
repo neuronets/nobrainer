@@ -9,7 +9,7 @@ FROM tensorflow/tensorflow:1.2.0-gpu-py3
 LABEL maintainer="Jakub Kaczmarzyk <jakubk@mit.edu>"
 
 RUN pip install --no-cache-dir -U pip \
-    && pip install --no-cache-dir h5py keras nibabel opencv-python \
+    && pip install --no-cache-dir h5py keras nibabel opencv-python
 
 WORKDIR /home
 ENTRYPOINT ["/usr/bin/python"]
