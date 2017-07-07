@@ -5,16 +5,6 @@
 - [TensorFlow model zoo](https://github.com/tensorflow/models)
 
 
-Command to run jupyter notebook from the tensorflow-gpu singularity image: 
-
-```shell
-$> singularity shell -B /om/user/jakubk/neuro_nn/data:/data -B /home/jakubk/neuro_nn:/home/neuro_nn /om/user/jakubk/singularity_images/neuro_nn.img
-$> unset XDG_RUNTIME_DIR
-$> jupyter notebook --ip=* --port=9000
-```
-
-(Is there a way to override the runscript? Similar to `docker run --entrypoint="jupyter notebook" <image>)`
-
 
 ## ImageNet networks
 
