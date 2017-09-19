@@ -9,8 +9,8 @@ BASE_PATH = os.path.join(os.sep, 'storage', 'gablab001', 'data', 'nobrainer',
                          'volumes')
 
 log_base = os.path.join(os.sep, 'home', 'jakubk', 'nobrainer')
-logger_stdout = utils.get_logger('logger-info', os.path.join(log_base, 'out.log'))
-logger_stderr = utils.get_logger('logger-info', os.path.join(log_base, 'err.log'))
+logger_stdout = utils.get_logger('logger-out', os.path.join(log_base, 'out.log'))
+logger_stderr = utils.get_logger('logger-err', os.path.join(log_base, 'err.log'))
 
 
 def load_data():
@@ -51,7 +51,9 @@ def _download_one_volume(_id, scan_type, url):
 
 
 def _download_one_volume_wrapped(row):
-    _id, scan_type, url = row
+    # _id, scan_type, url = row
+    _id, scan_type, url = row['_id'], row['variable'], row['url']
+    print(_id, scan_type)
     message = "{} {}".format(_id, scan_type)
     try:
         _download_one_volume(_id, scan_type, url)
