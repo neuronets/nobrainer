@@ -8,6 +8,50 @@ import pandas as pd
 
 import utils
 
+BRAINBOX_URL_ROOT = 'http://brainbox.pasteur.fr'
+
+
+def _get_annotation_names(json_response):
+    """Return list of annotation names from JSON response. If no names are
+    found, return empty list."""
+    names = []
+    try:
+        for annotation in json_response['mri']['atlas']:
+            try:
+                names.append(annotation['name'])
+            except KeyError:
+                pass
+    except TypeError:
+        pass
+    return names
+
+
+def _get_json_request(mri_url, **kwargs):
+    """Return dictionary with information about a BrainBox MR image, given
+    a URL that points to the MR image. Kwargs are passed to the JSON
+    request.
+    """
+    import requests
+
+    params = {'url': mri_url, **kwargs}
+    json_url = urljoin(BRAINBOX_URL_ROOT, '/mri/json')
+    return requests.get(json_url, params=params).json()
+
+
+def _has_annotation(json_request, name):
+    """Return True if json_request contains an annotation with
+    name==`name`. Else, return False."""
+    try:
+        for annotation in json_request['mri']['atlas']:
+            try:
+                if annotation['name'] == name:
+                    return True
+            except KeyError:
+                pass
+    except TypeError:
+        pass
+    return False
+
 
 class MetaSearchJSON:
     """Object to work with phenotype data on MetaSearch.
@@ -15,11 +59,9 @@ class MetaSearchJSON:
     Attributes
     ----------
     _json_col : column name for JSON responses.
-    brainbox_root : root BrainBox URL.
     phenotype : pd.DataFrame of MetaSearch phenotype data.
     """
     def __init__(self):
-        self.brainbox_root = 'http://brainbox.pasteur.fr'
         self.phenotype = None
         self._json_col = '_json'
 
@@ -41,62 +83,21 @@ class MetaSearchJSON:
         self.phenotype.to_json(path, **kwargs)
         return self
 
-    def _get_json_request(self, mri_url, **kwargs):
-        """Return dictionary with information about a BrainBox MR image, given
-        a URL that points to the MR image. Kwargs are passed to the JSON
-        request.
-        """
-        import requests
-
-        params = {'url': mri_url, **kwargs}
-        json_url = urljoin(self.brainbox_root, '/mri/json')
-        return requests.get(json_url, params=params).json()
-
     def add_mri_json_col(self, mri_url_col='MRIs', **kwargs):
         """Add column to DataFrame with JSON responses for each MR image.
 
         Note: this can take more than 30 minutes.
         """
         self.phenotype.loc[:, self._json_col] = \
-            self.phenotype.loc[:, mri_url_col].apply(self._get_json_request,
+            self.phenotype.loc[:, mri_url_col].apply(_get_json_request,
                                                      **kwargs)
         return self
-
-    @staticmethod
-    def _get_annotation_names(json_response):
-        """Return list of annotation names from JSON response. If no names are
-        found, return empty list."""
-        names = []
-        try:
-            for annotation in json_response['mri']['atlas']:
-                try:
-                    names.append(annotation['name'])
-                except KeyError:
-                    pass
-        except TypeError:
-            pass
-        return names
 
     def get_unique_annotation_names(self):
         """Return set of unique annotation names in MetaSearch data."""
         tmp = (self.phenotype.loc[:, self._json_col]
-               .apply(self._get_annotation_names))
+               .apply(_get_annotation_names))
         return set([item for sublist in tmp.tolist() for item in sublist])
-
-    @staticmethod
-    def _has_annotation(json_request, name):
-        """Return True if json_request contains an annotation with
-        name==`name`. Else, return False."""
-        try:
-            for annotation in json_request['mri']['atlas']:
-                try:
-                    if annotation['name'] == name:
-                        return True
-                except KeyError:
-                    pass
-        except TypeError:
-            pass
-        return False
 
     def add_has_annotation(self, annotation_names=None):
         """Add a column for each annotation name in `annotation_names`
@@ -109,8 +110,7 @@ class MetaSearchJSON:
         for name in annotation_names:
             col = "has_{}".format(name)
             self.phenotype.loc[:, col] = (self.phenotype.loc[:, self._json_col]
-                                          .apply(self._has_annotation,
-                                                 name=name))
+                                          .apply(_has_annotation, name=name))
         return self
 
     def _get_annotation_file_url(self, row, annotation_name, key='filename'):
@@ -125,7 +125,7 @@ class MetaSearchJSON:
         except TypeError:
             return None
         path = urljoin(row[self._json_col]['url'], filename)
-        return urljoin(self.brainbox_root, path)
+        return urljoin(BRAINBOX_URL_ROOT, path)
 
     def add_annotation_url(self, annotation_name):
         """Add a column with the file url for annotation_name, where the new
@@ -149,17 +149,6 @@ class MetaSearchJSON:
         self.phenotype.loc[:, key] = \
             self.phenotype.loc[:, self._json_col].apply(_get_value, key=key)
         return self
-
-
-class VolumeLoader:
-    """Object to load volume from URL."""
-    def __init__(self, url):
-        self.url = url
-        self.img, self.data = self._load(url)
-
-    @staticmethod
-    def _load(url):
-        return utils.load_volume_from_url(url)
 
 
 class HdfSinker:
