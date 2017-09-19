@@ -6,4 +6,4 @@
 
 source activate tumseg
 
-python /home/jakubk/neuro_nn/metasearch_to_hdf5/metasearch_to_hdf5.py
+python /home/jakubk/neuro_nn/brainbox_downloader/metasearch_to_hdf5.py

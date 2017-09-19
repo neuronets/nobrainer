@@ -38,8 +38,8 @@ def add_anat_mask(anat_url, mask_url, sinker, views, slice_shape):
     Multiple views (i.e., 'axial', 'coronal', 'sagittal') can be supported,
     but the functionality is commented out.
     """
-    anat = data_grabber.VolumeLoader(anat_url)
-    mask = data_grabber.VolumeLoader(mask_url)
+    anat = utils.load_volume_from_url(anat_url)
+    mask = utils.load_volume_from_url(mask_url)
 
     anat.reoriented = utils.reorient_volume(anat.img)
     mask.reoriented = utils.reorient_volume(mask.img)
