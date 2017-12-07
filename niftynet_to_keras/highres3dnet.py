@@ -34,6 +34,8 @@ def HighRes3DNet(n_classes, input_tensor=None, input_shape=None):
 
     Parameters
     ----------
+    n_classes : int
+        Number of classes to output in the last convolutional layer.
     input_tensor : optional Keras tensor (i.e., output of `layers.Input()`) to
         use as image input for the model. Does not have to be provided if
         `input_shape` is given.
@@ -42,7 +44,7 @@ def HighRes3DNet(n_classes, input_tensor=None, input_shape=None):
 
     Returns
     -------
-        A Keras model instance.
+    A Keras model instance.
     """
     if input_tensor is not None:
         inputs = input_tensor
