@@ -12,7 +12,11 @@ RUN pip install --no-cache-dir -U pip \
     && pip install --no-cache-dir h5py \
                                   keras \
                                   nibabel \
-                                  numpy
+                                  numpy \
+                                  scikit-image
 
-WORKDIR /home
+
+RUN useradd --no-user-group --create-home --shell /bin/bash neuro
+USER neuro
+WORKDIR /home/neuro
 ENTRYPOINT ["/usr/bin/python"]

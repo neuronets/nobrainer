@@ -11,27 +11,29 @@ Reference
 [On the Compactness, Efficiency, and Representation of 3D Convolutional Networks: Brain Parcellation as a Pretext Task](https://doi.org/10.1007/978-3-319-59050-9_28)
 """
 
-from keras import backend as K
-from keras import Model
-from keras.layers import (Activation, Add, BatchNormalization, Conv3D, Input)
+from tensorflow.python.keras import backend as K
+from tensorflow.python.keras.models import Model
+from tensorflow.python.keras.layers import (
+    Activation, Add, BatchNormalization, Conv3D, Input
+)
 
 
-def dice_coef(y_true, y_pred, smooth=1):
-    """Return Dice coefficient of boolean arrays `y_true` and `y_pred`."""
-    # https://github.com/fchollet/keras/issues/3611
-    axis = (1, 2, 3)  # TODO: investigate which axes are correct.
-    intersection = K.sum(y_true * y_pred, axis=axis)
-    union = K.sum(y_true, axis=axis) + K.sum(y_pred, axis=axis)
-    return K.mean((2. * intersection + smooth) / (union + smooth), axis=0)
+# https://github.com/jocicmarko/ultrasound-nerve-segmentation/blob/27c47a8f38f11e446e33465146c8eb6074872678/train.py#L23-L27
+def dice_coef(y_true, y_pred, smooth=1.):
+    """Return Dice coefficient given two boolean ndarrays."""
+    y_true_f = K.flatten(y_true)
+    y_pred_f = K.flatten(y_pred)
+    intersection = K.sum(y_true_f * y_pred_f)
+    return (2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
 
 
 def dice_loss(y_true, y_pred, smooth=1):
+    """Return Dice loss given two boolean ndarrays."""
     return 1 - dice_coef(y_true, y_pred, smooth)
 
 
 def HighRes3DNet(n_classes, input_tensor=None, input_shape=None):
     """Instantiates the HighRes3DNet architecture.
-
     Parameters
     ----------
     n_classes : int
@@ -41,7 +43,6 @@ def HighRes3DNet(n_classes, input_tensor=None, input_shape=None):
         `input_shape` is given.
     input_shape : optional shape tuple. Does not have to be provided if
         `input_tensor` is given.
-
     Returns
     -------
     A Keras model instance.
@@ -51,46 +52,63 @@ def HighRes3DNet(n_classes, input_tensor=None, input_shape=None):
     elif input_shape is not None:
         inputs = Input(shape=input_shape, name='input')
     else:
-        raise ValueError("Either `input_tensor` or `input_shape` is required.")
+        raise ValueError("`input_tensor` or `input_shape` must be provided.")
 
-    # Block 1
-    x = Conv3D(16, (3, 3, 3), padding='same')(inputs)
+    # Block 0
+    x = Conv3D(16, (3, 3, 3), padding='same', name='conv_0')(inputs)
     x = BatchNormalization(name='norm_0')(x)
-    x = Activation('relu')(x)
+    x = Activation('relu', name='activ_0')(x)
 
-    # Blocks 2-7 (3 groups with residual connections)
-    for _ in range(3):
-        residual = x
-        for ii in range(2):
-            x = BatchNormalization()(x)
-            x = Activation('relu')(x)
-            x = Conv3D(16, (3, 3, 3), padding='same')(x)
-        x = Add()([residual, x])
+    names = {
+        'activ': 'activ_{}_{}',
+        'conv': 'conv_{}_{}',
+        'norm': 'norm_{}_{}',
+        'add': 'add_{}',
+    }
 
-    # Blocks 8-13 (3 groups with residual connections)
-    for _ in range(3):
+    # Blocks 1-3 (each block has 2 conv3d layers).
+    _offset = 1
+    for ii in range(3):
         residual = x
-        for ii in range(2):
-            x = BatchNormalization()(x)
-            x = Activation('relu')(x)
+        for jj in range(2):
+            # suffix = "_{}".format(2 * ii + jj + _offset)
+            suffix = "_{}_{}".format(ii + _offset, jj)
+            x = BatchNormalization(name='norm' + suffix)(x)
+            x = Activation('relu', name='activ' + suffix)(x)
+            x = Conv3D(16, (3, 3, 3), padding='same', name='conv' + suffix)(x)
+        x = Add(name=names['add'].format(ii + _offset))([residual, x])
+
+    # Blocks 4-6 (each block has 2 conv3d layers).
+    for ii in range(3):
+        residual = x
+        _offset = 4
+        for jj in range(2):
+            suffix = "_{}_{}".format(ii + _offset, jj)
+            x = BatchNormalization(name='norm' + suffix)(x)
+            x = Activation('relu', name='activ' + suffix)(x)
             # TODO: confirm that filters=16 and dilation_rate=(2, 2, 2) gives a
             # convolution with 32 kernels dilated by 2.
-            x = Conv3D(16, (3, 3, 3), padding='same', dilation_rate=(2, 2, 2))(x)
-        x = Add()([residual, x])
+            x = Conv3D(16, (3, 3, 3), padding='same', dilation_rate=(2, 2, 2),
+                       name='conv' + suffix)(x)
+        x = Add(name=names['add'].format(ii + _offset))([residual, x])
 
-    # Blocks 14-19 (3 groups with residual connections)
-    for _ in range(3):
+    # Blocks 7-9 (each block has 2 conv3d layers).
+    for ii in range(3):
         residual = x
-        for ii in range(2):
-            x = BatchNormalization()(x)
-            x = Activation('relu')(x)
+        _offset = 7
+        for jj in range(2):
+            suffix = "_{}_{}".format(ii + _offset, jj)
+            x = BatchNormalization(name='norm' + suffix)(x)
+            x = Activation('relu', name='activ' + suffix)(x)
             # TODO: confirm that filters=16 and dilation_rate=(4, 4, 4) gives a
             # convolution with 64 kernels dilated by 4.
-            x = Conv3D(16, (3, 3, 3), padding='same', dilation_rate=(4, 4, 4))(x)
-        x = Add()([residual, x])
+            x = Conv3D(16, (3, 3, 3), padding='same', dilation_rate=(4, 4, 4),
+                       name='conv' + suffix)(x)
+        x = Add(name=names['add'].format(ii + _offset))([residual, x])
 
-    # Block 20
-    x = Conv3D(n_classes, (1, 1, 1))(x)
-    x = Activation('softmax')(x)
+    # Block 19
+    x = Conv3D(n_classes, (1, 1, 1), name='classification')(x)
+    x = Activation('softmax', name='final_activation')(x)
 
     return Model(inputs, x, name='highres3dnet')
+
