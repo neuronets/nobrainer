@@ -13,14 +13,14 @@ from highres3dnet import dice_loss, HighRes3DNet
 # Configuration
 # -------------
 NUM_CLASSES = 2
-BATCH_SIZE = 8
-LEARNING_RATE = 1e-5
-WINDOW_SHAPE = (64, 64, 64)
+BATCH_SIZE = 1
+LEARNING_RATE = 1e-4
+WINDOW_SHAPE = (128, 128, 128)
 NUM_CHANNELS = 1
 INPUT_SHAPE = (*WINDOW_SHAPE, NUM_CHANNELS)
 TARGET_DTYPE = 'uint8'
 CSV_FILEPATH = (
-    "/om/user/jakubk/nobrainer-code/niftynet_to_keras/t1_brainmask.csv"
+    "/om2/user/jakubk/openmind-surface-data/file-lists/master_file_list_brainmask.csv"
 )
 TENSORBOARD_BASE_DIR = (
     "/om/user/jakubk/nobrainer-code/niftynet_to_keras/models"
@@ -178,11 +178,25 @@ callbacks = [
 
 for index, these_files in df_input.iterrows():
 
-    data = load_volume(these_files['t1'])
-    data = _preprocess_data(data)
+    try:
+        data = load_volume(these_files['t1'])
+        target = load_volume(these_files['brainmask'], dtype=TARGET_DTYPE)
 
-    target = load_volume(these_files['brainmask'], dtype=TARGET_DTYPE)
-    target = _preprocess_target(target)
+        data = _preprocess_data(data)
+        target = _preprocess_target(target)
+    except Exception:
+        pass
+
+    # Retry...
+    try:
+        data = load_volume(these_files['t1'])
+        target = load_volume(these_files['brainmask'], dtype=TARGET_DTYPE)
+
+        data = _preprocess_data(data)
+        target = _preprocess_target(target)
+    except Exception:
+        with open("bad-pairs.txt", 'w') as fp:
+            print(these_files['t1'], these_files['brainmask'], file=fp)
 
     model.fit(
         x=data,
