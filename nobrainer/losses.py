@@ -1,8 +1,18 @@
-"""Loss functions."""
+"""Loss functions implemented in TensorFlow."""
 
-from nobrainer.scores import dice_coefficient
+import tensorflow as tf
+
+from nobrainer import scores
 
 
-def dice_loss(y_true, y_pred, smooth=1):
-    """Return Dice loss given two boolean ndarrays."""
-    return 1 - dice_coefficient(y_true, y_pred, smooth)
+def dice_loss(labels, predictions):
+    """Return Dice loss given two tensors. Output is in range [0, 1]."""
+    return 1 - scores.dice_coefficient(labels, predictions)
+
+
+def hamming_loss(labels, predictions):
+    """Return Hamming loss given two tensors. Output is in range [0, 1]."""
+    # QUESTION: does this implementation make sense?
+    return tf.truediv(
+        scores.hamming_distance(labels, predictions), tf.size(labels)
+    )
