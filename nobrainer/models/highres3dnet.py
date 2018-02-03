@@ -16,111 +16,77 @@ Science, vol 10265.
 
 import tensorflow as tf
 
-_BATCH_NORM_DECAY = 0.997
-_BATCH_NORM_EPSILON = 1e-5
+FUSED_BATCHED_NORM = True
 
-tf.logging.set_verbosity(tf.logging.INFO)
-
-
-def _batch_norm_relu(inputs, is_training, data_format):
-    """Perform batch normalization and ReLU on `inputs`."""
-    inputs = tf.layers.batch_normalization(
-        inputs=inputs, axis=1 if data_format == 'channels_first' else 3,
-        momentum=_BATCH_NORM_DECAY, epsilon=_BATCH_NORM_EPSILON, center=True,
-        scale=True, training=is_training, fused=True,
-    )
-    return tf.nn.relu(inputs)
+# TODO: use `tensorflow.python.framework.test_util.is_gpu_available` to
+# determine data format. `channels_first` is typically faster on GPU, and
+# `channels_last` is typically faster on CPU.
 
 
-def _building_block(inputs, filters, dilation_rate, is_training, strides,
-                    data_format):
-    """Perform two rounds of batch normalization, ReLU, and 3D convolution,
-    and sum original inputs with ouputs."""
-    shortcut = inputs
+def _activation_summary(x):
+    name = x.op.name + '/activations'
+    tf.summary.histogram(name, x)
 
-    for _ in range(2):
-        inputs = _batch_norm_relu(inputs, is_training, data_format)
-        inputs = tf.layers.conv3d(
-            inputs=inputs, filters=filters, kernel_size=(3, 3, 3),
-            strides=strides, padding='same', data_format=data_format,
+
+def _resblock(inputs, filters, kernel_size=3, dilation_rate=1):
+    """Return building block of residual network. Residual connections must be
+    made outside of this function.
+
+    `inputs -> batchnorm -> relu -> conv -> batchnorm -> relu -> conv`
+    """
+    with tf.variable_scope('conv1'):
+        x1 = tf.layers.batch_normalization(inputs, fused=FUSED_BATCHED_NORM)
+        x1 = tf.nn.relu(x1)
+        x1 = tf.layers.conv3d(
+            x1, filters=filters, kernel_size=kernel_size, padding='SAME',
             dilation_rate=dilation_rate,
         )
-
-    return inputs + shortcut
-
-
-def _block_layer(inputs, filters, dilation_rate, num_blocks, strides,
-                 is_training, name, data_format):
-    """Return blocks of blocks buildings."""
-    for _ in range(1, num_blocks):
-        inputs = _building_block(
-            inputs=inputs, filters=filters, dilation_rate=dilation_rate,
-            is_training=is_training, strides=strides, data_format=data_format,
+        _activation_summary(x1)
+    with tf.variable_scope('conv2'):
+        x2 = tf.layers.batch_normalization(x1, fused=FUSED_BATCHED_NORM)
+        x2 = tf.nn.relu(x2)
+        return tf.layers.conv3d(
+            x2, filters=filters, kernel_size=kernel_size, padding='SAME',
+            dilation_rate=dilation_rate
         )
-    return tf.identity(inputs, name=name)
+        _activation_summary(x2)
 
 
-def highres3dnet(features, labels, num_classes, is_training, data_format=None):
-    """Return a HighRes3DNet model.
+def _highres3dnet_inference(x, num_classes):
+    """Returns logits."""
 
-    Parameters
-    ----------
-    num_classes : int
-        Number of classes to output in the last convolutional layer.
-    input_tensor : optional tensor to use as image input for the model. Does
-        not have to be provided if `input_shape` is given.
-    input_shape : optional shape tuple. Does not have to be provided if
-        `input_tensor` is given.
+    with tf.variable_scope('conv1'):
+        conv = tf.layers.conv3d(x, filters=16, kernel_size=3, padding='SAME')
+        conv = tf.layers.batch_normalization(conv, fused=FUSED_BATCHED_NORM)
+        shortcut = tf.nn.relu(conv)
+        _activation_summary(shortcut)
 
-    Returns
-    -------
-    A TensorFlow model.
-    """
-    if data_format is None:
-        # 'channels_first' is typically faster on GPU. 'channels_last' is
-        # typically faster on CPU.
-        data_format = (
-            'channels_first' if tf.test.is_built_with_cuda()
-            else 'channels_last'
+    for ii in range(3):
+        offset = 1
+        name = 'resblock{}'.format(ii + offset)
+        with tf.variable_scope(name):
+            shortcut = tf.add(
+                shortcut, _resblock(shortcut, filters=16)
+            )
+
+    for ii in range(3):
+        offset = 4
+        name = 'resblock{}'.format(ii + offset)
+        with tf.variable_scope(name):
+            shortcut = tf.add(
+                shortcut, _resblock(shortcut, filters=16, dilation_rate=2)
+            )
+
+    for ii in range(3):
+        offset = 7
+        name = 'resblock{}'.format(ii + offset)
+        with tf.variable_scope(name):
+            shortcut = tf.add(
+                shortcut, _resblock(shortcut, filters=16, dilation_rate=4)
+            )
+    with tf.variable_scope('logits'):
+        logits = tf.layers.conv3d(
+            shortcut, filters=num_classes, kernel_size=1, padding='SAME'
         )
-
-    # Initial block.
-    inputs = tf.layers.conv3d(
-        inputs=features, filters=16, kernel_size=(3, 3, 3), padding='same',
-        name='initial_conv',
-    )
-    inputs = _batch_norm_relu(
-        inputs, is_training=is_training, data_format=data_format
-    )
-    inputs = tf.identity(inputs, name='initial_block')
-
-    # 3 residual blocks.
-    inputs = _block_layer(
-        inputs=inputs, filters=16, dilation_rate=(1, 1, 1), num_blocks=3,
-        strides=1, is_training=is_training, name='block_layer1',
-        data_format=data_format,
-    )
-
-    # 3 residual blocks.
-    inputs = _block_layer(
-        inputs=inputs, filters=32, dilation_rate=(2, 2, 2), num_blocks=3,
-        strides=1, is_training=is_training, name='block_layer2',
-        data_format=data_format,
-    )
-
-    # 3 residual blocks.
-    inputs = _block_layer(
-        inputs=inputs, filters=64, dilation_rate=(4, 4, 4), num_blocks=3,
-        strides=1, is_training=is_training, name='block_layer3',
-        data_format=data_format,
-    )
-
-    # Final classification layer.
-    inputs = tf.layers.conv3d(
-        inputs=inputs, filters=num_classes, kernel_size=(1, 1, 1),
-        padding='same',
-    )
-    probabilities = tf.nn.softmax(logits=inputs)
-    probabilities = tf.identity(inputs, name='classification')
-
-    return probabilities
+        _activation_summary(logits)
+        return logits
