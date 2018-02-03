@@ -1,10 +1,5 @@
 """HighRes3DNet implemented in TensorFlow.
 
-Notes
------
-This script was written with the help of
-https://github.com/tensorflow/models/blob/178480ed3be30bc33dafead53b5ee09c717fa2b7/official/resnet/resnet_model.py.
-
 Reference
 ---------
 Li W., Wang G., Fidon L., Ourselin S., Cardoso M.J., Vercauteren T. (2017)
@@ -52,7 +47,7 @@ def _resblock(inputs, filters, kernel_size=3, dilation_rate=1):
         _activation_summary(x2)
 
 
-def _highres3dnet_inference(x, num_classes):
+def highres3dnet(x, num_classes):
     """Returns logits."""
 
     with tf.variable_scope('conv1'):
