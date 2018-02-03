@@ -1,22 +1,12 @@
-# Dockerfile for 3D semantic segmentation project.
-#
-# - Use `singularity pull ...` to convert the resulting docker image to a
-#   singularity image.
-# - Use singularity >= 2.3.0 to mount local NVIDIA drivers with the --nv option.
-
 FROM tensorflow/tensorflow:1.4.0-gpu-py3
 
-LABEL maintainer="Jakub Kaczmarzyk <jakubk@mit.edu>"
+RUN pip install --no-cache-dir \
+        nibabel \
+    && useradd --no-user-group --create-home --shell /bin/bash neuro
 
-RUN pip install --no-cache-dir -U pip \
-    && pip install --no-cache-dir h5py \
-                                  keras \
-                                  nibabel \
-                                  numpy \
-                                  scikit-image
-
-
-RUN useradd --no-user-group --create-home --shell /bin/bash neuro
 USER neuro
 WORKDIR /home/neuro
+ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64/:$LD_LIBRARY_PATH"
 ENTRYPOINT ["/usr/bin/python"]
+
+LABEL maintainer="Jakub Kaczmarzyk <jakubk@mit.edu>"
