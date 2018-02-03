@@ -5,7 +5,7 @@
 import numpy as np
 import tensorflow as tf
 
-from nobrainer import utils
+from nobrainer.utils import _check_shapes_equal
 
 
 def dice_coefficient(labels, predictions):
@@ -15,13 +15,16 @@ def dice_coefficient(labels, predictions):
     Dice(A, B) = -----------
                   |A| + |B|
     """
-    utils._check_shapes_equal(labels, predictions)
-    labels = tf.reshape(labels, -1)
-    predictions = tf.reshape(predictions, -1)
-    return (
-        2 * tf.reduce_sum(tf.multiply(labels, predictions))
-        / (tf.reduce_sum(labels) + tf.reduce_sum(predictions))
-    )
+    with tf.name_scope('dice_coefficient'):
+        _check_shapes_equal(labels, predictions)
+        if len(labels.shape) > 1:
+            labels = tf.reshape(labels, -1)
+        if len(predictions.shape) > 1:
+            predictions = tf.reshape(predictions, -1)
+        return (
+            2 * tf.reduce_sum(tf.multiply(labels, predictions))
+            / (tf.reduce_sum(labels) + tf.reduce_sum(predictions))
+        )
 
 
 def dice_coefficient_numpy(labels, predictions):
@@ -31,7 +34,7 @@ def dice_coefficient_numpy(labels, predictions):
     Dice(A,B) = -----------
                  |A| + |B|
     """
-    utils._check_shapes_equal(labels, predictions, implementation='np')
+    _check_shapes_equal(labels, predictions)
     labels = labels.flatten()
     predictions = predictions.flatten()
     return (
@@ -41,11 +44,14 @@ def dice_coefficient_numpy(labels, predictions):
 
 def hamming_distance(labels, predictions):
     """Return Hamming distance between two tensors."""
-    utils._check_shapes_equal(labels, predictions)
-    return tf.reduce_sum(tf.not_equal(labels, predictions))
+    with tf.name_scope('hamming_distance'):
+        _check_shapes_equal(labels, predictions)
+        return tf.reduce_sum(
+            tf.cast(tf.not_equal(labels, predictions), tf.int32)
+        )
 
 
 def hamming_distance_numpy(labels, predictions):
-    """Return Hamming distance between two tensors."""
-    utils._check_shapes_equal(labels, predictions, implementation='np')
+    """Return Hamming distance between two Numpy arrays."""
+    _check_shapes_equal(labels, predictions)
     return np.not_equal(labels, predictions).sum()
