@@ -48,7 +48,7 @@ def _resblock(inputs, filters, kernel_size=3, dilation_rate=1):
 
 
 def highres3dnet(x, num_classes):
-    """Returns logits."""
+    """Instantiate HighRes3DNet architecture, and return tensor of logits."""
 
     with tf.variable_scope('conv1'):
         conv = tf.layers.conv3d(x, filters=16, kernel_size=3, padding='SAME')
