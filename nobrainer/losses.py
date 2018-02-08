@@ -18,4 +18,3 @@ def hamming_loss(labels, predictions):
     with tf.name_scope('hamming_loss'):
         return tf.truediv(
             metrics.hamming_distance(labels, predictions), tf.size(labels)
-        )
