@@ -18,70 +18,100 @@ FUSED_BATCHED_NORM = True
 # `channels_last` is typically faster on CPU.
 
 
+# QUESTION: does adding histograms increase the memory footprint of the model?
 def _activation_summary(x):
     name = x.op.name + '/activations'
     tf.summary.histogram(name, x)
 
 
-def _resblock(inputs, filters, kernel_size=3, dilation_rate=1):
+def _resblock(inputs, filters, num_prefix, mode, kernel_size=3,
+              dilation_rate=1, save_to_histogram=False):
     """Return building block of residual network. Residual connections must be
     made outside of this function.
 
     `inputs -> batchnorm -> relu -> conv -> batchnorm -> relu -> conv`
     """
-    with tf.variable_scope('conv1'):
-        x1 = tf.layers.batch_normalization(inputs, fused=FUSED_BATCHED_NORM)
-        x1 = tf.nn.relu(x1)
-        x1 = tf.layers.conv3d(
-            x1, filters=filters, kernel_size=kernel_size, padding='SAME',
+    training = mode == tf.estimator.ModeKeys.TRAIN
+
+    with tf.variable_scope('batchnorm_{}_0'.format(num_prefix)):
+        bn1 = tf.layers.batch_normalization(
+            inputs, training=training, fused=FUSED_BATCHED_NORM,
+        )
+    with tf.variable_scope('relu_{}_0'.format(num_prefix)):
+        relu1 = tf.nn.relu(bn1)
+    with tf.variable_scope('conv_{}_0'.format(num_prefix)):
+        conv1 = tf.layers.conv3d(
+            relu1, filters=filters, kernel_size=kernel_size, padding='SAME',
             dilation_rate=dilation_rate,
         )
-        _activation_summary(x1)
-    with tf.variable_scope('conv2'):
-        x2 = tf.layers.batch_normalization(x1, fused=FUSED_BATCHED_NORM)
-        x2 = tf.nn.relu(x2)
-        return tf.layers.conv3d(
-            x2, filters=filters, kernel_size=kernel_size, padding='SAME',
-            dilation_rate=dilation_rate
+        if save_to_histogram:
+            _activation_summary(conv1)
+
+    with tf.variable_scope('batchnorm_{}_1'.format(num_prefix)):
+        bn2 = tf.layers.batch_normalization(
+            conv1, training=training, fused=FUSED_BATCHED_NORM,
         )
-        _activation_summary(x2)
+    with tf.variable_scope('relu_{}_1'.format(num_prefix)):
+        relu2 = tf.nn.relu(bn2)
+    with tf.variable_scope('conv_{}_1'.format(num_prefix)):
+        conv2 = tf.layers.conv3d(
+            relu2, filters=filters, kernel_size=kernel_size, padding='SAME',
+            dilation_rate=dilation_rate,
+        )
+        if save_to_histogram:
+            _activation_summary(conv2)
+
+    with tf.variable_scope('add_{}'.format(num_prefix)):
+        return tf.add(conv2, inputs)
 
 
-def highres3dnet(x, num_classes):
+def highres3dnet(features, num_classes, mode, save_to_histogram=False):
     """Instantiate HighRes3DNet architecture, and return tensor of logits."""
 
-    with tf.variable_scope('conv1'):
-        conv = tf.layers.conv3d(x, filters=16, kernel_size=3, padding='SAME')
-        conv = tf.layers.batch_normalization(conv, fused=FUSED_BATCHED_NORM)
-        shortcut = tf.nn.relu(conv)
-        _activation_summary(shortcut)
+    training = mode == tf.estimator.ModeKeys.TRAIN
+
+    with tf.variable_scope('conv_0'):
+        conv = tf.layers.conv3d(
+            features, filters=16, kernel_size=3, padding='SAME'
+        )
+    with tf.variable_scope('batchnorm_0'):
+        conv = tf.layers.batch_normalization(
+            conv, training=training, fused=FUSED_BATCHED_NORM
+        )
+    with tf.variable_scope('relu_0'):
+        outputs = tf.nn.relu(conv)
+
+    if save_to_histogram:
+        _activation_summary(outputs)
 
     for ii in range(3):
         offset = 1
-        name = 'resblock{}'.format(ii + offset)
-        with tf.variable_scope(name):
-            shortcut = tf.add(
-                shortcut, _resblock(shortcut, filters=16)
-            )
+        num_prefix = ii + offset
+        outputs = _resblock(
+            outputs, num_prefix=num_prefix, mode=mode, filters=16
+        )
 
     for ii in range(3):
         offset = 4
-        name = 'resblock{}'.format(ii + offset)
-        with tf.variable_scope(name):
-            shortcut = tf.add(
-                shortcut, _resblock(shortcut, filters=16, dilation_rate=2)
-            )
+        num_prefix = ii + offset
+        outputs = _resblock(
+            outputs, num_prefix=num_prefix, mode=mode, filters=16,
+            dilation_rate=2
+        )
 
     for ii in range(3):
         offset = 7
-        name = 'resblock{}'.format(ii + offset)
-        with tf.variable_scope(name):
-            shortcut = tf.add(
-                shortcut, _resblock(shortcut, filters=16, dilation_rate=4)
-            )
+        num_prefix = ii + offset
+        outputs = _resblock(
+            outputs, num_prefix=num_prefix, mode=mode, filters=16,
+            dilation_rate=4
+        )
+
     with tf.variable_scope('logits'):
         logits = tf.layers.conv3d(
-            shortcut, filters=num_classes, kernel_size=1, padding='SAME'
+            outputs, filters=num_classes, kernel_size=1, padding='SAME'
         )
-        _activation_summary(logits)
-        return logits
+        if save_to_histogram:
+            _activation_summary(logits)
+
+    return logits
