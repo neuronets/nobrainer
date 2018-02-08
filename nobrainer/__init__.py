@@ -1,1 +1,1 @@
-from nobrainer import losses, models, scores
+from nobrainer import losses, metrics, models
