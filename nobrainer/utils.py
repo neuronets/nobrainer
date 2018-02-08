@@ -11,4 +11,8 @@ def _check_shapes_equal(x1, x2):
     unqeual.
     """
     if not _shapes_equal(x1, x2):
-        raise ValueError("Shapes of both arrays or tensors must be equal.")
+        _shapes = ", ".join((str(x1.shape), str(x2.shape)))
+        ValueError(
+            "Shapes of both arrays or tensors must be equal. Got shapes: "
+            + _shapes
+        )
