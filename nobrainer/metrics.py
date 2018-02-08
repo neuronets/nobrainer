@@ -16,11 +16,8 @@ def dice_coefficient(labels, predictions):
                   |A| + |B|
     """
     with tf.name_scope('dice_coefficient'):
-        _check_shapes_equal(labels, predictions)
-        if len(labels.shape) > 1:
-            labels = tf.reshape(labels, -1)
-        if len(predictions.shape) > 1:
-            predictions = tf.reshape(predictions, -1)
+        labels = tf.contrib.layers.flatten(labels)
+        predictions = tf.contrib.layers.flatten(predictions)
         return (
             2 * tf.reduce_sum(tf.multiply(labels, predictions))
             / (tf.reduce_sum(labels) + tf.reduce_sum(predictions))
@@ -40,6 +37,21 @@ def dice_coefficient_numpy(labels, predictions):
     return (
         2 * (labels * predictions).sum() / (labels.sum() + predictions.sum())
     )
+
+
+def dice_coefficient_by_class_numpy(labels, predictions, num_classes):
+    """Return Dice coefficient per class. Class labels must be in last
+    dimension.
+    """
+    coefficients = np.zeros(num_classes, np.float32)
+
+    # QUESTION: can this be done in vectorized fashion?
+    for ii in range(num_classes):
+        coefficients[ii] = dice_coefficient_numpy(
+            labels=labels[Ellipsis, ii],
+            predictions=predictions[Ellipsis, ii])
+
+    return coefficients.astype(np.float32)
 
 
 def hamming_distance(labels, predictions):
