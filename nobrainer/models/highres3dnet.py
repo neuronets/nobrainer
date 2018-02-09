@@ -123,7 +123,7 @@ def highres3dnet(features, num_classes, mode, save_activations=False):
     Returns
     -------
     Tensor of logits.
-    """"
+    """
     training = mode == tf.estimator.ModeKeys.TRAIN
 
     with tf.variable_scope('conv_0'):
