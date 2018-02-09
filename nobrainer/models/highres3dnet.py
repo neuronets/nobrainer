@@ -10,6 +10,7 @@ Science, vol 10265.
 """
 
 import tensorflow as tf
+from tensorflow.python.estimator.canned import optimizers
 
 from nobrainer.models import util
 
@@ -105,7 +106,8 @@ def _resblock(inputs, layer_num, mode, filters, kernel_size=3, dilation_rate=1,
         return tf.add(conv2, inputs)
 
 
-def highres3dnet(features, num_classes, mode, save_activations=False):
+def _highres3dnet_logit_fn(features, num_classes, mode,
+                           save_activations=False):
     """HighRes3DNet logit function.
 
     Parameters
@@ -171,3 +173,55 @@ def highres3dnet(features, num_classes, mode, save_activations=False):
             util._add_activation_summary(logits)
 
     return logits
+
+
+def _highres3dnet_model_fn(features, labels, mode, num_classes,
+                           optimizer='Adam', learning_rate=0.001, config=None):
+    """"""
+    logits = _highres3dnet_logit_fn(
+        features=features, mode=mode, num_classes=num_classes,
+    )
+    predictions = tf.argmax(logits, axis=-1)
+
+    optimizer_ = optimizers.get_optimizer_instance(
+        optimizer, learning_rate=learning_rate
+    )
+
+    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+        labels=labels, logits=logits,
+    )
+    # cross_entropy.shape == (batch_size, *block_shape)
+    loss = tf.reduce_mean(cross_entropy)
+
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    with tf.control_dependencies(update_ops):
+        train_op = optimizer_.minimize(
+            loss, global_step=tf.train.get_global_step(),
+        )
+
+    return tf.estimator.EstimatorSpec(
+        mode=mode,
+        predictions=predictions,
+        loss=loss,
+        train_op=train_op,
+    )
+
+
+class HighRes3DNet(tf.estimator.Estimator):
+    """"""
+    def __init__(self, num_classes, model_dir=None, optimizer='Adam',
+                 learning_rate=0.001, warm_start_from=None, config=None):
+
+        def _model_fn(features, labels, mode, config):
+            """"""
+            return _highres3dnet_model_fn(
+                features=features, labels=labels, mode=mode,
+                num_classes=num_classes,
+                optimizer=optimizer, learning_rate=learning_rate,
+                config=config,
+            )
+
+        super(HighRes3DNet, self).__init__(
+            model_fn=_model_fn, model_dir=model_dir, config=config,
+            warm_start_from=warm_start_from,
+        )
