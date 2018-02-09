@@ -165,6 +165,7 @@ class MeshNet(tf.estimator.Estimator):
         def _model_fn(features, labels, mode, config):
             """"""
             return _meshnet_model_fn(
+                features=features, labels=labels, mode=mode,
                 num_classes=num_classes, dropout_rate=dropout_rate,
                 optimizer=optimizer, learning_rate=learning_rate,
                 config=config,
