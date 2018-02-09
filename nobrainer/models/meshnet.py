@@ -8,6 +8,7 @@ labeling. IJCNN 2017. (pp. 3785-3792). IEEE.
 """
 
 import tensorflow as tf
+from tensorflow.python.estimator.canned import optimizers
 
 from nobrainer.models import util
 
@@ -68,8 +69,8 @@ def _layer(inputs, layer_num, mode, filters, dropout_rate, kernel_size=3,
         return dropout
 
 
-def meshnet(features, num_classes, mode, dropout_rate=0.25,
-            save_activations=False):
+def _meshnet_logit_fn(features, num_classes, mode, dropout_rate=0.25,
+                      save_activations=False):
     """MeshNet logit function.
 
     Parameters
@@ -108,7 +109,7 @@ def meshnet(features, num_classes, mode, dropout_rate=0.25,
     for ii in range(7):
         dilation_rate = dilation_rates[ii]
         outputs = _layer(
-            outputs, filters=filters, num_prefix=ii + 1, mode=mode,
+            outputs, filters=filters, layer_num=ii + 1, mode=mode,
             dropout_rate=dropout_rate, dilation_rate=dilation_rate,
         )
 
@@ -120,3 +121,56 @@ def meshnet(features, num_classes, mode, dropout_rate=0.25,
             util._add_activation_summary(logits)
 
     return logits
+
+
+def _meshnet_model_fn(features, labels, mode, num_classes, dropout_rate=0.25,
+                      optimizer='Adam', learning_rate=0.001, config=None):
+    """"""
+    logits = _meshnet_logit_fn(
+        features=features, mode=mode, num_classes=num_classes,
+        dropout_rate=dropout_rate,
+    )
+    predictions = tf.argmax(logits, axis=-1)
+
+    optimizer_ = optimizers.get_optimizer_instance(
+        optimizer, learning_rate=learning_rate
+    )
+
+    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+        labels=labels, logits=logits,
+    )
+    # cross_entropy.shape == (batch_size, *block_shape)
+    loss = tf.reduce_mean(cross_entropy)
+
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    with tf.control_dependencies(update_ops):
+        train_op = optimizer_.minimize(
+            loss, global_step=tf.train.get_global_step(),
+        )
+
+    return tf.estimator.EstimatorSpec(
+        mode=mode,
+        predictions=predictions,
+        loss=loss,
+        train_op=train_op,
+    )
+
+
+class MeshNet(tf.estimator.Estimator):
+    """"""
+    def __init__(self, num_classes, model_dir=None, dropout_rate=0.25,
+                 optimizer='Adam', learning_rate=0.001, warm_start_from=None,
+                 config=None):
+
+        def _model_fn(features, labels, mode, config):
+            """"""
+            return _meshnet_model_fn(
+                num_classes=num_classes, dropout_rate=dropout_rate,
+                optimizer=optimizer, learning_rate=learning_rate,
+                config=config,
+            )
+
+        super(MeshNet, self).__init__(
+            model_fn=_model_fn, model_dir=model_dir, config=config,
+            warm_start_from=warm_start_from,
+        )
