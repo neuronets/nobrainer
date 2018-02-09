@@ -1,11 +1,11 @@
 """Scoring functions implemented in TensorFlow and NumPy. Functions that end in
-`_numpy` are implemented in NumPy for convenience.
+`_numpy` are implemented in NumPy for convenience and eager computation..
 """
 
 import numpy as np
 import tensorflow as tf
 
-from nobrainer.utils import _check_shapes_equal
+from nobrainer.util import _check_shapes_equal
 
 
 def dice_coefficient(labels, predictions):
