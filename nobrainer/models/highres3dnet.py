@@ -14,7 +14,7 @@ from tensorflow.python.estimator.canned import optimizers
 
 from nobrainer.models import util
 
-FUSED_BATCHED_NORM = True
+FUSED_BATCH_NORM = True
 
 # TODO: use `tensorflow.python.framework.test_util.is_gpu_available` to
 # determine data format. `channels_first` is typically faster on GPU, and
@@ -76,7 +76,7 @@ def _resblock(inputs, layer_num, mode, filters, kernel_size=3, dilation_rate=1,
 
     with tf.variable_scope('batchnorm_{}_0'.format(layer_num)):
         bn1 = tf.layers.batch_normalization(
-            inputs, training=training, fused=FUSED_BATCHED_NORM,
+            inputs, training=training, fused=FUSED_BATCH_NORM,
         )
     with tf.variable_scope('relu_{}_0'.format(layer_num)):
         relu1 = tf.nn.relu(bn1)
@@ -90,7 +90,7 @@ def _resblock(inputs, layer_num, mode, filters, kernel_size=3, dilation_rate=1,
 
     with tf.variable_scope('batchnorm_{}_1'.format(layer_num)):
         bn2 = tf.layers.batch_normalization(
-            conv1, training=training, fused=FUSED_BATCHED_NORM,
+            conv1, training=training, fused=FUSED_BATCH_NORM,
         )
     with tf.variable_scope('relu_{}_1'.format(layer_num)):
         relu2 = tf.nn.relu(bn2)
@@ -134,7 +134,7 @@ def _highres3dnet_logit_fn(features, num_classes, mode,
         )
     with tf.variable_scope('batchnorm_0'):
         conv = tf.layers.batch_normalization(
-            conv, training=training, fused=FUSED_BATCHED_NORM,
+            conv, training=training, fused=FUSED_BATCH_NORM,
         )
     with tf.variable_scope('relu_0'):
         outputs = tf.nn.relu(conv)

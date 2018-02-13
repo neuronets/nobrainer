@@ -12,7 +12,7 @@ from tensorflow.python.estimator.canned import optimizers
 
 from nobrainer.models import util
 
-FUSED_BATCHED_NORM = True
+FUSED_BATCH_NORM = True
 
 
 def _layer(inputs, layer_num, mode, filters, dropout_rate, kernel_size=3,
@@ -59,7 +59,7 @@ def _layer(inputs, layer_num, mode, filters, dropout_rate, kernel_size=3,
         )
         relu = tf.nn.relu(conv)
         bn = tf.layers.batch_normalization(
-            relu, training=training, fused=FUSED_BATCHED_NORM,
+            relu, training=training, fused=FUSED_BATCH_NORM,
         )
         dropout = tf.layers.dropout(bn, rate=dropout_rate, training=training)
 
