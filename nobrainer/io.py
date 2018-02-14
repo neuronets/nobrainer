@@ -1,10 +1,28 @@
 """"""
 
 import csv
+import json
 
 import nibabel as nib
 import numpy as np
 import tensorflow as tf
+
+
+def load_json(filepath, **kwargs):
+    """Load JSON file `filepath` as dictionary. `kwargs` are keyword arguments
+    for `json.load()`.
+    """
+    with open(filepath, 'r') as fp:
+        return json.load(fp, **kwargs)
+
+
+def save_json(obj, filepath, indent=4, **kwargs):
+    """Save `obj` to JSON file `filepath`. `kwargs` are keyword arguments for
+    `json.dump()`.
+    """
+    with open(filepath, 'w') as fp:
+        json.dump(obj, fp, indent=indent, **kwargs)
+        fp.write('\n')
 
 
 def read_feature_label_filepaths(filepath, header=True, delimiter=','):
@@ -84,3 +102,21 @@ def iter_features_labels_fn_builder(list_of_filepaths, x_dtype, y_dtype,
                 )
 
     return iter_features_labels
+
+
+def input_fn_builder(generator, output_types, output_shapes, repeat=None):
+    """Return `input_fn` handle. `input_fn` returns an instance of
+    `tf.estimator.Dataset`, which iterates over `generator`.
+    """
+
+    def input_fn():
+        """Input function meant to be used with `tf.estimator.Estimator`."""
+        dset = tf.data.Dataset.from_generator(
+            generator=generator,
+            output_types=output_types,
+            output_shapes=output_shapes,
+        ).repeat(repeat)
+
+        return dset
+
+    return input_fn
