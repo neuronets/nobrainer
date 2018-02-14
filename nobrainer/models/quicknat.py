@@ -221,6 +221,12 @@ def _quicknat_model_fn(features, labels, mode, num_classes, optimizer='Adam',
     )
     predictions = tf.argmax(logits, axis=-1)
 
+    if mode == tf.estimator.ModeKeys.PREDICT:
+        return tf.estimator.EstimatorSpec(
+            mode=mode,
+            predictions=predictions
+        )
+
     optimizer_ = optimizers.get_optimizer_instance(
         optimizer, learning_rate=learning_rate,
     )
