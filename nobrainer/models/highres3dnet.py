@@ -1,6 +1,7 @@
 """HighRes3DNet implemented in TensorFlow.
 
-Reference:
+Reference
+---------
 Li W., Wang G., Fidon L., Ourselin S., Cardoso M.J., Vercauteren T. (2017)
 On the Compactness, Efficiency, and Representation of 3D Convolutional
 Networks: Brain Parcellation as a Pretext Task. In: Niethammer M. et al. (eds)
