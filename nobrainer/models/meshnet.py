@@ -10,45 +10,34 @@ labeling. IJCNN 2017. (pp. 3785-3792). IEEE.
 import tensorflow as tf
 from tensorflow.python.estimator.canned import optimizers
 
+from nobrainer.metrics import dice_coefficient_by_class_numpy
 from nobrainer.models import util
 
 FUSED_BATCH_NORM = True
 
 
 def _layer(inputs, layer_num, mode, filters, dropout_rate, kernel_size=3,
-           dilation_rate=1, save_activations=False):
+           dilation_rate=1):
     """Return layer building block of MeshNet.
 
     See the notes below for an overview of the operations performed in this
     function.
 
-    Parameters
-    ----------
-    inputs : numeric Tensor
-        Input Tensor.
-    layer_num : int
-        Value to append to each operator name. This should be the layer number
-        in the network.
-    mode : string
-        A TensorFlow mode key.
-    filters : int or tuple
-        Number of 3D convolution filters.
-    dropout_rate : float
-        The dropout rate between 0 and 1.
-    kernel_size : int or tuple
-        Size of 3D convolution kernel.
-    dilation_rate : int or tuple
-        Rate of dilution in 3D convolution.
-    save_activations : boolean
-        If true, save activations to histogram.
+    Args:
+        inputs : float `Tensor`, input tensor.
+        layer_num : int, value to append to each operator name. This should be
+        the layer number in the network.
+        mode : string, a TensorFlow mode key.
+        filters : int, number of 3D convolution filters.
+        dropout_rate : float, the dropout rate between 0 and 1.
+        kernel_size : int or tuple, size of 3D convolution kernel.
+        dilation_rate : int or tuple, rate of dilution in 3D convolution.
 
-    Returns
-    -------
-    Numeric Tensor of same type as `inputs`.
+    Returns:
+        `Tensor` of sample type as `inputs`.
 
-    Notes
-    -----
-    `inputs - conv3d - relu - batchnorm - dropout - outputs`
+    Notes:
+        `inputs - conv3d - relu - batchnorm - dropout - outputs`
     """
     training = mode == tf.estimator.ModeKeys.TRAIN
 
@@ -63,33 +52,23 @@ def _layer(inputs, layer_num, mode, filters, dropout_rate, kernel_size=3,
         )
         dropout = tf.layers.dropout(bn, rate=dropout_rate, training=training)
 
-        if save_activations:
-            util._add_activation_summary(dropout)
+        util._add_activation_summary(dropout)
 
         return dropout
 
 
-def _meshnet_logit_fn(features, num_classes, mode, dropout_rate=0.25,
-                      save_activations=False):
+def _meshnet_logit_fn(features, num_classes, mode, dropout_rate=0.25):
     """MeshNet logit function.
 
-    Parameters
-    ----------
-    features : numeric Tensor
-        Input Tensor.
-    num_classes : int
-        Number of classes to segment. This is the number of filters in the
-        final convolution layer.
-    mode : string
-        A TensorFlow mode key.
-    dropout_rate : float
-        The dropout rate between 0 and 1.
-    save_activations : boolean
-        If true, save activations to histogram.
+    Args:
+        features : float `Tensor`, input tensor.
+        num_classes : int, number of classes to segment. This is the number of
+            filters in the final convolutional layer.
+        mode : string, a TensorFlow mode key.
+        dropout_rate : float, the dropout rate between 0 and 1.
 
-    Returns
-    -------
-    Tensor of logits.
+    Returns:
+        `Tensor` of logits.
     """
     # Dilation rate by layer.
     dilation_rates = (
@@ -117,8 +96,7 @@ def _meshnet_logit_fn(features, num_classes, mode, dropout_rate=0.25,
         logits = tf.layers.conv3d(
             outputs, filters=num_classes, kernel_size=1, padding='SAME',
         )
-        if save_activations:
-            util._add_activation_summary(logits)
+        util._add_activation_summary(logits)
 
     return logits
 
@@ -147,6 +125,17 @@ def _meshnet_model_fn(features, labels, mode, num_classes, dropout_rate=0.25,
         train_op = optimizer_.minimize(
             loss, global_step=tf.train.get_global_step(),
         )
+
+    # Add Dice coefficients to summary for visualization in TensorBoard.
+    predictions_onehot = tf.one_hot(predictions, depth=num_classes)
+    labels_onehot = tf.one_hot(labels, depth=num_classes)
+
+    dice_coefs = tf.py_func(
+        dice_coefficient_by_class_numpy, [labels_onehot, predictions_onehot],
+        tf.float32,
+    )
+    for ii in range(num_classes):
+        tf.summary.scalar('dice_label{}'.format(ii), dice_coefs[ii])
 
     return tf.estimator.EstimatorSpec(
         mode=mode,
