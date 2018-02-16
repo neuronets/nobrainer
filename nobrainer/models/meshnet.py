@@ -57,7 +57,7 @@ def _layer(inputs, layer_num, mode, filters, dropout_rate, kernel_size=3,
         return dropout
 
 
-def _meshnet_logit_fn(features, num_classes, mode, dropout_rate=0.25):
+def _meshnet_logit_fn(features, num_classes, mode, filters, dropout_rate):
     """MeshNet logit function.
 
     Args:
@@ -65,6 +65,8 @@ def _meshnet_logit_fn(features, num_classes, mode, dropout_rate=0.25):
         num_classes : int, number of classes to segment. This is the number of
             filters in the final convolutional layer.
         mode : string, a TensorFlow mode key.
+        filters : int, number of filters in all 3D convolution layers except
+            the last layer.
         dropout_rate : float, the dropout rate between 0 and 1.
 
     Returns:
@@ -81,8 +83,6 @@ def _meshnet_logit_fn(features, num_classes, mode, dropout_rate=0.25):
         (1, 1, 1),
     )
 
-    # All convolution layers use this number of filters.
-    filters = 21
     outputs = features
 
     for ii in range(7):
@@ -101,11 +101,11 @@ def _meshnet_logit_fn(features, num_classes, mode, dropout_rate=0.25):
     return logits
 
 
-def _meshnet_model_fn(features, labels, mode, num_classes, dropout_rate=0.25,
-                      optimizer='Adam', learning_rate=0.001, config=None):
+def _meshnet_model_fn(features, labels, mode, num_classes, filters,
+                      dropout_rate, optimizer, learning_rate, config=None):
     """"""
     logits = _meshnet_logit_fn(
-        features=features, mode=mode, num_classes=num_classes,
+        features=features, mode=mode, num_classes=num_classes, filters=filters,
         dropout_rate=dropout_rate,
     )
     predictions = tf.argmax(logits, axis=-1)
@@ -147,17 +147,17 @@ def _meshnet_model_fn(features, labels, mode, num_classes, dropout_rate=0.25,
 
 class MeshNet(tf.estimator.Estimator):
     """"""
-    def __init__(self, num_classes, model_dir=None, dropout_rate=0.25,
-                 optimizer='Adam', learning_rate=0.001, warm_start_from=None,
-                 config=None):
+    def __init__(self, num_classes, model_dir=None, filters=21,
+                 dropout_rate=0.25, optimizer='Adam', learning_rate=0.001,
+                 warm_start_from=None, config=None):
 
         def _model_fn(features, labels, mode, config):
             """"""
             return _meshnet_model_fn(
                 features=features, labels=labels, mode=mode,
-                num_classes=num_classes, dropout_rate=dropout_rate,
-                optimizer=optimizer, learning_rate=learning_rate,
-                config=config,
+                num_classes=num_classes, filters=filters,
+                dropout_rate=dropout_rate, optimizer=optimizer,
+                learning_rate=learning_rate, config=config,
             )
 
         super(MeshNet, self).__init__(
