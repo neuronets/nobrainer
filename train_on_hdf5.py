@@ -52,6 +52,15 @@ def _check_required_keys_exist(params):
             raise ValueError("Required key not in parameters: {}".format(key))
 
 
+def read_mapping(filepath):
+    """Read CSV to dictionary, where first column becomes keys and second columns
+    becomes values. Keys and values must be integers.
+    """
+    mapping = nobrainer.io.read_csv(filepath, header=True)
+    mapping = [(int(orig), int(new)) for orig, new, _ in mapping]
+    return dict(mapping)
+
+
 def iter_hdf5(filepath, x_dataset, y_dataset, x_dtype, y_dtype,
               batch_size, shuffle=False, binarize_y=False,
               aparcaseg_mapping=None):
@@ -102,7 +111,7 @@ def train(params):
     _group = "/{}-iso".format(params['block_shape'][0])
 
     if params['brainmask']:
-        mapping = (
+        mapping = read_mapping(
             '/om2/user/jakubk/openmind-surface-data/data/'
             'FreeSurferColorLUT-mapping-108.csv'
         )
