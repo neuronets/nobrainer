@@ -77,10 +77,15 @@ def dice_coefficient_numpy(x1, x2, reducer=np.mean):
     _check_all_x_in_subset_numpy(x1, subset)
     _check_all_x_in_subset_numpy(x2, subset)
 
-    # QUESTION: what should the behavior be if the denominator is 0?
-    dice_by_elem = 2 * (x1 * x2).sum(-1) / (x1.sum(-1) + x2.sum(-1))
+    denominator = x1.sum(-1) + x2.sum(-1)
+    if denominator == 0:
+        tf.logging.warn(
+            "Encountered zero denominator in Dice coefficient calculation."
+            " Both arrays only contain zeros. Will return NaN."
+        )
+        return np.nan
 
-    np.nan_to_num(dice_by_elem, copy=False)
+    dice_by_elem = 2 * (x1 * x2).sum(-1) / denominator
 
     return reducer(dice_by_elem) if reducer is not None else dice_by_elem
 
