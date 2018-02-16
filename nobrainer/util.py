@@ -28,3 +28,19 @@ def _check_all_x_in_subset_numpy(x, subset=(0, 1)):
     if not all_x_in_subset:
         _subset = ", ".join(map(str, subset))
         raise ValueError("Not all values are in set {}.".format(_subset))
+
+
+def create_indices(num_samples, batch_size, shuffle=False):
+    """Return list of tuples, where each tuple is """
+    import random
+
+    indices = zip(
+        range(0, num_samples, batch_size),
+        range(batch_size, num_samples + batch_size, batch_size),
+    )
+    indices = list(indices)
+
+    if shuffle:
+        random.shuffle(indices)
+
+    return indices
