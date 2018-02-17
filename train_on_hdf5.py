@@ -11,7 +11,7 @@ import tensorflow as tf
 
 import nobrainer
 
-BASE_MODEL_SAVE_PATH = '/om/user/jakubk/nobrainer/models'
+BASE_MODEL_SAVE_PATH = '/om/user/jakubk/nobrainer/models-hdf5'
 
 
 def _get_timestamp(fmt='%Y%m%d-%H%M%S'):
@@ -28,7 +28,7 @@ def write_params_to_file(filepath, params):
     key = params['model_dir']
     to_save = {key: params}
     if os.path.isfile(filepath):
-        previous_params = nobrainer.io.load_json(filepath)
+        previous_params = nobrainer.io.read_json(filepath)
         to_save.update(previous_params)
     nobrainer.io.save_json(to_save, filepath)
 
@@ -104,11 +104,18 @@ def iter_hdf5(filepath, x_dataset, y_dataset, x_dtype, y_dtype,
 def train(params):
     """Train estimator."""
 
-    print("++ Using parameters:")
+    tf.logging.info("++ Using parameters:")
     for k, v in params.items():
-        print('++', k, v)
+        tf.logging.info('++ {} : {}'.format(k, v))
 
     _group = "/{}-iso".format(params['block_shape'][0])
+    x_dataset = _group + '/t1'
+    y_dataset = _group + '/aparcaseg'
+
+    tf.logging.info(
+        'Using features dataset {x} and labels dataset {y}'
+        .format(x=x_dataset, y=y_dataset)
+    )
 
     if params['brainmask']:
         mapping = read_mapping(
@@ -120,8 +127,8 @@ def train(params):
 
     generator = iter_hdf5(
         filepath=params['filepath'],
-        x_dataset=_group + '/t1',
-        y_dataset=_group + '/aparcaseg',
+        x_dataset=x_dataset,
+        y_dataset=y_dataset,
         x_dtype=_DT_X_NP,
         y_dtype=_DT_Y_NP,
         batch_size=params['batch_size'],
@@ -136,7 +143,7 @@ def train(params):
     )
 
     input_fn = nobrainer.io.input_fn_builder(
-        generator=generator,
+        generator=lambda: generator,
         output_types=(_DT_X_TF, _DT_Y_TF),
         output_shapes=_output_shapes,
     )
