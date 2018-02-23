@@ -26,6 +26,12 @@ def binarize(a, threshold=0, copy=False):
     return a
 
 
+def normalize_zero_one(a):
+    """Return array with values of `a` normalized to range [0, 1]."""
+    min_ = a.min()
+    return (a - min_) / (a.max() - min_)
+
+
 def preprocess_aparcaseg(a, mapping):
     """Return preprocessed aparc+aseg array. Replaces values in `a` based on
     diciontary `mapping`, and zeros values that are not values in `mapping`.

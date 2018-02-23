@@ -86,6 +86,8 @@ def iter_hdf5(filepath, x_dataset, y_dataset, x_dtype, y_dtype,
             features = fp[x_dataset][start:end]
             labels = fp[y_dataset][start:end]
 
+        features = nobrainer.preprocessing.normalize_zero_one(features)
+
         features = np.expand_dims(features, -1)
         features = features.astype(x_dtype)
         labels = labels.astype(y_dtype)
