@@ -12,9 +12,10 @@ Science, vol 10265.
 import tensorflow as tf
 from tensorflow.python.estimator.canned import optimizers
 
+from nobrainer.metrics import dice_coefficient_by_class_numpy
 from nobrainer.models import util
 
-FUSED_BATCHED_NORM = True
+FUSED_BATCH_NORM = True
 
 # TODO: use `tensorflow.python.framework.test_util.is_gpu_available` to
 # determine data format. `channels_first` is typically faster on GPU, and
@@ -22,38 +23,28 @@ FUSED_BATCHED_NORM = True
 # TODO: Once the above todo is implemented, add `channel_format` arguments.
 
 
-def _resblock(inputs, layer_num, mode, filters, kernel_size=3, dilation_rate=1,
-              save_activations=False):
+def _resblock(inputs, layer_num, mode, filters, kernel_size=3,
+              dilation_rate=1):
     """Return building block of residual network. This includes the residual
     connection.
 
     See the notes below for an overview of the operations performed in this
     function.
 
-    Parameters
-    ----------
-    inputs : numeric Tensor
-        Input Tensor.
-    layer_num : int
-        Value to append to each operator name. This should be the layer number
-        in the network.
-    mode : string
-        A TensorFlow mode key.
-    filters : int or tuple
-        Number of 3D convolution filters.
-    kernel_size : int or tuple
-        Size of 3D convolution kernel.
-    dilation_rate : int or tuple
-        Rate of dilution in 3D convolution.
-    save_activations : boolean
-        If true, save activations to histogram.
+    Args:
+        inputs : float `Tensor`, input tensor.
+        layer_num : int, value to append to each operator name. This should be
+            the layer number in the network.
+        mode : string, a TensorFlow mode key.
+        filters : int, number of 3D convolution filters.
+        kernel_size : int or tuple, size of 3D convolution kernel.
+        dilation_rate : int or tuple, rate of dilution in 3D convolution.
 
-    Returns
-    -------
-    Numeric Tensor of same type as `inputs`.
+    Returns:
+        `Tensor` of same type as `inputs`.
 
-    Notes
-    -----
+    Notes:
+        ```
         +-inputs-+
         |        |
         |    batchnorm
@@ -71,12 +62,13 @@ def _resblock(inputs, layer_num, mode, filters, kernel_size=3, dilation_rate=1,
         +-(sum)--+
             |
          outputs
+        ```
     """
     training = mode == tf.estimator.ModeKeys.TRAIN
 
     with tf.variable_scope('batchnorm_{}_0'.format(layer_num)):
         bn1 = tf.layers.batch_normalization(
-            inputs, training=training, fused=FUSED_BATCHED_NORM,
+            inputs, training=training, fused=FUSED_BATCH_NORM,
         )
     with tf.variable_scope('relu_{}_0'.format(layer_num)):
         relu1 = tf.nn.relu(bn1)
@@ -85,12 +77,11 @@ def _resblock(inputs, layer_num, mode, filters, kernel_size=3, dilation_rate=1,
             relu1, filters=filters, kernel_size=kernel_size, padding='SAME',
             dilation_rate=dilation_rate,
         )
-        if save_activations:
-            util._add_activation_summary(conv1)
+        util._add_activation_summary(conv1)
 
     with tf.variable_scope('batchnorm_{}_1'.format(layer_num)):
         bn2 = tf.layers.batch_normalization(
-            conv1, training=training, fused=FUSED_BATCHED_NORM,
+            conv1, training=training, fused=FUSED_BATCH_NORM,
         )
     with tf.variable_scope('relu_{}_1'.format(layer_num)):
         relu2 = tf.nn.relu(bn2)
@@ -99,32 +90,23 @@ def _resblock(inputs, layer_num, mode, filters, kernel_size=3, dilation_rate=1,
             relu2, filters=filters, kernel_size=kernel_size, padding='SAME',
             dilation_rate=dilation_rate,
         )
-        if save_activations:
-            util._add_activation_summary(conv2)
+        util._add_activation_summary(conv2)
 
     with tf.variable_scope('add_{}'.format(layer_num)):
         return tf.add(conv2, inputs)
 
 
-def _highres3dnet_logit_fn(features, num_classes, mode,
-                           save_activations=False):
+def _highres3dnet_logit_fn(features, num_classes, mode):
     """HighRes3DNet logit function.
 
-    Parameters
-    ----------
-    features : numeric Tensor
-        Input Tensor.
-    num_classes : int
-        Number of classes to segment. This is the number of filters in the
-        final convolution layer.
-    mode : string
-        A TensorFlow mode key.
-    save_activations : boolean
-        If true, save activations to histogram.
+    Args:
+        features : float `Tensor`, input tensor.
+        num_classes : int, number of classes to segment. This is the number of
+            filters in the final convolutional layer.
+        mode : string, A TensorFlow mode key.
 
-    Returns
-    -------
-    Tensor of logits.
+    Returns:
+        `Tensor` of logits.
     """
     training = mode == tf.estimator.ModeKeys.TRAIN
 
@@ -134,13 +116,12 @@ def _highres3dnet_logit_fn(features, num_classes, mode,
         )
     with tf.variable_scope('batchnorm_0'):
         conv = tf.layers.batch_normalization(
-            conv, training=training, fused=FUSED_BATCHED_NORM,
+            conv, training=training, fused=FUSED_BATCH_NORM,
         )
     with tf.variable_scope('relu_0'):
         outputs = tf.nn.relu(conv)
 
-    if save_activations:
-        util._add_activation_summary(outputs)
+    util._add_activation_summary(outputs)
 
     for ii in range(3):
         offset = 1
@@ -169,8 +150,8 @@ def _highres3dnet_logit_fn(features, num_classes, mode,
         logits = tf.layers.conv3d(
             outputs, filters=num_classes, kernel_size=1, padding='SAME',
         )
-        if save_activations:
-            util._add_activation_summary(logits)
+
+    util._add_activation_summary(logits)
 
     return logits
 
@@ -198,6 +179,17 @@ def _highres3dnet_model_fn(features, labels, mode, num_classes,
         train_op = optimizer_.minimize(
             loss, global_step=tf.train.get_global_step(),
         )
+
+    # Add Dice coefficients to summary for visualization in TensorBoard.
+    predictions_onehot = tf.one_hot(predictions, depth=num_classes)
+    labels_onehot = tf.one_hot(labels, depth=num_classes)
+
+    dice_coefs = tf.py_func(
+        dice_coefficient_by_class_numpy, [labels_onehot, predictions_onehot],
+        tf.float32,
+    )
+    for ii in range(num_classes):
+        tf.summary.scalar('dice_label{}'.format(ii), dice_coefs[ii])
 
     return tf.estimator.EstimatorSpec(
         mode=mode,

@@ -3,6 +3,8 @@
 .ipynb_checkpoints
 scratch.ipynb
 
+/models
+
 __pycache__
 *.pyc
 
