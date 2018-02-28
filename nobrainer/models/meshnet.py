@@ -10,7 +10,6 @@ labeling. IJCNN 2017. (pp. 3785-3792). IEEE.
 import tensorflow as tf
 from tensorflow.python.estimator.canned import optimizers
 
-from nobrainer.metrics import dice_coefficient_by_class_numpy
 from nobrainer.models import util
 
 FUSED_BATCH_NORM = True
@@ -131,17 +130,6 @@ def _meshnet_model_fn(features, labels, mode, num_classes, filters,
         train_op = optimizer_.minimize(
             loss, global_step=tf.train.get_global_step(),
         )
-
-    # Add Dice coefficients to summary for visualization in TensorBoard.
-    predictions_onehot = tf.one_hot(predictions, depth=num_classes)
-    labels_onehot = tf.one_hot(labels, depth=num_classes)
-
-    dice_coefs = tf.py_func(
-        dice_coefficient_by_class_numpy, [labels_onehot, predictions_onehot],
-        tf.float32,
-    )
-    for ii in range(num_classes):
-        tf.summary.scalar('dice_label{}'.format(ii), dice_coefs[ii])
 
     return tf.estimator.EstimatorSpec(
         mode=mode,
