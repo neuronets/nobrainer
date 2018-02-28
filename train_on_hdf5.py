@@ -107,8 +107,8 @@ def train(params):
     """Train estimator."""
 
     tf.logging.info("++ Using parameters:")
-    for k, v in params.items():
-        tf.logging.info('++ {} : {}'.format(k, v))
+    # for k, v in params.items():
+    #     tf.logging.info('++ {} : {}'.format(k, v))
 
     _group = "/{}-iso".format(params['block_shape'][0])
     x_dataset = _group + '/t1'
@@ -119,7 +119,7 @@ def train(params):
         .format(x=x_dataset, y=y_dataset)
     )
 
-    if params['brainmask']:
+    if not params['brainmask']:
         mapping = read_mapping(
             '/om2/user/jakubk/openmind-surface-data/data/'
             'FreeSurferColorLUT-mapping-108.csv'
@@ -156,14 +156,14 @@ def train(params):
 
     model = nobrainer.models.get_estimator(params['model'])(
         num_classes=params['num_classes'],
-        model_dir=params['model_dir'],
+        model_dir=None,  # params['model_dir'],
         config=runconfig,
         learning_rate=params['learning_rate'],
     )
 
-    write_params_to_file(
-        os.path.join(BASE_MODEL_SAVE_PATH, 'directory-mapping.json'), params
-    )
+    # write_params_to_file(
+    #     os.path.join(BASE_MODEL_SAVE_PATH, 'directory-mapping.json'), params
+    # )
 
     model.train(input_fn=input_fn)
 
