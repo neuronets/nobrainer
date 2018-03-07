@@ -30,6 +30,8 @@ def write_params_to_file(filepath, params):
     if os.path.isfile(filepath):
         previous_params = nobrainer.io.read_json(filepath)
         to_save.update(previous_params)
+        if params['model_dir'] in previous_params:
+            return  # do not overwrite existing entries.
     nobrainer.io.save_json(to_save, filepath)
 
 
@@ -86,7 +88,8 @@ def iter_hdf5(filepath, x_dataset, y_dataset, x_dtype, y_dtype,
             features = fp[x_dataset][start:end]
             labels = fp[y_dataset][start:end]
 
-        features = nobrainer.preprocessing.normalize_zero_one(features)
+        # Data are normalized in the hdf5 file.
+        # features = nobrainer.preprocessing.normalize_zero_one(features)
 
         features = np.expand_dims(features, -1)
         features = features.astype(x_dtype)
@@ -100,16 +103,14 @@ def iter_hdf5(filepath, x_dataset, y_dataset, x_dtype, y_dtype,
         if binarize_y:
             labels = nobrainer.preprocessing.binarize(labels, threshold=0)
 
+        print("FEATURES SHAPE:", features.shape)
+        print("LABELS SHAPE:", labels.shape, flush=True)
+
         yield features, labels
 
 
 def train(params):
     """Train estimator."""
-
-    tf.logging.info("++ Using parameters:")
-    # for k, v in params.items():
-    #     tf.logging.info('++ {} : {}'.format(k, v))
-
     _group = "/{}-iso".format(params['block_shape'][0])
     x_dataset = _group + '/t1'
     y_dataset = _group + '/aparcaseg'
@@ -119,15 +120,19 @@ def train(params):
         .format(x=x_dataset, y=y_dataset)
     )
 
-    if not params['brainmask']:
-        mapping = read_mapping(
-            '/om2/user/jakubk/openmind-surface-data/data/'
-            'FreeSurferColorLUT-mapping-108.csv'
+    with h5py.File(params['filepath'], mode='r') as fp:
+        examples_per_epoch = fp[x_dataset].shape[0]
+        assert examples_per_epoch == fp[y_dataset].shape[0]
+
+    if params['aparcaseg_mapping']:
+        tf.logging.info(
+            "Reading mapping file: {}".format(params['aparcaseg_mapping'])
         )
+        mapping = read_mapping(params['aparcaseg_mapping'])
     else:
         mapping = None
 
-    generator = iter_hdf5(
+    generator_builder = lambda: iter_hdf5(
         filepath=params['filepath'],
         x_dataset=x_dataset,
         y_dataset=y_dataset,
@@ -145,25 +150,31 @@ def train(params):
     )
 
     input_fn = nobrainer.io.input_fn_builder(
-        generator=lambda: generator,
+        generator=generator_builder,
         output_types=(_DT_X_TF, _DT_Y_TF),
         output_shapes=_output_shapes,
+        num_epochs=params['num_epochs'],
+        multi_gpu=params['multi_gpu'],
+        examples_per_epoch=examples_per_epoch,
+        batch_size=params['batch_size'],
     )
 
     runconfig = tf.estimator.RunConfig(
-        save_summary_steps=20, keep_checkpoint_max=20,
+        save_summary_steps=20, save_checkpoints_steps=20,
+        keep_checkpoint_max=20,
     )
 
     model = nobrainer.models.get_estimator(params['model'])(
         num_classes=params['num_classes'],
-        model_dir=None,  # params['model_dir'],
+        model_dir=params['model_dir'],
         config=runconfig,
         learning_rate=params['learning_rate'],
+        multi_gpu=params['multi_gpu'],
     )
 
-    # write_params_to_file(
-    #     os.path.join(BASE_MODEL_SAVE_PATH, 'directory-mapping.json'), params
-    # )
+    write_params_to_file(
+        os.path.join(BASE_MODEL_SAVE_PATH, 'directory-mapping.json'), params
+    )
 
     model.train(input_fn=input_fn)
 
@@ -177,8 +188,11 @@ def create_parser():
     p.add_argument('-b', '--batch-size', required=True, type=int)
     p.add_argument('--block-shape', nargs=3, required=True, type=int)
     p.add_argument('--brainmask', action='store_true')
+    p.add_argument('--aparcaseg-mapping')
     p.add_argument('--filepath', required=True, type=str)
-    p.add_argument('--repeat', type=int, default=0)
+    p.add_argument('-e', '--num-epochs', type=int, default=1)
+    p.add_argument('--multi-gpu', action='store_true')
+    p.add_argument('--model-dir')
     return p
 
 
@@ -193,8 +207,15 @@ if __name__ == '__main__':
 
     namespace = parse_args(sys.argv[1:])
     params = vars(namespace)
+
+    if params['brainmask'] and params['aparcaseg_mapping']:
+        raise ValueError(
+            "brainmask and aparcaseg-mapping cannot both be provided."
+        )
+
     params['block_shape'] = tuple(params['block_shape'])
 
-    params['model_dir'] = get_model_dir(BASE_MODEL_SAVE_PATH, params['model'])
+    if params['model_dir'] is None:
+        params['model_dir'] = get_model_dir(BASE_MODEL_SAVE_PATH, params['model'])
 
     train(params)
