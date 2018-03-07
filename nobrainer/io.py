@@ -101,7 +101,9 @@ def iterator_nibabel(list_of_filepaths, x_dtype, y_dtype, block_shape,
             )
 
 
-def input_fn_builder(generator, output_types, output_shapes, repeat=None):
+def input_fn_builder(generator, output_types, output_shapes, num_epochs=1,
+                     multi_gpu=False, examples_per_epoch=None,
+                     batch_size=None):
     """Return `input_fn` handle. `input_fn` returns an instance of
     `tf.estimator.Dataset`, which iterates over `generator`.
     """
@@ -112,7 +114,25 @@ def input_fn_builder(generator, output_types, output_shapes, repeat=None):
             generator=generator,
             output_types=output_types,
             output_shapes=output_shapes,
-        ).repeat(repeat)
+        )
+
+        dset = dset.repeat(num_epochs)
+
+        if multi_gpu:
+            if examples_per_epoch is None or batch_size is None:
+                raise ValueError(
+                    "`examples_per_epoch` and `batch_size` must be provided"
+                    " if using multiple GPUs."
+                )
+            total_examples = num_epochs * examples_per_epoch
+            take_size = batch_size * (total_examples // batch_size)
+
+            print("GOT EXAMPLES PER EPOCH", examples_per_epoch)
+            print("GOT TOTAL EXAMPLES", total_examples)
+            print("GOT BATCH SIZE", batch_size)
+            print("GOT EPOCHS", num_epochs)
+            print("TAKING DATASET SIZE", take_size, flush=True)
+            dset = dset.take(take_size)
 
         return dset
 
