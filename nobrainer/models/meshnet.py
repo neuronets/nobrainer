@@ -10,6 +10,7 @@ labeling. IJCNN 2017. (pp. 3785-3792). IEEE.
 import tensorflow as tf
 from tensorflow.python.estimator.canned import optimizers
 
+from nobrainer.metrics import dice_coefficient_by_class_numpy
 from nobrainer.models import util
 
 FUSED_BATCH_NORM = True
@@ -100,8 +101,24 @@ def _meshnet_logit_fn(features, num_classes, mode, filters, dropout_rate):
     return logits
 
 
+def _optimizer_fn_builder(optimizer, learning_rate, multi_gpu=False):
+
+    def optimizer_fn():
+        opt = optimizers.get_optimizer_instance(
+            optimizer, learning_rate=learning_rate,
+        )
+
+        if multi_gpu:
+            opt = tf.contrib.estimator.TowerOptimizer(opt)
+
+        return opt
+
+    return optimizer_fn
+
+
 def _meshnet_model_fn(features, labels, mode, num_classes, filters,
-                      dropout_rate, optimizer, learning_rate, config=None):
+                      dropout_rate, optimizer, learning_rate, multi_gpu=False,
+                      config=None):
     """"""
     logits = _meshnet_logit_fn(
         features=features, mode=mode, num_classes=num_classes, filters=filters,
@@ -115,15 +132,26 @@ def _meshnet_model_fn(features, labels, mode, num_classes, filters,
             predictions=predictions,
         )
 
-    optimizer_ = optimizers.get_optimizer_instance(
-        optimizer, learning_rate=learning_rate
-    )
+    optimizer_ = _optimizer_fn_builder(
+        optimizer, learning_rate, multi_gpu=multi_gpu
+    )()
 
     cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
         labels=labels, logits=logits,
     )
     # cross_entropy.shape == (batch_size, *block_shape)
     loss = tf.reduce_mean(cross_entropy)
+
+    # Add Dice coefficients to summary for visualization in TensorBoard.
+    predictions_onehot = tf.one_hot(predictions, depth=num_classes)
+    labels_onehot = tf.one_hot(labels, depth=num_classes)
+
+    dice_coefs = tf.py_func(
+        dice_coefficient_by_class_numpy, [labels_onehot, predictions_onehot],
+        tf.float32,
+    )
+    for ii in range(num_classes):
+        tf.summary.scalar('dice_label{}'.format(ii), dice_coefs[ii])
 
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     with tf.control_dependencies(update_ops):
@@ -143,7 +171,7 @@ class MeshNet(tf.estimator.Estimator):
     """"""
     def __init__(self, num_classes, model_dir=None, filters=21,
                  dropout_rate=0.25, optimizer='Adam', learning_rate=0.001,
-                 warm_start_from=None, config=None):
+                 multi_gpu=False, warm_start_from=None, config=None):
 
         def _model_fn(features, labels, mode, config):
             """"""
@@ -151,7 +179,17 @@ class MeshNet(tf.estimator.Estimator):
                 features=features, labels=labels, mode=mode,
                 num_classes=num_classes, filters=filters,
                 dropout_rate=dropout_rate, optimizer=optimizer,
-                learning_rate=learning_rate, config=config,
+                learning_rate=learning_rate, multi_gpu=multi_gpu,
+                config=config,
+            )
+
+        if multi_gpu:
+            optimizer_fn = _optimizer_fn_builder(
+                optimizer=optimizer, learning_rate=learning_rate,
+                multi_gpu=multi_gpu,
+            )
+            _model_fn = tf.contrib.estimator.replicate_model_fn(
+                _model_fn, optimizer_fn,
             )
 
         super(MeshNet, self).__init__(
