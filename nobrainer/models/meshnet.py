@@ -156,6 +156,21 @@ def model_fn(features,
 class MeshNet(tf.estimator.Estimator):
     """MeshNet model.
 
+    Example:
+        ```python
+        shape = (1, 10, 10, 10)  # batch of 1
+        X = np.random.rand(*shape, 1).astype(np.float32)
+        y = np.random.randint(0, 9, size=(shape), dtype=np.int32)
+
+        estimator = nobrainer.models.MeshNet(
+            n_classes=10, optimizer='Adam', n_filters=71, dropout_rate=0.25,
+            learning_rate=0.001,
+        )
+        dset = tf.data.Dataset.from_tensors((X, y))
+        dset_fn = lambda: tf.data.Dataset.from_tensors((X, y))
+        classifier.train(input_fn=dset_fn)
+        ```
+
     Args:
         n_classes: int, number of classes to classify.
         optimizer: instance of TensorFlow optimizer or string of optimizer
