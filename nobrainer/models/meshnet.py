@@ -158,6 +158,9 @@ class MeshNet(tf.estimator.Estimator):
 
     Example:
         ```python
+        import numpy as np
+        import tensorflow as tf
+
         shape = (1, 10, 10, 10)  # batch of 1
         X = np.random.rand(*shape, 1).astype(np.float32)
         y = np.random.randint(0, 9, size=(shape), dtype=np.int32)
