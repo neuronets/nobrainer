@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """Script to convert neuroimaging volumes to volumes."""
 
 import argparse
