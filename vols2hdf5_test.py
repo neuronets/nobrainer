@@ -69,8 +69,8 @@ def test_vols2hdf5_one():
 
 
 def test_vols2hdf5_two():
-    volume_shape = (256, 256, 256)
-    n_volumes = 6
+    volume_shape = (64, 64, 64)
+    n_volumes = 4
 
     features = np.random.rand(n_volumes, *volume_shape) * 100
     features = features.astype(np.int32)
@@ -100,8 +100,8 @@ def test_vols2hdf5_two():
         otherpath = os.path.join(tmpdir, "foundfiles.csv")
         subprocess.check_output(
             "python3 vols2hdf5.py -o {outfile}"
-            " --block-shape 128 128 128"
-            " --block-shape 64 64 64"
+            " --block-shape 32 32 32"
+            " --block-shape 16 16 16"
             " -fdt int32 -ldt float32"
             " --chunksize 3 --ncpu 2"
             " --compression gzip --compression-opts 1"
@@ -113,29 +113,29 @@ def test_vols2hdf5_two():
         )
 
         with h5py.File(hdf5path, mode='r') as fp:
-            features_128 = fp['/128x128x128/features'][:]
-            labels_128 = fp['/128x128x128/labels'][:]
-            features_64 = fp['/64x64x64/features'][:]
-            labels_64 = fp['/64x64x64/labels'][:]
+            features_32 = fp['/32x32x32/features'][:]
+            labels_32 = fp['/32x32x32/labels'][:]
+            features_16 = fp['/16x16x16/features'][:]
+            labels_16 = fp['/16x16x16/labels'][:]
 
-        features_blocked_128 = np.concatenate(
-            tuple(as_blocks(features[i], block_shape=(128, 128, 128))
+        features_blocked_32 = np.concatenate(
+            tuple(as_blocks(features[i], block_shape=(32, 32, 32))
                   for i in range(features.shape[0])))
 
-        labels_blocked_128 = np.concatenate(
-            tuple(as_blocks(labels[i], block_shape=(128, 128, 128))
+        labels_blocked_32 = np.concatenate(
+            tuple(as_blocks(labels[i], block_shape=(32, 32, 32))
                   for i in range(labels.shape[0])))
 
-        features_blocked_64 = np.concatenate(
-            tuple(as_blocks(features[i], block_shape=(64, 64, 64))
+        features_blocked_16 = np.concatenate(
+            tuple(as_blocks(features[i], block_shape=(16, 16, 16))
                   for i in range(features.shape[0])))
 
-        labels_blocked_64 = np.concatenate(
-            tuple(as_blocks(labels[i], block_shape=(64, 64, 64))
+        labels_blocked_16 = np.concatenate(
+            tuple(as_blocks(labels[i], block_shape=(16, 16, 16))
                   for i in range(labels.shape[0])))
 
-        assert_array_equal(features_128, features_blocked_128)
-        assert_array_equal(labels_128, labels_blocked_128)
+        assert_array_equal(features_32, features_blocked_32)
+        assert_array_equal(labels_32, labels_blocked_32)
 
-        assert_array_equal(features_64, features_blocked_64)
-        assert_array_equal(labels_64, labels_blocked_64)
+        assert_array_equal(features_16, features_blocked_16)
+        assert_array_equal(labels_16, labels_blocked_16)
