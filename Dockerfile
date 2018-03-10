@@ -1,7 +1,8 @@
-FROM tensorflow/tensorflow:1.6.0-rc0-gpu-py3
+FROM tensorflow/tensorflow:1.6.0-gpu-py3
 
 RUN pip install --no-cache-dir \
         nibabel \
+        pytest \
     && useradd --no-user-group --create-home --shell /bin/bash neuro
 
 USER neuro
