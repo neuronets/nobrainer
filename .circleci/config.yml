@@ -12,8 +12,7 @@ jobs:
       - run:
           name: Install nobrainer and dependencies
           command: |
-            pip uninstall -y tensorflow-gpu
-            pip install --no-cache-dir -e /home/circleci/nobrainer[cpu]
+            pip install --no-cache-dir -e /home/circleci/nobrainer
             pip install --no-cache-dir pytest-cov
       - run:
           name: Run tests
