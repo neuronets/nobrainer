@@ -5,7 +5,7 @@ jobs:
 
   build:
     docker:
-      - image: kaczmarj/nobrainer:enh_stabilize
+      - image: circleci/python:3.6.4-stretch-browsers
     steps:
       - checkout:
           path: /home/circleci/nobrainer
