@@ -7,7 +7,12 @@ Segmenting MRI Neuroanatomy in 20 seconds. arXiv preprint arXiv:1801.04161.
 """
 
 import tensorflow as tf
-from tensorflow.python.estimator.canned import optimizers
+from tensorflow.contrib.estimator import TowerOptimizer, replicate_model_fn
+from tensorflow.python.estimator.canned.optimizers import (
+    get_optimizer_instance
+)
+
+from nobrainer.models.util import check_required_params
 
 FUSED_BATCH_NORM = True
 
@@ -64,20 +69,23 @@ def unpool_2d(pool,
               stride=[1, 2, 2, 1],
               scope='unpool_2d'):
     """Adds a 2D unpooling op.
+
     https://arxiv.org/abs/1505.04366
     Unpooling layer after max_pool_with_argmax.
-       Args:
-           pool:        max pooled output tensor
-           ind:         argmax indices
-           stride:      stride is the same as for the pool
-       Return:
-           unpool:    unpooling tensor
+
+    Args:
+        pool: max pooled output tensor
+        ind: argmax indices
+        stride: stride is the same as for the pool
+
+    Returns:
+        unpool: unpooling tensor
     """
     with tf.variable_scope(scope):
         input_shape = tf.shape(pool)
         output_shape = [
             input_shape[0], input_shape[1] * stride[1],
-            input_shape[2] * stride[2], input_shape[3],
+            input_shape[2] * stride[2], input_shape[3]
         ]
 
         flat_input_size = tf.reduce_prod(input_shape)
@@ -104,29 +112,43 @@ def unpool_2d(pool,
         set_input_shape = pool.get_shape()
         set_output_shape = [
             set_input_shape[0], set_input_shape[1] * stride[1],
-            set_input_shape[2] * stride[2], set_input_shape[3],
+            set_input_shape[2] * stride[2], set_input_shape[3]
         ]
         ret.set_shape(set_output_shape)
         return ret
 
 
-def _quicknat_logit_fn(features, num_classes, mode):
-    """QuickNAT logit function.
+def model_fn(features,
+             labels,
+             mode,
+             params):
+    """MeshNet model function.
 
-    Parameters
-    ----------
-    features : numeric Tensor
-        Input Tensor.
-    num_classes : int
-        Number of classes to segment. This is the number of filters in the
-        final convolution layer.
-    mode : string
-        A TensorFlow mode key.
+    Args:
+        features: 4D float `Tensor`, input tensor. This is the first item
+            returned from the `input_fn` passed to `train`, `evaluate`, and
+            `predict`. Use `NHWC` format.
+        labels: 3D float `Tensor`, labels tensor. This is the second item
+            returned from the `input_fn` passed to `train`, `evaluate`, and
+            `predict`. Labels should not be one-hot encoded.
+        mode: Optional. Specifies if this training, evaluation or prediction.
+        params: `dict` of parameters. All parameters below are required.
+            - n_classes: number of classes to classify.
+            - optimizer: instance of TensorFlow optimizer.
 
-    Returns
-    -------
-    Tensor of logits.
+    Returns:
+        `tf.estimator.EstimatorSpec`
+
+    Raises:
+        `ValueError` if required parameters are not in `params`.
     """
+    # TODO (kaczmarj): remove this error once implementation is fixed.
+    raise NotImplementedError(
+        "This QuickNAT implementation is not complete."
+    )
+    required_keys = {'n_classes', 'optimizer'}
+    check_required_params(params=params, required_keys=required_keys)
+
     training = mode == tf.estimator.ModeKeys.TRAIN
 
     # ENCODING
@@ -208,63 +230,105 @@ def _quicknat_logit_fn(features, num_classes, mode):
 
     with tf.variable_scope('logits'):
         logits = tf.layers.conv2d(
-            dense8, filters=num_classes, kernel_size=(1, 1)
+            dense8, filters=params['n_classes'], kernel_size=(1, 1)
         )
 
-    return logits
-
-
-def _quicknat_model_fn(features, labels, mode, num_classes, optimizer='Adam',
-                       learning_rate=0.001, config=None):
-    logits = _quicknat_logit_fn(
-        features=features, num_classes=num_classes, mode=mode,
-    )
-    predictions = tf.argmax(logits, axis=-1)
+    predicted_classes = tf.argmax(logits, axis=-1)
 
     if mode == tf.estimator.ModeKeys.PREDICT:
-        return tf.estimator.EstimatorSpec(
-            mode=mode,
-            predictions=predictions
-        )
+        predictions = {
+            'class_ids': predicted_classes,
+            'probabilities': tf.nn.softmax(logits),
+            'logits': logits,
+        }
+        return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
 
-    optimizer_ = optimizers.get_optimizer_instance(
-        optimizer, learning_rate=learning_rate,
-    )
-
-    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+    # QUESTION (kaczmarj): is this the same as
+    # `tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(...))`
+    loss = tf.losses.sparse_softmax_cross_entropy(
         labels=labels, logits=logits,
+        reduction=tf.losses.Reduction.SUM_BY_NONZERO_WEIGHTS,
     )
-    loss = tf.reduce_mean(cross_entropy)
 
-    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-    with tf.control_dependencies(update_ops):
-        train_op = optimizer_.minimize(
-            loss, global_step=tf.train.get_global_step(),
+    # Compute metrics here...
+    # Use `tf.summary.scalar` to add summaries to tensorboard.
+
+    if mode == tf.estimator.ModeKeys.EVAL:
+        return tf.estimator.EstimatorSpec(
+            mode=mode, loss=loss, eval_metric_ops=None,
         )
 
-    return tf.estimator.EstimatorSpec(
-        mode=mode,
-        predictions=predictions,
-        loss=loss,
-        train_op=train_op,
+    assert mode == tf.estimator.ModeKeys.TRAIN
+
+    train_op = params['optimizer'].minimize(
+        loss, global_step=tf.train.get_global_step()
     )
+    return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
 
 
 class QuickNAT(tf.estimator.Estimator):
-    """"""
-    def __init__(self, num_classes, model_dir=None, optimizer='Adam',
-                 learning_rate=0.001, warm_start_from=None, config=None):
+    """QuickNAT model.
 
-        def _model_fn(features, labels, mode, config):
-            """"""
-            return _quicknat_model_fn(
-                features=features, labels=labels, mode=mode,
-                num_classes=num_classes,
-                optimizer=optimizer, learning_rate=learning_rate,
-                config=config,
-            )
+    Example:
+        ```python
+        import numpy as np
+        import tensorflow as tf
+
+        shape = (1, 10, 10, 10)  # batch of 1
+        X = np.random.rand(*shape, 1).astype(np.float32)
+        y = np.random.randint(0, 9, size=(shape), dtype=np.int32)
+
+        estimator = nobrainer.models.QuickNAT(
+            n_classes=10, optimizer='Adam', n_filters=71, dropout_rate=0.25,
+            learning_rate=0.001,
+        )
+        dset_fn = lambda: tf.data.Dataset.from_tensors((X, y))
+        estimator.train(input_fn=dset_fn)
+        ```
+
+    Args:
+        n_classes: int, number of classes to classify.
+        optimizer: instance of TensorFlow optimizer or string of optimizer
+            name.
+        learning_rate: float, only required if `optimizer` is a string.
+        model_dir: Directory to save model parameters, graph, etc. This can
+            also be used to load checkpoints from the directory in an estimator
+            to continue training a previously saved model. If PathLike object,
+            the path will be resolved. If None, the model_dir in config will be
+            used if set. If both are set, they must be same. If both are None,
+            a temporary directory will be used.
+        config: Configuration object.
+        warm_start_from: Optional string filepath to a checkpoint to warm-start
+            from, or a `tf.estimator.WarmStartSettings` object to fully
+            configure warm-starting. If the string filepath is provided instead
+            of a `WarmStartSettings`, then all variables are warm-started, and
+            it is assumed that vocabularies and Tensor names are unchanged.
+        multi_gpu: boolean, if true, optimizer is wrapped in
+            `tf.contrib.estimator.TowerOptimizer` and model function is wrapped
+            in `tf.contrib.estimator.replicate_model_fn()`.
+    """
+    def __init__(self,
+                 n_classes,
+                 optimizer,
+                 learning_rate=None,
+                 model_dir=None,
+                 config=None,
+                 warm_start_from=None,
+                 multi_gpu=False):
+        params = {
+            'n_classes': n_classes,
+            # If an instance of an optimizer is passed in, this will just
+            # return it.
+            'optimizer': get_optimizer_instance(optimizer, learning_rate),
+        }
+
+        _model_fn = model_fn
+
+        if multi_gpu:
+            params['optimizer'] = TowerOptimizer(params['optimizer'])
+            _model_fn = replicate_model_fn(_model_fn)
 
         super(QuickNAT, self).__init__(
-            model_fn=_model_fn, model_dir=model_dir, config=config,
-            warm_start_from=warm_start_from,
+            model_fn=_model_fn, model_dir=model_dir, params=params,
+            config=config, warm_start_from=warm_start_from,
         )

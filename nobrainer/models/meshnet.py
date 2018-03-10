@@ -86,9 +86,9 @@ def model_fn(features,
     Raises:
         `ValueError` if required parameters are not in `params`.
     """
-    required_params = {'n_classes', 'optimizer'}
+    required_keys = {'n_classes', 'optimizer'}
     default_params = {'n_filters': 21, 'dropout_rate': 0.25}
-    check_required_params(params=params, required_keys=required_params)
+    check_required_params(params=params, required_keys=required_keys)
     set_default_params(params=params, defaults=default_params)
 
     tf.logging.debug("Parameters for model:")
@@ -169,9 +169,8 @@ class MeshNet(tf.estimator.Estimator):
             n_classes=10, optimizer='Adam', n_filters=71, dropout_rate=0.25,
             learning_rate=0.001,
         )
-        dset = tf.data.Dataset.from_tensors((X, y))
         dset_fn = lambda: tf.data.Dataset.from_tensors((X, y))
-        classifier.train(input_fn=dset_fn)
+        estimator.train(input_fn=dset_fn)
         ```
 
     Args:
