@@ -97,6 +97,7 @@ def test_vols2hdf5_two():
 
         # Create HDF5 based on filepaths in CSV.
         hdf5path = os.path.join(tmpdir, "data.h5")
+        otherpath = os.path.join(tmpdir, "foundfiles.csv")
         subprocess.check_output(
             "python3 vols2hdf5.py -o {outfile}"
             " --block-shape 128 128 128"
@@ -104,7 +105,11 @@ def test_vols2hdf5_two():
             " -fdt int32 -ldt float32"
             " --chunksize 3 --ncpu 2"
             " --compression gzip --compression-opts 1"
-            " {infile}".format(outfile=hdf5path, infile=filepaths_path).split()
+            " --save-filepaths {otherpath}"
+            " {infile}"
+            .format(
+                outfile=hdf5path, infile=filepaths_path, otherpath=otherpath)
+            .split()
         )
 
         with h5py.File(hdf5path, mode='r') as fp:
