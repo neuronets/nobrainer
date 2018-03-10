@@ -6,6 +6,8 @@ import glob
 import logging
 from multiprocessing import Pool
 import os
+import sys
+import time
 import types
 import warnings
 
@@ -248,7 +250,9 @@ def create_parser():
         '--compression', default='gzip', choices={'gzip', 'lfz', 'szip'},
         help="Compression to use.")
     p.add_argument(
-        '--compression-opts', default=1, help="Compression options.")
+        '--compression-opts', default=1, type=int, help="Compression options.")
+    p.add_argument('--save-filepaths', help="path to save CSV of filepaths.")
+    p.add_argument('-v', '--verbose', action='count', default=0)
     return p
 
 
@@ -259,10 +263,15 @@ def parse_args(args):
 
 
 if __name__ == '__main__':
-    import sys
 
+    time_zero = time.time()
     namespace = parse_args(sys.argv[1:])
     params = vars(namespace)
+
+    if params['verbose'] >= 1:
+        logger.setLevel(logging.DEBUG)
+    elif params['verbose'] == 0:
+        logger.setLevel(logging.INFO)
 
     if os.path.isdir(params['input']):
         logger.info("Assuming SUBJECTS_DIR was passed in. Findings file pairs")
@@ -279,14 +288,24 @@ if __name__ == '__main__':
     logger.info("Found {} pairs of volumes".format(len(list_of_files)))
     logger.info("User requested chunk size of {}".format(params['chunksize']))
     logger.info(
-        "Will iterate over {} block shapes".format(len(params['block_shape'])))
+        "Will iterate over {} set(s) of block shape(s)"
+        .format(len(params['block_shape'])))
+
+    if params['save_filepaths'] is not None:
+        _df = pd.DataFrame(list_of_files)
+        _df.columns = ["features", "labels"]
+        logger.info(
+            "Saving CSV of filepaths found by this script to {}"
+            .format(params['save_filepaths']))
+        _df.to_csv(params['save_filepaths'], index=False)
+        del _df
 
     sinker = HdfSinker(path=params['outfile'], overwrite=params['overwrite'])
     logger.info("Will save data to {}".format(params['outfile']))
 
     # Iterate over the requested block shapes.
     for block_shape in params['block_shape']:  # list of block shapes
-        logger.info("")
+        block_shape = tuple(block_shape)
         group_n = "/" + "x".join(map(str, block_shape))
         logger.info(
             "Iteratively appending to features and labels datasets in group"
@@ -309,3 +328,7 @@ if __name__ == '__main__':
             chunksize=params['chunksize'],
             n_cpu=params['ncpu'],
         )
+
+    time_elapsed = time.time() - time_zero
+    logger.info("Elapsed time: {} seconds".format(int(time_elapsed)))
+    logger.info("Finished.")
