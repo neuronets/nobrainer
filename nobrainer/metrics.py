@@ -1,4 +1,4 @@
-"""Scoring functions implemented in TensorFlow and NumPy. Functions that end in
+"""Metrics implemented in TensorFlow and NumPy. Functions that end in
 `_numpy` are implemented in NumPy for eager computation.
 """
 
@@ -8,170 +8,108 @@ import tensorflow as tf
 from nobrainer.util import _check_all_x_in_subset_numpy, _check_shapes_equal
 
 
-def dice_coefficient(x1, x2, reducer=tf.reduce_mean, name=None):
-    """Return the Dice coefficients between two Tensors. Assumes that the first
-    axis is the batch.
+def dice(u, v, axis=None, name=None):
+    """Return the Dice coefficients between two Tensors. Perfect Dice is 1.0.
 
                      2 * | intersection(A, B) |
         Dice(A, B) = --------------------------
                             |A| + |B|
 
     Args:
-        x1, x2 : `Tensor`, input tensors with values 0 or 1. The first axis is
-            assumed to be the batch.
-        reducer : `callable`, if this is None, Dice coefficient is calculated
-            for each item in the batch. If this is a callable, the array of
-            Dice coefficients is reduced using this callable.
+        u, v: `Tensor`, input boolean tensors.
+        axis: `int` or `tuple`, the dimension(s) along which to compute Dice.
+        name: `str`, a name for the operation.
 
     Returns:
-        `Tensor` of Dice coefficients of shape `(batch_size,)` if `reducer` is
-        None, otherwise `Tensor` of reduced Dice coefficient.
+        `Tensor` of Dice coefficient(s).
+
+    Notes:
+        This functions is similar to `scipy.spatial.distance.dice` but returns
+        `1 - scipy.spatial.distance.dice(u, v)`.
     """
-    with tf.name_scope(name, 'dice_coefficient', [x1, x2]):
-        x1 = tf.convert_to_tensor(x1)
-        x2 = tf.convert_to_tensor(x2)
-        x1 = tf.contrib.layers.flatten(x1)  # preserves batch dimension
-        x2 = tf.contrib.layers.flatten(x2)
-        _check_shapes_equal(x1, x2)
+    with tf.name_scope(name, 'dice_coefficient', [u, v]):
+        u = tf.convert_to_tensor(u)
+        v = tf.convert_to_tensor(v)
+        _check_shapes_equal(u, v)
 
-        dice_by_elem = (
-            2 * tf.reduce_sum(x1 * x2, -1)
-            / (tf.reduce_sum(x1, -1) + tf.reduce_sum(x2, -1))
-        )
-
-        # TODO:
-        #   - Account for nan output (zero denominator)
-        #   - Check that all values are either 0 or 1.
-
-        return reducer(dice_by_elem) if reducer is not None else dice_by_elem
+        intersection = tf.reduce_sum(tf.multiply(u, v), axis=axis)
+        const = tf.constant(2, dtype=intersection.dtype)
+        numerator = tf.multiply(const, intersection)
+        denominator = tf.add(
+            tf.reduce_sum(u, axis=axis), tf.reduce_sum(v, axis=axis))
+        return tf.truediv(numerator, denominator)
 
 
-def dice_coefficient_numpy(x1, x2, reducer=np.mean):
-    """Return the Dice coefficients between two Numpy arrays. Assumes that the
-    first axis is the batch.
+def dice_numpy(u, v, axis=None):
+    """Return the Dice coefficients between two ndarrays. Perfect Dice is 1.0.
 
                      2 * | intersection(A, B) |
         Dice(A, B) = --------------------------
                             |A| + |B|
 
     Args:
-        x1, x2 : `ndarray`, arrays of data with values 0 or 1. The first axis
-            is assumed to be the batch.
-        reducer : `callable`, if this is None, Dice coefficient is calculated
-            for each item in the batch. If this is a callable, the array of
-            Dice coefficients is reduced using this callable.
+        u, v: `ndarray`, input boolean ndarrays.
+        axis: `int` or `tuple`, the dimension(s) along which to compute Dice.
 
     Returns:
-        `ndarray` of Dice coefficients of shape `(batch_size,)` if `reducer` is
-        None, otherwise reduced Dice coefficient.
-    """
-    x1 = np.asarray(x1)
-    x2 = np.asarray(x2)
+        `float` Dice coefficient or `ndarray` of Dice coefficients.
 
-    batch_size = x1.shape[0]
-    x1 = x1.reshape(batch_size, -1)
-    x2 = x2.reshape(batch_size, -1)
-    _check_shapes_equal(x1, x2)
+    Notes:
+        This functions is similar to `scipy.spatial.distance.dice` but returns
+        `1 - scipy.spatial.distance.dice(u, v)`.
+    """
+    u = np.asarray(u)
+    v = np.asarray(v)
+    _check_shapes_equal(u, v)
 
     subset = (0, 1)  # Values must be 0 or 1.
-    _check_all_x_in_subset_numpy(x1, subset)
-    _check_all_x_in_subset_numpy(x2, subset)
+    if u.dtype != bool:
+        _check_all_x_in_subset_numpy(u, subset)
+    if v.dtype != bool:
+        _check_all_x_in_subset_numpy(v, subset)
 
-    denominator = x1.sum(-1) + x2.sum(-1)
-    if not denominator.any():
-        tf.logging.warn(
-            "Encountered zero denominator in Dice coefficient calculation."
-            " Both arrays only contain zeros. Will return NaN."
-        )
-        return np.nan
-
-    dice_by_elem = 2 * (x1 * x2).sum(-1) / denominator
-
-    return reducer(dice_by_elem) if reducer is not None else dice_by_elem
+    numerator = 2 * (u * v).sum(axis=axis)
+    denominator = u.sum(axis=axis) + v.sum(axis=axis)
+    return numerator / denominator
 
 
-def dice_coefficient_by_class_numpy(x1, x2, reducer=np.mean):
-    """Return Dice coefficient per class. Assumes that the first axis is the
-    batch and that class labels are in the last axis.
+def hamming(u, v, axis=None, name=None):
+    """Return the Hamming distance between two Tensors.
 
     Args:
-        x1, x2 : `ndarray`, arrays of data with values 0 or 1. The first axis
-            is assumed to be the batch, and the last axis is assumed to contain
-            one-hot encoded classes. This means that the size of the last axis
-            must equal the number of classes.
-        reducer : `callable`, if None, Dice coefficient is calculated for each
-            item in the batch, per class. If this is a callable, the array of
-            Dice coefficients within each class is reduced using this callable.
-
-    Returns: `ndarray` of Dice coefficients, one per class. If `reducer` is
-        None, the shape of the output is `(n_classes, batch_size)`. Otherwise,
-        the shape of the output is `(n_classes,)`.
-    """
-    x1 = np.asarray(x1)
-    x2 = np.asarray(x2)
-    _check_shapes_equal(x1, x2)
-    num_classes = x1.shape[-1]
-
-    _shape = (num_classes, x1.shape[0]) if reducer is None else num_classes
-    coefficients = np.zeros(_shape, np.float32)
-
-    for ii in range(num_classes):
-        coefficients[ii] = dice_coefficient_numpy(
-            x1=x1[Ellipsis, ii],
-            x2=x2[Ellipsis, ii],
-            reducer=reducer,
-        )
-
-    return coefficients
-
-
-def hamming_distance(x1, x2, reducer=tf.reduce_mean, name=None):
-    """Return Hamming distance between two tensors.
-
-    Args:
-        x1, x2: `Tensor`, input tensors. The first axis is assumed to be the
-            batch.
-        reducer : `callable`, if this is None, Hamming distance is calculated
-            for each item in the batch. If this is a callable, the tensor of
-            Hamming distances is reduced using this callable.
+        u, v: `Tensor`, input tensors.
+        axis: `int` or `tuple`, the dimension(s) along which to compute Hamming
+            distance.
+        name: `str`, a name for the operation.
 
     Returns:
-        `Tensor` of Hamming distances of shape `(batch_size,)` if `reducer` is
-        None, otherwise `Tensor` of reduced Hamming distance.
+        `Tensor` of Hamming distance(s).
+
+    Notes:
+        This function is almost identical to `scipy.spatial.distance.hamming`
+        but accepts n-D tensors and adds an `axis` parameter.
     """
-    with tf.name_scope(name, 'hamming_distance', [x1, x2]):
-        x1 = tf.convert_to_tensor(x1)
-        x2 = tf.convert_to_tensor(x2)
-        _check_shapes_equal(x1, x2)
-        hamming_by_elem = tf.count_nonzero(tf.not_equal(x1, x2), axis=-1)
-        return (
-            reducer(hamming_by_elem) if reducer is not None
-            else hamming_by_elem
-        )
+    with tf.name_scope(name, 'dice_coefficient', [u, v]):
+        u = tf.convert_to_tensor(u)
+        v = tf.convert_to_tensor(v)
+        _check_shapes_equal(u, v)
+        return tf.reduce_mean(tf.not_equal(u, v), axis=axis)
 
 
-def hamming_distance_numpy(x1, x2, reducer=np.mean):
-    """Return Hamming distance between two tensors.
+def hamming_numpy(u, v, axis=None):
+    """Return Hamming distance between two ndarrays.
 
     Args:
-        x1, x2: `ndarray`, input arrays. The first axis is assumed to be the
-            batch.
-        reducer : `callable`, if this is None, Hamming distance is calculated
-            for each item in the batch. If this is a callable, the array of
-            Hamming distances is reduced using this callable.
+        u, v: `ndarray`, input ndarrays.
+        axis: `int` or `tuple`, the dimension(s) along which to compute Hamming
+            distance.
 
     Returns:
-        `ndarray` of Hamming distances of shape `(batch_size,)` if `reducer` is
-        None, otherwise value of reduced Hamming distance.
+        `float` Hamming distance or `ndarray` of Hamming distances.
+
+    Notes:
+        This function is almost identical to `scipy.spatial.distance.hamming`
+        but accepts ndarrays and adds an `axis` parameter.
     """
-    x1 = np.asarray(x1)
-    x2 = np.asarray(x2)
-
-    batch_size = x1.shape[0]
-    x1 = x1.reshape(batch_size, -1)
-    x2 = x2.reshape(batch_size, -1)
-    _check_shapes_equal(x1, x2)
-
-    hamming_by_elem = np.not_equal(x1, x2).sum(-1)
-
-    return reducer(hamming_by_elem) if reducer is not None else hamming_by_elem
+    u_ne_v = u != v
+    return np.mean(u_ne_v, axis=axis)
