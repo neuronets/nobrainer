@@ -15,7 +15,7 @@ def test__shapes_equal():
     assert not util._shapes_equal(x1, x2.reshape(-1))
 
 
-def test__check_shapes_equal(x1, x2):
+def test__check_shapes_equal():
     shape = (2, 2, 2)
     x1 = np.zeros(shape)
     x2 = np.zeros(shape)
@@ -23,7 +23,7 @@ def test__check_shapes_equal(x1, x2):
     util._check_shapes_equal(x1, x2)
 
     with pytest.raises(ValueError):
-        util._check_shapes_equal(x1, x2.reshape(-1))
+        util._check_shapes_equal(x1, x2.flatten())
 
 
 def test__check_all_x_in_subset_numpy():
