@@ -4,7 +4,7 @@ import numpy as np
 import scipy as sp
 import tensorflow as tf
 
-from nobrainer.metrics import dice, dice_numpy
+from nobrainer.metrics import dice, dice_numpy, hamming, hamming_numpy
 
 
 def test_dice():
@@ -56,11 +56,11 @@ def test_hamming():
         u_ = tf.placeholder(tf.float64)
         v_ = tf.placeholder(tf.float64)
         test_hammings = sess.run(
-            dice(u_, v_, axis=-1), feed_dict={u_: foo, v_: bar})
+            hamming(u_, v_, axis=-1), feed_dict={u_: foo, v_: bar})
 
     # Test TensorFlow implementation.
     np.testing.assert_almost_equal(test_hammings, true_hammings)
 
     # Test NumPy implementation.
-    test_hammings_np = dice_numpy(foo, bar, axis=-1)
+    test_hammings_np = hamming_numpy(foo, bar, axis=-1)
     np.testing.assert_almost_equal(test_hammings_np, true_hammings)
