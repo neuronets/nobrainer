@@ -26,17 +26,31 @@ def binarize(a, threshold=0, copy=False):
     return a
 
 
+def from_blocks(a, output_shape):
+    """Initial implementation of function to go from blocks to full volume."""
+    if output_shape != (256, 256, 256) or a.shape != (8, 128, 128, 128):
+        raise ValueError(
+            "This function only accepts arrays of shape (8, 128, 128, 128) and"
+            " output shape of (256, 256, 256). A more general implementation"
+            " is in progress.")
+    return (
+        a.reshape((2, 2, 2, 128, 128, 128))
+        .transpose((0, 3, 1, 4, 2, 5))
+        .reshape(output_shape))
+
+
 def normalize_zero_one(a):
     """Return array with values of `a` normalized to range [0, 1]."""
+    a = np.asarray(a)
     min_ = a.min()
     return (a - min_) / (a.max() - min_)
 
 
-def preprocess_aparcaseg(a, mapping):
+def preprocess_aparcaseg(a, mapping, copy=False):
     """Return preprocessed aparc+aseg array. Replaces values in `a` based on
     diciontary `mapping`, and zeros values that are not values in `mapping`.
     """
-    a = replace(a, mapping=mapping)
+    a = replace(a, mapping=mapping, copy=copy)
     max_label = max(mapping.values())
     a[a > max_label] = 0
     return a
@@ -45,6 +59,8 @@ def preprocess_aparcaseg(a, mapping):
 def replace(a, mapping, copy=False):
     """Replace values in array `a` with using dictionary `mapping`."""
     a = np.asarray(a)
+    # TODO(kaczmarj): this implementation can lead to unexpected behavior if
+    # keys and values of mapping overlap.
     if copy:
         a = a.copy()
     for k, v in mapping.items():

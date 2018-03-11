@@ -5,22 +5,21 @@ import tensorflow as tf
 import nobrainer
 
 
-def _add_activation_summary(x):
-    """Add data from Tensor `x` to histogram."""
-    name = x.op.name + '/activations'
-    tf.summary.histogram(name, x)
-
-
 def get_estimator(name):
-    """Return `tf.estimators.Estimator` subclass of model `name`."""
-    estimators = {
-        'highres3dnet': nobrainer.models.HighRes3DNet,
-        'meshnet': nobrainer.models.MeshNet,
-        'quicknat': nobrainer.models.QuickNAT,
-    }
+    """Return `tf.estimators.Estimator` subclass of model `name`. If `name`
+    is an Estimator object, return the object.
+    """
+    try:
+        if issubclass(name, tf.estimator.Estimator):
+            return name
+    except TypeError:
+        pass
 
-    if isinstance(name, tf.estimator.Estimator):
-        return name
+    estimators = {
+        'highres3dnet': nobrainer.models.highres3dnet.HighRes3DNet,
+        'meshnet': nobrainer.models.meshnet.MeshNet,
+        'quicknat': nobrainer.models.quicknat.QuickNAT,
+    }
 
     try:
         return estimators[name.lower()]
