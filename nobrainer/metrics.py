@@ -73,14 +73,18 @@ def dice_numpy(u, v, axis=None):
     return numerator / denominator
 
 
-def hamming(u, v, axis=None, name=None):
+def hamming(u, v, axis=None, name=None, dtype=tf.float64):
     """Return the Hamming distance between two Tensors.
+
+    This operation cannot be used as a loss function because it uses `tf.cast`.
 
     Args:
         u, v: `Tensor`, input tensors.
         axis: `int` or `tuple`, the dimension(s) along which to compute Hamming
             distance.
         name: `str`, a name for the operation.
+        dtype: `str` or dtype object, specified output type of the operation.
+            Defaults to `tf.float64`.
 
     Returns:
         `Tensor` of Hamming distance(s).
@@ -93,7 +97,10 @@ def hamming(u, v, axis=None, name=None):
         u = tf.convert_to_tensor(u)
         v = tf.convert_to_tensor(v)
         _check_shapes_equal(u, v)
-        return tf.reduce_mean(tf.not_equal(u, v), axis=axis)
+
+        u_ne_v = tf.not_equal(u, v)
+        return tf.reduce_mean(
+            tf.cast(u_ne_v, dtype=dtype), axis=axis)
 
 
 def hamming_numpy(u, v, axis=None):
