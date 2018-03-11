@@ -61,8 +61,15 @@ def _preprocess_one(path, block_shape, normalize=None):
 
 
 def _preprocess_one_multiproc(path_block_shape_normalize):
-    """Iterable of length 3 (filepath, blockshape, normalize)."""
-    path, block_shape, normalize = path_block_shape_normalize
+    """Iterable of length 2 or 3 (filepath, blockshape, [normalize])."""
+    if len(path_block_shape_normalize) == 2:
+        path, block_shape = path_block_shape_normalize
+        normalize = None
+    elif len(path_block_shape_normalize) == 3:
+        path, block_shape, normalize = path_block_shape_normalize
+    else:
+        raise ValueError("2 or 3 values should have been passed in.")
+
     return _preprocess_one(path, block_shape, normalize)
 
 

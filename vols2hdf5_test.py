@@ -142,7 +142,7 @@ def test_vols2hdf5_three():
     volume_shape = (32, 32, 32)
     n_volumes = 20
 
-    features = np.random.rand(n_volumes, *volume_shape).astype(np.float32)
+    features = np.random.rand(n_volumes, *volume_shape)
     labels = np.random.rand(n_volumes, *volume_shape) * 100
     labels = labels.astype(np.int32)
     affine = np.eye(4)
@@ -183,6 +183,7 @@ def test_vols2hdf5_three():
         for ii in range(n_volumes):
             features[ii] = (
                 (features[ii] - features[ii].mean()) / features[ii].std())
+        features = features.astype(np.float32)
 
         features_blocked = np.concatenate(
             tuple(as_blocks(features[i], block_shape=(16, 16, 16))
