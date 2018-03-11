@@ -19,7 +19,7 @@ import numpy as np
 import pandas as pd
 
 from nobrainer.io import load_volume, read_csv
-from nobrainer.preprocessing import as_blocks
+from nobrainer.preprocessing import as_blocks, normalize_zero_one
 from nobrainer.util import _check_shapes_equal
 
 
@@ -47,8 +47,16 @@ def group(iterable, chunksize=10):
         yield iterable[i:i + chunksize]
 
 
-def _preprocess_one(path, block_shape):
-    return as_blocks(load_volume(path), block_shape)
+def _preprocess_one(path, block_shape, normalize=None):
+    data = load_volume(path)
+    if normalize == 'zeroone':
+        data = normalize_zero_one(data)
+    elif normalize == 'zscore':
+        data = (data - data.mean()) / data.std()
+    else:
+        raise ValueError("value of `normalize` not understood.")
+
+    return as_blocks(data, block_shape)
 
 
 def _preprocess_one_multiproc(path_block_shape):
@@ -144,7 +152,8 @@ def _create_datasets(sinker, group_name, block_shape, features_dtype,
 
 
 def vols2hdf5_one_group(sinker, list_of_files, group_name, block_shape,
-                        remove_empty_slices=False, chunksize=10, n_cpu=1):
+                        normalize=None, remove_empty_slices=False,
+                        chunksize=10, n_cpu=1):
     """Convert the volumes in `list_of_files` to HDF5.
 
     Args:
@@ -155,8 +164,17 @@ def vols2hdf5_one_group(sinker, list_of_files, group_name, block_shape,
             place into `labels` dataset.
         group_name: name of group to create dataset within. Two datasets are
             created within this group: `features` and `labels`.
+        normalize: {'zeroone', 'zscore', None}
+            - zeroone: normalize feature data by volume to `[0, 1]`.
+            - zscore: zscore feature data by volume.
+            - None: do not normalize feature data.
         block_shape: tuple, shape of blocks into which volumes are separated.
             At the moment, this produces non-overlapping blocks.
+        remove_empty_slices: boolean, if true, remove empty label blocks and
+            corresponding feature blocks.
+        chunksize: int, number of pairs of volumes to load and append to HDF5
+            at a time.
+        n_cpu: int, number of CPU processes to use when loading volumes.
 
     Returns:
         None
@@ -180,7 +198,7 @@ def vols2hdf5_one_group(sinker, list_of_files, group_name, block_shape,
                 these_features = np.concatenate(
                     pool.map(
                         _preprocess_one_multiproc,
-                        [(x, block_shape) for x, _ in this_buffer]))
+                        [(x, block_shape, normalize) for x, _ in this_buffer]))
             logger.debug("Loading labels with {} CPUs".format(n_cpu))
             with Pool(processes=n_cpu) as pool:
                 these_labels = np.concatenate(
@@ -190,7 +208,9 @@ def vols2hdf5_one_group(sinker, list_of_files, group_name, block_shape,
         else:
             logger.debug("Loading features")
             these_features = np.concatenate(
-                tuple(_preprocess_one(x, block_shape) for x, _ in this_buffer))
+                tuple(
+                    _preprocess_one(x, block_shape, normalize=normalize)
+                    for x, _ in this_buffer))
             logger.debug("Loading labels")
             these_labels = np.concatenate(
                 tuple(_preprocess_one(y, block_shape) for _, y in this_buffer))
@@ -240,6 +260,10 @@ def create_parser():
     h = ("If true, remove empty blocks in labels and their corresponding"
          " feature blocks.")
     p.add_argument('--rm-empty', action='store_true', help=h)
+    h = (
+        "Normalize feature data per volume. If 'zeroone', normalize to range"
+        " [0-1]. If 'zscore', z-score data.")
+    p.add_argument('--normalize', choice={'zeroone', 'zscore'}, help=h)
     h = "Number of pairs of volumes to load and append to HDF5 at a time."
     p.add_argument('--chunksize', type=int, default=10, help=h)
     h = "Number of CPU processes to use when loading volumes."
@@ -325,6 +349,7 @@ if __name__ == '__main__':
             list_of_files=list_of_files,
             group_name=group_n,
             block_shape=block_shape,
+            normalize=params['normalize'],
             remove_empty_slices=params['rm_empty'],
             chunksize=params['chunksize'],
             n_cpu=params['ncpu'],
