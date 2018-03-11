@@ -15,7 +15,7 @@ AUTHOR = 'nobrainer developers'
 here = os.path.abspath(os.path.dirname(__file__))
 
 # Import the README and use it as the long-description.
-with open(os.path.join(here, 'README.md')) as fp:
+with open(os.path.join(here, 'README.md'), encoding='utf-8') as fp:
     long_description = fp.read()
 
 with open(os.path.join(here, 'requirements.txt')) as fp:
