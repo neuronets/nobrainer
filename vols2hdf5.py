@@ -49,12 +49,13 @@ def group(iterable, chunksize=10):
 
 def _preprocess_one(path, block_shape, normalize=None):
     data = load_volume(path)
-    if normalize == 'zeroone':
-        data = normalize_zero_one(data)
-    elif normalize == 'zscore':
-        data = (data - data.mean()) / data.std()
-    else:
-        raise ValueError("value of `normalize` not understood.")
+    if normalize is not None:
+        if normalize == 'zeroone':
+            data = normalize_zero_one(data)
+        elif normalize == 'zscore':
+            data = (data - data.mean()) / data.std()
+        else:
+            raise ValueError("value of `normalize` not understood.")
 
     return as_blocks(data, block_shape)
 
