@@ -12,8 +12,8 @@ jobs:
       - run:
           name: Install nobrainer and dependencies for tests
           command: |
-            pip install --user --no-cache-dir -e /home/circleci/nobrainer
-            pip install --user --no-cache-dir pytest-cov scipy
+            pip install --user --no-cache-dir --progress-bar=off -e /home/circleci/nobrainer
+            pip install --user --no-cache-dir --progress-bar=off pytest-cov scipy
       - run:
           name: Run tests
           working_directory: /home/circleci/nobrainer
