@@ -263,7 +263,7 @@ def create_parser():
     h = (
         "Normalize feature data per volume. If 'zeroone', normalize to range"
         " [0-1]. If 'zscore', z-score data.")
-    p.add_argument('--normalize', choice={'zeroone', 'zscore'}, help=h)
+    p.add_argument('--normalize', choices={'zeroone', 'zscore'}, help=h)
     h = "Number of pairs of volumes to load and append to HDF5 at a time."
     p.add_argument('--chunksize', type=int, default=10, help=h)
     h = "Number of CPU processes to use when loading volumes."
@@ -335,6 +335,7 @@ if __name__ == '__main__':
         logger.info(
             "Iteratively appending to features and labels datasets in group"
             " {}".format(group_n))
+
         _create_datasets(
             sinker=sinker,
             group_name=group_n,
