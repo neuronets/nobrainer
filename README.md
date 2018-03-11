@@ -101,7 +101,7 @@ $ ./train_on_hdf5.py  --n-classes=2 --model=meshnet \
   --brainmask
 ```
 
-#### Train a four-class HighRes3DNet model to recognize multiple brain structures.
+#### Train a multi-class HighRes3DNet model to classify multiple brain structures.
 
 The `--aparcaseg-mapping` option is used to convert the label values to continuous labels beginning at 0.
 

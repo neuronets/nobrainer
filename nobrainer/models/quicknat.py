@@ -277,12 +277,11 @@ class QuickNAT(tf.estimator.Estimator):
         shape = (1, 10, 10, 10)  # batch of 1
         X = np.random.rand(*shape, 1).astype(np.float32)
         y = np.random.randint(0, 9, size=(shape), dtype=np.int32)
-
+        dset_fn = lambda: tf.data.Dataset.from_tensors((X, y))
         estimator = nobrainer.models.QuickNAT(
             n_classes=10, optimizer='Adam', n_filters=71, dropout_rate=0.25,
             learning_rate=0.001,
         )
-        dset_fn = lambda: tf.data.Dataset.from_tensors((X, y))
         estimator.train(input_fn=dset_fn)
         ```
 

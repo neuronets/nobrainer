@@ -153,20 +153,53 @@ def _check_required_keys_exist(params):
 def create_parser():
     """Return argument parser."""
     p = argparse.ArgumentParser()
-    p.add_argument('-n', '--n-classes', required=True, type=int)
-    p.add_argument('-m', '--model', required=True)
-    p.add_argument('-o', '--optimizer', required=True)
-    p.add_argument('-l', '--learning-rate', required=True, type=float)
-    p.add_argument('-b', '--batch-size', required=True, type=int)
-    p.add_argument('--block-shape', nargs=3, required=True, type=int)
-    p.add_argument('--hdf5path', required=True)
-    p.add_argument('--xdset', required=True)
-    p.add_argument('--ydset', required=True)
-    p.add_argument('-e', '--n-epochs', type=int, default=1)
-    p.add_argument('--brainmask', action='store_true')
-    p.add_argument('--aparcaseg-mapping')
-    p.add_argument('--model-dir')
-    p.add_argument('--multi-gpu', action='store_true')
+    p.add_argument(
+        '-n', '--n-classes', required=True, type=int,
+        help="Number of classes to classify")
+    p.add_argument(
+        '-m', '--model', required=True, choices={'highres3dnet', 'meshnet'},
+        help="Model to use")
+    p.add_argument(
+        '-o', '--optimizer', required=True,
+        help="TensorFlow optimizer to use for training")
+    p.add_argument(
+        '-l', '--learning-rate', required=True, type=float,
+        help="Learning rate to use with optimizer for training")
+    p.add_argument(
+        '-b', '--batch-size', required=True, type=int,
+        help=(
+            "Number of samples per batch. If `--multi-gpu` is specified, batch"
+            " is split across available GPUs."))
+    p.add_argument(
+        '--block-shape', nargs=3, required=True, type=int,
+        help="Height, width, and depth of input data and features.")
+    p.add_argument('--hdf5path', required=True, help="Path to input HDF5")
+    p.add_argument('--xdset', required=True, help="Features dataset in HDF5")
+    p.add_argument('--ydset', required=True, help="Labels dataset in HDF5")
+    p.add_argument(
+        '-e', '--n-epochs', type=int, default=1,
+        help="Number of training epochs")
+    p.add_argument(
+        '--brainmask', action='store_true',
+        help="If specified, binarize labels data")
+    p.add_argument(
+        '--aparcaseg-mapping',
+        help=(
+            "Path to CSV mapping file. First column contains original labels,"
+            " and second column contains new labels in range [0, n_classes-1]."
+            " Header must be included. More than two columns are accepted, but"
+            " only the first two columns are used."))
+    p.add_argument(
+        '--model-dir',
+        help=(
+            "Directory in which to save model checkpoints. If an existing"
+            " directory, will resume training from last checkpoint. If not"
+            " specified, will use a temporary directory."))
+    p.add_argument(
+        '--multi-gpu', action='store_true',
+        help=(
+            "If specified, train across all available GPUs. Batches are split"
+            " across GPUs."))
     return p
 
 

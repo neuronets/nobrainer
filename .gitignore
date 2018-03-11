@@ -1,9 +1,9 @@
 .DS_Store
-
 .ipynb_checkpoints
 scratch.ipynb
 
-/models
+/models*
+.pytest_cache
 
 __pycache__
 *.pyc
@@ -14,5 +14,6 @@ __pycache__
 *.json
 *.log
 *.pkl
+._*
 
 slurm-*.out
