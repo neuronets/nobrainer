@@ -103,6 +103,8 @@ $ ./train_on_hdf5.py  --n-classes=2 --model=meshnet \
 
 #### Train a four-class HighRes3DNet model to recognize multiple brain structures.
 
+The `--aparcaseg-mapping` option is used to convert the label values to continuous labels beginning at 0.
+
 ```shell
 $ ./train_on_hdf5.py  --n-classes=7 --model=highres3dnet \
   --model-dir=path/to/checkpoints \
@@ -113,7 +115,7 @@ $ ./train_on_hdf5.py  --n-classes=7 --model=highres3dnet \
   --aparcaseg-mapping=mapping.csv
 ```
 
-The file `mapping.csv` is used to convert the label values to continuous labels beginning from 0.
+The `mapping.csv` file looks like this:
 
 ```
 original,new,label
@@ -130,7 +132,7 @@ original,new,label
 #### Train a two-class HighRes3DNet model to classify hippocampus/not-hippocampus.
 
 ```shell
-$ ./train_on_hdf5.py  --n-classes=4 --model=highres3dnet \
+$ ./train_on_hdf5.py  --n-classes=2 --model=highres3dnet \
   --model-dir=path/to/checkpoints \
   --optimizer=Adam --learning-rate=0.001 --batch-size=1 \
   --hdf5path data.h5 \
