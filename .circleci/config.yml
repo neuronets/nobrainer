@@ -10,10 +10,10 @@ jobs:
       - checkout:
           path: /home/circleci/nobrainer
       - run:
-          name: Install nobrainer and dependencies
+          name: Install nobrainer and dependencies for tests
           command: |
             pip install --user --no-cache-dir -e /home/circleci/nobrainer
-            pip install --user --no-cache-dir pytest-cov
+            pip install --user --no-cache-dir pytest-cov scipy
       - run:
           name: Run tests
           working_directory: /home/circleci/nobrainer
