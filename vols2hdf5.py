@@ -59,10 +59,10 @@ def _preprocess_one(path, block_shape, normalize=None):
     return as_blocks(data, block_shape)
 
 
-def _preprocess_one_multiproc(path_block_shape):
-    """Iterable of length 2 (filepath, blockshape)."""
-    path, block_shape = path_block_shape
-    return _preprocess_one(path, block_shape)
+def _preprocess_one_multiproc(path_block_shape_normalize):
+    """Iterable of length 3 (filepath, blockshape, normalize)."""
+    path, block_shape, normalize = path_block_shape_normalize
+    return _preprocess_one(path, block_shape, normalize)
 
 
 def remove_empty_slices_(mask_arr, other_arr, axis=(1, 2, 3)):
