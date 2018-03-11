@@ -1,0 +1,23 @@
+---
+
+version: 2
+jobs:
+
+  build:
+    docker:
+      - image: circleci/python:3.6.4-stretch-browsers
+    steps:
+      - checkout:
+          path: /home/circleci/nobrainer
+      - run:
+          name: Install nobrainer and dependencies
+          command: |
+            pip install --user --no-cache-dir -e /home/circleci/nobrainer
+            pip install --user --no-cache-dir pytest-cov
+      - run:
+          name: Run tests
+          working_directory: /home/circleci/nobrainer
+          command: |
+            export PATH="~/.local/bin:$PATH"
+            pytest --cov=./
+            bash <(curl -s https://codecov.io/bash)
