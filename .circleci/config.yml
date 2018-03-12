@@ -12,7 +12,7 @@ jobs:
       - run:
           name: Install nobrainer and dependencies for tests
           command: |
-            pip install --user --no-cache-dir -e /home/circleci/nobrainer
+            pip install --user --no-cache-dir -e /home/circleci/nobrainer[cpu]
             pip install --user --no-cache-dir pytest-cov scipy
       - run:
           name: Run tests
