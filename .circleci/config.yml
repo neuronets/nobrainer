@@ -25,4 +25,4 @@ jobs:
           working_directory: /home/circleci/nobrainer
           command: |
             ls -a
-            codecov
+            bash <(curl -s https://codecov.io/bash)
