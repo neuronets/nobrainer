@@ -5,8 +5,8 @@ COPY . .
 RUN pip install --no-cache-dir -e /opt/nobrainer[gpu] \
     && mkdir bin \
     && mv vols2hdf5.py train.py train_on_hdf5.py bin/. \
-    && chmod +x bin/*.py
-    && useradd --no-user-group --create-home --shell /bin/bash neuro \
+    && chmod +x bin/*.py \
+    && useradd --no-user-group --create-home --shell /bin/bash neuro
 
 ENV PATH="$PATH:/opt/nobrainer/bin"
 
