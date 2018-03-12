@@ -123,7 +123,8 @@ def train(params):
     )
 
     runconfig = tf.estimator.RunConfig(
-        save_summary_steps=100, save_checkpoints_steps=100,
+        save_summary_steps=25,
+        save_checkpoints_steps=100,
         keep_checkpoint_max=25,
     )
 
