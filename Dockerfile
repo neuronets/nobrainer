@@ -7,7 +7,8 @@ RUN pip install --no-cache-dir -e /opt/nobrainer \
     && ln -sv /opt/nobrainer/vols2hdf5.py /usr/local/bin/vols2hdf5.py \
     && ln -sv /opt/nobrainer/train.py /usr/local/bin/train.py \
     && ln -sv /opt/nobrainer/train_on_hdf5.py /usr/local/bin/train_on_hdf5.py \
-    && useradd --no-user-group --create-home --shell /bin/bash neuro
+    && useradd --no-user-group --create-home --shell /bin/bash neuro \
+    && ldconfig
 
 USER neuro
 WORKDIR /home/neuro
