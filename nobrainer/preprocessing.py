@@ -17,6 +17,7 @@ def binarize(a, threshold=0, upper=1, lower=0):
     """Binarize array `a`, where values greater than `threshold` become `upper`
     and all other values become `lower`. Creates new array.
     """
+    a = np.asarray(a)
     return np.where(a > threshold, upper, lower)
 
 
