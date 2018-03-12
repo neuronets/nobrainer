@@ -54,3 +54,9 @@ def set_default_params(defaults, params):
     """
     for k, v in defaults.items():
         params.setdefault(k, v)
+
+
+def check_optimizer_for_training(optimizer, mode):
+    """Raise `ValueError` if `optimizer` is None when training."""
+    if mode == tf.estimator.ModeKeys.TRAIN and optimizer is None:
+        raise ValueError("Optimizer must be provided when training.")
