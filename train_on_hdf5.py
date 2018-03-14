@@ -3,16 +3,14 @@
 """Example training script."""
 
 import argparse
-import warnings
-
-warnings.simplefilter(action='ignore', category=FutureWarning)
 
 import h5py
 import numpy as np
 import tensorflow as tf
 
 import nobrainer
-
+from nobrainer.preprocessing import binarize, preprocess_aparcaseg
+from nobrainer.util import iter_hdf5, input_fn_builder
 
 # Data types of labels (x) and features (y).
 DT_X = 'float32'
@@ -32,46 +30,6 @@ def read_mapping(filepath):
     return dict(mapping)
 
 
-def iter_hdf5(filepath, x_dataset, y_dataset, x_dtype, y_dtype,
-              batch_size, shuffle=False, binarize_y=False,
-              aparcaseg_mapping=None):
-    """Yield tuples of numpy arrays `(features, labels)` from an HDF5 file."""
-    with h5py.File(filepath, 'r') as fp:
-        num_x_samples = fp[x_dataset].shape[0]
-        num_y_samples = fp[y_dataset].shape[0]
-
-    if num_x_samples != num_y_samples:
-        raise ValueError(
-            "Number of feature samples is not equal to number of label"
-            " samples. Found {x} feature samples and {y} label samples."
-            .format(x=num_x_samples, y=num_y_samples)
-        )
-
-    indices = nobrainer.util.create_indices(
-        num_x_samples, batch_size=batch_size, shuffle=shuffle,
-    )
-
-    for start, end in indices:
-
-        with h5py.File(filepath, 'r') as fp:
-            features = fp[x_dataset][start:end]
-            labels = fp[y_dataset][start:end]
-
-        features = np.expand_dims(features, -1)
-        features = features.astype(x_dtype)
-        labels = labels.astype(y_dtype)
-
-        if aparcaseg_mapping is not None:
-            labels = nobrainer.preprocessing.preprocess_aparcaseg(
-                labels, aparcaseg_mapping
-            )
-
-        if binarize_y:
-            labels = nobrainer.preprocessing.binarize(labels, threshold=0)
-
-        yield features, labels
-
-
 def train(params):
     """Train estimator."""
 
@@ -89,44 +47,54 @@ def train(params):
 
     if params['aparcaseg_mapping']:
         tf.logging.info(
-            "Reading mapping file: {}".format(params['aparcaseg_mapping'])
-        )
+            "Reading mapping file: {}".format(params['aparcaseg_mapping']))
         mapping = read_mapping(params['aparcaseg_mapping'])
     else:
         mapping = None
 
-    generator_builder = lambda: iter_hdf5(
-        filepath=params['hdf5path'],
-        x_dataset=x_dataset,
-        y_dataset=y_dataset,
-        x_dtype=_DT_X_NP,
-        y_dtype=_DT_Y_NP,
-        batch_size=params['batch_size'],
-        shuffle=True,
-        binarize_y=params['brainmask'],  # aparcaseg -> brainmask
-        aparcaseg_mapping=mapping,
-    )
+    def normalizer_aparcaseg(features, labels):
+        return (
+            features,
+            preprocess_aparcaseg(labels, params['aparcaseg_mapping']))
+
+    def normalizer_brainmask(features, labels):
+        return features, binarize(labels, threshold=0)
+
+    if params['aparcaseg_mapping'] is not None:
+        normalizer = normalizer_aparcaseg
+    elif params['brainmask']:
+        normalizer = normalizer_brainmask
+    else:
+        normalizer = None
+
+    def generator_builder():
+        """Return a function that returns a generator."""
+        return iter_hdf5(
+            filepath=params['hdf5path'],
+            x_dataset=x_dataset,
+            y_dataset=y_dataset,
+            x_dtype=_DT_X_NP,
+            y_dtype=_DT_Y_NP,
+            shuffle=False,
+            normalizer=normalizer)
 
     _output_shapes = (
-        (None, *params['block_shape'], 1),
-        (None, *params['block_shape']),
-    )
+        (*params['block_shape'], 1),
+        params['block_shape'])
 
-    input_fn = nobrainer.io.input_fn_builder(
+    input_fn = input_fn_builder(
         generator=generator_builder,
         output_types=(_DT_X_TF, _DT_Y_TF),
         output_shapes=_output_shapes,
         num_epochs=params['n_epochs'],
         multi_gpu=params['multi_gpu'],
         examples_per_epoch=examples_per_epoch,
-        batch_size=params['batch_size'],
-    )
+        batch_size=params['batch_size'])
 
     runconfig = tf.estimator.RunConfig(
         save_summary_steps=25,
         save_checkpoints_steps=100,
-        keep_checkpoint_max=25,
-    )
+        keep_checkpoint_max=100)
 
     model = nobrainer.models.get_estimator(params['model'])(
         n_classes=params['n_classes'],
@@ -134,8 +102,7 @@ def train(params):
         learning_rate=params['learning_rate'],
         model_dir=params['model_dir'],
         config=runconfig,
-        multi_gpu=params['multi_gpu'],
-    )
+        multi_gpu=params['multi_gpu'])
 
     model.train(input_fn=input_fn)
 
@@ -212,6 +179,8 @@ def parse_args(args):
 
 if __name__ == '__main__':
     import sys
+
+    print("USING UP-TO-DATE CODE", flush=True)
 
     namespace = parse_args(sys.argv[1:])
     params = vars(namespace)
