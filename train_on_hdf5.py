@@ -9,6 +9,7 @@ import numpy as np
 import tensorflow as tf
 
 import nobrainer
+from nobrainer.io import read_mapping
 from nobrainer.preprocessing import binarize, preprocess_aparcaseg
 from nobrainer.util import iter_hdf5, input_fn_builder
 
@@ -19,15 +20,6 @@ _DT_X_NP = np.dtype(DT_X)
 _DT_X_TF = tf.as_dtype(DT_X)
 _DT_Y_NP = np.dtype(DT_Y)
 _DT_Y_TF = tf.as_dtype(DT_Y)
-
-
-def read_mapping(filepath):
-    """Read CSV to dictionary, where first column becomes keys and second columns
-    becomes values. Keys and values must be integers.
-    """
-    mapping = nobrainer.io.read_csv(filepath, header=True)
-    mapping = [(int(row[0]), int(row[1])) for row in mapping]
-    return dict(mapping)
 
 
 def train(params):
@@ -53,9 +45,7 @@ def train(params):
         mapping = None
 
     def normalizer_aparcaseg(features, labels):
-        return (
-            features,
-            preprocess_aparcaseg(labels, params['aparcaseg_mapping']))
+        return features, preprocess_aparcaseg(labels, mapping)
 
     def normalizer_brainmask(features, labels):
         return features, binarize(labels, threshold=0)
