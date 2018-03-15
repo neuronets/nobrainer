@@ -1,5 +1,6 @@
 """Utilities."""
 
+import copy
 import numbers
 import random
 
@@ -12,7 +13,10 @@ from nobrainer.io import load_volume
 
 def _shapes_equal(x1, x2):
     """Return whether shapes of arrays or tensors `x1` and `x2` are equal."""
-    return x1.shape == x2.shape
+    try:
+        x1.shape.as_list() == x2.shape.as_list()  # TensorFlow
+    except AttributeError:
+        return x1.shape == x2.shape  # NumPy
 
 
 def _check_shapes_equal(x1, x2):
@@ -124,13 +128,22 @@ def iterblocks_3d(arr, kernel_size, strides=(1, 1, 1)):
                 yield arr[ixs, iys, izs]
 
 
-def iter_volumes(list_of_filepaths, x_dtype, y_dtype, block_shape,
+def iter_volumes(list_of_filepaths, vol_shape, block_shape, x_dtype, y_dtype,
                  strides=(1, 1, 1), shuffle=False, normalizer=None):
     """Yield tuples of numpy arrays `(features, labels)` from a list of
     filepaths to neuroimaging files.
     """
+    list_of_filepaths = copy.deepcopy(list_of_filepaths)
     if shuffle:
         random.shuffle(list_of_filepaths)
+
+    _n_blocks = np.prod(
+        _get_n_blocks(
+            arr_shape=vol_shape, kernel_size=block_shape, strides=strides))
+
+    tf.logging.info(
+        "Will yield {} blocks of shape {} per volume"
+        .format(_n_blocks, block_shape))
 
     for idx, (features_fp, labels_fp) in enumerate(list_of_filepaths):
         try:
