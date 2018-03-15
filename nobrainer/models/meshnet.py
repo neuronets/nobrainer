@@ -13,6 +13,7 @@ from tensorflow.python.estimator.canned.optimizers import (
     get_optimizer_instance
 )
 
+from nobrainer.metrics import streaming_dice, streaming_hamming
 from nobrainer.models.util import (
     check_optimizer_for_training, check_required_params, set_default_params)
 
@@ -124,7 +125,6 @@ def model_fn(features,
             inputs=outputs, filters=params['n_classes'], kernel_size=(1, 1, 1),
             padding='SAME', activation=None,
         )
-
     predicted_classes = tf.argmax(logits, axis=-1)
 
     if mode == tf.estimator.ModeKeys.PREDICT:
@@ -139,9 +139,18 @@ def model_fn(features,
         labels=labels, logits=logits)
     loss = tf.reduce_mean(cross_entropy)
 
+    labels = tf.cast(labels, predicted_classes.dtype)
+
+    # This will only work on 2-class problems at the moment.
+    eval_metric_ops = {
+        'accuracy': tf.metrics.accuracy(labels, predicted_classes),
+        'dice': streaming_dice(labels, predicted_classes),
+        'hamming': streaming_hamming(labels, predicted_classes),
+    }
+
     if mode == tf.estimator.ModeKeys.EVAL:
         return tf.estimator.EstimatorSpec(
-            mode=mode, loss=loss, eval_metric_ops=None)
+            mode=mode, loss=loss, eval_metric_ops=eval_metric_ops)
 
     assert mode == tf.estimator.ModeKeys.TRAIN
 
