@@ -43,3 +43,12 @@ def load_volume(filepath, dtype=None, return_affine=False):
         data = data.astype(dtype)
     img.uncache()
     return data if not return_affine else (data, img.affine)
+
+
+def read_mapping(filepath):
+    """Read CSV to dictionary, where first column becomes keys and second columns
+    becomes values. Keys and values must be integers.
+    """
+    mapping = read_csv(filepath, header=True)
+    mapping = [(int(row[0]), int(row[1])) for row in mapping]
+    return dict(mapping)
