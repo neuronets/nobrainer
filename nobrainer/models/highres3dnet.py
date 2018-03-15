@@ -184,26 +184,24 @@ def model_fn(features,
         }
         return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
 
-    # QUESTION (kaczmarj): is this the same as
-    # `tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(...))`
-    loss = tf.losses.sparse_softmax_cross_entropy(
-        labels=labels, logits=logits,
-        reduction=tf.losses.Reduction.SUM_BY_NONZERO_WEIGHTS,
-    )
+    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+        labels=labels, logits=logits)
+    loss = tf.reduce_mean(cross_entropy)
 
     # Compute metrics here...
     # Use `tf.summary.scalar` to add summaries to tensorboard.
 
     if mode == tf.estimator.ModeKeys.EVAL:
         return tf.estimator.EstimatorSpec(
-            mode=mode, loss=loss, eval_metric_ops=None,
-        )
+            mode=mode, loss=loss, eval_metric_ops=None)
 
     assert mode == tf.estimator.ModeKeys.TRAIN
 
-    train_op = params['optimizer'].minimize(
-        loss, global_step=tf.train.get_global_step()
-    )
+    global_step = tf.train.get_global_step()
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    with tf.control_dependencies(update_ops):
+        train_op = params['optimizer'].minimize(loss, global_step=global_step)
+
     return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
 
 
