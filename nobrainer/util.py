@@ -125,17 +125,20 @@ def iterblocks_3d(arr, kernel_size, strides=(1, 1, 1)):
 
 
 def iter_volumes(list_of_filepaths, x_dtype, y_dtype, block_shape,
-                 strides=(1, 1, 1), normalizer=None):
+                 strides=(1, 1, 1), shuffle=False, normalizer=None):
     """Yield tuples of numpy arrays `(features, labels)` from a list of
     filepaths to neuroimaging files.
     """
+    if shuffle:
+        random.shuffle(list_of_filepaths)
+
     for idx, (features_fp, labels_fp) in enumerate(list_of_filepaths):
         try:
             features = load_volume(features_fp, dtype=x_dtype)
             labels = load_volume(labels_fp, dtype=y_dtype)
         except Exception:
             tf.logging.warn(
-                "Error reading at least one input file. Skipping...\n{} {}"
+                "Error reading at least one input file. Skipping... {} {}"
                 .format(features_fp, labels_fp))
             continue
 
