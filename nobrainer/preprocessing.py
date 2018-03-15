@@ -35,10 +35,19 @@ def from_blocks(a, output_shape):
 
 
 def normalize_zero_one(a):
-    """Return array with values of `a` normalized to range [0, 1]."""
+    """Return array with values of `a` normalized to range [0, 1].
+
+    This procedure is also known as min-max scaling.
+    """
     a = np.asarray(a)
     min_ = a.min()
     return (a - min_) / (a.max() - min_)
+
+
+def zscore(a):
+    """Return array of z-scored values."""
+    a = np.asarray(a)
+    return (a - a.mean()) / a.std()
 
 
 def preprocess_aparcaseg(a, mapping, copy=False):
