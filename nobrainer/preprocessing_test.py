@@ -25,13 +25,16 @@ def test_binarize():
     assert_array_equal(binarize(data), [0, 1, 1, 1, 1])
     assert_array_equal(binarize(data, threshold=1), [0, 0, 1, 1, 1])
     assert_array_equal(binarize(data, threshold=3), [0, 0, 0, 0, 1])
+    assert_array_equal(binarize(data, threshold=1, upper=4), [0, 0, 4, 4, 4])
+    assert_array_equal(
+        binarize(data, threshold=3, upper=9, lower=8), [8, 8, 8, 8, 9])
 
     data = np.arange(100)
-    binarize(data, copy=False)
-    assert_array_equal(np.unique(data), (0, 1))
+    data = binarize(data, upper=4, lower=1)
+    assert_array_equal(np.unique(data), (1, 4))
 
     data = np.arange(100)
-    data_c = binarize(data, copy=True)
+    data_c = binarize(data)
     assert_array_equal(np.unique(data_c), (0, 1))
     assert not np.array_equal(np.unique(data), (0, 1))
 

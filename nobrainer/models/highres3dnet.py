@@ -15,7 +15,9 @@ from tensorflow.python.estimator.canned.optimizers import (
     get_optimizer_instance
 )
 
-from nobrainer.models.util import check_required_params
+from nobrainer.metrics import streaming_dice, streaming_hamming
+from nobrainer.models.util import (
+    check_optimizer_for_training, check_required_params, set_default_params)
 
 FUSED_BATCH_NORM = True
 
@@ -103,7 +105,8 @@ def _resblock(inputs,
 def model_fn(features,
              labels,
              mode,
-             params):
+             params,
+             config=None):
     """HighRes3DNet model function.
 
     Args:
@@ -115,8 +118,10 @@ def model_fn(features,
             `predict`. Labels should not be one-hot encoded.
         mode: Optional. Specifies if this training, evaluation or prediction.
         params: `dict` of parameters. All parameters below are required.
-            - n_classes: number of classes to classify.
-            - optimizer: instance of TensorFlow optimizer.
+            - n_classes: (required) number of classes to classify.
+            - optimizer: instance of TensorFlow optimizer. Required if
+                training.
+        config: configuration object.
 
     Returns:
         `tf.estimator.EstimatorSpec`
@@ -124,8 +129,11 @@ def model_fn(features,
     Raises:
         `ValueError` if required parameters are not in `params`.
     """
-    required_keys = {'n_classes', 'optimizer'}
+    required_keys = {'n_classes'}
+    default_params = {'optimizer': None}
     check_required_params(params=params, required_keys=required_keys)
+    set_default_params(params=params, defaults=default_params)
+    check_optimizer_for_training(optimizer=params['optimizer'], mode=mode)
 
     tf.logging.debug("Parameters for model:")
     tf.logging.debug(params)
@@ -177,26 +185,33 @@ def model_fn(features,
         }
         return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
 
-    # QUESTION (kaczmarj): is this the same as
-    # `tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(...))`
-    loss = tf.losses.sparse_softmax_cross_entropy(
-        labels=labels, logits=logits,
-        reduction=tf.losses.Reduction.SUM_BY_NONZERO_WEIGHTS,
-    )
+    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+        labels=labels, logits=logits)
+    loss = tf.reduce_mean(cross_entropy)
 
-    # Compute metrics here...
-    # Use `tf.summary.scalar` to add summaries to tensorboard.
+    # Add evaluation metrics for class 1.
+    labels = tf.cast(labels, predicted_classes.dtype)
+    labels_onehot = tf.one_hot(labels, params['n_classes'])
+    predictions_onehot = tf.one_hot(predicted_classes, params['n_classes'])
+    eval_metric_ops = {
+        'accuracy': tf.metrics.accuracy(labels, predicted_classes),
+        'dice': streaming_dice(
+            labels_onehot[..., 1], predictions_onehot[..., 1]),
+        'hamming': streaming_hamming(
+            labels_onehot[..., 1], predictions_onehot[..., 1]),
+    }
 
     if mode == tf.estimator.ModeKeys.EVAL:
         return tf.estimator.EstimatorSpec(
-            mode=mode, loss=loss, eval_metric_ops=None,
-        )
+            mode=mode, loss=loss, eval_metric_ops=eval_metric_ops)
 
     assert mode == tf.estimator.ModeKeys.TRAIN
 
-    train_op = params['optimizer'].minimize(
-        loss, global_step=tf.train.get_global_step()
-    )
+    global_step = tf.train.get_global_step()
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    with tf.control_dependencies(update_ops):
+        train_op = params['optimizer'].minimize(loss, global_step=global_step)
+
     return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
 
 
@@ -221,7 +236,7 @@ class HighRes3DNet(tf.estimator.Estimator):
     Args:
         n_classes: int, number of classes to classify.
         optimizer: instance of TensorFlow optimizer or string of optimizer
-            name.
+            name. Required if training.
         learning_rate: float, only required if `optimizer` is a string.
         model_dir: Directory to save model parameters, graph, etc. This can
             also be used to load checkpoints from the directory in an estimator
@@ -241,7 +256,7 @@ class HighRes3DNet(tf.estimator.Estimator):
     """
     def __init__(self,
                  n_classes,
-                 optimizer,
+                 optimizer=None,
                  learning_rate=None,
                  model_dir=None,
                  config=None,
@@ -251,7 +266,9 @@ class HighRes3DNet(tf.estimator.Estimator):
             'n_classes': n_classes,
             # If an instance of an optimizer is passed in, this will just
             # return it.
-            'optimizer': get_optimizer_instance(optimizer, learning_rate),
+            'optimizer': (
+                None if optimizer is None
+                else get_optimizer_instance(optimizer, learning_rate)),
         }
 
         _model_fn = model_fn

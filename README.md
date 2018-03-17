@@ -14,9 +14,27 @@ $ singularity build nobrainer.simg docker://kaczmarj/nobrainer
 
 ## Train your own models
 
-Feature and label data should be converted to HDF5 format. Models can be trained on data in HDF5 files. Better support for training on volumes is coming soon.
+Models can be trained on neuroimaging volumes or HDF5 data.
 
-`$` in the examples below indicate command-line calls.
+`$` in the examples below indicate command-line calls. All of the commands below can be run within the Nobrainer container.
+
+### Train on neuroimaging volumes
+
+Volumes must all be the same shape. No preprocessing is necessary.
+
+```shell
+$ ./train_on_volumes.py -n2 -mhighres3dnet \
+  -oAdam -l0.001 -b6 \
+  --brainmask \
+  --vol-shape 256 256 256 \
+  --block-shape 64 64 64  \
+  --strides 32 32 32 \
+  --n-epochs=5 \
+  --model-dir path/to/model \
+  --csv features_labels.csv \
+  --eval-csv evaluation_data.csv
+```
+
 
 ### Convert volumes to HDF5
 

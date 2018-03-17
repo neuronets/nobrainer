@@ -1,10 +1,12 @@
 """Tests for `nobrainer.models.util`"""
 
 import pytest
+import tensorflow as tf
 
 import nobrainer
 from nobrainer.models.util import (
-    get_estimator, get_items_not_in_iterable, check_required_params)
+    get_estimator, get_items_not_in_iterable, check_required_params,
+    check_optimizer_for_training)
 
 
 def test_get_estimator():
@@ -47,3 +49,16 @@ def set_default_params():
     assert params['foo'] == 0
     assert params['bar'] == 1
     assert params['baz'] == 30
+
+
+def test_check_optimizer_for_training():
+    with pytest.raises(ValueError):
+        check_optimizer_for_training(
+            optimizer=None, mode=tf.estimator.ModeKeys.TRAIN)
+
+    check_optimizer_for_training(
+        optimizer='Adam', mode=tf.estimator.ModeKeys.TRAIN)
+    check_optimizer_for_training(
+        optimizer=None, mode=tf.estimator.ModeKeys.EVAL)
+    check_optimizer_for_training(
+        optimizer=None, mode=tf.estimator.ModeKeys.PREDICT)

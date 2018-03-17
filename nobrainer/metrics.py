@@ -4,6 +4,7 @@
 
 import numpy as np
 import tensorflow as tf
+from tensorflow.python.framework.ops import add_to_collections
 
 from nobrainer.util import _check_all_x_in_subset_numpy, _check_shapes_equal
 
@@ -30,7 +31,6 @@ def dice(u, v, axis=None, name=None):
     with tf.name_scope(name, 'dice_coefficient', [u, v]):
         u = tf.convert_to_tensor(u)
         v = tf.convert_to_tensor(v)
-        _check_shapes_equal(u, v)
 
         intersection = tf.reduce_sum(tf.multiply(u, v), axis=axis)
         const = tf.constant(2, dtype=intersection.dtype)
@@ -73,6 +73,21 @@ def dice_numpy(u, v, axis=None):
     return numerator / denominator
 
 
+def streaming_dice(labels, predictions, weights=None, metrics_collections=None,
+                   update_collections=None, name=None):
+    """Calculates Dice coefficient between `labels` and `features`."""
+    dice_ = dice(labels, predictions, axis=(1, 2, 3))
+    # TODO (kaczmarj): do not get mean of NaN.
+    mean_dice, update_op = tf.metrics.mean(dice_)
+
+    if metrics_collections:
+        add_to_collections(metrics_collections, mean_dice)
+    if update_collections:
+        add_to_collections(update_collections, update_op)
+
+    return mean_dice, update_op
+
+
 def hamming(u, v, axis=None, name=None, dtype=tf.float64):
     """Return the Hamming distance between two Tensors.
 
@@ -96,8 +111,6 @@ def hamming(u, v, axis=None, name=None, dtype=tf.float64):
     with tf.name_scope(name, 'dice_coefficient', [u, v]):
         u = tf.convert_to_tensor(u)
         v = tf.convert_to_tensor(v)
-        _check_shapes_equal(u, v)
-
         u_ne_v = tf.not_equal(u, v)
         return tf.reduce_mean(
             tf.cast(u_ne_v, dtype=dtype), axis=axis)
@@ -120,3 +133,18 @@ def hamming_numpy(u, v, axis=None):
     """
     u_ne_v = u != v
     return np.mean(u_ne_v, axis=axis)
+
+
+def streaming_hamming(labels, predictions, weights=None,
+                      metrics_collections=None, update_collections=None,
+                      name=None):
+    """Calculates Hamming distance between `labels` and `features`."""
+    hamming_ = hamming(labels, predictions, axis=(1, 2, 3))
+    mean_hamming, update_op = tf.metrics.mean(hamming_)
+
+    if metrics_collections:
+        add_to_collections(metrics_collections, mean_hamming)
+    if update_collections:
+        add_to_collections(update_collections, update_op)
+
+    return mean_hamming, update_op
