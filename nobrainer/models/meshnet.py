@@ -139,13 +139,16 @@ def model_fn(features,
         labels=labels, logits=logits)
     loss = tf.reduce_mean(cross_entropy)
 
+    # Add evaluation metrics for class 1.
     labels = tf.cast(labels, predicted_classes.dtype)
-
-    # This will only work on 2-class problems at the moment.
+    labels_onehot = tf.one_hot(labels, params['n_classes'])
+    predictions_onehot = tf.one_hot(predicted_classes, params['n_classes'])
     eval_metric_ops = {
         'accuracy': tf.metrics.accuracy(labels, predicted_classes),
-        'dice': streaming_dice(labels, predicted_classes),
-        'hamming': streaming_hamming(labels, predicted_classes),
+        'dice': streaming_dice(
+            labels_onehot[..., 1], predictions_onehot[..., 1]),
+        'hamming': streaming_hamming(
+            labels_onehot[..., 1], predictions_onehot[..., 1]),
     }
 
     if mode == tf.estimator.ModeKeys.EVAL:
