@@ -77,6 +77,7 @@ def streaming_dice(labels, predictions, weights=None, metrics_collections=None,
                    update_collections=None, name=None):
     """Calculates Dice coefficient between `labels` and `features`."""
     dice_ = dice(labels, predictions, axis=(1, 2, 3))
+    # TODO (kaczmarj): do not get mean of NaN.
     mean_dice, update_op = tf.metrics.mean(dice_)
 
     if metrics_collections:
