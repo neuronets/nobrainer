@@ -13,17 +13,12 @@ def as_blocks(a, block_shape):
     return a.reshape(inter_shape).transpose(perm).reshape(new_shape)
 
 
-def binarize(a, threshold=0, copy=False):
-    """Binarize array `a`, where values greater than `threshold` become 1 and
-    all other values become 0. Operates in-place unless `copy` is true.
+def binarize(a, threshold=0, upper=1, lower=0):
+    """Binarize array `a`, where values greater than `threshold` become `upper`
+    and all other values become `lower`. Creates new array.
     """
     a = np.asarray(a)
-    if copy:
-        a = a.copy()
-    mask = a > threshold
-    a[mask] = 1
-    a[~mask] = 0
-    return a
+    return np.where(a > threshold, upper, lower)
 
 
 def from_blocks(a, output_shape):
@@ -40,10 +35,19 @@ def from_blocks(a, output_shape):
 
 
 def normalize_zero_one(a):
-    """Return array with values of `a` normalized to range [0, 1]."""
+    """Return array with values of `a` normalized to range [0, 1].
+
+    This procedure is also known as min-max scaling.
+    """
     a = np.asarray(a)
     min_ = a.min()
     return (a - min_) / (a.max() - min_)
+
+
+def zscore(a):
+    """Return array of z-scored values."""
+    a = np.asarray(a)
+    return (a - a.mean()) / a.std()
 
 
 def preprocess_aparcaseg(a, mapping, copy=False):

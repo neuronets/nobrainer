@@ -121,7 +121,8 @@ def unpool_2d(pool,
 def model_fn(features,
              labels,
              mode,
-             params):
+             params,
+             config=None):
     """MeshNet model function.
 
     Args:
@@ -132,9 +133,11 @@ def model_fn(features,
             returned from the `input_fn` passed to `train`, `evaluate`, and
             `predict`. Labels should not be one-hot encoded.
         mode: Optional. Specifies if this training, evaluation or prediction.
-        params: `dict` of parameters. All parameters below are required.
-            - n_classes: number of classes to classify.
-            - optimizer: instance of TensorFlow optimizer.
+        params: `dict` of parameters.
+            - n_classes: (required) number of classes to classify.
+            - optimizer: instance of TensorFlow optimizer. Required if
+                training.
+        config: configuration object.
 
     Returns:
         `tf.estimator.EstimatorSpec`
@@ -318,7 +321,9 @@ class QuickNAT(tf.estimator.Estimator):
             'n_classes': n_classes,
             # If an instance of an optimizer is passed in, this will just
             # return it.
-            'optimizer': get_optimizer_instance(optimizer, learning_rate),
+            'optimizer': (
+                None if optimizer is None
+                else get_optimizer_instance(optimizer, learning_rate)),
         }
 
         _model_fn = model_fn
