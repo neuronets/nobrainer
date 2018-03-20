@@ -1,5 +1,8 @@
 """Metrics implemented in TensorFlow and NumPy. Functions that end in
 `_numpy` are implemented in NumPy for eager computation.
+
+Functions that have the prefix `streaming_` are meant to be used when
+evaluating TensorFlow estimators with `estimator.eval()`.
 """
 
 import numpy as np
