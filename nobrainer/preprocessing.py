@@ -42,11 +42,11 @@ def from_blocks(a, output_shape):
 
     n_blocks = a.shape[0]
     block_shape = a.shape[1:]
-    nn = n_blocks ** (1 / 3)
-    if not nn.is_integer():
+    ncbrt = np.cbrt(n_blocks)
+    if not ncbrt.is_integer():
         raise ValueError("Cubed root of number of blocks is not an integer")
-    nn = int(nn)
-    intershape = (nn, nn, nn, *block_shape)
+    ncbrt = int(ncbrt)
+    intershape = (ncbrt, ncbrt, ncbrt, *block_shape)
 
     return (
         a.reshape(intershape)
