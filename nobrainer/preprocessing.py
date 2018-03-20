@@ -42,7 +42,7 @@ def from_blocks(a, output_shape):
 
     n_blocks = a.shape[0]
     block_shape = a.shape[1:]
-    ncbrt = np.cbrt(n_blocks)
+    ncbrt = np.cbrt(n_blocks).round(6)
     if not ncbrt.is_integer():
         raise ValueError("Cubed root of number of blocks is not an integer")
     ncbrt = int(ncbrt)
