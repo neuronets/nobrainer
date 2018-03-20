@@ -150,10 +150,10 @@ def iter_volumes(list_of_filepaths, vol_shape, block_shape, x_dtype, y_dtype,
             features = load_volume(features_fp, dtype=x_dtype)
             labels = load_volume(labels_fp, dtype=y_dtype)
         except Exception:
-            tf.logging.warn(
-                "Error reading at least one input file. Skipping... {} {}"
+            tf.logging.fatal(
+                "Error reading at least one input file: {} {}"
                 .format(features_fp, labels_fp))
-            continue
+            raise
 
         if normalizer is not None:
             features, labels = normalizer(features, labels)
@@ -214,22 +214,51 @@ def input_fn_builder(generator, output_types, output_shapes, num_epochs=1,
             output_types=output_types,
             output_shapes=output_shapes)
 
-        dset = dset.repeat(num_epochs).batch(batch_size)
+        dset = dset.repeat(num_epochs)
 
         if multi_gpu:
             if examples_per_epoch is None or batch_size is None:
                 raise ValueError(
                     "`examples_per_epoch` and `batch_size` must be provided"
                     " if using multiple GPUs.")
-            # TODO(kaczmarj): look into
-            # `tf.contrib.data.batch_and_drop_remainder`.
             total_examples = num_epochs * examples_per_epoch
             take_size = batch_size * (total_examples // batch_size)
             tf.logging.info(
+                "Total examples (all epochs): {}".format(total_examples))
+            tf.logging.info(
                 "Training on multiple GPUs. Taking {} samples from dataset."
-                .format(take_size, total_examples))
+                .format(take_size))
             dset = dset.take(take_size)
+
+        dset = dset.batch(batch_size)
 
         return dset
 
     return input_fn
+
+
+# https://github.com/tensorflow/models/blob/master/official/resnet/resnet_run_loop.py
+def validate_batch_size_for_multi_gpu(batch_size):
+    """For multi-gpu, batch-size must be a multiple of the number of
+    available GPUs.
+    Note that this should eventually be handled by replicate_model_fn
+    directly. Multi-GPU support is currently experimental, however,
+    so doing the work here until that feature is in place.
+    """
+    from tensorflow.python.client import device_lib
+
+    local_device_protos = device_lib.list_local_devices()
+    num_gpus = sum([1 for d in local_device_protos if d.device_type == 'GPU'])
+    if not num_gpus:
+        raise ValueError(
+            'Multi-GPU mode was specified, but no GPUs were found. To use CPU,'
+            ' run without --multi-gpu.')
+
+    remainder = batch_size % num_gpus
+    if remainder:
+        err = (
+            'When running with multiple GPUs, batch size must be a multiple of'
+            ' the number of available GPUs. Found {} GPUs with a batch size of'
+            ' {}; try --batch-size={} instead.'
+            .format(num_gpus, batch_size, batch_size - remainder))
+        raise ValueError(err)
