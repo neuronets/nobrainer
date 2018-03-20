@@ -7,7 +7,7 @@ import tempfile
 import h5py
 import nibabel as nb
 import numpy as np
-from numpy.testing import assert_array_equal
+from numpy.testing import assert_array_equal, assert_allclose
 import pandas as pd
 
 from nobrainer.preprocessing import as_blocks
@@ -193,5 +193,5 @@ def test_vols2hdf5_three():
             tuple(as_blocks(labels[i], block_shape=(16, 16, 16))
                   for i in range(labels.shape[0])))
 
-        assert_array_equal(features_16, features_blocked)
-        assert_array_equal(labels_16, labels_blocked)
+        assert_allclose(features_16, features_blocked)
+        assert_allclose(labels_16, labels_blocked)
