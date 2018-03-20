@@ -3,9 +3,12 @@
 import numpy as np
 from numpy.testing import assert_array_equal
 
-from nobrainer.preprocessing import (
-    as_blocks, binarize, from_blocks, normalize_zero_one, preprocess_aparcaseg,
-    replace)
+from nobrainer.preprocessing import as_blocks
+from nobrainer.preprocessing import binarize
+from nobrainer.preprocessing import from_blocks
+from nobrainer.preprocessing import normalize_zero_one
+from nobrainer.preprocessing import preprocess_aparcaseg
+from nobrainer.preprocessing import replace
 
 
 def test_as_blocks():
@@ -13,6 +16,11 @@ def test_as_blocks():
     data = np.ones(shape)
     blocks = as_blocks(data, (10, 10, 10))
     assert blocks.shape == (8, 10, 10, 10)
+
+    data = np.arange(2**3)
+    blocks = as_blocks(data.reshape(2, 2, 2), (1, 1, 1))
+    reference = data[..., None, None, None]
+    assert_array_equal(blocks, reference)
 
     shape = (256, 256, 200)
     data = np.ones(shape)
@@ -43,6 +51,10 @@ def test_from_blocks():
     data = np.ones((256, 256, 256))
     blocks = as_blocks(data, (128, 128, 128))
     assert_array_equal(data, from_blocks(blocks, (256, 256, 256)))
+
+    data = np.arange(12**3).reshape(12, 12, 12)
+    blocks = as_blocks(data, (4, 4, 4))
+    assert_array_equal(data, from_blocks(blocks, (12, 12, 12)))
 
 
 def test_normalize_zero_one():
