@@ -7,11 +7,15 @@ import argparse
 import numpy as np
 import tensorflow as tf
 
-import nobrainer
 from nobrainer.io import read_csv, read_mapping
-from nobrainer.preprocessing import (
-    binarize, preprocess_aparcaseg, normalize_zero_one)
-from nobrainer.util import iter_volumes, input_fn_builder
+from nobrainer.models import get_estimator
+from nobrainer.preprocessing import binarize
+from nobrainer.preprocessing import preprocess_aparcaseg
+from nobrainer.preprocessing import normalize_zero_one
+from nobrainer.util import _get_n_blocks
+from nobrainer.util import iter_volumes
+from nobrainer.util import input_fn_builder
+from nobrainer.util import validate_batch_size_for_multi_gpu
 
 # Data types of labels (x) and features (y).
 DT_X = 'float32'
@@ -62,9 +66,18 @@ def train(params):
             shuffle=True,
             normalizer=normalizer)
 
-    _output_shapes = (
-        (*params['block_shape'], 1),
-        params['block_shape'])
+    _output_shapes = ((*params['block_shape'], 1), params['block_shape'])
+
+    # Get number of samples per epoch after taking into account blocking.
+    n_samples_per_vol = np.prod(
+        _get_n_blocks(
+            arr_shape=params['vol_shape'],
+            kernel_size=params['block_shape'], strides=params['strides']))
+    n_samples_per_epochs = n_samples_per_vol * len(list_of_filepaths)
+
+    if params['multi_gpu']:
+        # Raise error if batch size is not divisible by number of GPUs.
+        validate_batch_size_for_multi_gpu(params['batch_size'])
 
     input_fn = input_fn_builder(
         generator=generator_builder,
@@ -72,17 +85,15 @@ def train(params):
         output_shapes=_output_shapes,
         num_epochs=params['n_epochs'],
         batch_size=params['batch_size'],
-        # TODO(kaczmarj): add multi-gpu support for training on volumes.
-        # multi_gpu=params['multi_gpu'],
-        # examples_per_epoch=examples_per_epoch,
-    )
+        multi_gpu=params['multi_gpu'],
+        examples_per_epoch=n_samples_per_epochs)
 
     runconfig = tf.estimator.RunConfig(
         save_summary_steps=25,
         save_checkpoints_steps=500,
         keep_checkpoint_max=100)
 
-    model = nobrainer.models.get_estimator(params['model'])(
+    model = get_estimator(params['model'])(
         n_classes=params['n_classes'],
         optimizer=params['optimizer'],
         learning_rate=params['learning_rate'],
@@ -93,43 +104,50 @@ def train(params):
     # Setup for training and periodic evaluation.
     if params['eval_csv'] is not None:
         eval_list_of_filepaths = read_csv(params['eval_csv'])
-        gen = nobrainer.util.iter_volumes(
-            list_of_filepaths=eval_list_of_filepaths,
-            x_dtype=_DT_X_NP,
-            y_dtype=_DT_Y_NP,
-            vol_shape=params['vol_shape'],
-            block_shape=params['block_shape'],
-            strides=params['strides'],
-            shuffle=False,
-            normalizer=normalizer)
 
-        def _get_eval_features_labels():
-            _features = []
-            _labels = []
-            for _f, _l in gen:
-                _features.append(_f)
-                _labels.append(_l)
-            return np.stack(_features), np.stack(_labels)
+        def _eval_generator_builder():
+            """Return a function that returns a generator."""
+            return iter_volumes(
+                list_of_filepaths=eval_list_of_filepaths,
+                vol_shape=params['vol_shape'],
+                block_shape=params['block_shape'],
+                x_dtype=_DT_X_NP,
+                y_dtype=_DT_Y_NP,
+                strides=params['strides'],
+                shuffle=False,
+                normalizer=normalizer)
 
-        tf.logging.info("Loading evaluation data")
-        _eval_features, _eval_labels = _get_eval_features_labels()
+        _eval_n_samples_per_epochs = (
+            n_samples_per_vol * len(eval_list_of_filepaths))
 
-        eval_input_fn = tf.estimator.inputs.numpy_input_fn(
-            x=_eval_features, y=_eval_labels, batch_size=2, num_epochs=1,
-            shuffle=False)
+        eval_input_fn = input_fn_builder(
+            generator=generator_builder,
+            output_types=(_DT_X_TF, _DT_Y_TF),
+            output_shapes=_output_shapes,
+            num_epochs=params['n_epochs'],
+            batch_size=params['batch_size'],
+            multi_gpu=params['multi_gpu'],
+            examples_per_epoch=_eval_n_samples_per_epochs)
 
-        _monitors = [
-            tf.contrib.learn.monitors.ValidationMonitor(
-                input_fn=eval_input_fn, every_n_steps=2000,
-                early_stopping_metric=None, early_stopping_rounds=None)]
-        hooks = tf.contrib.learn.monitors.replace_monitors_with_hooks(
-            _monitors, model)
+        eval_spec = tf.estimator.EvalSpec(
+            input_fn=eval_input_fn,
+            steps=None,  # Evaluate until input_fn raises end-of-input.
+            name=None,
+            start_delay_secs=600,  # Start evaluating after 10 minutes.
+            throttle_secs=1200)  # Evaluate every 20 minutes.
+
+        max_steps = n_samples_per_epochs * params['n_epochs']
+        tf.logging.info("Will train for {} steps".format(max_steps))
+        train_spec = tf.estimator.TrainSpec(
+            input_fn=input_fn,
+            max_steps=max_steps)
+
+        tf.estimator.train_and_evaluate(
+            estimator=model, train_spec=train_spec, eval_spec=eval_spec)
 
     # Training without evaluation.
     else:
-        hooks = None
-
-    model.train(input_fn=input_fn, hooks=hooks)
+        model.train(input_fn=input_fn)
 
 
 def _check_required_keys_exist(params):
