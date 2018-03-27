@@ -31,7 +31,7 @@ def dice(u, v, axis=None, name=None):
         This functions is similar to `scipy.spatial.distance.dice` but returns
         `1 - scipy.spatial.distance.dice(u, v)`.
     """
-    with tf.name_scope(name, 'dice_coefficient', [u, v]):
+    with tf.name_scope(name, 'dice', [u, v]):
         u = tf.convert_to_tensor(u)
         v = tf.convert_to_tensor(v)
 
@@ -111,7 +111,7 @@ def hamming(u, v, axis=None, name=None, dtype=tf.float64):
         This function is almost identical to `scipy.spatial.distance.hamming`
         but accepts n-D tensors and adds an `axis` parameter.
     """
-    with tf.name_scope(name, 'dice_coefficient', [u, v]):
+    with tf.name_scope(name, 'hamming', [u, v]):
         u = tf.convert_to_tensor(u)
         v = tf.convert_to_tensor(v)
         u_ne_v = tf.not_equal(u, v)
