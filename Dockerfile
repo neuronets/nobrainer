@@ -4,7 +4,7 @@ WORKDIR /opt/nobrainer
 COPY . .
 RUN pip install --no-cache-dir -e /opt/nobrainer[cpu] \
     && mkdir bin \
-    && mv vols2hdf5.py train.py train_on_hdf5.py bin/. \
+    && mv vols2hdf5.py train_on_hdf5.py train_on_volumes.py bin/. \
     && chmod +x bin/*.py \
     && useradd --no-user-group --create-home --shell /bin/bash neuro
 
