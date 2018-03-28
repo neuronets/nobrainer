@@ -85,7 +85,7 @@ def test_aparcaseg():
 
         model_dir = os.path.join(tmpdir, 'model')
         cmd = (
-            "python3 train_on_volumes.py  --n-classes=2 --model=meshnet"
+            "python3 train_on_volumes.py  --n-classes=4 --model=meshnet"
             " --optimizer=Adam --learning-rate=0.001 --batch-size=2"
             " --model-dir={model_dir}"
             " --csv={csv}"
