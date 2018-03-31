@@ -72,12 +72,12 @@ def zscore(a):
 
 def preprocess_aparcaseg(a, mapping):
     """Return preprocessed aparc+aseg array. Replaces values in `a` based on
-    diciontary `mapping`, and zeros values that are not values in `mapping`.
+    dictionary `mapping`, and zeros values that are not values in `mapping`.
     """
     a = np.asarray(a)
     a = replace(a, mapping=mapping)
-    max_label = max(mapping.values())
-    a[a > max_label] = 0
+    a_not_in_mapping = ~np.isin(a, mapping.values())
+    a[a_not_in_mapping] = 0
     return a
 
 
