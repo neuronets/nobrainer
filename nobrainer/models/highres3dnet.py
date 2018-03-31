@@ -10,14 +10,17 @@ Science, vol 10265.
 """
 
 import tensorflow as tf
-from tensorflow.contrib.estimator import TowerOptimizer, replicate_model_fn
+from tensorflow.contrib.estimator import TowerOptimizer
+from tensorflow.contrib.estimator import replicate_model_fn
 from tensorflow.python.estimator.canned.optimizers import (
     get_optimizer_instance
 )
 
-from nobrainer.metrics import streaming_dice, streaming_hamming
-from nobrainer.models.util import (
-    check_optimizer_for_training, check_required_params, set_default_params)
+from nobrainer.metrics import streaming_dice
+from nobrainer.metrics import streaming_hamming
+from nobrainer.models.util import check_optimizer_for_training
+from nobrainer.models.util import check_required_params
+from nobrainer.models.util import set_default_params
 
 FUSED_BATCH_NORM = True
 
@@ -32,7 +35,8 @@ def _resblock(inputs,
               layer_num,
               filters,
               kernel_size,
-              dilation_rate):
+              dilation_rate,
+              one_batchnorm):
     """Layer building block of residual network. This includes the residual
     connection.
 
@@ -47,6 +51,10 @@ def _resblock(inputs,
         filters : int, number of 3D convolution filters.
         kernel_size : int or tuple, size of 3D convolution kernel.
         dilation_rate : int or tuple, rate of dilution in 3D convolution.
+        one_batchnorm : bool, if true, only apply first batch normalization
+            layer in each residually connected block. Empirically, only using
+            first batch normalization layer allowed the model to model to be
+            trained on 128**3 float32 inputs.
 
     Returns:
         `Tensor` of same type as `inputs`.
@@ -61,7 +69,7 @@ def _resblock(inputs,
         |        |
         |     conv3d
         |        |
-        |    batchnorm
+        |    batchnorm (if `one_batchnorm` is false)
         |        |
         |      relu
         |        |
@@ -83,20 +91,22 @@ def _resblock(inputs,
     with tf.variable_scope('conv_{}_0'.format(layer_num)):
         conv1 = tf.layers.conv3d(
             relu1, filters=filters, kernel_size=kernel_size, padding='SAME',
-            dilation_rate=dilation_rate,
-        )
+            dilation_rate=dilation_rate)
 
-    with tf.variable_scope('batchnorm_{}_1'.format(layer_num)):
-        bn2 = tf.layers.batch_normalization(
-            conv1, training=training, fused=FUSED_BATCH_NORM,
-        )
-    with tf.variable_scope('relu_{}_1'.format(layer_num)):
-        relu2 = tf.nn.relu(bn2)
+    if one_batchnorm:
+        with tf.variable_scope('relu_{}_1'.format(layer_num)):
+            relu2 = tf.nn.relu(conv1)
+    else:
+        with tf.variable_scope('batchnorm_{}_1'.format(layer_num)):
+            bn2 = tf.layers.batch_normalization(
+                conv1, training=training, fused=FUSED_BATCH_NORM)
+            with tf.variable_scope('relu_{}_1'.format(layer_num)):
+                relu2 = tf.nn.relu(bn2)
+
     with tf.variable_scope('conv_{}_1'.format(layer_num)):
         conv2 = tf.layers.conv3d(
             relu2, filters=filters, kernel_size=kernel_size, padding='SAME',
-            dilation_rate=dilation_rate,
-        )
+            dilation_rate=dilation_rate)
 
     with tf.variable_scope('add_{}'.format(layer_num)):
         return tf.add(conv2, inputs)
@@ -121,6 +131,14 @@ def model_fn(features,
             - n_classes: (required) number of classes to classify.
             - optimizer: instance of TensorFlow optimizer. Required if
                 training.
+            - one_batchnorm_per_resblock: (default false) if true, only apply
+                first batch normalization layer in each residually connected
+                block. Empirically, only using first batch normalization layer
+                allowed the model to model to be trained on 128**3 float32
+                inputs.
+            - dropout_rate: (default 0), value between 0 and 1, dropout rate
+                to be applied immediately before last convolution layer. If 0
+                or false, dropout is not applied.
         config: configuration object.
 
     Returns:
@@ -130,7 +148,11 @@ def model_fn(features,
         `ValueError` if required parameters are not in `params`.
     """
     required_keys = {'n_classes'}
-    default_params = {'optimizer': None}
+    default_params = {
+        'optimizer': None,
+        'one_batchnorm_per_resblock': False,
+        'dropout_rate': 0,
+    }
     check_required_params(params=params, required_keys=required_keys)
     set_default_params(params=params, defaults=default_params)
     check_optimizer_for_training(optimizer=params['optimizer'], mode=mode)
@@ -149,26 +171,30 @@ def model_fn(features,
     with tf.variable_scope('relu_0'):
         outputs = tf.nn.relu(conv)
 
-    for ii in range(3):
-        offset = 1
-        layer_num = ii + offset
-        outputs = _resblock(
-            outputs, mode=mode, layer_num=layer_num, filters=16, kernel_size=3,
-            dilation_rate=1)
+    layer_num = 0
+    one_batchnorm = params['one_batchnorm_per_resblock']
 
     for ii in range(3):
-        offset = 4
-        layer_num = ii + offset
+        layer_num += 1
         outputs = _resblock(
             outputs, mode=mode, layer_num=layer_num, filters=16, kernel_size=3,
-            dilation_rate=2)
+            dilation_rate=1, one_batchnorm=one_batchnorm)
 
     for ii in range(3):
-        offset = 7
-        layer_num = ii + offset
+        layer_num += 1
         outputs = _resblock(
             outputs, mode=mode, layer_num=layer_num, filters=16, kernel_size=3,
-            dilation_rate=4)
+            dilation_rate=2, one_batchnorm=one_batchnorm)
+
+    for ii in range(3):
+        layer_num += 1
+        outputs = _resblock(
+            outputs, mode=mode, layer_num=layer_num, filters=16, kernel_size=3,
+            dilation_rate=4, one_batchnorm=one_batchnorm)
+
+    if params['dropout_rate']:
+        outputs = tf.layers.dropout(
+            outputs, rate=params['dropout_rate'], training=training)
 
     with tf.variable_scope('logits'):
         logits = tf.layers.conv3d(
@@ -238,6 +264,13 @@ class HighRes3DNet(tf.estimator.Estimator):
         optimizer: instance of TensorFlow optimizer or string of optimizer
             name. Required if training.
         learning_rate: float, only required if `optimizer` is a string.
+        one_batchnorm_per_resblock: (default false) if true, only apply first
+            batch normalization layer in each residually connected block.
+            Empirically, only using first batch normalization layer allowed the
+            model to model to be trained on 128**3 float32 inputs.
+        dropout_rate: (default 0), value between 0 and 1, dropout rate to be
+            applied immediately before last convolution layer. If 0 or false,
+            dropout is not applied.
         model_dir: Directory to save model parameters, graph, etc. This can
             also be used to load checkpoints from the directory in an estimator
             to continue training a previously saved model. If PathLike object,
@@ -258,6 +291,8 @@ class HighRes3DNet(tf.estimator.Estimator):
                  n_classes,
                  optimizer=None,
                  learning_rate=None,
+                 one_batchnorm_per_resblock=False,
+                 dropout_rate=0,
                  model_dir=None,
                  config=None,
                  warm_start_from=None,
@@ -269,6 +304,8 @@ class HighRes3DNet(tf.estimator.Estimator):
             'optimizer': (
                 None if optimizer is None
                 else get_optimizer_instance(optimizer, learning_rate)),
+            'one_batchnorm_per_resblock': one_batchnorm_per_resblock,
+            'dropout_rate': dropout_rate,
         }
 
         _model_fn = model_fn
@@ -279,5 +316,4 @@ class HighRes3DNet(tf.estimator.Estimator):
 
         super(HighRes3DNet, self).__init__(
             model_fn=_model_fn, model_dir=model_dir, params=params,
-            config=config, warm_start_from=warm_start_from,
-        )
+            config=config, warm_start_from=warm_start_from)

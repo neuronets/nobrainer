@@ -3,6 +3,7 @@
 """Example script to train on neuroimaging volumes."""
 
 import argparse
+import json
 
 import numpy as np
 import tensorflow as tf
@@ -99,7 +100,8 @@ def train(params):
         learning_rate=params['learning_rate'],
         model_dir=params['model_dir'],
         config=runconfig,
-        multi_gpu=params['multi_gpu'])
+        multi_gpu=params['multi_gpu'],
+        **params['model_opts'])
 
     # Setup for training and periodic evaluation.
     if params['eval_csv'] is not None:
@@ -151,6 +153,10 @@ def train(params):
 
 
 def _check_required_keys_exist(params):
+    """Raise ValueError if a required key is not found. The argument parser
+    will do this for command-line use, but this function is useful if the
+    train function is used directly.
+    """
     keys = {
         'n_classes', 'model', 'model_dir', 'optimizer', 'learning_rate',
         'batch_size', 'vol_shape', 'block_shape', 'brainmask',
@@ -170,6 +176,10 @@ def create_parser():
     p.add_argument(
         '-m', '--model', required=True, choices={'highres3dnet', 'meshnet'},
         help="Model to use")
+    p.add_argument(
+        '--model-opts', type=json.loads, default={},
+        help='JSON string of model-specific options. For example'
+             ' `{"n_filters": 71}`. JSON requires strings to be double-quoted')
     p.add_argument(
         '-o', '--optimizer', required=True,
         help="TensorFlow optimizer to use for training")

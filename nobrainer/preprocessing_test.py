@@ -74,7 +74,7 @@ def test_preprocess_aparcaseg():
         30: 2,
     }
     data = np.arange(4) * 10
-    preprocess_aparcaseg(data, mapping)
+    data = preprocess_aparcaseg(data, mapping)
     assert_array_equal(data, [0, 0, 1, 2])
     assert_array_equal(np.unique(data), list(mapping.values()))
 
@@ -88,5 +88,16 @@ def test_replace():
         3: 40,
         4: 30,
     }
-    replace(data, mapping)
+    data = replace(data, mapping)
     assert_array_equal(data, [10, 20, 30, 40, 30])
+
+    # Test that overlapping keys and values gives correct result.
+    data = np.arange(5)
+    mapping = {
+        0: 1,
+        1: 2,
+        2: 3,
+        3: 4,
+    }
+    data = replace(data, mapping)
+    assert_array_equal(data, [1, 2, 3, 4, 4])

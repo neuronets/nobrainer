@@ -8,14 +8,17 @@ labeling. IJCNN 2017. (pp. 3785-3792). IEEE.
 """
 
 import tensorflow as tf
-from tensorflow.contrib.estimator import TowerOptimizer, replicate_model_fn
+from tensorflow.contrib.estimator import TowerOptimizer
+from tensorflow.contrib.estimator import replicate_model_fn
 from tensorflow.python.estimator.canned.optimizers import (
     get_optimizer_instance
 )
 
-from nobrainer.metrics import streaming_dice, streaming_hamming
-from nobrainer.models.util import (
-    check_optimizer_for_training, check_required_params, set_default_params)
+from nobrainer.metrics import streaming_dice
+from nobrainer.metrics import streaming_hamming
+from nobrainer.models.util import check_optimizer_for_training
+from nobrainer.models.util import check_required_params
+from nobrainer.models.util import set_default_params
 
 FUSED_BATCH_NORM = True
 
@@ -50,12 +53,10 @@ def _layer(inputs,
     with tf.variable_scope('layer_{}'.format(layer_num)):
         conv = tf.layers.conv3d(
             inputs, filters=filters, kernel_size=kernel_size,
-            padding='SAME', dilation_rate=dilation_rate, activation=None
-        )
+            padding='SAME', dilation_rate=dilation_rate, activation=None)
         activation = tf.nn.relu(conv)
         bn = tf.layers.batch_normalization(
-            activation, training=training, fused=FUSED_BATCH_NORM,
-        )
+            activation, training=training, fused=FUSED_BATCH_NORM)
         return tf.layers.dropout(bn, rate=dropout_rate, training=training)
 
 
@@ -108,8 +109,7 @@ def model_fn(features,
         (2, 2, 2),
         (4, 4, 4),
         (8, 8, 8),
-        (1, 1, 1),
-    )
+        (1, 1, 1))
 
     outputs = features
 
@@ -117,14 +117,12 @@ def model_fn(features,
         outputs = _layer(
             outputs, mode=mode, layer_num=ii + 1, filters=params['n_filters'],
             kernel_size=3, dilation_rate=dilation_rate,
-            dropout_rate=params['dropout_rate'],
-        )
+            dropout_rate=params['dropout_rate'])
 
     with tf.variable_scope('logits'):
         logits = tf.layers.conv3d(
             inputs=outputs, filters=params['n_classes'], kernel_size=(1, 1, 1),
-            padding='SAME', activation=None,
-        )
+            padding='SAME', activation=None)
     predicted_classes = tf.argmax(logits, axis=-1)
 
     if mode == tf.estimator.ModeKeys.PREDICT:
@@ -239,5 +237,4 @@ class MeshNet(tf.estimator.Estimator):
 
         super(MeshNet, self).__init__(
             model_fn=_model_fn, model_dir=model_dir, params=params,
-            config=config, warm_start_from=warm_start_from,
-        )
+            config=config, warm_start_from=warm_start_from)
