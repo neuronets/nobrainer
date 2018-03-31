@@ -76,7 +76,7 @@ def preprocess_aparcaseg(a, mapping):
     """
     a = np.asarray(a)
     a = replace(a, mapping=mapping)
-    a_not_in_mapping = ~np.isin(a, mapping.values())
+    a_not_in_mapping = ~np.isin(a, list(mapping.values()))
     a[a_not_in_mapping] = 0
     return a
 
