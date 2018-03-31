@@ -70,24 +70,45 @@ def zscore(a):
     return (a - a.mean()) / a.std()
 
 
-def preprocess_aparcaseg(a, mapping, copy=False):
+def preprocess_aparcaseg(a, mapping):
     """Return preprocessed aparc+aseg array. Replaces values in `a` based on
     diciontary `mapping`, and zeros values that are not values in `mapping`.
     """
     a = np.asarray(a)
-    a = replace(a, mapping=mapping, copy=copy)
+    a = replace(a, mapping=mapping)
     max_label = max(mapping.values())
     a[a > max_label] = 0
     return a
 
 
-def replace(a, mapping, copy=False):
-    """Replace values in array `a` with using dictionary `mapping`."""
-    a = np.asarray(a)
-    # TODO(kaczmarj): this implementation can lead to unexpected behavior if
-    # keys and values of mapping overlap.
-    if copy:
-        a = a.copy()
-    for k, v in mapping.items():
-        a[a == k] = v
-    return a
+# https://stackoverflow.com/a/47171600
+def replace(a, mapping, assume_all_present=False):
+    """Replace values in array `a` using dictionary `mapping`.
+
+    Args:
+        a: ndarray
+        mapping: dict, items in `a` matching a key in `mapping` are replaced
+            with the corresponding value. Keys and values may overlap.
+        assume_all_present: bool, true if there is key for each unique value in
+            `a`. This allows the use of a faster implementation.
+
+    Returns:
+        replaced ndarray
+    """
+    # Extract out keys and values
+    k = np.array(list(mapping.keys()))
+    v = np.array(list(mapping.values()))
+
+    # Get argsort indices
+    sidx = k.argsort()
+
+    ks = k[sidx]
+    vs = v[sidx]
+    idx = np.searchsorted(ks, a)
+
+    if not assume_all_present:
+        idx[idx == len(vs)] = 0
+        mask = ks[idx] == a
+        return np.where(mask, vs[idx], a)
+    else:
+        return vs[idx]

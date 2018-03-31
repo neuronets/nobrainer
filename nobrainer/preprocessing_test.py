@@ -88,5 +88,16 @@ def test_replace():
         3: 40,
         4: 30,
     }
-    replace(data, mapping)
+    data = replace(data, mapping)
     assert_array_equal(data, [10, 20, 30, 40, 30])
+
+    # Test that overlapping keys and values gives correct result.
+    data = np.arange(5)
+    mapping = {
+        0: 1,
+        1: 2,
+        2: 3,
+        3: 4,
+    }
+    data = replace(data, mapping)
+    assert_array_equal(data, [1, 2, 3, 4, 4])
