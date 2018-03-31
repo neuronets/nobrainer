@@ -74,7 +74,7 @@ def test_preprocess_aparcaseg():
         30: 2,
     }
     data = np.arange(4) * 10
-    preprocess_aparcaseg(data, mapping)
+    data = preprocess_aparcaseg(data, mapping)
     assert_array_equal(data, [0, 0, 1, 2])
     assert_array_equal(np.unique(data), list(mapping.values()))
 
