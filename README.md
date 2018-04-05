@@ -1,6 +1,8 @@
 # nobrainer
 
-Neural network to identify brains in structural magnetic resonance images. This is a work in progress.
+Neural networks for brain extraction and brain parcellation from structural MR images.
+
+_Note: this is a work in progress._
 
 
 ## Get the container
@@ -8,13 +10,13 @@ Neural network to identify brains in structural magnetic resonance images. This 
 ```shell
 $ docker pull kaczmarj/nobrainer
 # or
-$ singularity build nobrainer.simg docker://kaczmarj/nobrainer
+$ singularity build nobrainer.sqsh docker://kaczmarj/nobrainer
 ```
 
 
 ## Train your own models
 
-Models can be trained on neuroimaging volumes (recommended) or HDF5 data. Please see examples below. All of the examples can be run within the Nobrainer container.
+Models can be trained on neuroimaging volumes (recommended) or HDF5 data. Please see examples below. All of the examples can be run within the nobrainer container.
 
 Note: `$` indicates a command-line call.
 
@@ -35,7 +37,7 @@ The command below trains a HighRes3DNet model to perform brain extraction on T1s
 
 ```shell
 $ train_on_volumes.py \
-  -n-classes=2 \
+  --n-classes=2 \
   --model=highres3dnet \
   --brainmask \
   --optimizer=Adam \
@@ -66,7 +68,27 @@ path/to/2/T1.mgz,path/to/2/aparc+aseg.mgz
 - `--multi-gpu`: if specified, train across multiple GPUs. The batch is split across GPUs, so the batch must be divisible by the number of GPUs.
 
 
-### Convert volumes to HDF5
+Training progress can be visualized with [TensorBoard](https://www.tensorflow.org/programmers_guide/summaries_and_tensorboard):
+
+```
+singularity exec --bind /path/to/models:/models nobrainer.sqsh \
+  tensorboard --logdir /models
+```
+
+If `--eval-csv` was specified, evaluation results will also appear in TensorBoard.
+
+
+### Train on HDF5
+
+Models can be trained with a command-line interface. For more granular control, write a Python train script (refer to the `train` function in `train_on_hdf5.py`).
+
+```shell
+$ ./train_on_hdf5.py --help
+```
+
+Before training, the user must have data in HDF5.
+
+#### Convert volumes to HDF5
 
 Note: all volumes must have the same shape.
 
@@ -125,14 +147,6 @@ The resulting HDF5 file has the structure:
 └── 64x64x64
     ├── features
     └── labels
-```
-
-### Train on HDF5 data
-
-Models can be trained with a command-line interface. For more granular control, write a Python train script (refer to the `train` function in `train_on_hdf5.py`).
-
-```shell
-$ ./train_on_hdf5.py --help
 ```
 
 #### Train a two-class MeshNet model that classifies brain/not-brain.
@@ -197,3 +211,4 @@ original,new,label
 17,1,left-hippocampus
 53,1,right-hippocampus
 ```
+
