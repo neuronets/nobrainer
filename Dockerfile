@@ -2,7 +2,7 @@
 
 # Use "gpu-py3" to build GPU-enabled container and "py3" for non-GPU container.
 ARG TF_ENV="gpu-py3"
-FROM tensorflow/tensorflow:1.6.0-${TF_ENV}
+FROM tensorflow/tensorflow:1.8.0-${TF_ENV}
 
 # The TF_ENV ARG before FROM is not available in the build stage, so we
 # declare it again.
@@ -17,6 +17,7 @@ RUN \
     && mkdir bin \
     && mv vols2hdf5.py train_on_hdf5.py train_on_volumes.py bin/. \
     && chmod +x bin/*.py \
+    && rm -rf ~/.cache/pip/* \
     && useradd --no-user-group --create-home --shell /bin/bash neuro
 
 ENV PATH="$PATH:/opt/nobrainer/bin"
