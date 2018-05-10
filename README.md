@@ -16,11 +16,11 @@ $ singularity build nobrainer.sqsh docker://kaczmarj/nobrainer
 
 ## Train your own models
 
-Models can be trained on neuroimaging volumes (recommended) or HDF5 data. Please see examples below. All of the examples can be run within the nobrainer container.
+Models can be trained on neuroimaging volumes. Please see examples below. All of the examples can be run within the nobrainer container.
 
 Note: `$` indicates a command-line call.
 
-### Train on neuroimaging volumes (recommended)
+### Command-line interface
 
 Data pre-requisites:
 1. Volumes must all be the same shape.
@@ -78,137 +78,68 @@ singularity exec --bind /path/to/models:/models nobrainer.sqsh \
 If `--eval-csv` was specified, evaluation results will also appear in TensorBoard.
 
 
-### Train on HDF5
+### Python interface
 
-Models can be trained with a command-line interface. For more granular control, write a Python train script (refer to the `train` function in `train_on_hdf5.py`).
+```python
+import nobrainer
+import tensorflow as tf
 
-```shell
-$ ./train_on_hdf5.py --help
+filepaths = nobrainer.read_csv("path/to/feature_labels.csv")
+
+datagen = nobrainer.VolumeDataGenerator(
+    samplewise_minmax=True,
+    rot90_x=True,
+    rot90_y=True,
+    rot90_z=True,
+    flip_x=True,
+    flip_y=True,
+    flip_z=True,
+    salt_and_pepper=True,
+    gaussian=True,
+    reduce_contrast=True,
+    binarize_y=True)
+
+model = nobrainer.HighRes3DNet(
+    n_classes=2,
+    optimizer='Adam',
+    learning_rate=0.01,
+    one_batchnorm_per_resblock=True)
+
+block_shape = (128, 128, 128)
+nobrainer.train(
+    model=model,
+    volume_data_generator=datagen,
+    filepaths=filepaths,
+    volume_shape=(256, 256, 256),
+    block_shape=block_shape,
+    strides=block_shape,
+    batch_size=1,
+    num_epochs=1,
+    prefetch=4)
+
+
+# Save model to .pb file.
+## The shape of the input volume (batch_size, *block_shape, 1). The 1 indicates
+## one channel (grayscale).
+volume = tf.placeholder(tf.float32, shape=[None, *block_shape, 1])
+## Attach the volume placeholder above to the input function for the model.
+serving_input_fn = tf.estimator.export.build_raw_serving_input_receiver_fn({
+    'volume': volume})
+## Save the model to a .pb file in the specified directory.
+model.export_savedmodel("path/to/savedmodel", serving_input_fn)
+
+
+# Predict on a T1 using saved model.
+## Load saved model.
+predictor = tf.contrib.predictor.from_saved_model("path/to/savedmodel")
+## Load volume and block in preparation for prediction.
+anat = nobrainer.read_volume("path/to/t1.nii.gz", dtype="float32")
+anat = nobrainer.normalize_zero_one(features)
+features = nobrainer.as_blocks(anat, block_shape)
+## Add a dimension for single channel.
+features = features[..., None]
+## Run prediction. Returns a dictionary with tensors as values.
+predictions = predictor({'volume': features})
+## Combine the predicted blocks as a full volume.
+predictions = nobrainer.from_blocks(predictions['class_ids'], (256, 256, 256))
 ```
-
-Before training, the user must have data in HDF5.
-
-#### Convert volumes to HDF5
-
-Note: all volumes must have the same shape.
-
-```shell
-$ ./vols2hdf5.py --help
-```
-
-#### Examples:
-
-##### Convert pairs of T1 and aparc+aseg files from a FreeSurfer SUBJECTS_DIR to HDF5:
-
-This also z-scores the feature data per volume.
-
-```shell
-$ ./vols2hdf5.py -o output.h5 \
-  --block-shape 128 128 128 \
-  --block-shape 64 64 64 \
-  -fdt float32 -ldt int32 \
-  --chunksize 75 --ncpu 6 \
-  --normalize zscore \
-  --compression gzip --compression-opts 1 \
-  $SUBJECTS_DIR
-```
-
-The resulting HDF5 file has the structure:
-
-```
-/
-├── 128x128x128
-│   ├── features
-│   └── labels
-└── 64x64x64
-    ├── features
-    └── labels
-```
-
-##### Convert features and labels volumes using filepaths stored in CSV to HDF5:
-
-```shell
-$ ./vols2hdf5.py -o output.h5 \
-  --block-shape 128 128 128 \
-  --block-shape 64 64 64 \
-  -fdt float32 -ldt int32 \
-  --chunksize 75 --ncpu 6 \
-  --compression gzip --compression-opts 1 \
-  files.csv
-```
-
-The resulting HDF5 file has the structure:
-
-```
-/
-├── 128x128x128
-│   ├── features
-│   └── labels
-└── 64x64x64
-    ├── features
-    └── labels
-```
-
-#### Train a two-class MeshNet model that classifies brain/not-brain.
-
-The `--brainmask` option binarizes the labels.
-
-```shell
-$ ./train_on_hdf5.py  --n-classes=2 --model=meshnet \
-  --model-dir=path/to/checkpoints \
-  --optimizer=Adam --learning-rate=0.001 --batch-size=1 \
-  --hdf5path data.h5 \
-  --xdset=/128x128x128/features --ydset=/128x128x128/labels \
-  --block-shape 128 128 128 \
-  --brainmask
-```
-
-#### Train a multi-class HighRes3DNet model to classify multiple brain structures.
-
-The `--aparcaseg-mapping` option is used to convert the label values to continuous labels beginning at 0.
-
-```shell
-$ ./train_on_hdf5.py  --n-classes=7 --model=highres3dnet \
-  --model-dir=path/to/checkpoints \
-  --optimizer=Adam --learning-rate=0.001 --batch-size=1 \
-  --hdf5path data.h5 \
-  --xdset=/128x128x128/features --ydset=/128x128x128/labels \
-  --block-shape 128 128 128 \
-  --aparcaseg-mapping=mapping.csv
-```
-
-The `mapping.csv` file looks like this:
-
-```
-original,new,label
-0,0,Unknown
-2,1,Left-Cerebral-White-Matter
-7,2,Left-Cerebellum-White-Matter
-8,3,Left-Cerebellum-Cortex
-41,4,Right-Cerebral-White-Matter
-46,5,Right-Cerebellum-White-Matter
-47,6,Right-Cerebellum-Cortex
-```
-
-
-#### Train a two-class HighRes3DNet model to classify hippocampus/not-hippocampus.
-
-```shell
-$ ./train_on_hdf5.py  --n-classes=2 --model=highres3dnet \
-  --model-dir=path/to/checkpoints \
-  --optimizer=Adam --learning-rate=0.001 --batch-size=1 \
-  --hdf5path data.h5 \
-  --xdset=/128x128x128/features --ydset=/128x128x128/labels \
-  --block-shape 128 128 128 \
-  --aparcaseg-mapping=mapping.csv
-```
-
-The `mapping.csv` file looks like this:
-
-```
-original,new,label
-0,0,unknown
-17,1,left-hippocampus
-53,1,right-hippocampus
-```
-
