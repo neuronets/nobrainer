@@ -147,6 +147,10 @@ def model_fn(features,
     Raises:
         `ValueError` if required parameters are not in `params`.
     """
+    volume = features
+    if isinstance(volume, dict):
+        volume = features['volume']
+
     required_keys = {'n_classes'}
     default_params = {
         'optimizer': None,
@@ -164,7 +168,7 @@ def model_fn(features,
 
     with tf.variable_scope('conv_0'):
         conv = tf.layers.conv3d(
-            features, filters=16, kernel_size=3, padding='SAME')
+            volume, filters=16, kernel_size=3, padding='SAME')
     with tf.variable_scope('batchnorm_0'):
         conv = tf.layers.batch_normalization(
             conv, training=training, fused=FUSED_BATCH_NORM)
@@ -207,9 +211,14 @@ def model_fn(features,
         predictions = {
             'class_ids': predicted_classes,
             'probabilities': tf.nn.softmax(logits),
-            'logits': logits,
-        }
-        return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
+            'logits': logits}
+        # Outputs for SavedModel.
+        export_outputs = {
+            'outputs': tf.estimator.export.PredictOutput(predictions)}
+        return tf.estimator.EstimatorSpec(
+            mode=mode,
+            predictions=predictions,
+            export_outputs=export_outputs)
 
     cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
         labels=labels, logits=logits)
@@ -229,7 +238,9 @@ def model_fn(features,
 
     if mode == tf.estimator.ModeKeys.EVAL:
         return tf.estimator.EstimatorSpec(
-            mode=mode, loss=loss, eval_metric_ops=eval_metric_ops)
+            mode=mode,
+            loss=loss,
+            eval_metric_ops=eval_metric_ops)
 
     assert mode == tf.estimator.ModeKeys.TRAIN
 
@@ -238,7 +249,10 @@ def model_fn(features,
     with tf.control_dependencies(update_ops):
         train_op = params['optimizer'].minimize(loss, global_step=global_step)
 
-    return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
+    return tf.estimator.EstimatorSpec(
+        mode=mode,
+        loss=loss,
+        train_op=train_op)
 
 
 class HighRes3DNet(tf.estimator.Estimator):
