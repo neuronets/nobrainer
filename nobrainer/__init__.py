@@ -9,8 +9,6 @@ except ImportError:
         " see https://www.tensorflow.org/install/ for installation"
         " instructions.")
 
-from nobrainer import metrics, models, preprocessing
-
 from nobrainer.io import read_csv
 from nobrainer.io import read_json
 from nobrainer.io import read_mapping
@@ -31,7 +29,6 @@ from nobrainer.models import QuickNAT
 
 from nobrainer.train import train
 
-from nobrainer.volume import as_blocks
 from nobrainer.volume import binarize
 from nobrainer.volume import change_brightness
 from nobrainer.volume import downsample
@@ -46,6 +43,7 @@ from nobrainer.volume import replace
 from nobrainer.volume import rotate
 from nobrainer.volume import salt_and_pepper
 from nobrainer.volume import shift
+from nobrainer.volume import to_blocks
 from nobrainer.volume import zoom
 from nobrainer.volume import zscore
 from nobrainer.volume import VolumeDataGenerator

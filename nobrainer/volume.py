@@ -15,25 +15,6 @@ from nobrainer.io import read_volume
 from nobrainer.util import _check_shapes_equal
 
 
-def as_blocks(a, block_shape):
-    """Return new array of shape `(n_blocks, *block_shape)`. This separates `a`
-    into non-overlapping blocks, each with shape `block_shape`.
-    """
-    a = np.asarray(a)
-    orig_shape = np.asarray(a.shape)
-
-    if a.ndim != 3:
-        raise ValueError("This function only works for 3D arrays.")
-    if len(block_shape) != 3:
-        raise ValueError("block_shape must have three values.")
-
-    blocks = orig_shape // block_shape
-    inter_shape = tuple(e for tup in zip(blocks, block_shape) for e in tup)
-    new_shape = (-1,) + block_shape
-    perm = (0, 2, 4, 1, 3, 5)
-    return a.reshape(inter_shape).transpose(perm).reshape(new_shape)
-
-
 def binarize(a, threshold=0, upper=1, lower=0):
     """Binarize array `a`, where values greater than `threshold` become `upper`
     and all other values become `lower`. Creates new array.
@@ -78,7 +59,7 @@ def downsample(x, n, axis=0):
     return np.repeat(x[slices], n, axis=axis)
 
 
-def flip(x, axis):
+def flip(x, axis=0):
     """Reverse the order of elements along the given axis.
 
     Args:
@@ -95,8 +76,16 @@ def flip(x, axis):
 
 
 def from_blocks(a, output_shape):
-    """Return new array of shape `output_shape`. This combines non-overlapping
-    blocks, likely created by `as_blocks`."""
+    """Combine 4D array of non-overlapping blocks `a` into 3D array of shape
+    `output_shape`.
+
+    For the reverse of this function, see `to_blocks`.
+
+    Args:
+        a: array-like, 4D array of blocks with shape (N, *block_shape), where
+            N is the number of blocks.
+        output_shape: tuple of len 3, shape of the combined array.
+    """
     a = np.asarray(a)
 
     if a.ndim != 4:
@@ -323,6 +312,31 @@ def shift(x, s, out=None):
     return ndimage.shift(input=x, shift=s, output=out)
 
 
+def to_blocks(a, block_shape):
+    """Return new array of non-overlapping blocks of shape `block_shape` from
+    array `a`.
+
+    For the reverse of this function (blocks to array), see `from_blocks`.
+
+    Args:
+        a: array-like, 3D array to block
+        block_shape: tuple of len 3, shape of non-overlapping blocks
+    """
+    a = np.asarray(a)
+    orig_shape = np.asarray(a.shape)
+
+    if a.ndim != 3:
+        raise ValueError("This function only supports 3D arrays.")
+    if len(block_shape) != 3:
+        raise ValueError("block_shape must have three values.")
+
+    blocks = orig_shape // block_shape
+    inter_shape = tuple(e for tup in zip(blocks, block_shape) for e in tup)
+    new_shape = (-1,) + block_shape
+    perm = (0, 2, 4, 1, 3, 5)
+    return a.reshape(inter_shape).transpose(perm).reshape(new_shape)
+
+
 # https://stackoverflow.com/a/37121993/5666087
 def zoom(x, zoom_factor, **kwds):
     """Zoom and retain shape of input.
@@ -422,7 +436,7 @@ class VolumeDataGenerator:
     Example of using `.flow_from_files(filepaths)`:
 
     ```python
-    datagen = ImageDataGenerator(
+    datagen = VolumeDataGenerator(
         samplewise_minmax=True,
         rot90_x=True,
         flip_y=True,
@@ -735,7 +749,7 @@ class VolumeDataGenerator:
                               y_dtype,
                               shuffle=None,
                               batch_size=8,
-                              num_epochs=1,
+                              n_epochs=1,
                               prefetch=1,
                               multi_gpu=False):
         """Return function that returns instance of `tensorflow.data.Dataset`.
@@ -761,7 +775,7 @@ class VolumeDataGenerator:
             y_dtype: str or dtype object, datatype of labels output.
             shuffle: boolean, shuffle list of filepaths.
             batch_size: int, number of blocks per batch.
-            num_epochs: int, number of epochs.
+            n_epochs: int, number of epochs.
             prefetch: int, number of full volumes to prefetch. See
                 `tensorflow.data.Dataset.prefetch`.
             multi_gpu: boolean, train on multiple GPUs.
@@ -790,7 +804,7 @@ class VolumeDataGenerator:
                 generator=generator_builder,
                 output_types=(tf.as_dtype(x_dtype), tf.as_dtype(y_dtype)),
                 output_shapes=((*block_shape, 1), block_shape))
-            dset = dset.repeat(num_epochs)
+            dset = dset.repeat(n_epochs)
 
             num_volumes = len(filepaths)
             examples_per_volume = np.prod(
@@ -799,7 +813,7 @@ class VolumeDataGenerator:
                     kernel_size=block_shape,
                     strides=strides))
 
-            total_examples = examples_per_volume * num_volumes * num_epochs
+            total_examples = examples_per_volume * num_volumes * n_epochs
             tf.logging.info(
                 "Total examples (all epochs): {}".format(total_examples))
 
