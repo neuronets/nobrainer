@@ -189,7 +189,7 @@ def train(params):
         multi_gpu=params['multi_gpu'])
 
 
-if __name__ == '__main__':
+def main():
     namespace = parse_args(sys.argv[1:])
     params = vars(namespace)
 
@@ -201,3 +201,7 @@ if __name__ == '__main__':
     params['strides'] = tuple(params['strides'])
 
     train(params=params)
+
+
+if __name__ == '__main__':
+    main()
