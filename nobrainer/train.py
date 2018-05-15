@@ -21,7 +21,7 @@ def train(model,
           y_dtype=DT_Y,
           shuffle=True,
           batch_size=8,
-          num_epochs=1,
+          n_epochs=1,
           prefetch=1,
           multi_gpu=False,
           eval_volume_data_generator=None,
@@ -37,7 +37,7 @@ def train(model,
         y_dtype=DT_Y,
         shuffle=shuffle,
         batch_size=batch_size,
-        num_epochs=num_epochs,
+        n_epochs=n_epochs,
         prefetch=prefetch,
         multi_gpu=multi_gpu)
 
@@ -57,7 +57,7 @@ def train(model,
             x_dtype=DT_X,
             y_dtype=DT_Y,
             batch_size=batch_size,
-            num_epochs=num_epochs,
+            n_epochs=n_epochs,
             prefetch=prefetch,
             multi_gpu=multi_gpu)
 
@@ -67,7 +67,7 @@ def train(model,
                 kernel_size=block_shape,
                 strides=strides))
         n_samples_per_epoch = examples_per_volume * len(filepaths)
-        max_steps = n_samples_per_epoch * num_epochs
+        max_steps = n_samples_per_epoch * n_epochs
 
         tf.logging.info("Will train for {} steps".format(max_steps))
         train_spec = tf.estimator.TrainSpec(
