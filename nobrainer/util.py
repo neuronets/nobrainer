@@ -1,8 +1,5 @@
 """Utilities."""
 
-import random
-
-import h5py
 import numpy as np
 import tensorflow as tf
 
@@ -36,56 +33,14 @@ def _check_all_x_in_subset_numpy(x, subset=(0, 1)):
         raise ValueError("Not all values are in set {}.".format(_subset))
 
 
-def create_indices(num_samples, batch_size, shuffle=False):
-    """Return list of tuples, where each tuple is """
-    import random
-
-    indices = zip(
-        range(0, num_samples, batch_size),
-        range(batch_size, num_samples + batch_size, batch_size))
-    indices = list(indices)
-
-    if shuffle:
-        random.shuffle(indices)
-
-    return indices
-
-
-def iter_hdf5(filepath, x_dataset, y_dataset, x_dtype, y_dtype, shuffle=False,
-              normalizer=None):
-    """Yield tuples of numpy arrays `(features, labels)` from an HDF5 file."""
-    with h5py.File(filepath, 'r') as fp:
-        num_x_samples = fp[x_dataset].shape[0]
-        num_y_samples = fp[y_dataset].shape[0]
-
-    if num_x_samples != num_y_samples:
-        raise ValueError(
-            "Number of feature samples is not equal to number of label"
-            " samples. Found {x} feature samples and {y} label samples."
-            .format(x=num_x_samples, y=num_y_samples))
-
-    indices = list(range(num_x_samples))
-    if shuffle:
-        random.shuffle(indices)
-
-    for idx in indices:
-        with h5py.File(filepath, 'r') as fp:
-            features = fp[x_dataset][idx]
-            labels = fp[y_dataset][idx]
-
-        features = features[..., np.newaxis]
-        features = features.astype(x_dtype)
-        labels = labels.astype(y_dtype)
-
-        if normalizer is not None:
-            features, labels = normalizer(features, labels)
-
-        yield features, labels
-
-
-def input_fn_builder(generator, output_types, output_shapes, num_epochs=1,
-                     multi_gpu=False, examples_per_epoch=None,
-                     batch_size=1):
+def input_fn_builder(generator,
+                     output_types,
+                     output_shapes,
+                     num_epochs=1,
+                     multi_gpu=False,
+                     examples_per_epoch=None,
+                     batch_size=1,
+                     prefetch=1):
     """Return `input_fn` handle. `input_fn` returns an instance of
     `tf.estimator.Dataset`, which iterates over `generator`.
     """
@@ -114,6 +69,9 @@ def input_fn_builder(generator, output_types, output_shapes, num_epochs=1,
             dset = dset.take(take_size)
 
         dset = dset.batch(batch_size)
+
+        if prefetch:
+            dset = dset.prefetch(prefetch)
 
         return dset
 
