@@ -4,7 +4,7 @@
 import tensorflow as tf
 
 from nobrainer.io import read_volume
-from nobrainer.volume import as_blocks
+from nobrainer.volume import to_blocks
 from nobrainer.volume import from_blocks
 from nobrainer.volume import normalize_zero_one
 
@@ -84,7 +84,7 @@ def predict_array(predictor,
     """
     if normalizer:
         features = normalizer(inputs)
-    features = as_blocks(features, block_shape=block_shape)
+    features = to_blocks(features, block_shape=block_shape)
     features = features[..., None]  # Add a dimension for single channel.
     predictions = predictor({'volume': features})
     return from_blocks(predictions, output_shape=inputs.shape)
