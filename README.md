@@ -106,7 +106,7 @@ If `--eval-csv` was specified, evaluation results will also appear in TensorBoar
 
 ### Python interface
 
-Models can also be trained with nobrainer's Python interface.
+Models can also be trained with nobrainer's Python interface. Trained models can be saved as `.pb` files in Python as well. These models can be used for prediction in other TensorFlow interfaces (JavaScript, C++, etc.).
 
 ```python
 import nobrainer
