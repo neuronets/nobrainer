@@ -56,6 +56,16 @@ def create_parser():
     t.add_argument(
         '--prefetch', type=int,
         help="Number of full volumes to prefetch for training and evaluation")
+    t.add_argument(
+        "--save-summary-steps", type=int, default=25,
+        help="Save summaries every this many steps.")
+    t.add_argument(
+        "--save-checkpoints-steps", type=int, default=100,
+        help="Save checkpoints every this many steps.")
+    t.add_argument(
+        "--keep-checkpoint-max", type=int, default=5,
+        help="Maximum number of recent checkpoint files to keep. Use 0 or None"
+             " to keep all.")
 
     d = p.add_argument_group('data arguments')
     d.add_argument(
@@ -91,26 +101,26 @@ def create_parser():
         help="Path to CSV of features, labels for periodic evaluation.")
 
     a = p.add_argument_group('data augmentation arguments')
-    a.add_argument('--samplewise_minmax', action='store_true')
-    a.add_argument('--samplewise_zscore', action='store_true')
-    a.add_argument('--samplewise_center', action='store_true')
-    a.add_argument('--samplewise_std_normalization', action='store_true')
-    a.add_argument('--rot90_x', action='store_true')
-    a.add_argument('--rot90_y', action='store_true')
-    a.add_argument('--rot90_z', action='store_true')
-    a.add_argument('--rotation_range_x', type=float, default=0.)
-    a.add_argument('--rotation_range_y', type=float, default=0.)
-    a.add_argument('--rotation_range_z', type=float, default=0.)
-    a.add_argument('--shift_range_x', type=float, default=0.)
-    a.add_argument('--shift_range_y', type=float, default=0.)
-    a.add_argument('--shift_range_z', type=float, default=0.)
-    a.add_argument('--flip_x', action='store_true')
-    a.add_argument('--flip_y', action='store_true')
-    a.add_argument('--flip_z', action='store_true')
-    a.add_argument('--brightness_range', type=float, default=0.)
-    a.add_argument('--zoom_range', type=float, default=0.)
-    a.add_argument('--reduce_contrast', action='store_true')
-    a.add_argument('--salt_and_pepper', action='store_true')
+    a.add_argument('--samplewise-minmax', action='store_true')
+    a.add_argument('--samplewise-zscore', action='store_true')
+    a.add_argument('--samplewise-center', action='store_true')
+    a.add_argument('--samplewise-std-normalization', action='store_true')
+    a.add_argument('--rot90-x', action='store_true')
+    a.add_argument('--rot90-y', action='store_true')
+    a.add_argument('--rot90-z', action='store_true')
+    a.add_argument('--rotation-range-x', type=float, default=0.)
+    a.add_argument('--rotation-range-y', type=float, default=0.)
+    a.add_argument('--rotation-range-z', type=float, default=0.)
+    a.add_argument('--shift-range-x', type=float, default=0.)
+    a.add_argument('--shift-range-y', type=float, default=0.)
+    a.add_argument('--shift-range-z', type=float, default=0.)
+    a.add_argument('--flip-x', action='store_true')
+    a.add_argument('--flip-y', action='store_true')
+    a.add_argument('--flip-z', action='store_true')
+    a.add_argument('--brightness-range', type=float, default=0.)
+    a.add_argument('--zoom-range', type=float, default=0.)
+    a.add_argument('--reduce-contrast', action='store_true')
+    a.add_argument('--salt-and-pepper', action='store_true')
     a.add_argument('--gaussian', action='store_true')
     a.add_argument('--rescale', type=float, default=0.)
 
@@ -126,9 +136,9 @@ def parse_args(args):
 def train(params):
 
     model_config = tf.estimator.RunConfig(
-        save_summary_steps=25,
-        save_checkpoints_steps=500,
-        keep_checkpoint_max=100)
+        save_summary_steps=params['save_summary_steps'],
+        save_checkpoints_steps=params['save_checkpoints_steps'],
+        keep_checkpoint_max=params['keep_checkpoint_max'])
 
     model = get_estimator(params['model'])(
         n_classes=params['n_classes'],
@@ -173,6 +183,13 @@ def train(params):
         binarize_y=params['binarize'],
         mapping_y=label_mapping)
 
+    if params['eval_csv']:
+        eval_volume_data_generator = VolumeDataGenerator(
+            binarize_y=params['binarize'],
+            mapping_y=label_mapping)
+    else:
+        eval_volume_data_generator = None
+
     _train(
         model=model,
         volume_data_generator=volume_data_generator,
@@ -186,7 +203,9 @@ def train(params):
         batch_size=params['batch_size'],
         n_epochs=params['n_epochs'],
         prefetch=params['prefetch'],
-        multi_gpu=params['multi_gpu'])
+        multi_gpu=params['multi_gpu'],
+        eval_volume_data_generator=eval_volume_data_generator,
+        eval_filepaths=params['eval_csv'])
 
 
 def main():
