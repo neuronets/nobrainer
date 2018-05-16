@@ -821,7 +821,7 @@ class VolumeDataGenerator:
                 take_size = batch_size * (total_examples // batch_size)
                 tf.logging.info(
                     "Training on multiple GPUs. Taking {} samples from"
-                    " dataset to divide batch size into epoch size evently."
+                    " dataset to divide batch size into epoch size evenly."
                     .format(take_size))
                 dset = dset.take(take_size)
 
