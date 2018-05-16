@@ -18,8 +18,14 @@ def create_parser():
     """Return argument parser for nobrainer training interface."""
     p = argparse.ArgumentParser()
 
-    m = p.add_argument_group('model arguments')
+    subparsers = p.add_subparsers(
+        dest="subparser_name", title="subcommands",
+        description="valid subcommands")
 
+    # Training subparser
+    tp = subparsers.add_parser('train', help="train models")
+
+    m = tp.add_argument_group('model arguments')
     m.add_argument(
         '-n', '--n-classes', required=True, type=int,
         help="Number of classes to classify")
@@ -36,7 +42,7 @@ def create_parser():
              " directory, will resume training from last checkpoint. If not"
              " specified, will use a temporary directory.")
 
-    t = p.add_argument_group('train arguments')
+    t = tp.add_argument_group('train arguments')
     t.add_argument(
         '-o', '--optimizer', required=True,
         help="Optimizer to use for training")
@@ -57,17 +63,17 @@ def create_parser():
         '--prefetch', type=int,
         help="Number of full volumes to prefetch for training and evaluation")
     t.add_argument(
-        "--save-summary-steps", type=int, default=25,
+        '--save-summary-steps', type=int, default=25,
         help="Save summaries every this many steps.")
     t.add_argument(
-        "--save-checkpoints-steps", type=int, default=100,
+        '--save-checkpoints-steps', type=int, default=100,
         help="Save checkpoints every this many steps.")
     t.add_argument(
-        "--keep-checkpoint-max", type=int, default=5,
+        '--keep-checkpoint-max', type=int, default=5,
         help="Maximum number of recent checkpoint files to keep. Use 0 or None"
              " to keep all.")
 
-    d = p.add_argument_group('data arguments')
+    d = tp.add_argument_group('data arguments')
     d.add_argument(
         '--volume-shape', nargs=3, required=True, type=int,
         help="Height, width, and depth of input data and features.")
@@ -83,7 +89,7 @@ def create_parser():
         '--csv', required=True,
         help="Path to CSV of features, labels for training.")
 
-    s = p.add_argument_group('segmentation task arguments')
+    s = tp.add_argument_group('segmentation task arguments')
     s.add_argument(
         '--binarize', action='store_true',
         help="If specified, binarize labels (e.g., for training a brain"
@@ -95,12 +101,12 @@ def create_parser():
              ". Header must be included. More than two columns are accepted,"
              " but only the first two columns are used.")
 
-    e = p.add_argument_group("evaluation arguments")
+    e = tp.add_argument_group("evaluation arguments")
     e.add_argument(
         '--eval-csv',
         help="Path to CSV of features, labels for periodic evaluation.")
 
-    a = p.add_argument_group('data augmentation arguments')
+    a = tp.add_argument_group('data augmentation arguments')
     a.add_argument('--samplewise-minmax', action='store_true')
     a.add_argument('--samplewise-zscore', action='store_true')
     a.add_argument('--samplewise-center', action='store_true')
@@ -124,13 +130,20 @@ def create_parser():
     a.add_argument('--gaussian', action='store_true')
     a.add_argument('--rescale', type=float, default=0.)
 
+    # Prediction subparser
+    pp = subparsers.add_parser('predict', help="predict using saved models")
+
     return p
 
 
 def parse_args(args):
     """Return namespace of arguments."""
     parser = create_parser()
-    return parser.parse_args(args)
+    namespace = parser.parse_args(args)
+    if namespace.subparser_name is None:
+        parser.print_usage()
+        parser.exit(1)
+    return namespace
 
 
 def train(params):
@@ -184,10 +197,12 @@ def train(params):
         mapping_y=label_mapping)
 
     if params['eval_csv']:
+        eval_filepaths = read_csv(params['eval_csv'])
         eval_volume_data_generator = VolumeDataGenerator(
             binarize_y=params['binarize'],
             mapping_y=label_mapping)
     else:
+        eval_filepaths = None
         eval_volume_data_generator = None
 
     _train(
@@ -205,21 +220,25 @@ def train(params):
         prefetch=params['prefetch'],
         multi_gpu=params['multi_gpu'],
         eval_volume_data_generator=eval_volume_data_generator,
-        eval_filepaths=params['eval_csv'])
+        eval_filepaths=eval_filepaths)
 
 
 def main():
     namespace = parse_args(sys.argv[1:])
     params = vars(namespace)
 
-    if params['binarize'] and params['label_mapping']:
-        raise ValueError(
-            "brainmask and aparcaseg-mapping cannot both be provided.")
-
-    params['block_shape'] = tuple(params['block_shape'])
-    params['strides'] = tuple(params['strides'])
-
-    train(params=params)
+    if params['subparser_name'] == 'train':
+        if params['binarize'] and params['label_mapping']:
+            raise ValueError(
+                "brainmask and aparcaseg-mapping cannot both be provided.")
+        params['block_shape'] = tuple(params['block_shape'])
+        params['strides'] = tuple(params['strides'])
+        train(params=params)
+    elif params['subparser_name'] == 'predict':
+        raise NotImplementedError("not implemented yet")
+    else:
+        # should never get to this point.
+        raise ValueError("invalid subparser.")
 
 
 if __name__ == '__main__':
