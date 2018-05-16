@@ -45,4 +45,9 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: Implementation :: CPython',
     ],
+    entry_points={
+        "console_scripts": [
+            "nobrainer=nobrainer.cli:main"
+        ]
+    },
 )
