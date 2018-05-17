@@ -16,16 +16,28 @@ $ singularity build nobrainer.sqsh docker://kaczmarj/nobrainer
 
 ## Train your own models
 
-Models can be trained on neuroimaging volumes on the command line or with a Python script. Please see examples below. All of the examples can be run within the nobrainer container.
+Models can be trained on neuroimaging volumes on the command line or with a Python script. All of the examples can be run within the nobrainer container.
+
+Training data pre-requisites:
+  1. Volumes must all be the same shape.
+  2. Volumes must be in a format supported by [nibabel](http://nipy.org/nibabel/).
+  3. Feature and label data must be available (e.g., T1 and aparc+aseg).
+
+Examples:
+  - [Command-line interface](#command-line-interface)
+  - [Python interface](#python-interface)
+
+Training progress can be visualized with [TensorBoard](https://www.tensorflow.org/programmers_guide/summaries_and_tensorboard):
+
+```
+$ singularity exec --clean-env --bind /path/to/models:/models nobrainer.sqsh \
+    tensorboard --logdir /models
+```
 
 Note: `$` indicates a command-line call.
 
-### Command-line interface
 
-Data pre-requisites:
-1. Volumes must all be the same shape.
-2. Volumes must be in a format supported by [nibabel](http://nipy.org/nibabel/).
-3. Feature and label data must be available (e.g., T1 and aparc+aseg).
+### Command-line interface
 
 Run the following to show the script's help message
 
@@ -71,6 +83,7 @@ $ nobrainer \
 Please see the command-line help message for a description of these options. Explanations of the less intuitive options are provided below.
 
 - `--model-opts`: model-specific options, which can be found in the model `__init__` signatures. This must be in JSON format.
+- `--model-dir`: the directory in which to save model checkpoints. These checkpoints can be used later for inference and to create a `.pb` model file.
 - `--multi-gpu`: if specified, train across all available GPUs. The batch will be split evenly across the GPUs. For example, if 8 GPUs are available and a batch of 8 is specified, each GPU receives a batch of size 1.
 - `--prefetch`: prepare this many full volumes while training is going on. This can be especially useful when applying multiple augmentations, as each augmentation takes time.
 - `--volume-shape`: shape of feature and label volumes.
@@ -83,10 +96,11 @@ features,labels
 /absolute/path/to/1/T1.mgz,/absolute/path/to/1/aparc+aseg.mgz
 /absolute/path/to/2/T1.mgz,/absolute/path/to/2/aparc+aseg.mgz
 ```
-- `--eval-csv`: path to CSV file with columns of features and labels filepaths. The file must have a header, although the column names can be arbitrary. If this file is given, the model will be evaluated on these data periodically. Results are available in TensorBoard. The CSV should look like the CSV in `--csv`, but of course, use different files.
+- `--eval-csv`: path to CSV file with columns of features and labels filepaths, like the CSV file in `--csv`. The file must have a header, although the column names can be arbitrary. If this file is given, the model will be evaluated on these data periodically. Results are available in TensorBoard. Of course, the evaluation CSV should not include files from the training CSV.
 - `--brainmask`: if specified, binarize the labels. If an aparc+aseg file is passed in as a label, the data will be binarized to create a brainmask.
-- `--label-mapping`: a path to a CSV file mapping the original labels in the label volumes to a range `[0, n_classes-1]`. The original labels are in the first column, and the new labels are in the second column. Values in the labels not included in the second column are automatically made 0. For example, the file below is used in a 3-class classification problem, where values 10 and 50 correspond to one class, values 20 and 60 correspond to another class, and all other values correspond to another class.
+- `--label-mapping`: a path to a CSV file mapping the original labels in the label volumes to a range `[0, n_classes-1]`. The file must have a header but the column names can be arbitrary. The original labels are in the first column, and the new labels are in the second column. Values in the labels not included in the second column are automatically made 0. For example, the file below is used in a 3-class classification problem, where values 10 and 50 correspond to one class, values 20 and 60 correspond to another class, and all other values correspond to another class.
 ```
+original,new
 10,1
 50,1
 20,2
@@ -94,27 +108,20 @@ features,labels
 ```
 
 
-Training progress can be visualized with [TensorBoard](https://www.tensorflow.org/programmers_guide/summaries_and_tensorboard):
-
-```
-singularity exec --bind /path/to/models:/models nobrainer.sqsh \
-  tensorboard --logdir /models
-```
-
-If `--eval-csv` was specified, evaluation results will also appear in TensorBoard.
-
-
 ### Python interface
 
 Models can also be trained with nobrainer's Python interface. Trained models can be saved as `.pb` files in Python as well. These models can be used for prediction in other TensorFlow interfaces (JavaScript, C++, etc.).
+
+The example below trains a HighRes3DNet model to perform brain extraction on 3D volumes. Training data are augmented in various ways. After training, the model is saved as a `.pb` model file and is used for prediction on new data.
 
 ```python
 import nobrainer
 import tensorflow as tf
 
-filepaths = nobrainer.read_csv("path/to/feature_labels.csv")
-
-datagen = nobrainer.VolumeDataGenerator(
+# Instantiate object to perform real-time data augmentation on training data.
+# This object is similar to `keras.preprocessing.image.ImageDataGenerator` but
+# works with volumetric data.
+volume_data_generator = nobrainer.VolumeDataGenerator(
     samplewise_minmax=True,
     rot90_x=True,
     rot90_y=True,
@@ -127,16 +134,22 @@ datagen = nobrainer.VolumeDataGenerator(
     reduce_contrast=True,
     binarize_y=True)
 
+# Instantiate TensorFlow model.
 model = nobrainer.HighRes3DNet(
     n_classes=2,
     optimizer='Adam',
     learning_rate=0.01,
-    one_batchnorm_per_resblock=True)
+    one_batchnorm_per_resblock=True,
+    dropout_rate=0.25)
 
+# Read in filepaths to features and labels.
+filepaths = nobrainer.read_csv("path/to/feature_labels.csv")
+
+# Train model.
 block_shape = (128, 128, 128)
 nobrainer.train(
     model=model,
-    volume_data_generator=datagen,
+    volume_data_generator=volume_data_generator,
     filepaths=filepaths,
     volume_shape=(256, 256, 256),
     block_shape=block_shape,
@@ -157,17 +170,10 @@ serving_input_fn = tf.estimator.export.build_raw_serving_input_receiver_fn({
 model.export_savedmodel("path/to/savedmodel", serving_input_fn)
 
 
-# Predict on a T1 using saved model.
+# Predict on a T1 using the saved model.
 ## Load saved model.
 predictor = tf.contrib.predictor.from_saved_model("path/to/savedmodel")
-## Load volume and block in preparation for prediction.
-anat = nobrainer.read_volume("path/to/t1.nii.gz", dtype="float32")
-anat = nobrainer.normalize_zero_one(features)
-features = nobrainer.as_blocks(anat, block_shape)
-## Add a dimension for single channel.
-features = features[..., None]
-## Run prediction. Returns a dictionary with tensors as values.
-predictions = predictor({'volume': features})
-## Combine the predicted blocks as a full volume.
-predictions = nobrainer.from_blocks(predictions['class_ids'], (256, 256, 256))
+predictions = nobrainer.predict_filepath(
+    predictor=predictor,
+    filepath="path/to/T1.mgz")
 ```
