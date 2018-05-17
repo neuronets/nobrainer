@@ -4,12 +4,15 @@
 
 import argparse
 import json
+from pathlib import Path
 import sys
 
+import nibabel as nib
 import tensorflow as tf
 
 from nobrainer.io import read_csv
 from nobrainer.models.util import get_estimator
+from nobrainer.predict import predict as _predict
 from nobrainer.train import train as _train
 from nobrainer.volume import VolumeDataGenerator
 
@@ -131,7 +134,16 @@ def create_parser():
     a.add_argument('--rescale', type=float, default=0.)
 
     # Prediction subparser
-    pp = subparsers.add_parser('predict', help="predict using saved models")
+    pp = subparsers.add_parser('predict', help="Predict using saved models.")
+    pp.add_argument('input', help="Filepath to volume on which to predict.")
+    pp.add_argument('output', help="Name out output file.")
+    ppp = pp.add_argument_group('prediction arguments')
+    ppp.add_argument(
+        '-b', '--block-shape', nargs=3, required=True, type=int,
+        help="Shape of blocks on which predict. Non-overlapping blocks of this"
+             " shape are taken from the inputs for prediction.")
+    ppp.add_argument(
+        '-m', '--model', required=True, help="Path to saved model.")
 
     return p
 
@@ -223,6 +235,14 @@ def train(params):
         eval_filepaths=eval_filepaths)
 
 
+def predict(params):
+    img = _predict(
+        inputs=params['input'],
+        predictor=params['model'],
+        block_shape=params['block_shape'])
+    nib.save(img, params['output'])
+
+
 def main():
     namespace = parse_args(sys.argv[1:])
     params = vars(namespace)
@@ -234,12 +254,27 @@ def main():
         params['block_shape'] = tuple(params['block_shape'])
         params['strides'] = tuple(params['strides'])
         train(params=params)
+
     elif params['subparser_name'] == 'predict':
-        raise NotImplementedError("not implemented yet")
+        params['block_shape'] = tuple(params['block_shape'])
+        if not Path(params['input']).is_file():
+            raise FileNotFoundError(
+                "file not found: {}".format(params['input']))
+        if Path(params['output']).is_file():
+            raise FileExistsError(
+                "output file exists: {}".format(params['output']))
+        predict(params)
+
     else:
         # should never get to this point.
         raise ValueError("invalid subparser.")
 
 
+# https://stackoverflow.com/a/27674608/5666087
+def _exception_handler(exception_type, exception, traceback):
+    print("Error [{}]: {}".format(exception_type.__name__, exception))
+
+
 if __name__ == '__main__':
+    sys.excepthook = _exception_handler
     main()
