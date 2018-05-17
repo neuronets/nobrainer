@@ -1,5 +1,9 @@
 """Top-level module imports for nobrainer."""
 
+import warnings
+# Ignore FutureWarning (from h5py in this case).
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
 try:
     import tensorflow
 except ImportError:
@@ -26,6 +30,8 @@ from nobrainer.models import get_estimator
 from nobrainer.models import HighRes3DNet
 from nobrainer.models import MeshNet
 from nobrainer.models import QuickNAT
+
+from nobrainer.predict import predict
 
 from nobrainer.train import train
 
