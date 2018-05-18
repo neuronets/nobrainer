@@ -11,6 +11,7 @@ import nibabel as nib
 import tensorflow as tf
 
 from nobrainer.io import read_csv
+from nobrainer.io import read_mapping
 from nobrainer.models.util import get_estimator
 from nobrainer.predict import predict as _predict
 from nobrainer.train import train as _train
@@ -26,7 +27,7 @@ def create_parser():
         description="valid subcommands")
 
     # Training subparser
-    tp = subparsers.add_parser('train', help="train models")
+    tp = subparsers.add_parser('train', help="Train models")
 
     m = tp.add_argument_group('model arguments')
     m.add_argument(
@@ -134,7 +135,7 @@ def create_parser():
     a.add_argument('--rescale', type=float, default=0.)
 
     # Prediction subparser
-    pp = subparsers.add_parser('predict', help="Predict using saved models.")
+    pp = subparsers.add_parser('predict', help="Predict using SavedModel")
     pp.add_argument('input', help="Filepath to volume on which to predict.")
     pp.add_argument('output', help="Name out output file.")
     ppp = pp.add_argument_group('prediction arguments')
@@ -144,6 +145,27 @@ def create_parser():
              " shape are taken from the inputs for prediction.")
     ppp.add_argument(
         '-m', '--model', required=True, help="Path to saved model.")
+
+    # Save subparser
+    sp = subparsers.add_parser('save', help="Save model as SavedModel (.pb)")
+    sp.add_argument('savedir', help="Path in which to save SavedModel.")
+    spp = sp.add_argument_group('Model arguments')
+    spp.add_argument(
+        '-m', '--model', required=True,
+        help="Nobrainer model (e.g., highres3dnet)")
+    spp.add_argument(
+        '-d', '--model-dir',
+        help="Path to model directory, containing checkpoints, graph, etc.")
+    spp.add_argument(
+        '-n', '--n-classes', required=True, type=int,
+        help="Number of classes the model classifies.")
+    spp.add_argument(
+        '-b', '--block-shape', nargs=3, required=True, type=int,
+        help="Height, width, and depth of data that model takes as input.")
+    spp.add_argument(
+        '--model-opts', type=json.loads, default={},
+        help='JSON string of model-specific options. For example'
+             ' `{"n_filters": 71}`.')
 
     return p
 
@@ -178,7 +200,7 @@ def train(params):
     if params['label_mapping']:
         tf.logging.info(
             "Reading mapping file: {}".format(params['label_mapping']))
-        label_mapping = read_csv(params['label_mapping'])
+        label_mapping = read_mapping(params['label_mapping'])
 
     filepaths = read_csv(params['csv'])
 
@@ -243,6 +265,23 @@ def predict(params):
     nib.save(img, params['output'])
 
 
+def save(params):
+    volume = tf.placeholder(
+        tf.float32, shape=[None, *params['block_shape'], 1])
+    serving_input_fn = tf.estimator.export.build_raw_serving_input_receiver_fn(
+        features={'volume': volume})
+
+    model = get_estimator(params['model'])(
+        n_classes=params['n_classes'],
+        model_dir=params['model_dir'],
+        **params['model_opts'])
+
+    saved_dir = model.export_savedmodel(
+        export_dir_base=params['savedir'],
+        serving_input_receiver_fn=serving_input_fn)
+    print("Saved model to {}".format(saved_dir.decode()))
+
+
 def main():
     namespace = parse_args(sys.argv[1:])
     params = vars(namespace)
@@ -264,6 +303,13 @@ def main():
             raise FileExistsError(
                 "output file exists: {}".format(params['output']))
         predict(params)
+
+    elif params['subparser_name'] == 'save':
+        params['block_shape'] = tuple(params['block_shape'])
+        if not Path(params['model_dir']).is_dir():
+            raise FileExistsError(
+                "model directory not found: {}".format(params['modeldir']))
+        save(params)
 
     else:
         # should never get to this point.
