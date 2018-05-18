@@ -1,0 +1,6 @@
+features,labels
+/evaldata/0_t1.mgz,/evaldata/0_aparc+aseg.mgz
+/evaldata/1_t1.mgz,/evaldata/1_aparc+aseg.mgz
+/evaldata/2_t1.mgz,/evaldata/2_aparc+aseg.mgz
+/evaldata/3_t1.mgz,/evaldata/3_aparc+aseg.mgz
+/evaldata/4_t1.mgz,/evaldata/4_aparc+aseg.mgz

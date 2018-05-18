@@ -1,18 +1,10 @@
-""""""
+"""Collection of methods for input/output."""
 
 import csv
 import json
 
 import nibabel as nib
 import numpy as np
-
-
-def read_json(filepath, **kwargs):
-    """Load JSON file `filepath` as dictionary. `kwargs` are keyword arguments
-    for `json.load()`.
-    """
-    with open(filepath, 'r') as fp:
-        return json.load(fp, **kwargs)
 
 
 def read_csv(filepath, header=True, delimiter=','):
@@ -26,16 +18,23 @@ def read_csv(filepath, header=True, delimiter=','):
         return [row for row in reader]
 
 
-def save_json(obj, filepath, indent=4, **kwargs):
-    """Save `obj` to JSON file `filepath`. `kwargs` are keyword arguments for
-    `json.dump()`.
+def read_json(filepath, **kwargs):
+    """Load JSON file `filepath` as dictionary. `kwargs` are keyword arguments
+    for `json.load()`.
     """
-    with open(filepath, 'w') as fp:
-        json.dump(obj, fp, indent=indent, **kwargs)
-        fp.write('\n')
+    with open(filepath, 'r') as fp:
+        return json.load(fp, **kwargs)
 
 
-def load_volume(filepath, dtype=None, return_affine=False):
+def read_mapping(filepath, header=True, delimiter=','):
+    """Read CSV to dictionary, where first column becomes keys and second columns
+    becomes values. Keys and values must be integers.
+    """
+    mapping = read_csv(filepath, header=header, delimiter=delimiter)
+    return {int(row[0]): int(row[1]) for row in mapping}
+
+
+def read_volume(filepath, dtype=None, return_affine=False):
     """Return numpy array of data from a neuroimaging file."""
     img = nib.load(filepath)
     data = np.asarray(img.dataobj)
@@ -45,10 +44,10 @@ def load_volume(filepath, dtype=None, return_affine=False):
     return data if not return_affine else (data, img.affine)
 
 
-def read_mapping(filepath):
-    """Read CSV to dictionary, where first column becomes keys and second columns
-    becomes values. Keys and values must be integers.
+def save_json(obj, filepath, indent=4, **kwargs):
+    """Save `obj` to JSON file `filepath`. `kwargs` are keyword arguments for
+    `json.dump()`.
     """
-    mapping = read_csv(filepath, header=True)
-    mapping = [(int(row[0]), int(row[1])) for row in mapping]
-    return dict(mapping)
+    with open(filepath, 'w') as fp:
+        json.dump(obj, fp, indent=indent, **kwargs)
+        fp.write('\n')
