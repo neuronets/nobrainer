@@ -10,4 +10,3 @@ Below are links to examples of training and saving models for brain extraction a
 
 - brain labelling
   - [command-line](brain-labelling-cli)
-  - [Python script](brain-labelling-python)
