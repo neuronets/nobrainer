@@ -21,7 +21,7 @@ $ singularity build nobrainer.sqsh docker://kaczmarj/nobrainer
 
 ### Train your own models
 
-Models can be trained on neuroimaging volumes on the command line or with a Python script. All of the examples can be run within the nobrainer container. Please see the [examples](examples) for more information.
+Models can be trained on neuroimaging volumes on the command line or with a Python script. All of the examples can be run within the _Nobrainer_ container. Please see the [examples](examples) for more information.
 
 Training data pre-requisites:
   1. Volumes must be in a format supported by [nibabel](http://nipy.org/nibabel/).
