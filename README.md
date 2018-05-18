@@ -1,8 +1,7 @@
 # nobrainer
 
-Neural networks for brain extraction and brain labelling from structural magnetic resonance images.
+Neural networks for brain extraction and labelling from structural magnetic resonance images.
 
-_Note: this is a work in progress._
 
 ## Examples
 
