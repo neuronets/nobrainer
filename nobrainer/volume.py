@@ -132,8 +132,14 @@ def iterblocks_3d(arr, kernel_size, strides=(1, 1, 1)):
                 yield arr[ixs, iys, izs]
 
 
-def itervolumes(filepaths, vol_shape, block_shape, x_dtype, y_dtype,
-                strides=(1, 1, 1), shuffle=False, normalizer=None):
+def itervolumes(filepaths,
+                vol_shape,
+                block_shape,
+                x_dtype,
+                y_dtype,
+                strides=(1, 1, 1),
+                shuffle=False,
+                normalizer=None):
     """Yield tuples of numpy arrays `(features, labels)` from a list of
     filepaths to neuroimaging files.
     """
