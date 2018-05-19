@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Metrics implemented in TensorFlow and NumPy. Functions that end in
 `_numpy` are implemented in NumPy for eager computation.
 

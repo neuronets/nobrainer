@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """HighRes3DNet implemented in TensorFlow.
 
 Reference

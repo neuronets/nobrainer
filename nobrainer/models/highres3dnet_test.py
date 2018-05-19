@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Tests for HighRes3DNet."""
 
 import numpy as np

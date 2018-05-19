@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Methods for real-time augmentation of volumetric data.
 
 Based on `keras.preprocessing.image`.

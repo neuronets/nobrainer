@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Utilities for `nobrainer.models`."""
 
 import tensorflow as tf

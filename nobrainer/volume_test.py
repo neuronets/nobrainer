@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Tests for `nobrainer.volume` module."""
 
 import numpy as np
