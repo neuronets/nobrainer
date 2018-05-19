@@ -124,6 +124,10 @@ def iterblocks_3d(arr, kernel_size, strides=(1, 1, 1)):
                 ixs = slice(ix, ix + kernel_size[0])
                 iys = slice(iy, iy + kernel_size[1])
                 izs = slice(iz, iz + kernel_size[2])
+                if arr[ixs, iys, izs].shape != tuple(kernel_size):
+                    raise ValueError(
+                        "block should have shape {} but got {}".format(
+                            kernel_size, arr[ixs, iys, izs].shape))
                 yield arr[ixs, iys, izs]
 
 
@@ -392,35 +396,25 @@ class VolumeDataGenerator:
         samplewise_center: boolean, subtract mean from each sample.
         samplewise_std_normalization: boolean, divide each sample by its
             standard deviation.
-        rot90_x: boolean, rotate 90 degrees in plane (0, 1).
-        rot90_y: boolean, rotate 90 degrees in plane (1, 2).
-        rot90_z: boolean, rotate 90 degrees in plane (0, 2).
-        rotation_range_x: float, range of rotation in plane (0, 1). Range is
-            [-rotation_range_x, rotation_range_x].
-        rotation_range_y: float, range of rotation in plane (1, 2). Range is
-            [-rotation_range_y, rotation_range_y].
-        rotation_range_z: float, range of rotation in plane (0, 2). Range is
-            [-rotation_range_z, rotation_range_z].
-        shift_range_x: float, range of volume shift in axis 0. Range is
-            [-shift_range_x, shift_range_x].
-        shift_range_y: float, range of volume shift in axis 1. Range is
-            [-shift_range_y, shift_range_y].
-        shift_range_z: float, range of volume shift in axis 2. Range is
-            [-shift_range_z, shift_range_z].
-        flip_x: boolean, reverse values in axis 0.
-        flip_y: boolean, reverse values in axis 1.
-        flip_z: boolean, reverse values in axis 2.
-        brightness_range: float, add value in range
-            [-brightness_range, brightness_range] to data.
-        zoom_range: float or tuple len 2, if float, zoom by factor in range
-            [1 - zoom_range, 1 + zoom_range]. If tuple, zoom by factor in range
-            [zoom_range[0], zoom_range[1]].
+        flip: boolean, reverse values in a random axis. If provided, labels are
+            flipped in the same way.
+        rescale: float, multiply data by this value.
+        rotate: boolean, rotate 90 degrees in a random plane. If provided,
+            labels are rotated in the same way.
+        gaussian: boolean, add Gaussian noise.
         reduce_contrast: boolean, reduce contrast by taking square root of
             (data + 1). One is added to the data before calculating square root
             to avoid amplifying values in range (0, 1).
         salt_and_pepper: boolean, add random salt and pepper noise.
-        gaussian: boolean, add Gaussian noise.
-        rescale: float, multiply data by this value.
+        brightness_range: float, add value in range
+            [-brightness_range, brightness_range] to data.
+        shift_range: float, range of volume shift in a random axis. Range is
+            [-shift_range, shift_range]. If provided, labels are shifted in the
+            same way.
+        zoom_range: float or tuple len 2, if float, zoom by factor in range
+            [1 - zoom_range, 1 + zoom_range]. If tuple, zoom by factor in range
+            [zoom_range[0], zoom_range[1]]. If provided, labels are zoomed in
+            the same way.
         preprocessing_function: callable, modify data using this function
             prior to standardizing. Must accept a 3D array and return a 3D
             array.
@@ -438,8 +432,9 @@ class VolumeDataGenerator:
     ```python
     datagen = VolumeDataGenerator(
         samplewise_minmax=True,
-        rot90_x=True,
-        flip_y=True,
+        flip=True,
+        rotate=True,
+        gaussian=True,
         salt_and_pepper=True)
 
     filepaths = [
@@ -466,24 +461,15 @@ class VolumeDataGenerator:
                  samplewise_zscore=False,
                  samplewise_center=False,
                  samplewise_std_normalization=False,
-                 rot90_x=False,
-                 rot90_y=False,
-                 rot90_z=False,
-                 rotation_range_x=0.,
-                 rotation_range_y=0.,
-                 rotation_range_z=0.,
-                 shift_range_x=0.,
-                 shift_range_y=0.,
-                 shift_range_z=0.,
-                 flip_x=False,
-                 flip_y=False,
-                 flip_z=False,
-                 brightness_range=0.,
-                 zoom_range=0.,
+                 flip=False,
+                 rescale=None,
+                 rotate=False,
+                 gaussian=False,
                  reduce_contrast=False,
                  salt_and_pepper=False,
-                 gaussian=False,
-                 rescale=None,
+                 brightness_range=0.,
+                 shift_range=0,
+                 zoom_range=0.,
                  preprocessing_function=None,
                  binarize_y=False,
                  mapping_y=None):
@@ -491,24 +477,15 @@ class VolumeDataGenerator:
         self.samplewise_zscore = samplewise_zscore
         self.samplewise_center = samplewise_center
         self.samplewise_std_normalization = samplewise_std_normalization
-        self.rot90_x = rot90_x
-        self.rot90_y = rot90_y
-        self.rot90_z = rot90_z
-        self.rotation_range_x = rotation_range_x
-        self.rotation_range_y = rotation_range_y
-        self.rotation_range_z = rotation_range_z
-        self.shift_range_x = shift_range_x
-        self.shift_range_y = shift_range_y
-        self.shift_range_z = shift_range_z
-        self.flip_x = flip_x
-        self.flip_y = flip_y
-        self.flip_z = flip_z
-        self.brightness_range = brightness_range
-        self.zoom_range = zoom_range
+        self.flip = flip
+        self.rescale = rescale
+        self.rotate = rotate
+        self.gaussian = gaussian
         self.reduce_contrast = reduce_contrast
         self.salt_and_pepper = salt_and_pepper
-        self.gaussian = gaussian
-        self.rescale = rescale
+        self.brightness_range = brightness_range
+        self.shift_range = shift_range
+        self.zoom_range = zoom_range
         self.preprocessing_function = preprocessing_function
         self.binarize_y = binarize_y
         self.mapping_y = mapping_y
@@ -576,86 +553,28 @@ class VolumeDataGenerator:
         if y is not None:
             y = np.array(y, copy=copy, dtype=int)
 
-        if self.rot90_x:
+        if self.flip:
             if np.random.random() < 0.5:
-                x = np.rot90(x, k=1, axes=(0, 1))
+                axis = np.random.choice((0, 1, 2))
+                x = flip(x, axis=axis)
                 if y is not None:
-                    y = np.rot90(y, k=1, axes=(0, 1))
+                    y = flip(y, axis=axis)
 
-        if self.rot90_y:
+        if self.rotate:
             if np.random.random() < 0.5:
-                x = np.rot90(x, k=1, axes=(1, 2))
+                a1, a2 = np.random.choice((0, 1, 2), size=2, replace=False)
+                x = x.swapaxes(a1, a2)
                 if y is not None:
-                    y = np.rot90(y, k=1, axes=(1, 2))
+                    y = y.swapaxes(a1, a2)
 
-        if self.rot90_z:
+        if self.shift_range:
             if np.random.random() < 0.5:
-                x = np.rot90(x, k=1, axes=(0, 2))
+                ts = np.random.uniform(-self.shift_range, self.shift_range)
+                s = [ts, 0, 0]
+                np.random.shuffle(s)
+                x = shift(x, s=s)
                 if y is not None:
-                    y = np.rot90(y, k=1, axes=(0, 2))
-
-        if self.rotation_range_x:
-            if np.random.random() < 0.5:
-                theta = np.random.uniform(
-                    -self.rotation_range_x, self.rotation_range_x)
-                rotate(x, theta, axes=(0, 1), out=x)
-                if y is not None:
-                    rotate(y, theta, axes=(0, 1), out=y)
-
-        if self.rotation_range_y:
-            if np.random.random() < 0.5:
-                theta = np.random.uniform(
-                    -self.rotation_range_y, self.rotation_range_y)
-                rotate(x, theta, axes=(1, 2), out=x)
-                if y is not None:
-                    rotate(y, theta, axes=(1, 2), out=y)
-
-        if self.rotation_range_z:
-            if np.random.random() < 0.5:
-                theta = np.random.uniform(
-                    -self.rotation_range_z, self.rotation_range_z)
-                rotate(x, theta, axes=(0, 2), out=x)
-                if y is not None:
-                    rotate(y, theta, axes=(0, 2), out=y)
-
-        if self.shift_range_x:
-            if np.random.random() < 0.5:
-                ts = np.random.choice(self.width_shift_range)
-                x = shift(x, [ts, 0, 0])
-                if y is not None:
-                    y = shift(y, [ts, 0, 0])
-
-        if self.shift_range_y:
-            if np.random.random() < 0.5:
-                ts = np.random.choice(self.height_shift_range)
-                x = shift(x, [0, ts, 0])
-                if y is not None:
-                    y = shift(y, [0, ts, 0])
-
-        if self.shift_range_z:
-            if np.random.random() < 0.5:
-                ts = np.random.choice(self.depth_shift_range)
-                x = shift(x, [0, 0, ts])
-                if y is not None:
-                    y = shift(y, [0, 0, ts])
-
-        if self.flip_x:
-            if np.random.random() < 0.5:
-                x = flip(x, 0)
-                if y is not None:
-                    y = flip(y, 0)
-
-        if self.flip_y:
-            if np.random.random() < 0.5:
-                x = flip(x, 1)
-                if y is not None:
-                    y = flip(y, 1)
-
-        if self.flip_z:
-            if np.random.random() < 0.5:
-                x = flip(x, 2)
-                if y is not None:
-                    y = flip(y, 2)
+                    y = shift(y, s=s)
 
         if self.brightness_range:
             if np.random.random() < 0.5:
