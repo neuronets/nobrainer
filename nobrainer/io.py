@@ -27,8 +27,8 @@ def read_json(filepath, **kwargs):
 
 
 def read_mapping(filepath, header=True, delimiter=','):
-    """Read CSV to dictionary, where first column becomes keys and second columns
-    becomes values. Keys and values must be integers.
+    """Read CSV to dictionary, where first column becomes keys and second
+    columns becomes values. Keys and values must be integers.
     """
     mapping = read_csv(filepath, header=header, delimiter=delimiter)
     return {int(row[0]): int(row[1]) for row in mapping}
