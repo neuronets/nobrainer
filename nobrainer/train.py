@@ -82,8 +82,8 @@ def train(model,
             name=None,
             hooks=None,
             exporters=None,
-            start_delay_secs=600,  # Start evaluating after 10 minutes.
-            throttle_secs=1200)  # Evaluate every 20 minutes.
+            start_delay_secs=3600,  # Start evaluating after an hour.
+            throttle_secs=3600)  # Evaluate every hour.
 
         tf.estimator.train_and_evaluate(
             estimator=model,
