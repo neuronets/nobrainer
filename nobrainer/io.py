@@ -4,7 +4,6 @@ import csv
 import json
 
 import nibabel as nib
-import numpy as np
 
 
 def read_csv(filepath, header=True, delimiter=','):
@@ -37,10 +36,7 @@ def read_mapping(filepath, header=True, delimiter=','):
 def read_volume(filepath, dtype=None, return_affine=False):
     """Return numpy array of data from a neuroimaging file."""
     img = nib.load(filepath)
-    data = np.asarray(img.dataobj)
-    if dtype is not None:
-        data = data.astype(dtype)
-    img.uncache()
+    data = img.get_fdata(caching='unchanged', dtype=dtype)
     return data if not return_affine else (data, img.affine)
 
 
