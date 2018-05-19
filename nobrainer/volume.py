@@ -154,15 +154,6 @@ def itervolumes(filepaths, vol_shape, block_shape, x_dtype, y_dtype,
                 .format(features_fp, labels_fp))
             raise
 
-        if features.shape != vol_shape:
-            raise ValueError(
-                "shape of features is not {}: {}"
-                .format(vol_shape, features_fp))
-        if labels.shape != vol_shape:
-            raise ValueError(
-                "shape of labels is not {}: {}"
-                .format(vol_shape, labels_fp))
-
         if normalizer is not None:
             features, labels = normalizer(features, labels)
 
