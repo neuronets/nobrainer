@@ -114,24 +114,15 @@ def create_parser():
     a.add_argument('--samplewise-zscore', action='store_true')
     a.add_argument('--samplewise-center', action='store_true')
     a.add_argument('--samplewise-std-normalization', action='store_true')
-    a.add_argument('--rot90-x', action='store_true')
-    a.add_argument('--rot90-y', action='store_true')
-    a.add_argument('--rot90-z', action='store_true')
-    a.add_argument('--rotation-range-x', type=float, default=0.)
-    a.add_argument('--rotation-range-y', type=float, default=0.)
-    a.add_argument('--rotation-range-z', type=float, default=0.)
-    a.add_argument('--shift-range-x', type=float, default=0.)
-    a.add_argument('--shift-range-y', type=float, default=0.)
-    a.add_argument('--shift-range-z', type=float, default=0.)
-    a.add_argument('--flip-x', action='store_true')
-    a.add_argument('--flip-y', action='store_true')
-    a.add_argument('--flip-z', action='store_true')
-    a.add_argument('--brightness-range', type=float, default=0.)
-    a.add_argument('--zoom-range', type=float, default=0.)
+    a.add_argument('--flip', action='store_true')
+    a.add_argument('--rescale', type=float, default=0.)
+    a.add_argument('--rotate', action='store_true')
+    a.add_argument('--gaussian', action='store_true')
     a.add_argument('--reduce-contrast', action='store_true')
     a.add_argument('--salt-and-pepper', action='store_true')
-    a.add_argument('--gaussian', action='store_true')
-    a.add_argument('--rescale', type=float, default=0.)
+    a.add_argument('--brightness-range', type=float, default=0.)
+    a.add_argument('--shift-range', type=float, default=0.)
+    a.add_argument('--zoom-range', type=float, default=0.)
 
     # Prediction subparser
     pp = subparsers.add_parser('predict', help="Predict using SavedModel")
@@ -208,24 +199,15 @@ def train(params):
         samplewise_zscore=params['samplewise_zscore'],
         samplewise_center=params['samplewise_center'],
         samplewise_std_normalization=params['samplewise_std_normalization'],
-        rot90_x=params['rot90_x'],
-        rot90_y=params['rot90_y'],
-        rot90_z=params['rot90_z'],
-        rotation_range_x=params['rotation_range_x'],
-        rotation_range_y=params['rotation_range_y'],
-        rotation_range_z=params['rotation_range_z'],
-        shift_range_x=params['shift_range_x'],
-        shift_range_y=params['shift_range_y'],
-        shift_range_z=params['shift_range_z'],
-        flip_x=params['flip_x'],
-        flip_y=params['flip_y'],
-        flip_z=params['flip_z'],
-        brightness_range=params['brightness_range'],
-        zoom_range=params['zoom_range'],
+        flip=params['flip'],
+        rescale=params['rescale'],
+        rotate=params['rotate'],
+        gaussian=params['gaussian'],
         reduce_contrast=params['reduce_contrast'],
         salt_and_pepper=params['salt_and_pepper'],
-        gaussian=params['gaussian'],
-        rescale=params['rescale'],
+        brightness_range=params['brightness_range'],
+        shift_range=params['shift_range'],
+        zoom_range=params['zoom_range'],
         binarize_y=params['binarize'],
         mapping_y=label_mapping)
 
