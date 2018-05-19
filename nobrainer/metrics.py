@@ -77,8 +77,12 @@ def dice_numpy(u, v, axis=None):
     return numerator / denominator
 
 
-def streaming_dice(labels, predictions, weights=None, metrics_collections=None,
-                   update_collections=None, name=None):
+def streaming_dice(labels,
+                   predictions,
+                   weights=None,
+                   metrics_collections=None,
+                   update_collections=None,
+                   name=None):
     """Calculates Dice coefficient between `labels` and `features`."""
     dice_ = dice(labels, predictions, axis=(1, 2, 3))
     # TODO (kaczmarj): do not get mean of NaN.
@@ -139,8 +143,11 @@ def hamming_numpy(u, v, axis=None):
     return np.mean(u_ne_v, axis=axis)
 
 
-def streaming_hamming(labels, predictions, weights=None,
-                      metrics_collections=None, update_collections=None,
+def streaming_hamming(labels,
+                      predictions,
+                      weights=None,
+                      metrics_collections=None,
+                      update_collections=None,
                       name=None):
     """Calculates Hamming distance between `labels` and `features`."""
     hamming_ = hamming(labels, predictions, axis=(1, 2, 3))
