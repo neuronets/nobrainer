@@ -45,6 +45,15 @@ def read_volume(filepath, dtype=None, return_affine=False):
     return data if not return_affine else (data, img.affine)
 
 
+def save_csv(rows, filepath, mode='w', delimiter=','):
+    """Return list of tuples from a CSV, where each tuple contains the items
+    in a row.
+    """
+    with open(filepath, mode=mode, newline='') as csvfile:
+        writer = csv.writer(csvfile, delimiter=delimiter)
+        writer.writerows(rows)
+
+
 def save_json(obj, filepath, indent=4, **kwargs):
     """Save `obj` to JSON file `filepath`. `kwargs` are keyword arguments for
     `json.dump()`.
