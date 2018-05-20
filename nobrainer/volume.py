@@ -133,7 +133,6 @@ def iterblocks_3d(arr, kernel_size, strides=(1, 1, 1)):
 
 
 def itervolumes(filepaths,
-                vol_shape,
                 block_shape,
                 x_dtype,
                 y_dtype,
@@ -144,16 +143,9 @@ def itervolumes(filepaths,
     filepaths to neuroimaging files.
     """
     filepaths = copy.deepcopy(filepaths)
+
     if shuffle:
         random.shuffle(filepaths)
-
-    _n_blocks = np.prod(
-        _get_n_blocks(
-            arr_shape=vol_shape, kernel_size=block_shape, strides=strides))
-
-    tf.logging.info(
-        "Will yield {} blocks of shape {} per volume"
-        .format(_n_blocks, block_shape))
 
     for idx, (features_fp, labels_fp) in enumerate(filepaths):
         try:
@@ -451,7 +443,6 @@ class VolumeDataGenerator:
 
     generator = datagen.flow_from_files(
         filepaths=filepaths,
-        volume_shape=(256, 256, 256),
         block_shape=(128, 128, 128),
         strides=(128, 128, 128),
         x_dtype=np.float32,
@@ -617,7 +608,6 @@ class VolumeDataGenerator:
 
     def flow_from_filepaths(self,
                             filepaths,
-                            volume_shape,
                             block_shape,
                             strides,
                             x_dtype,
@@ -633,7 +623,6 @@ class VolumeDataGenerator:
             filepaths: list of tuples, where first item in each tuple is the
                 path to the features volume, and the second item is the path
                 to the corresponding labels volume.
-            volume_shape: tuple len 3, shape of input volumes.
             block_shape: tuple len 3, shape of output blocks.
             strides: int or tuple len 3, stride in each axis when extracting
                 blocks from the original volume. If an int, that stride is used
@@ -658,7 +647,6 @@ class VolumeDataGenerator:
 
         return itervolumes(
             filepaths=filepaths,
-            vol_shape=volume_shape,
             block_shape=block_shape,
             strides=strides,
             x_dtype=x_dtype,
@@ -668,7 +656,6 @@ class VolumeDataGenerator:
 
     def dset_input_fn_builder(self,
                               filepaths,
-                              volume_shape,
                               block_shape,
                               strides,
                               x_dtype,
@@ -676,7 +663,7 @@ class VolumeDataGenerator:
                               shuffle=None,
                               batch_size=8,
                               n_epochs=1,
-                              prefetch=1,
+                              prefetch=0,
                               multi_gpu=False):
         """Return function that returns instance of `tensorflow.data.Dataset`.
 
@@ -691,7 +678,6 @@ class VolumeDataGenerator:
             filepaths: list of tuples, where first item in each tuple is the
                 path to the features volume, and the second item is the path
                 to the corresponding labels volume.
-            volume_shape: tuple len 3, shape of input volumes.
             block_shape: tuple len 3, shape of output blocks.
             strides: int or tuple len 3, stride in each axis when extracting
                 blocks from the original volume. If an int, that stride is used
@@ -702,7 +688,7 @@ class VolumeDataGenerator:
             shuffle: boolean, shuffle list of filepaths.
             batch_size: int, number of blocks per batch.
             n_epochs: int, number of epochs.
-            prefetch: int, number of full volumes to prefetch. See
+            prefetch: int, number of blocks to prefetch. See
                 `tensorflow.data.Dataset.prefetch`.
             multi_gpu: boolean, train on multiple GPUs.
 
@@ -716,7 +702,6 @@ class VolumeDataGenerator:
         def generator_builder():
             return self.flow_from_filepaths(
                 filepaths=filepaths,
-                volume_shape=volume_shape,
                 block_shape=block_shape,
                 strides=strides,
                 x_dtype=x_dtype,
@@ -730,32 +715,25 @@ class VolumeDataGenerator:
                 generator=generator_builder,
                 output_types=(tf.as_dtype(x_dtype), tf.as_dtype(y_dtype)),
                 output_shapes=((*block_shape, 1), block_shape))
+
+            # Loop through the dataset `n_epochs` times.
             dset = dset.repeat(n_epochs)
 
-            num_volumes = len(filepaths)
-            examples_per_volume = np.prod(
-                _get_n_blocks(
-                    arr_shape=volume_shape,
-                    kernel_size=block_shape,
-                    strides=strides))
-
-            total_examples = examples_per_volume * num_volumes * n_epochs
-            tf.logging.info(
-                "Total examples (all epochs): {}".format(total_examples))
-
             if multi_gpu:
-                take_size = batch_size * (total_examples // batch_size)
-                tf.logging.info(
-                    "Training on multiple GPUs. Taking {} samples from"
-                    " dataset to divide batch size into epoch size evenly."
-                    .format(take_size))
-                dset = dset.take(take_size)
+                # If the last batch is smaller than `batch_size`, do not use
+                # that last batch. This is necessary when training on multiple
+                # GPUs because the batch size must always be divisible by the
+                # number of GPUs.
+                dset = dset.apply(
+                    tf.contrib.data.batch_and_drop_remainder(batch_size))
+            else:
+                # If not training on multiple GPUs, batch sizes do not have to
+                # be consistent.
+                dset = dset.batch(batch_size)
 
-            dset = dset.batch(batch_size)
-
-            # Prefetch N full volumes.
             if prefetch:
-                dset = dset.prefetch(prefetch * examples_per_volume)
+                # Prefetch samples to load/augment new data while training.
+                dset = dset.prefetch(prefetch)
 
             return dset
 

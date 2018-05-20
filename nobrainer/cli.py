@@ -64,7 +64,7 @@ def create_parser():
         help="Train across all available GPUs. Batches are split across GPUs.")
     t.add_argument(
         '--prefetch', type=int,
-        help="Number of full volumes to prefetch for training and evaluation")
+        help="Number of blocks to prefetch for training and evaluation")
     t.add_argument(
         '--save-summary-steps', type=int, default=25,
         help="Save summaries every this many steps.")
@@ -77,9 +77,6 @@ def create_parser():
              " to keep all.")
 
     d = tp.add_argument_group('data arguments')
-    d.add_argument(
-        '--volume-shape', nargs=3, required=True, type=int,
-        help="Height, width, and depth of input data and features.")
     d.add_argument(
         '--block-shape', nargs=3, required=True, type=int,
         help="Height, width, and depth of blocks to take from input data and"
@@ -224,7 +221,6 @@ def train(params):
         model=model,
         volume_data_generator=volume_data_generator,
         filepaths=filepaths,
-        volume_shape=params['volume_shape'],
         block_shape=params['block_shape'],
         strides=params['strides'],
         x_dtype='float32',
