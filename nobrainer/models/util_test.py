@@ -5,9 +5,11 @@ import pytest
 import tensorflow as tf
 
 import nobrainer
-from nobrainer.models.util import (
-    get_estimator, get_items_not_in_iterable, check_required_params,
-    check_optimizer_for_training)
+
+from nobrainer.models.util import check_optimizer_for_training
+from nobrainer.models.util import check_required_params
+from nobrainer.models.util import get_estimator
+from nobrainer.models.util import get_items_not_in_iterable
 
 
 def test_get_estimator():
