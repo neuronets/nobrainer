@@ -12,14 +12,15 @@ jobs:
       - run:
           name: Install nobrainer and dependencies for tests
           command: |
-            pip install --user --no-cache-dir -e /home/circleci/nobrainer[cpu]
-            pip install --user --no-cache-dir codecov pytest-cov
+            pip install --user --no-cache-dir -U pip
+            pip install --user --no-cache-dir -q -e /home/circleci/nobrainer[cpu]
+            pip install --user --no-cache-dir -q codecov pytest-cov
       - run:
           name: Run tests
           working_directory: /home/circleci/nobrainer
           command: |
             export PATH="~/.local/bin:$PATH"
-            pytest --cov=./
+            pytest --cov=nobrainer nobrainer
       - run:
           name: Upload coverage results
           working_directory: /home/circleci/nobrainer
