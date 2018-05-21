@@ -769,8 +769,9 @@ def _get_n_blocks(arr_shape, kernel_size, strides=1):
     for n in n_blocks:
         if not n.is_integer() or n < 1:
             raise ValueError(
-                "Invalid combination of input shape, kernel size, and strides."
-                " This combination would create a non-integer or <1 number of"
-                " blocks.")
+                "Invalid combination of input shape {}, kernel size {}, and"
+                " strides {}. This combination would create a non-integer or"
+                " <1 number of blocks."
+                .format(arr_shape, kernel_size, strides))
 
     return tuple(map(int, n_blocks))
