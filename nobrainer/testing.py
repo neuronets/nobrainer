@@ -18,7 +18,7 @@ def csv_of_volumes(tmpdir_factory):
     n_volumes = 2
 
     features = np.random.rand(n_volumes, *volume_shape).astype(np.float32) * 10
-    labels = np.random.rand(n_volumes, *volume_shape)
+    labels = np.random.randint(0, 1, size=(n_volumes, *volume_shape))
     labels = labels.astype(np.int32)
     affine = np.eye(4)
     list_of_filepaths = []
