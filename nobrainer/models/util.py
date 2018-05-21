@@ -45,8 +45,7 @@ def check_required_params(required_keys, params):
     if notin:
         raise ValueError(
             "required parameters were not found: '{}'."
-            .format("', ".join(notin))
-        )
+            .format("', ".join(notin)))
 
 
 def set_default_params(defaults, params):
