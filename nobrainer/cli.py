@@ -78,6 +78,9 @@ def create_parser():
 
     d = tp.add_argument_group('data arguments')
     d.add_argument(
+        '--volume-shape', nargs=3, required=True, type=int,
+        help="Height, width, and depth of input data and features.")
+    d.add_argument(
         '--block-shape', nargs=3, required=True, type=int,
         help="Height, width, and depth of blocks to take from input data and"
              " features.")
@@ -221,6 +224,7 @@ def train(params):
         model=model,
         volume_data_generator=volume_data_generator,
         filepaths=filepaths,
+        volume_shape=params['volume_shape'],
         block_shape=params['block_shape'],
         strides=params['strides'],
         x_dtype='float32',
@@ -259,8 +263,11 @@ def save(params):
     print("Saved model to {}".format(saved_dir.decode()))
 
 
-def main():
-    namespace = parse_args(sys.argv[1:])
+def main(args=None):
+    if args is None:
+        namespace = parse_args(sys.argv[1:])
+    else:
+        namespace = parse_args(args)
     params = vars(namespace)
 
     if params['subparser_name'] == 'train':
