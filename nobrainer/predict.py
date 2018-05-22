@@ -77,10 +77,14 @@ def predict_from_array(inputs,
     if normalizer:
         features = normalizer(inputs)
     features = to_blocks(features, block_shape=block_shape)
+    outputs = np.zeros_like(features)
     features = features[..., None]  # Add a dimension for single channel.
-    predictions = predictor({'volume': features})  # dictionary
-    predictions = predictions[_INFERENCE_CLASSES_KEY]
-    return from_blocks(predictions, output_shape=inputs.shape)
+
+    # Predict per block to reduce memory consumption.
+    for j in range(features.shape[0]):
+        outputs[j] = predictor({'volume': features[j]})[_INFERENCE_CLASSES_KEY]
+
+    return from_blocks(outputs, output_shape=inputs.shape)
 
 
 def predict_from_img(img,
