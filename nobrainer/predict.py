@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Methods to predict using trained models."""
 
+import math
 from pathlib import Path
 
 import nibabel as nib
@@ -81,12 +82,16 @@ def predict_from_array(inputs,
     features = features[..., None]  # Add a dimension for single channel.
 
     # Predict per block to reduce memory consumption.
-    msg = "++ predicting blocks {} to {} of {}"
     batch_size = 8
-    for j in range(0, features.shape[0], batch_size):
-        print(msg.format(j + 1, j + batch_size, features.shape[0]))
+    n_blocks = features.shape[0]
+    n_batches = math.ceil(n_blocks / batch_size)
+    progbar = tf.keras.utils.ProgBar(n_batches)
+    print("++ predicting on {} batches".format(n_batches))
+
+    for j in range(0, n_blocks, batch_size):
         outputs[j:j + batch_size] = predictor(
             {'volume': features[j:j + batch_size]})[_INFERENCE_CLASSES_KEY]
+        progbar.add(1)
 
     return from_blocks(outputs, output_shape=inputs.shape)
 
