@@ -81,7 +81,9 @@ def predict_from_array(inputs,
     features = features[..., None]  # Add a dimension for single channel.
 
     # Predict per block to reduce memory consumption.
+    msg = "++ predicting block {} of {}"
     for j in range(features.shape[0]):
+        print(msg.format(j + 1, features.shape[0]))
         outputs[j:j + 1] = predictor(
             {'volume': features[j:j + 1]})[_INFERENCE_CLASSES_KEY]
 
