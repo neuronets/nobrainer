@@ -82,7 +82,8 @@ def predict_from_array(inputs,
 
     # Predict per block to reduce memory consumption.
     for j in range(features.shape[0]):
-        outputs[j] = predictor({'volume': features[j]})[_INFERENCE_CLASSES_KEY]
+        outputs[j:j + 1] = predictor(
+            {'volume': features[j:j + 1]})[_INFERENCE_CLASSES_KEY]
 
     return from_blocks(outputs, output_shape=inputs.shape)
 
