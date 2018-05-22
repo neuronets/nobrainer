@@ -85,9 +85,9 @@ def predict_from_array(inputs,
     batch_size = 8
     n_blocks = features.shape[0]
     n_batches = math.ceil(n_blocks / batch_size)
-    progbar = tf.keras.utils.Progbar(n_batches)
     print("++ predicting on {} batches".format(n_batches))
-
+    progbar = tf.keras.utils.Progbar(n_batches)
+    progbar.update(0)
     for j in range(0, n_blocks, batch_size):
         outputs[j:j + batch_size] = predictor(
             {'volume': features[j:j + batch_size]})[_INFERENCE_CLASSES_KEY]
