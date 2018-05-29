@@ -576,9 +576,8 @@ class VolumeDataGenerator:
 
         if self.brightness_range:
             if np.random.random() < 0.5:
-                tb = np.random.uniform(
+                x += np.random.uniform(
                     -self.brightness_range, self.brightness_range)
-                x += tb
 
         if self.zoom_range:
             if np.random.random() < 0.5:
@@ -610,8 +609,8 @@ class VolumeDataGenerator:
                             filepaths,
                             block_shape,
                             strides,
-                            x_dtype,
-                            y_dtype,
+                            x_dtype='float32',
+                            y_dtype='int32',
                             shuffle=None):
         """Generate tuples of `(features, labels)` from a list of filepaths.
 
