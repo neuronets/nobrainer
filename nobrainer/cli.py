@@ -134,6 +134,10 @@ def create_parser():
         help="Shape of blocks on which predict. Non-overlapping blocks of this"
              " shape are taken from the inputs for prediction.")
     ppp.add_argument(
+        '--batch-size', default=4, type=int,
+        help="Number of sub-volumes per batch for prediction. Use a smaller"
+             " value if memory is insufficient.")
+    ppp.add_argument(
         '-m', '--model', required=True, help="Path to saved model.")
 
     # Save subparser
@@ -242,7 +246,8 @@ def predict(params):
     img = _predict(
         inputs=params['input'],
         predictor=params['model'],
-        block_shape=params['block_shape'])
+        block_shape=params['block_shape'],
+        batch_size=params['batch_size'])
     nib.save(img, params['output'])
 
 
