@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Methods to predict using trained models."""
 
+import math
 from pathlib import Path
 
 import nibabel as nib
@@ -19,11 +20,31 @@ def predict(inputs,
             predictor,
             block_shape,
             normalizer=normalize_zero_one,
+            batch_size=4,
             dtype=DT_X):
     """Return predictions from `inputs`.
 
     This is a general prediction method that can accept various types of
     `inputs` and `predictor`.
+
+    Args:
+        inputs: 3D array or Nibabel image or filepath or list of filepaths.
+        predictor: path-like or TensorFlow Predictor object, if path, must be
+            path to SavedModel.
+        block_shape: tuple of length 3, shape of sub-volumes on which to
+            predict.
+        normalizer: callable, function that accepts two arguments
+            `(features, labels)` and returns a tuple of modified
+            `(features, labels)`.
+        batch_size: int, number of sub-volumes per batch for predictions.
+        dtype: str or dtype object, datatype of features array.
+
+    Returns:
+        If `inputs` is a:
+            - 3D array, return a 3D array with predictions.
+            - Nibabel image or filepath, return a Nibabel image of predictions.
+            - list of filepaths, return generator that yields one Nibabel image
+                of predictions per iteration.
     """
     predictor = _get_predictor(predictor)
 
@@ -32,13 +53,15 @@ def predict(inputs,
             inputs=inputs,
             predictor=predictor,
             block_shape=block_shape,
-            normalizer=normalize_zero_one)
+            normalizer=normalize_zero_one,
+            batch_size=batch_size)
     elif isinstance(inputs, nib.spatialimages.SpatialImage):
         out = predict_from_img(
             img=inputs,
             predictor=predictor,
             block_shape=block_shape,
             normalizer=normalizer,
+            batch_size=batch_size,
             dtype=dtype)
     elif isinstance(inputs, str):
         out = predict_from_filepath(
@@ -46,6 +69,7 @@ def predict(inputs,
             predictor=predictor,
             block_shape=block_shape,
             normalizer=normalizer,
+            batch_size=batch_size,
             dtype=dtype)
     elif isinstance(inputs, (list, tuple)):
         out = predict_from_filepaths(
@@ -53,6 +77,7 @@ def predict(inputs,
             predictor=predictor,
             block_shape=block_shape,
             normalizer=normalizer,
+            batch_size=batch_size,
             dtype=dtype)
     return out
 
@@ -60,7 +85,8 @@ def predict(inputs,
 def predict_from_array(inputs,
                        predictor,
                        block_shape,
-                       normalizer=normalize_zero_one):
+                       normalizer=normalize_zero_one,
+                       batch_size=4):
     """Return a prediction given a filepath and an ndarray of features.
 
     Args:
@@ -70,6 +96,7 @@ def predict_from_array(inputs,
         block_shape: tuple of len 3, shape of blocks on which to predict.
         normalizer: callable, function that accepts an ndarray and returns an
             ndarray. Called before separating volume into blocks.
+        batch_size: int, number of sub-volumes per batch for prediction.
 
     Returns:
         ndarray of predictions.
@@ -77,16 +104,27 @@ def predict_from_array(inputs,
     if normalizer:
         features = normalizer(inputs)
     features = to_blocks(features, block_shape=block_shape)
+    outputs = np.zeros_like(features)
     features = features[..., None]  # Add a dimension for single channel.
-    predictions = predictor({'volume': features})  # dictionary
-    predictions = predictions[_INFERENCE_CLASSES_KEY]
-    return from_blocks(predictions, output_shape=inputs.shape)
+
+    # Predict per block to reduce memory consumption.
+    n_blocks = features.shape[0]
+    n_batches = math.ceil(n_blocks / batch_size)
+    progbar = tf.keras.utils.Progbar(n_batches)
+    progbar.update(0)
+    for j in range(0, n_blocks, batch_size):
+        outputs[j:j + batch_size] = predictor(
+            {'volume': features[j:j + batch_size]})[_INFERENCE_CLASSES_KEY]
+        progbar.add(1)
+
+    return from_blocks(outputs, output_shape=inputs.shape)
 
 
 def predict_from_img(img,
                      predictor,
                      block_shape,
                      normalizer=normalize_zero_one,
+                     batch_size=4,
                      dtype=DT_X):
     """Return a prediction given a Nibabel image instance and a predictor.
 
@@ -97,6 +135,7 @@ def predict_from_img(img,
         block_shape: tuple of len 3, shape of blocks on which to predict.
         normalizer: callable, function that accepts an ndarray and returns an
             ndarray. Called before separating volume into blocks.
+        batch_size: int, number of sub-volumes per batch for prediction.
         dtype: str or dtype object, dtype of features.
 
     Returns:
@@ -112,7 +151,8 @@ def predict_from_img(img,
         inputs=inputs,
         predictor=predictor,
         block_shape=block_shape,
-        normalizer=normalizer)
+        normalizer=normalizer,
+        batch_size=batch_size)
     return nib.spatialimages.SpatialImage(
         dataobj=y, affine=img.affine, header=img.header, extra=img.extra)
 
@@ -121,6 +161,7 @@ def predict_from_filepath(filepath,
                           predictor,
                           block_shape,
                           normalizer=normalize_zero_one,
+                          batch_size=4,
                           dtype=DT_X):
     """Return a prediction given a filepath and Predictor object.
 
@@ -132,6 +173,7 @@ def predict_from_filepath(filepath,
         block_shape: tuple of len 3, shape of blocks on which to predict.
         normalizer: callable, function that accepts an ndarray and returns an
             ndarray. Called before separating volume into blocks.
+        batch_size: int, number of sub-volumes per batch for prediction.
         dtype: str or dtype object, dtype of features.
 
     Returns:
@@ -144,13 +186,15 @@ def predict_from_filepath(filepath,
         img=img,
         predictor=predictor,
         block_shape=block_shape,
-        normalizer=normalizer)
+        normalizer=normalizer,
+        batch_size=batch_size)
 
 
 def predict_from_filepaths(filepaths,
                            predictor,
                            block_shape,
                            normalizer=normalize_zero_one,
+                           batch_size=4,
                            dtype=DT_X):
     """Yield predictions from filepaths using a SavedModel.
 
@@ -161,6 +205,7 @@ def predict_from_filepaths(filepaths,
         block_shape: tuple of len 3, shape of blocks on which to predict.
         normalizer: callable, function that accepts an ndarray and returns
             an ndarray. Called before separating volume into blocks.
+        batch_size: int, number of sub-volumes per batch for prediction.
         dtype: str or dtype object, dtype of features.
 
     Returns:
@@ -173,6 +218,7 @@ def predict_from_filepaths(filepaths,
             predictor=predictor,
             block_shape=block_shape,
             normalizer=normalizer,
+            batch_size=batch_size,
             dtype=dtype)
 
 

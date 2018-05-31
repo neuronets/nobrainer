@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """MeshNet implemented in TensorFlow.
 
 Reference

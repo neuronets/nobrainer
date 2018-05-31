@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Top-level module imports for nobrainer."""
 
 import warnings

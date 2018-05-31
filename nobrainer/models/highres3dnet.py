@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """HighRes3DNet implemented in TensorFlow.
 
 Reference
@@ -84,8 +85,7 @@ def _resblock(inputs,
 
     with tf.variable_scope('batchnorm_{}_0'.format(layer_num)):
         bn1 = tf.layers.batch_normalization(
-            inputs, training=training, fused=FUSED_BATCH_NORM,
-        )
+            inputs, training=training, fused=FUSED_BATCH_NORM)
     with tf.variable_scope('relu_{}_0'.format(layer_num)):
         relu1 = tf.nn.relu(bn1)
     with tf.variable_scope('conv_{}_0'.format(layer_num)):
@@ -220,9 +220,9 @@ def model_fn(features,
             predictions=predictions,
             export_outputs=export_outputs)
 
-    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
-        labels=labels, logits=logits)
-    loss = tf.reduce_mean(cross_entropy)
+    loss = tf.losses.sparse_softmax_cross_entropy(
+        labels=labels,
+        logits=logits)
 
     # Add evaluation metrics for class 1.
     labels = tf.cast(labels, predicted_classes.dtype)

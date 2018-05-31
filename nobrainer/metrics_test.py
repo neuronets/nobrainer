@@ -1,10 +1,14 @@
+# -*- coding: utf-8 -*-
 """Tests for `nobrainer.metrics`."""
 
 import numpy as np
 import scipy as sp
 import tensorflow as tf
 
-from nobrainer.metrics import dice, dice_numpy, hamming, hamming_numpy
+from nobrainer.metrics import dice
+from nobrainer.metrics import dice_numpy
+from nobrainer.metrics import hamming
+from nobrainer.metrics import hamming_numpy
 
 
 def test_dice():

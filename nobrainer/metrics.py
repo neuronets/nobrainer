@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Metrics implemented in TensorFlow and NumPy. Functions that end in
 `_numpy` are implemented in NumPy for eager computation.
 
@@ -10,6 +11,8 @@ import tensorflow as tf
 from tensorflow.python.framework.ops import add_to_collections
 
 from nobrainer.util import _check_all_x_in_subset_numpy, _check_shapes_equal
+
+_EPSILON = 1e-7
 
 
 def dice(u, v, axis=None, name=None):
@@ -35,11 +38,14 @@ def dice(u, v, axis=None, name=None):
         u = tf.convert_to_tensor(u)
         v = tf.convert_to_tensor(v)
 
-        intersection = tf.reduce_sum(tf.multiply(u, v), axis=axis)
+        # This is only the intersection when values are [0, 1].
+        intersection = tf.reduce_sum(u * v, axis=axis)
         const = tf.constant(2, dtype=intersection.dtype)
-        numerator = tf.multiply(const, intersection)
-        denominator = tf.add(
-            tf.reduce_sum(u, axis=axis), tf.reduce_sum(v, axis=axis))
+        numerator = tf.cast(tf.multiply(const, intersection), tf.float32)
+        denominator = tf.cast(
+            tf.reduce_sum(u, axis=axis) + tf.reduce_sum(v, axis=axis),
+            tf.float32)
+        denominator += _EPSILON
         return tf.truediv(numerator, denominator)
 
 
@@ -72,16 +78,23 @@ def dice_numpy(u, v, axis=None):
         _check_all_x_in_subset_numpy(v, subset)
 
     numerator = 2 * (u * v).sum(axis=axis)
-    denominator = u.sum(axis=axis) + v.sum(axis=axis)
+    denominator = u.sum(axis=axis) + v.sum(axis=axis) + _EPSILON
     return numerator / denominator
 
 
-def streaming_dice(labels, predictions, weights=None, metrics_collections=None,
-                   update_collections=None, name=None):
+def streaming_dice(labels,
+                   predictions,
+                   weights=None,
+                   metrics_collections=None,
+                   update_collections=None,
+                   name=None):
     """Calculates Dice coefficient between `labels` and `features`."""
     dice_ = dice(labels, predictions, axis=(1, 2, 3))
-    # TODO (kaczmarj): do not get mean of NaN.
-    mean_dice, update_op = tf.metrics.mean(dice_)
+    # Remove zeros from dice before getting mean. Zero can be caused by labels
+    # not having any non-zero class labels.
+    dice_nonzero = tf.gather(
+        dice_, tf.where(tf.not_equal(dice_, tf.constant(0, tf.float32))))
+    mean_dice, update_op = tf.metrics.mean(dice_nonzero)
 
     if metrics_collections:
         add_to_collections(metrics_collections, mean_dice)
@@ -138,8 +151,11 @@ def hamming_numpy(u, v, axis=None):
     return np.mean(u_ne_v, axis=axis)
 
 
-def streaming_hamming(labels, predictions, weights=None,
-                      metrics_collections=None, update_collections=None,
+def streaming_hamming(labels,
+                      predictions,
+                      weights=None,
+                      metrics_collections=None,
+                      update_collections=None,
                       name=None):
     """Calculates Hamming distance between `labels` and `features`."""
     hamming_ = hamming(labels, predictions, axis=(1, 2, 3))

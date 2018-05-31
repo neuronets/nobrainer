@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Methods for real-time augmentation of volumetric data.
 
 Based on `keras.preprocessing.image`.
@@ -124,25 +125,27 @@ def iterblocks_3d(arr, kernel_size, strides=(1, 1, 1)):
                 ixs = slice(ix, ix + kernel_size[0])
                 iys = slice(iy, iy + kernel_size[1])
                 izs = slice(iz, iz + kernel_size[2])
+                if arr[ixs, iys, izs].shape != tuple(kernel_size):
+                    raise ValueError(
+                        "block should have shape {} but got {}".format(
+                            kernel_size, arr[ixs, iys, izs].shape))
                 yield arr[ixs, iys, izs]
 
 
-def itervolumes(filepaths, vol_shape, block_shape, x_dtype, y_dtype,
-                strides=(1, 1, 1), shuffle=False, normalizer=None):
+def itervolumes(filepaths,
+                block_shape,
+                x_dtype,
+                y_dtype,
+                strides=(1, 1, 1),
+                shuffle=False,
+                normalizer=None):
     """Yield tuples of numpy arrays `(features, labels)` from a list of
     filepaths to neuroimaging files.
     """
     filepaths = copy.deepcopy(filepaths)
+
     if shuffle:
         random.shuffle(filepaths)
-
-    _n_blocks = np.prod(
-        _get_n_blocks(
-            arr_shape=vol_shape, kernel_size=block_shape, strides=strides))
-
-    tf.logging.info(
-        "Will yield {} blocks of shape {} per volume"
-        .format(_n_blocks, block_shape))
 
     for idx, (features_fp, labels_fp) in enumerate(filepaths):
         try:
@@ -153,15 +156,6 @@ def itervolumes(filepaths, vol_shape, block_shape, x_dtype, y_dtype,
                 "Error reading at least one input file: {} {}"
                 .format(features_fp, labels_fp))
             raise
-
-        if features.shape != vol_shape:
-            raise ValueError(
-                "shape of features is not {}: {}"
-                .format(vol_shape, features_fp))
-        if labels.shape != vol_shape:
-            raise ValueError(
-                "shape of labels is not {}: {}"
-                .format(vol_shape, labels_fp))
 
         if normalizer is not None:
             features, labels = normalizer(features, labels)
@@ -401,35 +395,25 @@ class VolumeDataGenerator:
         samplewise_center: boolean, subtract mean from each sample.
         samplewise_std_normalization: boolean, divide each sample by its
             standard deviation.
-        rot90_x: boolean, rotate 90 degrees in plane (0, 1).
-        rot90_y: boolean, rotate 90 degrees in plane (1, 2).
-        rot90_z: boolean, rotate 90 degrees in plane (0, 2).
-        rotation_range_x: float, range of rotation in plane (0, 1). Range is
-            [-rotation_range_x, rotation_range_x].
-        rotation_range_y: float, range of rotation in plane (1, 2). Range is
-            [-rotation_range_y, rotation_range_y].
-        rotation_range_z: float, range of rotation in plane (0, 2). Range is
-            [-rotation_range_z, rotation_range_z].
-        shift_range_x: float, range of volume shift in axis 0. Range is
-            [-shift_range_x, shift_range_x].
-        shift_range_y: float, range of volume shift in axis 1. Range is
-            [-shift_range_y, shift_range_y].
-        shift_range_z: float, range of volume shift in axis 2. Range is
-            [-shift_range_z, shift_range_z].
-        flip_x: boolean, reverse values in axis 0.
-        flip_y: boolean, reverse values in axis 1.
-        flip_z: boolean, reverse values in axis 2.
-        brightness_range: float, add value in range
-            [-brightness_range, brightness_range] to data.
-        zoom_range: float or tuple len 2, if float, zoom by factor in range
-            [1 - zoom_range, 1 + zoom_range]. If tuple, zoom by factor in range
-            [zoom_range[0], zoom_range[1]].
+        flip: boolean, reverse values in a random axis. If provided, labels are
+            flipped in the same way.
+        rescale: float, multiply data by this value.
+        rotate: boolean, rotate 90 degrees in a random plane. If provided,
+            labels are rotated in the same way.
+        gaussian: boolean, add Gaussian noise.
         reduce_contrast: boolean, reduce contrast by taking square root of
             (data + 1). One is added to the data before calculating square root
             to avoid amplifying values in range (0, 1).
         salt_and_pepper: boolean, add random salt and pepper noise.
-        gaussian: boolean, add Gaussian noise.
-        rescale: float, multiply data by this value.
+        brightness_range: float, add value in range
+            [-brightness_range, brightness_range] to data.
+        shift_range: float, range of volume shift in a random axis. Range is
+            [-shift_range, shift_range]. If provided, labels are shifted in the
+            same way.
+        zoom_range: float or tuple len 2, if float, zoom by factor in range
+            [1 - zoom_range, 1 + zoom_range]. If tuple, zoom by factor in range
+            [zoom_range[0], zoom_range[1]]. If provided, labels are zoomed in
+            the same way.
         preprocessing_function: callable, modify data using this function
             prior to standardizing. Must accept a 3D array and return a 3D
             array.
@@ -447,8 +431,9 @@ class VolumeDataGenerator:
     ```python
     datagen = VolumeDataGenerator(
         samplewise_minmax=True,
-        rot90_x=True,
-        flip_y=True,
+        flip=True,
+        rotate=True,
+        gaussian=True,
         salt_and_pepper=True)
 
     filepaths = [
@@ -458,7 +443,6 @@ class VolumeDataGenerator:
 
     generator = datagen.flow_from_files(
         filepaths=filepaths,
-        volume_shape=(256, 256, 256),
         block_shape=(128, 128, 128),
         strides=(128, 128, 128),
         x_dtype=np.float32,
@@ -475,24 +459,15 @@ class VolumeDataGenerator:
                  samplewise_zscore=False,
                  samplewise_center=False,
                  samplewise_std_normalization=False,
-                 rot90_x=False,
-                 rot90_y=False,
-                 rot90_z=False,
-                 rotation_range_x=0.,
-                 rotation_range_y=0.,
-                 rotation_range_z=0.,
-                 shift_range_x=0.,
-                 shift_range_y=0.,
-                 shift_range_z=0.,
-                 flip_x=False,
-                 flip_y=False,
-                 flip_z=False,
-                 brightness_range=0.,
-                 zoom_range=0.,
+                 flip=False,
+                 rescale=None,
+                 rotate=False,
+                 gaussian=False,
                  reduce_contrast=False,
                  salt_and_pepper=False,
-                 gaussian=False,
-                 rescale=None,
+                 brightness_range=0.,
+                 shift_range=0,
+                 zoom_range=0.,
                  preprocessing_function=None,
                  binarize_y=False,
                  mapping_y=None):
@@ -500,24 +475,15 @@ class VolumeDataGenerator:
         self.samplewise_zscore = samplewise_zscore
         self.samplewise_center = samplewise_center
         self.samplewise_std_normalization = samplewise_std_normalization
-        self.rot90_x = rot90_x
-        self.rot90_y = rot90_y
-        self.rot90_z = rot90_z
-        self.rotation_range_x = rotation_range_x
-        self.rotation_range_y = rotation_range_y
-        self.rotation_range_z = rotation_range_z
-        self.shift_range_x = shift_range_x
-        self.shift_range_y = shift_range_y
-        self.shift_range_z = shift_range_z
-        self.flip_x = flip_x
-        self.flip_y = flip_y
-        self.flip_z = flip_z
-        self.brightness_range = brightness_range
-        self.zoom_range = zoom_range
+        self.flip = flip
+        self.rescale = rescale
+        self.rotate = rotate
+        self.gaussian = gaussian
         self.reduce_contrast = reduce_contrast
         self.salt_and_pepper = salt_and_pepper
-        self.gaussian = gaussian
-        self.rescale = rescale
+        self.brightness_range = brightness_range
+        self.shift_range = shift_range
+        self.zoom_range = zoom_range
         self.preprocessing_function = preprocessing_function
         self.binarize_y = binarize_y
         self.mapping_y = mapping_y
@@ -585,92 +551,33 @@ class VolumeDataGenerator:
         if y is not None:
             y = np.array(y, copy=copy, dtype=int)
 
-        if self.rot90_x:
+        if self.flip:
             if np.random.random() < 0.5:
-                x = np.rot90(x, k=1, axes=(0, 1))
+                axis = np.random.choice((0, 1, 2))
+                x = flip(x, axis=axis)
                 if y is not None:
-                    y = np.rot90(y, k=1, axes=(0, 1))
+                    y = flip(y, axis=axis)
 
-        if self.rot90_y:
+        if self.rotate:
             if np.random.random() < 0.5:
-                x = np.rot90(x, k=1, axes=(1, 2))
+                a1, a2 = np.random.choice((0, 1, 2), size=2, replace=False)
+                x = x.swapaxes(a1, a2)
                 if y is not None:
-                    y = np.rot90(y, k=1, axes=(1, 2))
+                    y = y.swapaxes(a1, a2)
 
-        if self.rot90_z:
+        if self.shift_range:
             if np.random.random() < 0.5:
-                x = np.rot90(x, k=1, axes=(0, 2))
+                ts = np.random.uniform(-self.shift_range, self.shift_range)
+                s = [ts, 0, 0]
+                np.random.shuffle(s)
+                x = shift(x, s=s)
                 if y is not None:
-                    y = np.rot90(y, k=1, axes=(0, 2))
-
-        if self.rotation_range_x:
-            if np.random.random() < 0.5:
-                theta = np.random.uniform(
-                    -self.rotation_range_x, self.rotation_range_x)
-                rotate(x, theta, axes=(0, 1), out=x)
-                if y is not None:
-                    rotate(y, theta, axes=(0, 1), out=y)
-
-        if self.rotation_range_y:
-            if np.random.random() < 0.5:
-                theta = np.random.uniform(
-                    -self.rotation_range_y, self.rotation_range_y)
-                rotate(x, theta, axes=(1, 2), out=x)
-                if y is not None:
-                    rotate(y, theta, axes=(1, 2), out=y)
-
-        if self.rotation_range_z:
-            if np.random.random() < 0.5:
-                theta = np.random.uniform(
-                    -self.rotation_range_z, self.rotation_range_z)
-                rotate(x, theta, axes=(0, 2), out=x)
-                if y is not None:
-                    rotate(y, theta, axes=(0, 2), out=y)
-
-        if self.shift_range_x:
-            if np.random.random() < 0.5:
-                ts = np.random.choice(self.width_shift_range)
-                x = shift(x, [ts, 0, 0])
-                if y is not None:
-                    y = shift(y, [ts, 0, 0])
-
-        if self.shift_range_y:
-            if np.random.random() < 0.5:
-                ts = np.random.choice(self.height_shift_range)
-                x = shift(x, [0, ts, 0])
-                if y is not None:
-                    y = shift(y, [0, ts, 0])
-
-        if self.shift_range_z:
-            if np.random.random() < 0.5:
-                ts = np.random.choice(self.depth_shift_range)
-                x = shift(x, [0, 0, ts])
-                if y is not None:
-                    y = shift(y, [0, 0, ts])
-
-        if self.flip_x:
-            if np.random.random() < 0.5:
-                x = flip(x, 0)
-                if y is not None:
-                    y = flip(y, 0)
-
-        if self.flip_y:
-            if np.random.random() < 0.5:
-                x = flip(x, 1)
-                if y is not None:
-                    y = flip(y, 1)
-
-        if self.flip_z:
-            if np.random.random() < 0.5:
-                x = flip(x, 2)
-                if y is not None:
-                    y = flip(y, 2)
+                    y = shift(y, s=s)
 
         if self.brightness_range:
             if np.random.random() < 0.5:
-                tb = np.random.uniform(
+                x += np.random.uniform(
                     -self.brightness_range, self.brightness_range)
-                x += tb
 
         if self.zoom_range:
             if np.random.random() < 0.5:
@@ -700,11 +607,10 @@ class VolumeDataGenerator:
 
     def flow_from_filepaths(self,
                             filepaths,
-                            volume_shape,
                             block_shape,
                             strides,
-                            x_dtype,
-                            y_dtype,
+                            x_dtype='float32',
+                            y_dtype='int32',
                             shuffle=None):
         """Generate tuples of `(features, labels)` from a list of filepaths.
 
@@ -716,7 +622,6 @@ class VolumeDataGenerator:
             filepaths: list of tuples, where first item in each tuple is the
                 path to the features volume, and the second item is the path
                 to the corresponding labels volume.
-            volume_shape: tuple len 3, shape of input volumes.
             block_shape: tuple len 3, shape of output blocks.
             strides: int or tuple len 3, stride in each axis when extracting
                 blocks from the original volume. If an int, that stride is used
@@ -741,7 +646,6 @@ class VolumeDataGenerator:
 
         return itervolumes(
             filepaths=filepaths,
-            vol_shape=volume_shape,
             block_shape=block_shape,
             strides=strides,
             x_dtype=x_dtype,
@@ -751,7 +655,6 @@ class VolumeDataGenerator:
 
     def dset_input_fn_builder(self,
                               filepaths,
-                              volume_shape,
                               block_shape,
                               strides,
                               x_dtype,
@@ -759,7 +662,7 @@ class VolumeDataGenerator:
                               shuffle=None,
                               batch_size=8,
                               n_epochs=1,
-                              prefetch=1,
+                              prefetch=0,
                               multi_gpu=False):
         """Return function that returns instance of `tensorflow.data.Dataset`.
 
@@ -774,7 +677,6 @@ class VolumeDataGenerator:
             filepaths: list of tuples, where first item in each tuple is the
                 path to the features volume, and the second item is the path
                 to the corresponding labels volume.
-            volume_shape: tuple len 3, shape of input volumes.
             block_shape: tuple len 3, shape of output blocks.
             strides: int or tuple len 3, stride in each axis when extracting
                 blocks from the original volume. If an int, that stride is used
@@ -785,7 +687,7 @@ class VolumeDataGenerator:
             shuffle: boolean, shuffle list of filepaths.
             batch_size: int, number of blocks per batch.
             n_epochs: int, number of epochs.
-            prefetch: int, number of full volumes to prefetch. See
+            prefetch: int, number of blocks to prefetch. See
                 `tensorflow.data.Dataset.prefetch`.
             multi_gpu: boolean, train on multiple GPUs.
 
@@ -799,7 +701,6 @@ class VolumeDataGenerator:
         def generator_builder():
             return self.flow_from_filepaths(
                 filepaths=filepaths,
-                volume_shape=volume_shape,
                 block_shape=block_shape,
                 strides=strides,
                 x_dtype=x_dtype,
@@ -813,32 +714,25 @@ class VolumeDataGenerator:
                 generator=generator_builder,
                 output_types=(tf.as_dtype(x_dtype), tf.as_dtype(y_dtype)),
                 output_shapes=((*block_shape, 1), block_shape))
+
+            # Loop through the dataset `n_epochs` times.
             dset = dset.repeat(n_epochs)
 
-            num_volumes = len(filepaths)
-            examples_per_volume = np.prod(
-                _get_n_blocks(
-                    arr_shape=volume_shape,
-                    kernel_size=block_shape,
-                    strides=strides))
-
-            total_examples = examples_per_volume * num_volumes * n_epochs
-            tf.logging.info(
-                "Total examples (all epochs): {}".format(total_examples))
-
             if multi_gpu:
-                take_size = batch_size * (total_examples // batch_size)
-                tf.logging.info(
-                    "Training on multiple GPUs. Taking {} samples from"
-                    " dataset to divide batch size into epoch size evenly."
-                    .format(take_size))
-                dset = dset.take(take_size)
+                # If the last batch is smaller than `batch_size`, do not use
+                # that last batch. This is necessary when training on multiple
+                # GPUs because the batch size must always be divisible by the
+                # number of GPUs.
+                dset = dset.apply(
+                    tf.contrib.data.batch_and_drop_remainder(batch_size))
+            else:
+                # If not training on multiple GPUs, batch sizes do not have to
+                # be consistent.
+                dset = dset.batch(batch_size)
 
-            dset = dset.batch(batch_size)
-
-            # Prefetch N full volumes.
             if prefetch:
-                dset = dset.prefetch(prefetch * examples_per_volume)
+                # Prefetch samples to load/augment new data while training.
+                dset = dset.prefetch(prefetch)
 
             return dset
 
@@ -874,8 +768,9 @@ def _get_n_blocks(arr_shape, kernel_size, strides=1):
     for n in n_blocks:
         if not n.is_integer() or n < 1:
             raise ValueError(
-                "Invalid combination of input shape, kernel size, and strides."
-                " This combination would create a non-integer or <1 number of"
-                " blocks.")
+                "Invalid combination of input shape {}, kernel size {}, and"
+                " strides {}. This combination would create a non-integer or"
+                " <1 number of blocks."
+                .format(arr_shape, kernel_size, strides))
 
     return tuple(map(int, n_blocks))
