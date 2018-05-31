@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """Main command-line interface to nobrainer."""
 
@@ -65,7 +64,7 @@ def create_parser():
         help="Train across all available GPUs. Batches are split across GPUs.")
     t.add_argument(
         '--prefetch', type=int,
-        help="Number of full volumes to prefetch for training and evaluation")
+        help="Number of blocks to prefetch for training and evaluation")
     t.add_argument(
         '--save-summary-steps', type=int, default=25,
         help="Save summaries every this many steps.")
@@ -115,24 +114,15 @@ def create_parser():
     a.add_argument('--samplewise-zscore', action='store_true')
     a.add_argument('--samplewise-center', action='store_true')
     a.add_argument('--samplewise-std-normalization', action='store_true')
-    a.add_argument('--rot90-x', action='store_true')
-    a.add_argument('--rot90-y', action='store_true')
-    a.add_argument('--rot90-z', action='store_true')
-    a.add_argument('--rotation-range-x', type=float, default=0.)
-    a.add_argument('--rotation-range-y', type=float, default=0.)
-    a.add_argument('--rotation-range-z', type=float, default=0.)
-    a.add_argument('--shift-range-x', type=float, default=0.)
-    a.add_argument('--shift-range-y', type=float, default=0.)
-    a.add_argument('--shift-range-z', type=float, default=0.)
-    a.add_argument('--flip-x', action='store_true')
-    a.add_argument('--flip-y', action='store_true')
-    a.add_argument('--flip-z', action='store_true')
-    a.add_argument('--brightness-range', type=float, default=0.)
-    a.add_argument('--zoom-range', type=float, default=0.)
+    a.add_argument('--flip', action='store_true')
+    a.add_argument('--rescale', type=float, default=0.)
+    a.add_argument('--rotate', action='store_true')
+    a.add_argument('--gaussian', action='store_true')
     a.add_argument('--reduce-contrast', action='store_true')
     a.add_argument('--salt-and-pepper', action='store_true')
-    a.add_argument('--gaussian', action='store_true')
-    a.add_argument('--rescale', type=float, default=0.)
+    a.add_argument('--brightness-range', type=float, default=0.)
+    a.add_argument('--shift-range', type=float, default=0.)
+    a.add_argument('--zoom-range', type=float, default=0.)
 
     # Prediction subparser
     pp = subparsers.add_parser('predict', help="Predict using SavedModel")
@@ -143,6 +133,10 @@ def create_parser():
         '-b', '--block-shape', nargs=3, required=True, type=int,
         help="Shape of blocks on which predict. Non-overlapping blocks of this"
              " shape are taken from the inputs for prediction.")
+    ppp.add_argument(
+        '--batch-size', default=4, type=int,
+        help="Number of sub-volumes per batch for prediction. Use a smaller"
+             " value if memory is insufficient.")
     ppp.add_argument(
         '-m', '--model', required=True, help="Path to saved model.")
 
@@ -209,24 +203,15 @@ def train(params):
         samplewise_zscore=params['samplewise_zscore'],
         samplewise_center=params['samplewise_center'],
         samplewise_std_normalization=params['samplewise_std_normalization'],
-        rot90_x=params['rot90_x'],
-        rot90_y=params['rot90_y'],
-        rot90_z=params['rot90_z'],
-        rotation_range_x=params['rotation_range_x'],
-        rotation_range_y=params['rotation_range_y'],
-        rotation_range_z=params['rotation_range_z'],
-        shift_range_x=params['shift_range_x'],
-        shift_range_y=params['shift_range_y'],
-        shift_range_z=params['shift_range_z'],
-        flip_x=params['flip_x'],
-        flip_y=params['flip_y'],
-        flip_z=params['flip_z'],
-        brightness_range=params['brightness_range'],
-        zoom_range=params['zoom_range'],
+        flip=params['flip'],
+        rescale=params['rescale'],
+        rotate=params['rotate'],
+        gaussian=params['gaussian'],
         reduce_contrast=params['reduce_contrast'],
         salt_and_pepper=params['salt_and_pepper'],
-        gaussian=params['gaussian'],
-        rescale=params['rescale'],
+        brightness_range=params['brightness_range'],
+        shift_range=params['shift_range'],
+        zoom_range=params['zoom_range'],
         binarize_y=params['binarize'],
         mapping_y=label_mapping)
 
@@ -261,7 +246,8 @@ def predict(params):
     img = _predict(
         inputs=params['input'],
         predictor=params['model'],
-        block_shape=params['block_shape'])
+        block_shape=params['block_shape'],
+        batch_size=params['batch_size'])
     nib.save(img, params['output'])
 
 
@@ -282,8 +268,11 @@ def save(params):
     print("Saved model to {}".format(saved_dir.decode()))
 
 
-def main():
-    namespace = parse_args(sys.argv[1:])
+def main(args=None):
+    if args is None:
+        namespace = parse_args(sys.argv[1:])
+    else:
+        namespace = parse_args(args)
     params = vars(namespace)
 
     if params['subparser_name'] == 'train':

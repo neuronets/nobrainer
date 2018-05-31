@@ -1,19 +1,25 @@
+# -*- coding: utf-8 -*-
 """Tests for `nobrainer.models.util`"""
 
 import pytest
 import tensorflow as tf
 
-import nobrainer
-from nobrainer.models.util import (
-    get_estimator, get_items_not_in_iterable, check_required_params,
-    check_optimizer_for_training)
+from nobrainer.models.highres3dnet import HighRes3DNet
+from nobrainer.models.meshnet import MeshNet
+from nobrainer.models.util import check_optimizer_for_training
+from nobrainer.models.util import check_required_params
+from nobrainer.models.util import get_estimator
+from nobrainer.models.util import get_items_not_in_iterable
 
 
 def test_get_estimator():
     est_obj = get_estimator('highres3dnet')
-    assert est_obj == nobrainer.models.highres3dnet.HighRes3DNet
+    assert est_obj == HighRes3DNet
 
-    _model = nobrainer.models.HighRes3DNet
+    est_obj = get_estimator('meshnet')
+    assert est_obj == MeshNet
+
+    _model = HighRes3DNet
     assert get_estimator(_model) is _model
 
     with pytest.raises(ValueError):

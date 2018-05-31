@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Utilities."""
 
 import numpy as np
