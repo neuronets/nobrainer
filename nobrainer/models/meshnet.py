@@ -93,8 +93,16 @@ def model_fn(features,
     Raises:
         `ValueError` if required parameters are not in `params`.
     """
+    volume = features
+    if isinstance(volume, dict):
+        volume = features['volume']
+
     required_keys = {'n_classes'}
-    default_params = {'optimizer': None, 'n_filters': 21, 'dropout_rate': 0.25}
+    default_params = {
+        'optimizer': None,
+        'n_filters': 21,
+        'dropout_rate': 0.25,
+    }
     check_required_params(params=params, required_keys=required_keys)
     set_default_params(params=params, defaults=default_params)
     check_optimizer_for_training(optimizer=params['optimizer'], mode=mode)
@@ -112,7 +120,7 @@ def model_fn(features,
         (8, 8, 8),
         (1, 1, 1))
 
-    outputs = features
+    outputs = volume
 
     for ii, dilation_rate in enumerate(dilation_rates):
         outputs = _layer(
@@ -132,7 +140,12 @@ def model_fn(features,
             'probabilities': tf.nn.softmax(logits),
             'logits': logits,
         }
-        return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
+        export_outputs = {
+            'outputs': tf.estimator.export.PredictOutput(predictions)}
+        return tf.estimator.EstimatorSpec(
+            mode=mode,
+            predictions=predictions,
+            export_outputs=export_outputs)
 
     cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
         labels=labels, logits=logits)
