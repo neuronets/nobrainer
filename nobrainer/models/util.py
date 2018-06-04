@@ -19,6 +19,8 @@ def get_estimator(name):
     estimators = {
         'highres3dnet': nobrainer.models.highres3dnet.HighRes3DNet,
         'meshnet': nobrainer.models.meshnet.MeshNet,
+        'meshnetwn': nobrainer.models.meshnetwn.MeshNetWN,
+        'meshnetvwn': nobrainer.models.meshnetvwn.MeshNetVWN,
         'quicknat': nobrainer.models.quicknat.QuickNAT,
     }
 

@@ -33,7 +33,7 @@ def create_parser():
         '-n', '--n-classes', required=True, type=int,
         help="Number of classes to classify")
     m.add_argument(
-        '-m', '--model', required=True, choices={'highres3dnet', 'meshnet'},
+        '-m', '--model', required=True, choices={'highres3dnet', 'meshnet', 'meshnetwn', 'meshnetvwn'},
         help="Model to use")
     m.add_argument(
         '--model-opts', type=json.loads, default={},
