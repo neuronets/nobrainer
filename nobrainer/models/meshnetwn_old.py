@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """MeshNet implemented in TensorFlow.
 
 Reference
@@ -8,29 +7,22 @@ Fedorov, A., Johnson, J., Damaraju, E., Ozerin, A., Calhoun, V., & Plis, S.
 labeling. IJCNN 2017. (pp. 3785-3792). IEEE.
 """
 
+import numpy as np
 import tensorflow as tf
-from tensorflow.contrib.estimator import TowerOptimizer
-from tensorflow.contrib.estimator import replicate_model_fn
+from tensorflow.contrib.estimator import TowerOptimizer, replicate_model_fn
 from tensorflow.python.estimator.canned.optimizers import (
     get_optimizer_instance
 )
 
-from nobrainer.metrics import streaming_dice
-from nobrainer.metrics import streaming_hamming
-from nobrainer.models.util import check_optimizer_for_training
-from nobrainer.models.util import check_required_params
-from nobrainer.models.util import set_default_params
-
-FUSED_BATCH_NORM = True
-
+from nobrainer.models.util import check_required_params, set_default_params
+from nobrainer.models import vwn_conv
 
 def _layer(inputs,
            mode,
            layer_num,
            filters,
            kernel_size,
-           dilation_rate,
-           dropout_rate):
+           dilation_rate,is_mc):
     """Layer building block of MeshNet.
 
     Performs 3D convolution, activation, batch normalization, and dropout on
@@ -52,20 +44,17 @@ def _layer(inputs,
     training = mode == tf.estimator.ModeKeys.TRAIN
 
     with tf.variable_scope('layer_{}'.format(layer_num)):
-        conv = tf.layers.conv3d(
+        conv = vwn_conv.conv3d(
             inputs, filters=filters, kernel_size=kernel_size,
-            padding='SAME', dilation_rate=dilation_rate, activation=None)
-        activation = tf.nn.relu(conv)
-        bn = tf.layers.batch_normalization(
-            activation, training=training, fused=FUSED_BATCH_NORM)
-        return tf.layers.dropout(bn, rate=dropout_rate, training=training)
+            padding='SAME', dilation_rate=dilation_rate, activation=None,is_mc=is_mc
+        )
+        return tf.nn.relu(conv)
 
 
 def model_fn(features,
              labels,
              mode,
-             params,
-             config=None):
+             params):
     """MeshNet model function.
 
     Args:
@@ -76,16 +65,14 @@ def model_fn(features,
             returned from the `input_fn` passed to `train`, `evaluate`, and
             `predict`. Labels should not be one-hot encoded.
         mode: Optional. Specifies if this training, evaluation or prediction.
-        params: `dict` of parameters.
-            - n_classes: (required) number of classes to classify.
-            - optimizer: instance of TensorFlow optimizer. Required if
-                training.
+        params: `dict` of parameters. All parameters below are required.
+            - n_classes: number of classes to classify.
+            - optimizer: instance of TensorFlow optimizer.
             - n_filters: number of filters to use in each convolution. The
                 original implementation used 21 filters to classify brainmask
                 and 71 filters for the multi-class problem.
             - dropout_rate: rate of dropout. For example, 0.1 would drop 10% of
                 input units.
-        config: configuration object.
 
     Returns:
         `tf.estimator.EstimatorSpec`
@@ -93,15 +80,10 @@ def model_fn(features,
     Raises:
         `ValueError` if required parameters are not in `params`.
     """
-    volume = features
-    if isinstance(volume, dict):
-        volume = features['volume']
-        
-    required_keys = {'n_classes'}
-    default_params = {'optimizer': None, 'n_filters': 21, 'dropout_rate': 0.25}
+    required_keys = {'n_classes', 'optimizer'}
+    default_params = {'n_filters': 21, 'dropout_rate': 0.25}
     check_required_params(params=params, required_keys=required_keys)
     set_default_params(params=params, defaults=default_params)
-    check_optimizer_for_training(optimizer=params['optimizer'], mode=mode)
 
     tf.logging.debug("Parameters for model:")
     tf.logging.debug(params)
@@ -114,20 +96,25 @@ def model_fn(features,
         (2, 2, 2),
         (4, 4, 4),
         (8, 8, 8),
-        (1, 1, 1))
-
-    outputs = volume
-
+        (1, 1, 1),
+    )
+    
+    is_mc = tf.constant(False,dtype=tf.bool)
+    
+    outputs = features
+    
     for ii, dilation_rate in enumerate(dilation_rates):
         outputs = _layer(
             outputs, mode=mode, layer_num=ii + 1, filters=params['n_filters'],
-            kernel_size=3, dilation_rate=dilation_rate,
-            dropout_rate=params['dropout_rate'])
+            kernel_size=3, dilation_rate=dilation_rate, is_mc=is_mc
+        )
 
     with tf.variable_scope('logits'):
-        logits = tf.layers.conv3d(
+        logits = vwn_conv.conv3d(
             inputs=outputs, filters=params['n_classes'], kernel_size=(1, 1, 1),
-            padding='SAME', activation=None)
+            padding='SAME', activation=None, is_mc=is_mc
+        )
+
     predicted_classes = tf.argmax(logits, axis=-1)
 
     if mode == tf.estimator.ModeKeys.PREDICT:
@@ -136,32 +123,54 @@ def model_fn(features,
             'probabilities': tf.nn.softmax(logits),
             'logits': logits,
         }
-        export_outputs = {
-            'outputs': tf.estimator.export.PredictOutput(predictions)}
-        return tf.estimator.EstimatorSpec(
-            mode=mode,
-            predictions=predictions,
-            export_outputs=export_outputs)
+        return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
 
-    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
-        labels=labels, logits=logits)
-    loss = tf.reduce_mean(cross_entropy)
+    # QUESTION (kaczmarj): is this the same as
+    # `tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(...))`
+    if params['prior_path'] != None:
+        prior_np = np.load(params['prior_path'])
+    
+    with tf.variable_scope("prior"):
+        i=-1
+        for v in tf.get_collection('ms'):
+            i += 1
+            if params['prior_path'] == None:
+                tf.add_to_collection('ms_prior',tf.Variable(tf.constant(0, dtype = v.dtype, shape = v.shape),trainable = False))
+            else:
+                tf.add_to_collection('ms_prior',tf.Variable(tf.convert_to_tensor(prior_np[0][i], dtype = tf.float32),trainable = False))
+        
+        ms = tf.get_collection('ms')
+        ms_prior = tf.get_collection('ms_prior')
 
-    # Add evaluation metrics for class 1.
-    labels = tf.cast(labels, predicted_classes.dtype)
-    labels_onehot = tf.one_hot(labels, params['n_classes'])
-    predictions_onehot = tf.one_hot(predicted_classes, params['n_classes'])
-    eval_metric_ops = {
-        'accuracy': tf.metrics.accuracy(labels, predicted_classes),
-        'dice': streaming_dice(
-            labels_onehot[..., 1], predictions_onehot[..., 1]),
-        'hamming': streaming_hamming(
-            labels_onehot[..., 1], predictions_onehot[..., 1]),
-    }
+        print(len(ms))
+        i=-1
+        for v in tf.get_collection('ms'):
+            i += 1
+            if params['prior_path'] == None:
+                tf.add_to_collection('sigmas_prior',tf.Variable(tf.constant(1, dtype = v.dtype, shape = v.shape),trainable = False))
+            else:
+                tf.add_to_collection('sigmas_prior',tf.Variable(tf.convert_to_tensor(prior_np[1][i], dtype = tf.float32),trainable = False))
 
+        sigmas = tf.get_collection('sigmas')
+        sigmas_prior = tf.get_collection('sigmas_prior')
+     
+    nll_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels, logits=logits))
+    tf.summary.scalar('nll_loss', nll_loss)
+    print(tf.get_collection('kernels'))
+    
+    l2_loss = tf.add_n([tf.reduce_sum((tf.square(ms[i] - ms_prior[i])) / ((tf.square(sigmas_prior[i]) + 1e-8) * 2.0)) for i in range(len(ms))], name = 'l2_loss')
+    tf.summary.scalar('l2_loss', l2_loss)
+    
+    n_examples = tf.constant(params['n_examples'],dtype=ms[0].dtype)
+    tf.summary.scalar('n_examples', n_examples)
+    
+    
+    loss = nll_loss + l2_loss / (n_examples*256*256*256)
+    
     if mode == tf.estimator.ModeKeys.EVAL:
         return tf.estimator.EstimatorSpec(
-            mode=mode, loss=loss, eval_metric_ops=eval_metric_ops)
+            mode=mode, loss=loss, eval_metric_ops=None,
+        )
 
     assert mode == tf.estimator.ModeKeys.TRAIN
 
@@ -169,11 +178,10 @@ def model_fn(features,
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     with tf.control_dependencies(update_ops):
         train_op = params['optimizer'].minimize(loss, global_step=global_step)
-
     return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
 
 
-class MeshNet(tf.estimator.Estimator):
+class MeshNetWN(tf.estimator.Estimator):
     """MeshNet model.
 
     Example:
@@ -195,7 +203,7 @@ class MeshNet(tf.estimator.Estimator):
     Args:
         n_classes: int, number of classes to classify.
         optimizer: instance of TensorFlow optimizer or string of optimizer
-            name. Required if training.
+            name.
         n_filters: int (default 21), number of filters to use in each
             convolution. The original implementation used 21 filters to
             classify brainmask and 71 filters for the multi-class problem.
@@ -220,23 +228,25 @@ class MeshNet(tf.estimator.Estimator):
     """
     def __init__(self,
                  n_classes,
-                 optimizer=None,
-                 n_filters=21,
-                 dropout_rate=0.25,
+                 optimizer,
+                 n_filters=64,
+                 n_examples=1.0,
                  learning_rate=None,
                  model_dir=None,
                  config=None,
                  warm_start_from=None,
-                 multi_gpu=False):
+                 prior_path=None,
+                 multi_gpu=False,
+                 only_kld=False):
         params = {
             'n_classes': n_classes,
             # If an instance of an optimizer is passed in, this will just
             # return it.
-            'optimizer': (
-                None if optimizer is None
-                else get_optimizer_instance(optimizer, learning_rate)),
+            'optimizer': get_optimizer_instance(optimizer, learning_rate),
             'n_filters': n_filters,
-            'dropout_rate': dropout_rate,
+            'n_examples': n_examples,
+            'prior_path': prior_path,
+            'only_kld': only_kld
         }
 
         _model_fn = model_fn
@@ -245,6 +255,7 @@ class MeshNet(tf.estimator.Estimator):
             params['optimizer'] = TowerOptimizer(params['optimizer'])
             _model_fn = replicate_model_fn(_model_fn)
 
-        super(MeshNet, self).__init__(
+        super(MeshNetWN, self).__init__(
             model_fn=_model_fn, model_dir=model_dir, params=params,
-            config=config, warm_start_from=warm_start_from)
+            config=config, warm_start_from=warm_start_from,
+        )
