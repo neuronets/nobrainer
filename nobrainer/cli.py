@@ -15,6 +15,7 @@ from nobrainer.models.util import get_estimator
 from nobrainer.predict import predict as _predict
 from nobrainer.train import train as _train
 from nobrainer.volume import VolumeDataGenerator
+from nobrainer.volume import zscore, normalize_zero_one
 
 
 def create_parser():
@@ -139,7 +140,21 @@ def create_parser():
              " value if memory is insufficient.")
     ppp.add_argument(
         '-m', '--model', required=True, help="Path to saved model.")
-
+    ###
+    ppp.add_argument(
+        '--n-samples', type=int, default = 1,
+        help="Number of sampling.")
+    ppp.add_argument('--returnEntropy', action='store_true',
+        help = 'if you want to return entropy, add this flag.')
+    ppp.add_argument('--returnVariance', action='store_true', 
+        help ='if you want to return variance, add this flag.')
+    ppp.add_argument('--returnArrayFromImages', action = 'store_true', 
+        help = 'if you want to return array instead of image, add this flag.')
+    ppp.add_argument('--samplewise-minmax', action='store_true', 
+        help = 'set normalizer to be minmax. NOTE, normalizer cannot be both minmax and zscore')
+    ppp.add_argument('--samplewise-zscore', action='store_true',
+        help = 'set normalizer to be zscore. NOTE, normalizer cannot be both minmax and zscore')
+    ###
     # Save subparser
     sp = subparsers.add_parser('save', help="Save model as SavedModel (.pb)")
     sp.add_argument('savedir', help="Path in which to save SavedModel.")
@@ -156,6 +171,7 @@ def create_parser():
     spp.add_argument(
         '-b', '--block-shape', nargs=3, required=True, type=int,
         help="Height, width, and depth of data that model takes as input.")
+
     spp.add_argument(
         '--model-opts', type=json.loads, default={},
         help='JSON string of model-specific options. For example'
@@ -243,12 +259,70 @@ def train(params):
 
 
 def predict(params):
-    img = _predict(
+    ### add normalizer too!
+    
+    rV = params['returnVariance']
+    rE = params['returnEntropy']
+    rA = params['returnArrayFromImages']
+
+    normalizer = None
+    sm = params["samplewise_minmax"]
+    sz = params["samplewise_zscore"]
+    if sm and sz:
+        raise Exception("Normalizer cannot be both minmax and zscore")
+    if sm:
+        normalizer = normalize_zero_one
+    if sz:
+        normalizer = zscore
+
+    if params["n_samples"]  < 1:
+        raise Exception('n-samples cannot be lower than 1.')
+
+    ###
+    def nameFixer(thePath, newTxt):
+        arr = thePath.split(".")
+        if len(arr)==0:
+            return newTxt
+        txt = arr[0] + "_" + newTxt
+        for i in range(1, len(arr)):
+            txt = txt + "." + arr[i]
+        return txt
+    
+    meanPath = Path(nameFixer(params['output'], "means") )
+    variancePath = Path(nameFixer(params['output'], "variance"))
+    entropyPath = Path(nameFixer(params['output'], "entropy"))
+
+    if meanPath.is_file() or variancePath.is_file() or entropyPath.is_file():
+        raise Exception(str(meanPath) + " or " + str(variancePath) + " or " + str(entropyPath) + " already exists.")
+
+    
+    imgs = _predict(
         inputs=params['input'],
         predictor=params['model'],
         block_shape=params['block_shape'],
+        returnVariance=rV,
+        returnEntropy=rE,
+        returnArrayFromImages=rA,
+        normalizer=normalizer,
+        n_samples=params['n_samples'],
         batch_size=params['batch_size'])
-    nib.save(img, params['output'])
+    if not rA:
+        includeVariance = ((params['n_samples'] > 1) and (rV))
+        returnEntropy = rE
+        if includeVariance:
+            if returnEntropy:
+                nib.save(imgs[0], str(meanPath))
+                nib.save(imgs[1], str(variancePath))
+                nib.save(imgs[2], str(entropyPath))
+            else:
+                nib.save(imgs[0], str(meanPath))
+                nib.save(imgs[1], str(variancePath))
+        else:
+            if returnEntropy:
+                nib.save(imgs[0], str(meanPath))
+                nib.save(imgs[1], str(entropyPath))
+            else:
+                nib.save(imgs[0], str(meanPath))
 
 
 def save(params):
