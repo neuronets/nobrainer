@@ -177,43 +177,23 @@ def predict_from_array(inputs,
         prevMean = np.zeros_like(newPrediction['probabilities'])
         currMean = newPrediction['probabilities']
         
-        M = np.zeros_like(newPrediction['probabilities'])# + 1e-16
-        #print(M)
+        M = np.zeros_like(newPrediction['probabilities'])
         for n in range(1, n_samples):
 
             newPrediction = predictor( {'volume': features[j:j + batch_size]})
-            #time1 = time.time()
             prevMean = currMean
             currMean = prevMean + (newPrediction['probabilities'] - prevMean)/float(n+1)
             M = M + np.multiply(prevMean - newPrediction['probabilities'], currMean - newPrediction['probabilities'])
-            #print("\n computation takes: "+ str(time.time()-time1))
 
         progbar.add(1)
-        #time2 = time.time()
         means[j:j + batch_size] = np.argmax(currMean, axis = -1 ) # max mean
         variances[j:j + batch_size] = np.sum(M/n_samples, axis = -1)
-        
-        #variances[j:j + batch_size] = np.mean(M/n_samples, axis = -1)
-        #print(variances)
-        #variances[j:j + batch_size] = np.prod(M/n_samples, axis = -1)
         entropies[j:j + batch_size] = -np.sum(np.multiply(np.log(currMean+0.001),currMean), axis = -1) # entropy
-        #print( "\n computation2 takes: " + str(time.time() -time2)  )
-        #print(variances[j:j + batch_size])
-    print("**********************")    
-    minVariance = np.min(variances)
-    print(minVariance)
-    print("**********************")
-    variances = variances - minVariance
     totalMeans =from_blocks(means, output_shape=inputs.shape)
     totalVariance = from_blocks(variances, output_shape=inputs.shape)
     totalEntropy = from_blocks(entropies, output_shape=inputs.shape)
 
-
-        #/data/MLcore/nobrainer/logs/hcp_50_map
-        # change cli 
-
     includeVariance = ((n_samples > 1) and (returnVariance))
-
     if includeVariance:
         if returnEntropy:
             return totalMeans, totalVariance, totalEntropy
