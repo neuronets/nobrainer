@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """Methods to train models."""
 
+import math
+
 import numpy as np
 import tensorflow as tf
 
@@ -16,7 +18,7 @@ def train(model,
           filepaths,
           volume_shape,
           block_shape,
-          strides,
+          strides=None,
           x_dtype=DT_X,
           y_dtype=DT_Y,
           shuffle=True,
@@ -60,15 +62,18 @@ def train(model,
             prefetch=prefetch,
             multi_gpu=multi_gpu)
 
-        examples_per_volume = np.prod(
+        n_volumes = len(filepaths)
+        n_blocks_per_volume = np.prod(
             _get_n_blocks(
                 arr_shape=volume_shape,
                 kernel_size=block_shape,
                 strides=strides))
-        n_samples_per_epoch = examples_per_volume * len(filepaths)
-        max_steps = n_samples_per_epoch * n_epochs
 
+        n_blocks_per_epoch = n_blocks_per_volume * n_volumes
+        n_steps_per_epoch = n_blocks_per_epoch / batch_size
+        max_steps = math.ceil(n_steps_per_epoch * n_epochs)
         tf.logging.info("Will train for {} steps".format(max_steps))
+
         train_spec = tf.estimator.TrainSpec(
             input_fn=input_fn,
             max_steps=max_steps,
