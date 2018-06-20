@@ -22,6 +22,7 @@ def predict(inputs,
             returnEntropy=False,
             returnArrayFromImages = False, 
             n_samples=1,
+            n_std=7,
             normalizer=normalize_zero_one,
             batch_size=4,
             dtype=DT_X):
@@ -79,6 +80,7 @@ def predict(inputs,
             returnEntropy=returnEntropy,
             returnArrayFromImages=returnArrayFromImages, 
             n_samples=n_samples,
+            n_std=n_std,
             normalizer=normalizer,
             batch_size=batch_size)
     elif isinstance(inputs, nib.spatialimages.SpatialImage):
@@ -90,6 +92,7 @@ def predict(inputs,
             returnEntropy=returnEntropy,
             returnArrayFromImages=returnArrayFromImages, 
             n_samples=n_samples,
+            n_std=n_std,
             normalizer=normalizer,
             batch_size=batch_size,
             dtype=dtype)
@@ -102,6 +105,7 @@ def predict(inputs,
             returnEntropy=returnEntropy,
             returnArrayFromImages=returnArrayFromImages, 
             n_samples=n_samples,
+            n_std=n_std,
             normalizer=normalizer,
             batch_size=batch_size,
             dtype=dtype)
@@ -114,6 +118,7 @@ def predict(inputs,
             returnEntropy=returnEntropy,
             returnArrayFromImages=returnArrayFromImages, 
             n_samples=n_samples,
+            n_std=n_std,
             normalizer=normalizer,
             batch_size=batch_size,
             dtype=dtype)
@@ -127,6 +132,7 @@ def predict_from_array(inputs,
                        returnEntropy=False,
                        returnArrayFromImages=False, 
                        n_samples=1,
+                       n_std=7,
                        normalizer=normalize_zero_one,
                        batch_size=4):
     """Return a prediction given a filepath and an ndarray of features.
@@ -193,6 +199,13 @@ def predict_from_array(inputs,
     totalVariance = from_blocks(variances, output_shape=inputs.shape)
     totalEntropy = from_blocks(entropies, output_shape=inputs.shape)
 
+    mean_var_voxels = np.mean(totalVariance)
+    std_var_voxels = np.std(totalVariance)
+
+    gr = np.greater(totalVariance, mean_var_voxels+n_std*std_var_voxels)
+    ls = 1-gr
+    totalVariance = totalVariance*ls + gr*(mean_var_voxels+n_std*std_var_voxels)
+
     includeVariance = ((n_samples > 1) and (returnVariance))
     if includeVariance:
         if returnEntropy:
@@ -213,6 +226,7 @@ def predict_from_img(img,
                      returnEntropy=False,
                      returnArrayFromImages=False, 
                      n_samples=1,
+                     n_std=7,
                      normalizer=normalize_zero_one,
                      batch_size=4,
                      dtype=DT_X):
@@ -257,6 +271,7 @@ def predict_from_img(img,
         returnEntropy=returnEntropy,
         returnArrayFromImages=returnArrayFromImages, 
         n_samples=n_samples,
+        n_std=n_std,
         normalizer=normalizer,
         batch_size=batch_size)
 
@@ -291,6 +306,7 @@ def predict_from_filepath(filepath,
                           returnEntropy=False,
                           returnArrayFromImages=False, 
                           n_samples=1,
+                          n_std=7,
                           normalizer=normalize_zero_one,
                           batch_size=4,
                           dtype=DT_X):
@@ -333,6 +349,7 @@ def predict_from_filepath(filepath,
         returnEntropy=returnEntropy,
         returnArrayFromImages=returnArrayFromImages, 
         n_samples=n_samples,
+        n_std=n_std,
         normalizer=normalizer,
         batch_size=batch_size)
 
@@ -344,6 +361,7 @@ def predict_from_filepaths(filepaths,
                            returnEntropy=False,
                            returnArrayFromImages=False, 
                            n_samples=1,
+                           n_std=7,
                            normalizer=normalize_zero_one,
                            batch_size=4,
                            dtype=DT_X):
@@ -372,6 +390,7 @@ def predict_from_filepaths(filepaths,
             returnEntropy=returnEntropy,
             returnArrayFromImages=returnArrayFromImages, 
             n_samples=n_samples,
+            n_std=n_std,
             normalizer=normalizer,
             batch_size=batch_size,
             dtype=dtype)
