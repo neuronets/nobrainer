@@ -144,11 +144,6 @@ def create_parser():
     ppp.add_argument(
         '--n-samples', type=int, default = 1,
         help="Number of sampling.")
-    ppp.add_argument(
-        '--variance-threshold', type=int, default=7,
-        help="The variance values higher than this number "
-             "of standard deviation will be marked as mean + this number of standard deviation."
-             "The default is 7.")
     ppp.add_argument('--returnEntropy', action='store_true',
         help = 'if you want to return entropy, add this flag.')
     ppp.add_argument('--returnVariance', action='store_true', 
@@ -310,7 +305,6 @@ def predict(params):
         returnArrayFromImages=rA,
         normalizer=normalizer,
         n_samples=params['n_samples'],
-        n_std = params['variance_threshold'],
         batch_size=params['batch_size'])
     if not rA:
         includeVariance = ((params['n_samples'] > 1) and (rV))
