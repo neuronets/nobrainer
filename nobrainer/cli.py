@@ -155,6 +155,36 @@ def create_parser():
     ppp.add_argument('--samplewise-zscore', action='store_true',
         help = 'set normalizer to be zscore. NOTE, normalizer cannot be both minmax and zscore')
     ###
+    # Validation subparser
+    pp = subparsers.add_parser('validate', help="Validate model using input images and ground truth images.")
+    pp.add_argument('input', help="Filepath to csv containing image and ground truth on each line.")
+    pp.add_argument('output', help="Name out output file.")
+    ppp = pp.add_argument_group('validation arguments')
+    ppp.add_argument(
+        '-b', '--block-shape', nargs=3, required=True, type=int,
+        help="Shape of blocks on which predict. Non-overlapping blocks of this"
+             " shape are taken from the inputs for prediction.")
+    ppp.add_argument(
+        '--batch-size', default=4, type=int,
+        help="Number of sub-volumes per batch for prediction. Use a smaller"
+             " value if memory is insufficient.")
+    ppp.add_argument(
+        '-m', '--model', required=True, help="Path to saved model.")
+    ###
+    ppp.add_argument(
+        '--n-samples', type=int, default = 1,
+        help="Number of sampling.")
+    ppp.add_argument('--return_entropy', action='store_true',
+        help = 'if you want to return entropy, add this flag.')
+    ppp.add_argument('--return_variance', action='store_true', 
+        help ='if you want to return variance, add this flag.')
+    ppp.add_argument('--return_array_from_images', action = 'store_true', 
+        help = 'if you want to return array instead of image, add this flag.')
+    ppp.add_argument('--samplewise-minmax', action='store_true', 
+        help = 'set normalizer to be minmax. NOTE, normalizer cannot be both minmax and zscore')
+    ppp.add_argument('--samplewise-zscore', action='store_true',
+        help = 'set normalizer to be zscore. NOTE, normalizer cannot be both minmax and zscore')
+    ###
     # Save subparser
     sp = subparsers.add_parser('save', help="Save model as SavedModel (.pb)")
     sp.add_argument('savedir', help="Path in which to save SavedModel.")
@@ -352,7 +382,7 @@ def main(args=None):
         params['strides'] = tuple(params['strides'])
         train(params=params)
 
-    elif params['subparser_name'] == 'predict':
+    elif params['subparser_name'] in ['predict','validate']:
         params['block_shape'] = tuple(params['block_shape'])
         if not Path(params['input']).is_file():
             raise FileNotFoundError(
@@ -360,7 +390,10 @@ def main(args=None):
         if Path(params['output']).is_file():
             raise FileExistsError(
                 "output file exists: {}".format(params['output']))
-        predict(params)
+        if params['subparser_name'] == 'predict':
+            predict(params)
+        else: 
+            validate(params)
 
     elif params['subparser_name'] == 'save':
         params['block_shape'] = tuple(params['block_shape'])
