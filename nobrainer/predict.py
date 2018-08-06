@@ -68,6 +68,10 @@ def predict(inputs,
                 or arrays(if returnArrayFromImages is set True) of means, variance, and
                 entropy predictions per iteration.
     """
+    if n_samples < 1:
+        raise Exception('n-samples cannot be lower than 1.')
+
+
     predictor = _get_predictor(predictor)
 
     if isinstance(inputs, np.ndarray):
