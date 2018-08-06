@@ -96,9 +96,13 @@ def model_fn(features,
     volume = features
     if isinstance(volume, dict):
         volume = features['volume']
-        
+
     required_keys = {'n_classes'}
-    default_params = {'optimizer': None, 'n_filters': 21, 'dropout_rate': 0.25}
+    default_params = {
+        'optimizer': None,
+        'n_filters': 21,
+        'dropout_rate': 0.25,
+    }
     check_required_params(params=params, required_keys=required_keys)
     set_default_params(params=params, defaults=default_params)
     check_optimizer_for_training(optimizer=params['optimizer'], mode=mode)
