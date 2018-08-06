@@ -259,12 +259,6 @@ def train(params):
 
 
 def predict(params):
-    ### add normalizer too!
-    
-    rV = params['returnVariance']
-    rE = params['returnEntropy']
-    rA = params['returnArrayFromImages']
-
     normalizer = None
     sm = params["samplewise_minmax"]
     sz = params["samplewise_zscore"]
@@ -275,54 +269,35 @@ def predict(params):
     if sz:
         normalizer = zscore
 
-    if params["n_samples"]  < 1:
-        raise Exception('n-samples cannot be lower than 1.')
-
-    meanPath = Path(nameFixer(params['output'], "means") )
-    variancePath = Path(nameFixer(params['output'], "variance"))
-    entropyPath = Path(nameFixer(params['output'], "entropy"))
-
-    if meanPath.is_file() or variancePath.is_file() or entropyPath.is_file():
-        raise Exception(str(meanPath) + " or " + str(variancePath) + " or " + str(entropyPath) + " already exists.")
-
-    
     imgs = _predict(
         inputs=params['input'],
         predictor=params['model'],
         block_shape=params['block_shape'],
-        returnVariance=rV,
-        returnEntropy=rE,
-        returnArrayFromImages=rA,
+        returnVariance=params['returnVariance'],
+        returnEntropy=params['returnEntropy'],
+        returnArrayFromImages=params['returnArrayFromImages'],
         normalizer=normalizer,
         n_samples=params['n_samples'],
         batch_size=params['batch_size'])
-    if not rA:
-        includeVariance = ((params['n_samples'] > 1) and (rV))
-        returnEntropy = rE
-        if includeVariance:
-            if returnEntropy:
-                nib.save(imgs[0], str(meanPath))
-                nib.save(imgs[1], str(variancePath))
-                nib.save(imgs[2], str(entropyPath))
-            else:
-                nib.save(imgs[0], str(meanPath))
-                nib.save(imgs[1], str(variancePath))
+
+    outpath = Path(params['output'])
+    suffixes = '.'.join(s for s in outpath.suffixes)
+    variancePath = outpath.parent / (outpath.stem + '_variance.' + suffixes)
+    entropyPath = outpath.parent / (outpath.stem + '_entropy.' + suffixes)
+
+    nib.save(imgs[0], params['output']) # fix
+    if not params['returnArrayFromImages']:
+        includeVariance = ((params['n_samples'] > 1) and (params['returnVariance']))
+        returnEntropy = params['returnEntropy']
+        if includeVariance and returnEntropy:
+            nib.save(imgs[1], str(variancePath))
+            nib.save(imgs[2], str(entropyPath))
+        elif includeVariance:
+            nib.save(imgs[1], str(variancePath))
         else:
-            if returnEntropy:
-                nib.save(imgs[0], str(meanPath))
-                nib.save(imgs[1], str(entropyPath))
-            else:
-                nib.save(imgs[0], str(meanPath))
-
-
+            nib.save(imgs[1], str(entropyPath))
 
 def validate(params):
-    ### add normalizer too!
-    
-    rV = params['returnVariance']
-    rE = params['returnEntropy']
-    rA = params['returnArrayFromImages']
-
     normalizer = None
     sm = params["samplewise_minmax"]
     sz = params["samplewise_zscore"]
@@ -333,57 +308,16 @@ def validate(params):
     if sz:
         normalizer = zscore
 
-    if params["n_samples"]  < 1:
-        raise Exception('n-samples cannot be lower than 1.')
-
-        
-
-    
-    imgs = _validate_from_filepaths(
+    validate_from_filepaths(
         inputs=params['input'],
         predictor=params['model'],
-        n_classes = params['n_classes'],
-        mapping_y = params['label_mapping'],
-
         block_shape=params['block_shape'],
-        returnVariance=rV,
-        returnEntropy=rE,
-        returnArrayFromImages=rA,
+        returnVariance=params['returnVariance'],
+        returnEntropy=params['returnEntropy'],
+        returnArrayFromImages=params['returnArrayFromImages'],
         normalizer=normalizer,
         n_samples=params['n_samples'],
         batch_size=params['batch_size'])
-
-    for image in imgs:
-        print
-        save
-        
-
-
-    if not rA:
-    
-
-        meanPath = 
-        variancePath = Path(nameFixer(params['output'], "variance"))
-        entropyPath = Path(nameFixer(params['output'], "entropy"))
-
-        if meanPath.is_file() or variancePath.is_file() or entropyPath.is_file():
-            raise Exception(str(meanPath) + " or " + str(variancePath) + " or " + str(entropyPath) + " already exists.")
-        includeVariance = ((params['n_samples'] > 1) and (rV))
-        returnEntropy = rE
-        if includeVariance:
-            if returnEntropy:
-                nib.save(imgs[0], str(meanPath))
-                nib.save(imgs[1], str(variancePath))
-                nib.save(imgs[2], str(entropyPath))
-            else:
-                nib.save(imgs[0], str(meanPath))
-                nib.save(imgs[1], str(variancePath))
-        else:
-            if returnEntropy:
-                nib.save(imgs[0], str(meanPath))
-                nib.save(imgs[1], str(entropyPath))
-            else:
-                nib.save(imgs[0], str(meanPath))
 
 
 def save(params):
