@@ -1,25 +1,21 @@
 #!/usr/bin/env python3
 
-import math
 from pathlib import Path
 import nibabel as nib
 import numpy as np
-import tensorflow as tf
-import time
-from nobrainer.volume import from_blocks
 from nobrainer.volume import normalize_zero_one
-from nobrainer.volume import to_blocks
-from nobrainer.volume import zscore
 from nobrainer.volume import replace
 from nobrainer.io import read_mapping
 from nobrainer.metrics import dice_numpy
 from nobrainer.predict import predict as _predict
+DT_X = "float32"
+
+
 def validate_from_filepath(filepath,
                           predictor,
                           block_shape,
                           n_classes,
                           mapping_y,
-                          output_dir = None,
                           returnVariance=False,
                           returnEntropy=False,
                           returnArrayFromImages=False, 
@@ -59,7 +55,7 @@ def validate_from_filepath(filepath,
         mean, variance(optional), and entropy (optional).
     """
     if not Path(filepath).is_file():
-        raise FileNotFoundError("could not find file {}".format(filepath))
+        raise FileNotFoundError("could not find file {}".format(filepath[0]))
     img = nib.load(filepath[0])
     y = nib.load(filepath[1])
 
@@ -81,7 +77,8 @@ def validate_from_filepath(filepath,
         u = np.equal(prediction_image,i)
         v = np.equal(y,i)
         dice[i]= dice_numpy(u,v)
-    return outputs,dice
+
+    return outputs, dice
 
 
 
@@ -93,7 +90,6 @@ def validate_from_filepaths(filepaths,
                           block_shape,
                           n_classes,
                           mapping_y,
-                          output_dir = None,
                           returnVariance=False,
                           returnEntropy=False,
                           returnArrayFromImages=False, 
@@ -118,10 +114,11 @@ def validate_from_filepaths(filepaths,
         dtype: str or dtype object, dtype of features.
 
     Returns:
-        
+        None
     """
     for filepath in filepaths:
-        yield validate_from_filepath(
+
+        outputs,dice = validate_from_filepath(
             filepath=filepath,
             predictor=predictor,
             n_classes = n_classes,
@@ -134,5 +131,37 @@ def validate_from_filepaths(filepaths,
             normalizer=normalizer,
             batch_size=batch_size,
             dtype=dtype)
+
+
+        outpath = Path(filepath[0])
+        suffixes = '.'.join(s for s in outpath.suffixes)
+        meanPath = outpath.parent / (outpath.stem + '_mean.' + suffixes)
+        variancePath = outpath.parent / (outpath.stem + '_variance.' + suffixes)
+        entropyPath = outpath.parent / (outpath.stem + '_entropy.' + suffixes)
+        dicePath = outpath.parent / (outpath.stem + '_dice.npy')
+        if meanPath.is_file() or variancePath.is_file() or entropyPath.is_file():
+            raise Exception(str(meanPath) + " or " + str(variancePath) + " or " + str(entropyPath) + " already exists.")
+
+        nib.save(outputs[0], meanPath) # fix
+        if not returnArrayFromImages:
+            includeVariance = ((n_samples > 1) and (returnVariance))
+            returnEntropy = returnEntropy
+            if includeVariance and returnEntropy:
+                nib.save(outputs[1], str(variancePath))
+                nib.save(outputs[2], str(entropyPath))
+            elif includeVariance:
+                nib.save(outputs[1], str(variancePath))
+            else:
+                nib.save(outputs[1], str(entropyPath))
+
+    print(filepath[0])
+    print('Dice: ' + str(np.mean(dice)))
+    np.save(dicePath,dice)
+
+
+
+
+
+
 
 
