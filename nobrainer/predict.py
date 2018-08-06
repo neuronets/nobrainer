@@ -18,9 +18,9 @@ _INFERENCE_CLASSES_KEY = "class_ids"
 def predict(inputs,
             predictor,
             block_shape,
-            returnVariance=False,
-            returnEntropy=False,
-            returnArrayFromImages = False, 
+            return_variance=False,
+            return_entropy=False,
+            return_array_from_images = False, 
             n_samples=1,
             normalizer=normalize_zero_one,
             batch_size=4,
@@ -34,12 +34,12 @@ def predict(inputs,
         inputs: 3D array or Nibabel image or filepath or list of filepaths.
         predictor: path-like or TensorFlow Predictor object, if path, must be
             path to SavedModel.
-        returnVariance: Boolean. If set True, it returns the running population 
+        return_variance: Boolean. If set True, it returns the running population 
             variance along with mean. Note, if the n_samples is smaller or equal to 1,
             the variance will not be returned; instead it will return None
-        returnEntropy: Boolean. If set True, it returns the running entropy.
+        return_entropy: Boolean. If set True, it returns the running entropy.
             along with mean.       
-        returnArrayFromImages: Boolean. If set True and the given input is either image,
+        return_array_from_images: Boolean. If set True and the given input is either image,
             filepath, or filepaths, it will return arrays of [mean, variance, entropy]
             instead of images of them. Also, if the input is array, it will
             simply return array, whether or not this flag is True or False.
@@ -63,9 +63,9 @@ def predict(inputs,
                 Note, variance is only defined when n_sample  > 1
             - Nibabel image or filepath, return a set of Nibabel images of mean, variance, 
                 entropy of predictions or just the pure arrays of them, 
-                if returnArrayFromImages is True.
+                if return_array_from_images is True.
             - list of filepaths, return generator that yields one set of Nibabel images
-                or arrays(if returnArrayFromImages is set True) of means, variance, and
+                or arrays(if return_array_from_images is set True) of means, variance, and
                 entropy predictions per iteration.
     """
     if n_samples < 1:
@@ -79,9 +79,9 @@ def predict(inputs,
             inputs=inputs,
             predictor=predictor,
             block_shape=block_shape,
-            returnVariance=returnVariance,
-            returnEntropy=returnEntropy,
-            returnArrayFromImages=returnArrayFromImages, 
+            return_variance=return_variance,
+            return_entropy=return_entropy,
+            return_array_from_images=return_array_from_images, 
             n_samples=n_samples,
             normalizer=normalizer,
             batch_size=batch_size)
@@ -90,9 +90,9 @@ def predict(inputs,
             img=inputs,
             predictor=predictor,
             block_shape=block_shape,
-            returnVariance=returnVariance,
-            returnEntropy=returnEntropy,
-            returnArrayFromImages=returnArrayFromImages, 
+            return_variance=return_variance,
+            return_entropy=return_entropy,
+            return_array_from_images=return_array_from_images, 
             n_samples=n_samples,
             normalizer=normalizer,
             batch_size=batch_size,
@@ -102,9 +102,9 @@ def predict(inputs,
             filepath=inputs,
             predictor=predictor,
             block_shape=block_shape,
-            returnVariance=returnVariance,
-            returnEntropy=returnEntropy,
-            returnArrayFromImages=returnArrayFromImages, 
+            return_variance=return_variance,
+            return_entropy=return_entropy,
+            return_array_from_images=return_array_from_images, 
             n_samples=n_samples,
             normalizer=normalizer,
             batch_size=batch_size,
@@ -114,9 +114,9 @@ def predict(inputs,
             filepaths=inputs,
             predictor=predictor,
             block_shape=block_shape,
-            nreturnVariance=returnVariance,
-            returnEntropy=returnEntropy,
-            returnArrayFromImages=returnArrayFromImages, 
+            nreturn_variance=return_variance,
+            return_entropy=return_entropy,
+            return_array_from_images=return_array_from_images, 
             n_samples=n_samples,
             normalizer=normalizer,
             batch_size=batch_size,
@@ -127,9 +127,9 @@ def predict(inputs,
 def predict_from_array(inputs,
                        predictor,
                        block_shape,
-                       returnVariance=False,
-                       returnEntropy=False,
-                       returnArrayFromImages=False, 
+                       return_variance=False,
+                       return_entropy=False,
+                       return_array_from_images=False, 
                        n_samples=1,
                        normalizer=normalize_zero_one,
                        batch_size=4):
@@ -140,12 +140,12 @@ def predict_from_array(inputs,
         predictor: TensorFlow Predictor object, predictor from previously
             trained model.
         block_shape: tuple of len 3, shape of blocks on which to predict.
-        returnVariance: 'y' or 'n'. If set True, it returns the running population
+        return_variance: 'y' or 'n'. If set True, it returns the running population
             variance along with mean. Note, if the n_samples is smaller or equal to 1,
             the variance will not be returned; instead it will return None
-        returnEntropy: Boolean. If set True, it returns the running entropy.
+        return_entropy: Boolean. If set True, it returns the running entropy.
             along with mean.       
-        returnArrayFromImages: Boolean. If set True and the given input is either image,
+        return_array_from_images: Boolean. If set True and the given input is either image,
             filepath, or filepaths, it will return arrays of [mean, variance, entropy]
             instead of images of them. Also, if the input is array, it will
             simply return array, whether or not this flag is True or False.
@@ -200,14 +200,14 @@ def predict_from_array(inputs,
     mean_var_voxels = np.mean(totalVariance)
     std_var_voxels = np.std(totalVariance)
 
-    includeVariance = ((n_samples > 1) and (returnVariance))
-    if includeVariance:
-        if returnEntropy:
+    include_variance = ((n_samples > 1) and (return_variance))
+    if include_variance:
+        if return_entropy:
             return totalMeans, totalVariance, totalEntropy
         else:
             return totalMeans,totalVariance
     else:
-        if returnEntropy:
+        if return_entropy:
             return totalMeans, totalEntropy
         else:
             return totalMeans,
@@ -216,9 +216,9 @@ def predict_from_array(inputs,
 def predict_from_img(img,
                      predictor,
                      block_shape,
-                     returnVariance=False,
-                     returnEntropy=False,
-                     returnArrayFromImages=False, 
+                     return_variance=False,
+                     return_entropy=False,
+                     return_array_from_images=False, 
                      n_samples=1,
                      normalizer=normalize_zero_one,
                      batch_size=4,
@@ -230,12 +230,12 @@ def predict_from_img(img,
         predictor: TensorFlow Predictor object, predictor from previously
             trained model.
         block_shape: tuple of len 3, shape of blocks on which to predict.
-        returnVariance: Boolean. If set True, it returns the running population 
+        return_variance: Boolean. If set True, it returns the running population 
             variance along with mean. Note, if the n_samples is smaller or equal to 1,
             the variance will not be returned; instead it will return None
-        returnEntropy: Boolean. If set True, it returns the running entropy.
+        return_entropy: Boolean. If set True, it returns the running entropy.
             along with mean.       
-        returnArrayFromImages: Boolean. If set True and the given input is either image,
+        return_array_from_images: Boolean. If set True and the given input is either image,
             filepath, or filepaths, it will return arrays of [mean, variance, entropy]
             instead of images of them. Also, if the input is array, it will
             simply return array, whether or not this flag is True or False.
@@ -260,14 +260,14 @@ def predict_from_img(img,
         inputs=inputs,
         predictor=predictor,
         block_shape=block_shape,
-        returnVariance=returnVariance,
-        returnEntropy=returnEntropy,
-        returnArrayFromImages=returnArrayFromImages, 
+        return_variance=return_variance,
+        return_entropy=return_entropy,
+        return_array_from_images=return_array_from_images, 
         n_samples=n_samples,
         normalizer=normalizer,
         batch_size=batch_size)
 
-    if returnArrayFromImages:
+    if return_array_from_images:
         return y
     else:
         if len(y) == 1:
@@ -294,9 +294,9 @@ def predict_from_img(img,
 def predict_from_filepath(filepath,
                           predictor,
                           block_shape,
-                          returnVariance=False,
-                          returnEntropy=False,
-                          returnArrayFromImages=False, 
+                          return_variance=False,
+                          return_entropy=False,
+                          return_array_from_images=False, 
                           n_samples=1,
                           normalizer=normalize_zero_one,
                           batch_size=4,
@@ -309,12 +309,12 @@ def predict_from_filepath(filepath,
         predictor: TensorFlow Predictor object, predictor from previously
             trained model.
         block_shape: tuple of len 3, shape of blocks on which to predict.
-        returnVariance: Boolean. If set True, it returns the running population 
+        return_variance: Boolean. If set True, it returns the running population 
             variance along with mean. Note, if the n_samples is smaller or equal to 1,
             the variance will not be returned; instead it will return None
-        returnEntropy: Boolean. If set True, it returns the running entropy.
+        return_entropy: Boolean. If set True, it returns the running entropy.
             along with mean.       
-        returnArrayFromImages: Boolean. If set True and the given input is either image,
+        return_array_from_images: Boolean. If set True and the given input is either image,
             filepath, or filepaths, it will return arrays of [mean, variance, entropy]
             instead of images of them. Also, if the input is array, it will
             simply return array, whether or not this flag is True or False.
@@ -336,9 +336,9 @@ def predict_from_filepath(filepath,
         img=img,
         predictor=predictor,
         block_shape=block_shape,
-        returnVariance=returnVariance,
-        returnEntropy=returnEntropy,
-        returnArrayFromImages=returnArrayFromImages, 
+        return_variance=return_variance,
+        return_entropy=return_entropy,
+        return_array_from_images=return_array_from_images, 
         n_samples=n_samples,
         normalizer=normalizer,
         batch_size=batch_size)
@@ -347,9 +347,9 @@ def predict_from_filepath(filepath,
 def predict_from_filepaths(filepaths,
                            predictor,
                            block_shape,
-                           returnVariance=False,
-                           returnEntropy=False,
-                           returnArrayFromImages=False, 
+                           return_variance=False,
+                           return_entropy=False,
+                           return_array_from_images=False, 
                            n_samples=1,
                            normalizer=normalize_zero_one,
                            batch_size=4,
@@ -375,9 +375,9 @@ def predict_from_filepaths(filepaths,
             filepath=filepath,
             predictor=predictor,
             block_shape=block_shape,
-            returnVariance=returnVariance,
-            returnEntropy=returnEntropy,
-            returnArrayFromImages=returnArrayFromImages, 
+            return_variance=return_variance,
+            return_entropy=return_entropy,
+            return_array_from_images=return_array_from_images, 
             n_samples=n_samples,
             normalizer=normalizer,
             batch_size=batch_size,

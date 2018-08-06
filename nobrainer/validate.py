@@ -12,18 +12,18 @@ DT_X = "float32"
 
 
 def validate_from_filepath(filepath,
-                          predictor,
-                          block_shape,
-                          n_classes,
-                          mapping_y,
-                          returnVariance=False,
-                          returnEntropy=False,
-                          returnArrayFromImages=False, 
-                          n_samples=1,
-                          normalizer=normalize_zero_one,
-                          batch_size=4,
-                          dtype=DT_X,
-                          ):
+                           predictor,
+                           block_shape,
+                           n_classes,
+                           mapping_y,
+                           return_variance=False,
+                           return_entropy=False,
+                           return_array_from_images=False,
+                           n_samples=1,
+                           normalizer=normalize_zero_one,
+                           batch_size=4,
+                           dtype=DT_X,
+                           ):
     """Computes dice for a prediction compared to a ground truth image.
 
     Args:
@@ -34,12 +34,12 @@ def validate_from_filepath(filepath,
         n_classes: int, number of classifications the model is trained to output.
         mapping_y: path-like, path to csv mapping file per command line argument.
         block_shape: tuple of len 3, shape of blocks on which to predict.
-        returnVariance: Boolean. If set True, it returns the running population 
+        return_variance: Boolean. If set True, it returns the running population 
             variance along with mean. Note, if the n_samples is smaller or equal to 1,
             the variance will not be returned; instead it will return None
-        returnEntropy: Boolean. If set True, it returns the running entropy.
+        return_entropy: Boolean. If set True, it returns the running entropy.
             along with mean.       
-        returnArrayFromImages: Boolean. If set True and the given input is either image,
+        return_array_from_images: Boolean. If set True and the given input is either image,
             filepath, or filepaths, it will return arrays of [mean, variance, entropy]
             instead of images of them. Also, if the input is array, it will
             simply return array, whether or not this flag is True or False.
@@ -63,9 +63,9 @@ def validate_from_filepath(filepath,
         img=img,
         predictor=predictor,
         block_shape=block_shape,
-        returnVariance=returnVariance,
-        returnEntropy=returnEntropy,
-        returnArrayFromImages=returnArrayFromImages, 
+        return_variance=return_variance,
+        return_entropy=return_entropy,
+        return_array_from_images=return_array_from_images,
         n_samples=n_samples,
         normalizer=normalizer,
         batch_size=batch_size)
@@ -74,30 +74,26 @@ def validate_from_filepath(filepath,
     y = replace(y, read_mapping(mapping_y))
     dice = np.zeros(n_classes)
     for i in range(n_classes):
-        u = np.equal(prediction_image,i)
-        v = np.equal(y,i)
-        dice[i]= dice_numpy(u,v)
+        u = np.equal(prediction_image, i)
+        v = np.equal(y, i)
+        dice[i] = dice_numpy(u, v)
 
     return outputs, dice
 
 
-
-
-
-
 def validate_from_filepaths(filepaths,
-                          predictor,
-                          block_shape,
-                          n_classes,
-                          mapping_y,
-                          returnVariance=False,
-                          returnEntropy=False,
-                          returnArrayFromImages=False, 
-                          n_samples=1,
-                          normalizer=normalize_zero_one,
-                          batch_size=4,
-                          dtype=DT_X,
-                          ):
+                            predictor,
+                            block_shape,
+                            n_classes,
+                            mapping_y,
+                            return_variance=False,
+                            return_entropy=False,
+                            return_array_from_images=False,
+                            n_samples=1,
+                            normalizer=normalize_zero_one,
+                            batch_size=4,
+                            dtype=DT_X,
+                            ):
     """Yield predictions from filepaths using a SavedModel.
 
     Args:
@@ -118,50 +114,43 @@ def validate_from_filepaths(filepaths,
     """
     for filepath in filepaths:
 
-        outputs,dice = validate_from_filepath(
+        outputs, dice = validate_from_filepath(
             filepath=filepath,
             predictor=predictor,
-            n_classes = n_classes,
-            mapping_y = mapping_y,
+            n_classes=n_classes,
+            mapping_y=mapping_y,
             block_shape=block_shape,
-            returnVariance=returnVariance,
-            returnEntropy=returnEntropy,
-            returnArrayFromImages=returnArrayFromImages, 
+            return_variance=return_variance,
+            return_entropy=return_entropy,
+            return_array_from_images=return_array_from_images,
             n_samples=n_samples,
             normalizer=normalizer,
             batch_size=batch_size,
             dtype=dtype)
 
-
         outpath = Path(filepath[0])
         suffixes = '.'.join(s for s in outpath.suffixes)
-        meanPath = outpath.parent / (outpath.stem + '_mean.' + suffixes)
-        variancePath = outpath.parent / (outpath.stem + '_variance.' + suffixes)
-        entropyPath = outpath.parent / (outpath.stem + '_entropy.' + suffixes)
-        dicePath = outpath.parent / (outpath.stem + '_dice.npy')
-        if meanPath.is_file() or variancePath.is_file() or entropyPath.is_file():
-            raise Exception(str(meanPath) + " or " + str(variancePath) + " or " + str(entropyPath) + " already exists.")
+        mean_path = outpath.parent / (outpath.stem + '_mean.' + suffixes)
+        variance_path = outpath.parent / \
+            (outpath.stem + '_variance.' + suffixes)
+        entropy_path = outpath.parent / (outpath.stem + '_entropy.' + suffixes)
+        dice_path = outpath.parent / (outpath.stem + '_dice.npy')
+        if mean_path.is_file() or variance_path.is_file() or entropy_path.is_file():
+            raise Exception(str(mean_path) + " or " + str(variance_path) +
+                            " or " + str(entropy_path) + " already exists.")
 
-        nib.save(outputs[0], meanPath) # fix
-        if not returnArrayFromImages:
-            includeVariance = ((n_samples > 1) and (returnVariance))
-            returnEntropy = returnEntropy
-            if includeVariance and returnEntropy:
-                nib.save(outputs[1], str(variancePath))
-                nib.save(outputs[2], str(entropyPath))
-            elif includeVariance:
-                nib.save(outputs[1], str(variancePath))
+        nib.save(outputs[0], mean_path)  # fix
+        if not return_array_from_images:
+            include_variance = ((n_samples > 1) and (return_variance))
+            return_entropy = return_entropy
+            if include_variance and return_entropy:
+                nib.save(outputs[1], str(variance_path))
+                nib.save(outputs[2], str(entropy_path))
+            elif include_variance:
+                nib.save(outputs[1], str(variance_path))
             else:
-                nib.save(outputs[1], str(entropyPath))
+                nib.save(outputs[1], str(entropy_path))
 
     print(filepath[0])
     print('Dice: ' + str(np.mean(dice)))
-    np.save(dicePath,dice)
-
-
-
-
-
-
-
-
+    np.save(dice_path, dice)

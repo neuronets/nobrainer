@@ -144,11 +144,11 @@ def create_parser():
     ppp.add_argument(
         '--n-samples', type=int, default = 1,
         help="Number of sampling.")
-    ppp.add_argument('--returnEntropy', action='store_true',
+    ppp.add_argument('--return_entropy', action='store_true',
         help = 'if you want to return entropy, add this flag.')
-    ppp.add_argument('--returnVariance', action='store_true', 
+    ppp.add_argument('--return_variance', action='store_true', 
         help ='if you want to return variance, add this flag.')
-    ppp.add_argument('--returnArrayFromImages', action = 'store_true', 
+    ppp.add_argument('--return_array_from_images', action = 'store_true', 
         help = 'if you want to return array instead of image, add this flag.')
     ppp.add_argument('--samplewise-minmax', action='store_true', 
         help = 'set normalizer to be minmax. NOTE, normalizer cannot be both minmax and zscore')
@@ -273,29 +273,29 @@ def predict(params):
         inputs=params['input'],
         predictor=params['model'],
         block_shape=params['block_shape'],
-        returnVariance=params['returnVariance'],
-        returnEntropy=params['returnEntropy'],
-        returnArrayFromImages=params['returnArrayFromImages'],
+        return_variance=params['return_variance'],
+        return_entropy=params['return_entropy'],
+        return_array_from_images=params['return_array_from_images'],
         normalizer=normalizer,
         n_samples=params['n_samples'],
         batch_size=params['batch_size'])
 
     outpath = Path(params['output'])
     suffixes = '.'.join(s for s in outpath.suffixes)
-    variancePath = outpath.parent / (outpath.stem + '_variance.' + suffixes)
-    entropyPath = outpath.parent / (outpath.stem + '_entropy.' + suffixes)
+    variance_path = outpath.parent / (outpath.stem + '_variance.' + suffixes)
+    entropy_path = outpath.parent / (outpath.stem + '_entropy.' + suffixes)
 
     nib.save(imgs[0], params['output']) # fix
-    if not params['returnArrayFromImages']:
-        includeVariance = ((params['n_samples'] > 1) and (params['returnVariance']))
-        returnEntropy = params['returnEntropy']
-        if includeVariance and returnEntropy:
-            nib.save(imgs[1], str(variancePath))
-            nib.save(imgs[2], str(entropyPath))
-        elif includeVariance:
-            nib.save(imgs[1], str(variancePath))
+    if not params['return_array_from_images']:
+        include_variance = ((params['n_samples'] > 1) and (params['return_variance']))
+        return_entropy = params['return_entropy']
+        if include_variance and return_entropy:
+            nib.save(imgs[1], str(variance_path))
+            nib.save(imgs[2], str(entropy_path))
+        elif include_variance:
+            nib.save(imgs[1], str(variance_path))
         else:
-            nib.save(imgs[1], str(entropyPath))
+            nib.save(imgs[1], str(entropy_path))
 
 def validate(params):
     normalizer = None
@@ -312,9 +312,9 @@ def validate(params):
         inputs=params['input'],
         predictor=params['model'],
         block_shape=params['block_shape'],
-        returnVariance=params['returnVariance'],
-        returnEntropy=params['returnEntropy'],
-        returnArrayFromImages=params['returnArrayFromImages'],
+        return_variance=params['return_variance'],
+        return_entropy=params['return_entropy'],
+        return_array_from_images=params['return_array_from_images'],
         normalizer=normalizer,
         n_samples=params['n_samples'],
         batch_size=params['batch_size'])
