@@ -59,7 +59,7 @@ def validate_from_filepath(filepath,
     if not Path(filepath[0]).is_file():
         raise FileNotFoundError("could not find file {}".format(filepath[0]))
     img = nib.load(filepath[0])
-    y = labels = read_volume(filepath[1], dtype=np.int32)
+    y = read_volume(filepath[1], dtype=np.int32)
 
     outputs = _predict(
         inputs=img,
@@ -71,9 +71,7 @@ def validate_from_filepath(filepath,
         n_samples=n_samples,
         normalizer=normalizer,
         batch_size=batch_size)
-    prediction_image = outputs[0]
-    import pdb
-    pdb.set_trace()
+    prediction_image = outputs[0].get_data()
     y = replace(y, read_mapping(mapping_y))
     dice = np.zeros(n_classes)
     for i in range(n_classes):
@@ -132,26 +130,26 @@ def validate_from_filepaths(filepaths,
             dtype=dtype)
 
         outpath = Path(filepath[0])
-        suffixes = '.'.join(s for s in outpath.suffixes)
-        mean_path = outpath.parent / (outpath.stem + '_mean.' + suffixes)
+        suffixes = ''.join(s for s in outpath.suffixes)
+        mean_path = outpath.parent / (outpath.stem + '_mean' + suffixes)
         variance_path = outpath.parent / \
-            (outpath.stem + '_variance.' + suffixes)
-        entropy_path = outpath.parent / (outpath.stem + '_entropy.' + suffixes)
+            (outpath.stem + '_variance' + suffixes)
+        entropy_path = outpath.parent / (outpath.stem + '_entropy' + suffixes)
         dice_path = outpath.parent / (outpath.stem + '_dice.npy')
-        if mean_path.is_file() or variance_path.is_file() or entropy_path.is_file():
-            raise Exception(str(mean_path) + " or " + str(variance_path) +
-                            " or " + str(entropy_path) + " already exists.")
+        # if mean_path.is_file() or variance_path.is_file() or entropy_path.is_file():
+        #     raise Exception(str(mean_path) + " or " + str(variance_path) +
+        #                     " or " + str(entropy_path) + " already exists.")
 
-        nib.save(outputs[0], mean_path)  # fix
+        nib.save(outputs[0], mean_path.as_posix())  # fix
         if not return_array_from_images:
             include_variance = ((n_samples > 1) and (return_variance))
-            return_entropy = return_entropy
+            include_entropy = ((n_samples > 1) and (return_entropy))
             if include_variance and return_entropy:
                 nib.save(outputs[1], str(variance_path))
                 nib.save(outputs[2], str(entropy_path))
             elif include_variance:
                 nib.save(outputs[1], str(variance_path))
-            else:
+            elif include_entropy:
                 nib.save(outputs[1], str(entropy_path))
 
     print(filepath[0])
