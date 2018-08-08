@@ -31,7 +31,12 @@ original,new,label
 58,13,Right-Accumbens-area
 60,14,Right-VentralDC
 72,2,5th-Ventricle
-192,15,Corpus_Callosum 
+192,15,Corpus_Callosum
+251,15,CC_Posterior 
+252,15,CC_Mid_Posterior 
+253,15,CC_Central 
+254,15,CC_Mid_Anterior
+255,15,CC_Anterior 
 1001,16,ctx-lh-bankssts
 1002,17,ctx-lh-caudalanteriorcingulate
 1003,18,ctx-lh-caudalmiddlefrontal
