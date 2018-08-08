@@ -328,14 +328,14 @@ def predict(params):
 
     nib.save(imgs[0], params['output']) # fix
     if not params['return_array_from_images']:
-        include_variance = ((params['n_samples'] > 1) and (params['return_variance']))
-        return_entropy = params['return_entropy']
+        include_variance = ((params['n_samples'] > 1) and (return_variance))
+        include_entropy = ((params['n_samples'] > 1) and (return_entropy))
         if include_variance and return_entropy:
             nib.save(imgs[1], str(variance_path))
             nib.save(imgs[2], str(entropy_path))
         elif include_variance:
             nib.save(imgs[1], str(variance_path))
-        else:
+        elif include_entropy:
             nib.save(imgs[1], str(entropy_path))
 
 def validate(params):
