@@ -6,9 +6,11 @@ import numpy as np
 from nobrainer.volume import normalize_zero_one
 from nobrainer.volume import replace
 from nobrainer.io import read_mapping
+from nobrainer.io import read_volume
 from nobrainer.metrics import dice_numpy
 from nobrainer.predict import predict as _predict
 DT_X = "float32"
+
 
 
 def validate_from_filepath(filepath,
@@ -54,13 +56,13 @@ def validate_from_filepath(filepath,
         `nibabel.spatialimages.SpatialImage` or arrays of predictions of 
         mean, variance(optional), and entropy (optional).
     """
-    if not Path(filepath).is_file():
+    if not Path(filepath[0]).is_file():
         raise FileNotFoundError("could not find file {}".format(filepath[0]))
     img = nib.load(filepath[0])
-    y = nib.load(filepath[1])
+    y = labels = read_volume(filepath[1], dtype=np.int32)
 
     outputs = _predict(
-        img=img,
+        inputs=img,
         predictor=predictor,
         block_shape=block_shape,
         return_variance=return_variance,
@@ -70,7 +72,8 @@ def validate_from_filepath(filepath,
         normalizer=normalizer,
         batch_size=batch_size)
     prediction_image = outputs[0]
-
+    import pdb
+    pdb.set_trace()
     y = replace(y, read_mapping(mapping_y))
     dice = np.zeros(n_classes)
     for i in range(n_classes):
@@ -97,7 +100,7 @@ def validate_from_filepaths(filepaths,
     """Yield predictions from filepaths using a SavedModel.
 
     Args:
-        filepaths: list, neuroimaging volume filepaths on which to predict.
+        test_csv: list, neuroimaging volume filepaths on which to predict.
         n_classes: int, number of classifications the model is trained to output.
         mapping_y: path-like, path to csv mapping file per command line argument.
         block_shape: tuple of len 3, shape of blocks on which to predict.

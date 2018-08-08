@@ -13,6 +13,7 @@ from nobrainer.io import read_csv
 from nobrainer.io import read_mapping
 from nobrainer.models.util import get_estimator
 from nobrainer.predict import predict as _predict
+from nobrainer.validate import validate_from_filepaths
 from nobrainer.train import train as _train
 from nobrainer.volume import VolumeDataGenerator
 from nobrainer.volume import zscore, normalize_zero_one
@@ -155,35 +156,45 @@ def create_parser():
     ppp.add_argument('--samplewise-zscore', action='store_true',
         help = 'set normalizer to be zscore. NOTE, normalizer cannot be both minmax and zscore')
     ###
+
+
     # Validation subparser
-    pp = subparsers.add_parser('validate', help="Validate model using input images and ground truth images.")
-    pp.add_argument('input', help="Filepath to csv containing image and ground truth on each line.")
-    pp.add_argument('output', help="Name out output file.")
-    ppp = pp.add_argument_group('validation arguments')
-    ppp.add_argument(
+    vp = subparsers.add_parser('validate', help="Validate model using input images and ground truth images.")
+    vp.add_argument('--csv', help="Filepath to csv containing image and ground truth on each line.")
+    vpp = vp.add_argument_group('validation arguments')
+    vpp.add_argument(
         '-b', '--block-shape', nargs=3, required=True, type=int,
         help="Shape of blocks on which predict. Non-overlapping blocks of this"
              " shape are taken from the inputs for prediction.")
-    ppp.add_argument(
+    vpp.add_argument(
         '--batch-size', default=4, type=int,
         help="Number of sub-volumes per batch for prediction. Use a smaller"
              " value if memory is insufficient.")
-    ppp.add_argument(
+    vpp.add_argument(
         '-m', '--model', required=True, help="Path to saved model.")
     ###
-    ppp.add_argument(
+    vpp.add_argument(
         '--n-samples', type=int, default = 1,
         help="Number of sampling.")
-    ppp.add_argument('--return_entropy', action='store_true',
+    vpp.add_argument('--return_entropy', action='store_true',
         help = 'if you want to return entropy, add this flag.')
-    ppp.add_argument('--return_variance', action='store_true', 
+    vpp.add_argument('--return_variance', action='store_true', 
         help ='if you want to return variance, add this flag.')
-    ppp.add_argument('--return_array_from_images', action = 'store_true', 
+    vpp.add_argument('--return_array_from_images', action = 'store_true', 
         help = 'if you want to return array instead of image, add this flag.')
-    ppp.add_argument('--samplewise-minmax', action='store_true', 
+    vpp.add_argument('--samplewise-minmax', action='store_true', 
         help = 'set normalizer to be minmax. NOTE, normalizer cannot be both minmax and zscore')
-    ppp.add_argument('--samplewise-zscore', action='store_true',
+    vpp.add_argument('--samplewise-zscore', action='store_true',
         help = 'set normalizer to be zscore. NOTE, normalizer cannot be both minmax and zscore')
+    vpp.add_argument(
+        '--label-mapping',
+        help="Path to CSV mapping file. First column contains original labels,"
+             " and second column contains new labels in range [0, n_classes-1]"
+             ". Header must be included. More than two columns are accepted,"
+             " but only the first two columns are used.")
+    vpp.add_argument(
+        '-n', '--n-classes', required=True, type=int,
+        help="Number of classes the model classifies.")
     ###
     # Save subparser
     sp = subparsers.add_parser('save', help="Save model as SavedModel (.pb)")
@@ -337,16 +348,18 @@ def validate(params):
         normalizer = normalize_zero_one
     if sz:
         normalizer = zscore
-
+    print(params['model'])
     validate_from_filepaths(
-        inputs=params['input'],
+        filepaths=read_csv(params['csv']),
         predictor=params['model'],
         block_shape=params['block_shape'],
+        n_classes=params['n_classes'],
+        mapping_y=params['label_mapping'],
         return_variance=params['return_variance'],
         return_entropy=params['return_entropy'],
         return_array_from_images=params['return_array_from_images'],
-        normalizer=normalizer,
         n_samples=params['n_samples'],
+        normalizer=normalizer,
         batch_size=params['batch_size'])
 
 
@@ -382,7 +395,7 @@ def main(args=None):
         params['strides'] = tuple(params['strides'])
         train(params=params)
 
-    elif params['subparser_name'] in ['predict','validate']:
+    elif params['subparser_name'] == 'predict':
         params['block_shape'] = tuple(params['block_shape'])
         if not Path(params['input']).is_file():
             raise FileNotFoundError(
@@ -390,10 +403,7 @@ def main(args=None):
         if Path(params['output']).is_file():
             raise FileExistsError(
                 "output file exists: {}".format(params['output']))
-        if params['subparser_name'] == 'predict':
-            predict(params)
-        else: 
-            validate(params)
+        predict(params)
 
     elif params['subparser_name'] == 'save':
         params['block_shape'] = tuple(params['block_shape'])
@@ -402,6 +412,9 @@ def main(args=None):
                 "model directory not found: {}".format(params['modeldir']))
         save(params)
 
+    elif params['subparser_name'] == 'validate':
+        params['block_shape'] = tuple(params['block_shape'])
+        validate(params)
     else:
         # should never get to this point.
         raise ValueError("invalid subparser.")
