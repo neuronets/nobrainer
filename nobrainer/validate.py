@@ -152,6 +152,6 @@ def validate_from_filepaths(filepaths,
             elif include_entropy:
                 nib.save(outputs[1], str(entropy_path))
 
-    print(filepath[0])
-    print('Dice: ' + str(np.mean(dice)))
-    np.save(dice_path, dice)
+        print(filepath[0])
+        print('Dice: ' + str(np.mean(dice)))
+        np.save(dice_path, dice)
