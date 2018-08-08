@@ -214,7 +214,7 @@ class _Conv(base.Layer):
   def call(self, inputs):
     outputs_mean = self._convolution_op(inputs, self.kernel_m)
     outputs_var = self._convolution_op(tf.square(inputs), tf.square(self.kernel_sigma))
-    outputs_e = tf.random_normal(shape=tf.shape(outputs_mean),dtype=self.dtype)
+    outputs_e = tf.random_normal(shape=tf.shape(self.g),dtype=self.dtype)
     
     def apply_variational_dropout():
         return outputs_mean + tf.sqrt(outputs_var+1e-8) * outputs_e
