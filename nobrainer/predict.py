@@ -8,7 +8,7 @@ import numpy as np
 import tensorflow as tf
 import time
 from nobrainer.volume import from_blocks
-from nobrainer.volume import normalize_zero_one
+from nobrainer.volume import zscore, normalize_zero_one
 from nobrainer.volume import to_blocks
 
 DT_X = "float32"
@@ -22,7 +22,7 @@ def predict(inputs,
             return_entropy=False,
             return_array_from_images = False, 
             n_samples=1,
-            normalizer=normalize_zero_one,
+            normalizer=None,
             batch_size=4,
             dtype=DT_X):
     """Return predictions from `inputs`.
@@ -131,7 +131,7 @@ def predict_from_array(inputs,
                        return_entropy=False,
                        return_array_from_images=False, 
                        n_samples=1,
-                       normalizer=normalize_zero_one,
+                       normalizer=None,
                        batch_size=4):
     """Return a prediction given a filepath and an ndarray of features.
 
@@ -159,8 +159,11 @@ def predict_from_array(inputs,
         ndarray of predictions.
     """
 
+    print("Normalizer being used {n}".format(n = normalizer))
     if normalizer:
         features = normalizer(inputs)
+        print(features.mean())
+        print(features.std())
     else:
         features = inputs
     features = to_blocks(features, block_shape=block_shape) #NAO# This may be the clue.# This divides the image into cubes!
@@ -220,7 +223,7 @@ def predict_from_img(img,
                      return_entropy=False,
                      return_array_from_images=False, 
                      n_samples=1,
-                     normalizer=normalize_zero_one,
+                     normalizer=None,
                      batch_size=4,
                      dtype=DT_X):
     """Return a prediction given a Nibabel image instance and a predictor.
@@ -298,7 +301,7 @@ def predict_from_filepath(filepath,
                           return_entropy=False,
                           return_array_from_images=False, 
                           n_samples=1,
-                          normalizer=normalize_zero_one,
+                          normalizer=None,
                           batch_size=4,
                           dtype=DT_X):
     """Return a prediction given a filepath and Predictor object.
@@ -351,7 +354,7 @@ def predict_from_filepaths(filepaths,
                            return_entropy=False,
                            return_array_from_images=False, 
                            n_samples=1,
-                           normalizer=normalize_zero_one,
+                           normalizer=None,
                            batch_size=4,
                            dtype=DT_X):
     """Yield predictions from filepaths using a SavedModel.

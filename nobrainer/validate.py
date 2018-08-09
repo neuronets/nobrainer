@@ -113,6 +113,8 @@ def validate_from_filepaths(filepaths,
     Returns:
         None
     """
+    import pdb
+    pdb.set_trace()
     for filepath in filepaths:
 
         outputs, dice = validate_from_filepath(
@@ -155,3 +157,11 @@ def validate_from_filepaths(filepaths,
         print(filepath[0])
         print('Dice: ' + str(np.mean(dice)))
         np.save(dice_path, dice)
+
+
+def test_predict():
+    
+
+
+
+        CUDA_VISIBLE_DEVICES=0 nobrainer validate --model=/data/MLcore/nobrainer/logs/hcp_50_map/saved_model/1528485348/saved_model.pb   --batch-size=4 --block-shape 32 32 32  --csv=/data/SharedData/segmentation/hcp_test.csv --n-classes=50 --label-mapping=/data/MLcore/nobrainer/examples/brain-labelling-cli/50-class-mapping.csv
