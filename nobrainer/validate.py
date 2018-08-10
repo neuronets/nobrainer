@@ -9,6 +9,7 @@ from nobrainer.io import read_mapping
 from nobrainer.io import read_volume
 from nobrainer.metrics import dice_numpy
 from nobrainer.predict import predict as _predict
+import nobrainer
 DT_X = "float32"
 
 
@@ -73,13 +74,27 @@ def validate_from_filepath(filepath,
         batch_size=batch_size)
     prediction_image = outputs[0].get_data()
     y = replace(y, read_mapping(mapping_y))
+    dice = get_dice_for_images(prediction_image, y, n_classes)
+    return outputs, dice
+
+def get_dice_for_images(pred,gt,n_classes):
+    """Computes dice for a prediction compared to a ground truth image.
+
+    Args:
+        pred: nibabel.spatialimages.SpatialImage, a predicted image.
+        gt: nibabel.spatialimages.SpatialImage, a ground-truth image.
+
+
+    Returns:
+        `nibabel.spatialimages.SpatialImage`.
+    """
     dice = np.zeros(n_classes)
     for i in range(n_classes):
-        u = np.equal(prediction_image, i)
-        v = np.equal(y, i)
+        u = np.equal(pred, i)
+        v = np.equal(gt, i)
         dice[i] = dice_numpy(u, v)
 
-    return outputs, dice
+    return dice
 
 
 def validate_from_filepaths(filepaths,
@@ -159,9 +174,28 @@ def validate_from_filepaths(filepaths,
         np.save(dice_path, dice)
 
 
-def test_predict():
-    
+def test_validate():
+    test_data = Path(nobrainer.__file__).parent / "data"
+    test_input = test_data / "pac_1430_orig.nii.gz"
+    ground_truth = test_data / "pac_1430_aseg.nii.gz"
+    model = test_data / '1528485348' / 'saved_model.pb'
+    mapping_gt = test_data.parent.parent / 'examples' / 'brain-labelling-cli' / '50-class-mapping.csv'
 
+    outputs,dice = validate_from_filepath(
+        (test_input.as_posix(),ground_truth.as_posix()),
+        predictor = model.parent,
+        block_shape = (32,32,32),
+        return_variance=False,
+        return_entropy=False,
+        return_array_from_images = False,
+        n_classes =50,
+        mapping_y=mapping_gt,
+        n_samples=1,
+        normalizer=None,
+        batch_size=4,
+        dtype=DT_X)
 
+    print(dice)
+    assert(np.mean(dice) > 0.50)
 
-        CUDA_VISIBLE_DEVICES=0 nobrainer validate --model=/data/MLcore/nobrainer/logs/hcp_50_map/saved_model/1528485348/saved_model.pb   --batch-size=4 --block-shape 32 32 32  --csv=/data/SharedData/segmentation/hcp_test.csv --n-classes=50 --label-mapping=/data/MLcore/nobrainer/examples/brain-labelling-cli/50-class-mapping.csv
+# CUDA_VISIBLE_DEVICES=0 nobrainer validate --model=nobrainer/data/1528485348   --batch-size=4 --block-shape 32 32 32  --csv=nobrainer/data/test_validate.csv    --n-classes=50 --label-mapping=examples/brain-labelling-cli/50-class-mapping.csv

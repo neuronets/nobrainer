@@ -24,7 +24,8 @@ def predict(inputs,
             n_samples=1,
             normalizer=None,
             batch_size=4,
-            dtype=DT_X):
+            dtype=DT_X,
+            ):
     """Return predictions from `inputs`.
 
     This is a general prediction method that can accept various types of
@@ -121,6 +122,8 @@ def predict(inputs,
             normalizer=normalizer,
             batch_size=batch_size,
             dtype=dtype)
+    else:
+        raise TypeError("Input to predict is not a valid type")
     return out
 
 
