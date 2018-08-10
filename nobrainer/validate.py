@@ -128,8 +128,6 @@ def validate_from_filepaths(filepaths,
     Returns:
         None
     """
-    import pdb
-    pdb.set_trace()
     for filepath in filepaths:
 
         outputs, dice = validate_from_filepath(
@@ -195,7 +193,7 @@ def test_validate():
         batch_size=4,
         dtype=DT_X)
 
-    print(dice)
+    print("Dice: ", dice)
     assert(np.mean(dice) > 0.50)
 
 # CUDA_VISIBLE_DEVICES=0 nobrainer validate --model=nobrainer/data/1528485348   --batch-size=4 --block-shape 32 32 32  --csv=nobrainer/data/test_validate.csv    --n-classes=50 --label-mapping=examples/brain-labelling-cli/50-class-mapping.csv
