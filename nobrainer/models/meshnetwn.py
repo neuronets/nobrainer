@@ -155,7 +155,6 @@ def model_fn(features,
         ms = tf.get_collection('ms')
         ms_prior = tf.get_collection('ms_prior')
 
-        print(len(ms))
         i=-1
         for v in tf.get_collection('ms'):
             i += 1
@@ -169,16 +168,14 @@ def model_fn(features,
      
     nll_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels, logits=logits))
     tf.summary.scalar('nll_loss', nll_loss)
-    print(tf.get_collection('kernels'))
-    
-    l2_loss = tf.add_n([tf.reduce_sum((tf.square(ms[i] - ms_prior[i])) / ((tf.square(sigmas_prior[i]) + 1e-8) * 2.0)) for i in range(len(ms))], name = 'l2_loss')
-    tf.summary.scalar('l2_loss', l2_loss)
     
     n_examples = tf.constant(params['n_examples'],dtype=ms[0].dtype)
     tf.summary.scalar('n_examples', n_examples)
     
+    l2_loss = tf.add_n([tf.reduce_sum((tf.square(ms[i] - ms_prior[i])) / ((tf.square(sigmas_prior[i]) + 1e-8) * 2.0)) for i in range(len(ms))], name = 'l2_loss') / (n_examples*256.0*256.0*256.0)
+    tf.summary.scalar('l2_loss', l2_loss)
     
-    loss = nll_loss + l2_loss / (n_examples*256*256*256)
+    loss = nll_loss + l2_loss
 
     # Add evaluation metrics for class 1.
     labels = tf.cast(labels, predicted_classes.dtype)
