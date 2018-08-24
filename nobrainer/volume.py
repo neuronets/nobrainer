@@ -170,32 +170,6 @@ def itervolumes(filepaths,
             yield ff[..., np.newaxis], ll
 
 
-def match_histogram(x, target, bins=255):
-    """Match the histogram of the `target` array.
-
-    Args:
-        x: array-like, array to modify
-        target: array-like, array to match
-        bins: number of bins to compute in histogram
-
-    Returns:
-        Modified array
-    """
-    x = np.asarray(x)
-    target = np.asarray(target)
-    sh, _ = np.histogram(x.flatten(), bins=bins, density=True)
-    th, tbins = np.histogram(target.flatten(), bins=bins, density=True)
-    scdf = sh.cumsum()
-    tcdf = th.cumsum()
-    return np.interp(
-        np.interp(
-            x.flatten(),
-            tbins[:-1],
-            scdf),
-        tcdf,
-        tbins[:-1]).reshape(x.shape)
-
-
 def normalize_zero_one(a):
     """Return array with values of `a` normalized to range [0, 1].
 
