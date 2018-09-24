@@ -108,10 +108,22 @@ def from_blocks(a, output_shape):
         .reshape(output_shape))
 
 
-def iterblocks_3d(arr, kernel_size, strides=(1, 1, 1)):
+def iterblocks_3d(arr, kernel_size, strides=None):
     """Yield blocks of 3D array."""
+    arr = np.asarray(arr)
+
     if arr.ndim != 3:
         raise ValueError("Input array must be 3D.")
+
+    if strides is None:
+        strides = kernel_size
+
+    if len(kernel_size) != 3 and kernel_size is not None:
+        raise ValueError("block_shape must have 3 items if not None.")
+    if len(strides) != 3 and strides is not None:
+        raise ValueError("strides must have 3 items if not None.")
+    if kernel_size is None and strides is not None:
+        raise ValueError("strides cannot be None when block_shape is None.")
 
     bx, by, bz = _get_n_blocks(
         arr_shape=arr.shape, kernel_size=kernel_size, strides=strides)
@@ -134,15 +146,49 @@ def iterblocks_3d(arr, kernel_size, strides=(1, 1, 1)):
 
 def itervolumes(filepaths,
                 block_shape,
-                x_dtype,
-                y_dtype,
-                strides=(1, 1, 1),
-                shuffle=False,
+                x_dtype=np.float32,
+                y_dtype=np.int32,
+                strides=None,
+                shuffle=True,
                 normalizer=None):
     """Yield tuples of numpy arrays `(features, labels)` from a list of
     filepaths to neuroimaging files.
+
+    Args:
+        filepaths: nested list of tuples, where each tuple has length two. The
+            first item in each tuple is the path to the volume of features
+            (e.g., an anatomical scan), and the second item is the path to the
+            volume of features (e.g., FreeSurfer's aparc+aseg.mgz).
+        block_shape: tuple of len 3 or None, the shape of blocks to take from
+            the features and labels. This is useful if a full volume cannot fit
+            into GPU memory. If `block_shape` is `None`, full volumes are
+            yielded. Use `(None, None, None)` if yielding full volumes and
+            volumes have different shapes.
+        x_dtype: dtype object or string, data type of features.
+        y_dtype: dtype object or string, data type of labels.
+        strides: tuple or None, strides to take between blocks. If None,
+            strides will be equal to `block_shape`, which will generate
+            non-overlapping blocks.
+        shuffle: bool, if true, shuffle the list of filepaths. Pairs of
+            `(features, labels)` filepaths are maintained.
+        normalizer: callable, function that accepts two arrays (`features` and
+            `labels`) and returns two arrays (`features` and `labels`).
+
+    Yields:
+        Tuple of `(features, labels)`. If `block_shape` is a tuple of integers,
+        the shape of `features` is `(*block_shape, 1)`, and the shape of
+        `labels` is `block_shape`. If `block_shape` is `None` or
+        `(None, None, None)`, the shape of `features` is `(*volume_shape, 1)`,
+        and the shape of `labels` is `volume_shape`.
     """
     filepaths = copy.deepcopy(filepaths)
+
+    # Common error is to pass the CSV filepath as `filepaths` argument.
+    if isinstance(filepaths, str):
+        raise ValueError("`filepaths` must be a nested sequence of filepaths.")
+
+    if any((len(i) != 2 for i in filepaths)):
+        raise ValueError("Found sequence with len != 2 in `filepaths`.")
 
     if shuffle:
         random.shuffle(filepaths)
@@ -161,13 +207,22 @@ def itervolumes(filepaths,
             features, labels = normalizer(features, labels)
 
         _check_shapes_equal(features, labels)
-        feature_gen = iterblocks_3d(
-            arr=features, kernel_size=block_shape, strides=strides)
-        label_gen = iterblocks_3d(
-            arr=labels, kernel_size=block_shape, strides=strides)
 
-        for ff, ll in zip(feature_gen, label_gen):
-            yield ff[..., np.newaxis], ll
+        # Yield full volumes.
+        if block_shape is None or block_shape == (None, None, None):
+            yield (
+                features[..., np.newaxis].astype(x_dtype),
+                labels.astype(y_dtype))
+
+        # Yield blocks of volumes.
+        else:
+            feature_gen = iterblocks_3d(
+                arr=features, kernel_size=block_shape, strides=strides)
+            label_gen = iterblocks_3d(
+                arr=labels, kernel_size=block_shape, strides=strides)
+
+            for ff, ll in zip(feature_gen, label_gen):
+                yield ff[..., np.newaxis].astype(x_dtype), ll.astype(y_dtype)
 
 
 def normalize_zero_one(a):
@@ -189,6 +244,7 @@ def reduce_contrast(x, out=None):
     Returns:
         Modified array
     """
+    x = np.asarray(x)
     return np.sqrt(x, out=out)
 
 
@@ -205,8 +261,10 @@ def replace(a, mapping, assume_all_present=False, zero=True):
         zero: boolean, zero values in `a` not in `mapping.keys()`
 
     Returns:
-        replaced ndarray
+        Modified ndarray.
     """
+    a = np.asarray(a)
+    orig_dtype = a.dtype
     # Extract keys and values
     k = np.array(list(mapping.keys()))
     v = np.array(list(mapping.values()))
@@ -225,7 +283,7 @@ def replace(a, mapping, assume_all_present=False, zero=True):
     if zero:
         out[~np.isin(out, list(mapping.values()))] = 0
 
-    return out
+    return out.astype(orig_dtype)
 
 
 def rotate(x, angle, axes=(1, 0), out=None):
@@ -582,7 +640,7 @@ class VolumeDataGenerator:
     def flow_from_filepaths(self,
                             filepaths,
                             block_shape,
-                            strides,
+                            strides=None,
                             x_dtype='float32',
                             y_dtype='int32',
                             shuffle=None):
@@ -597,10 +655,9 @@ class VolumeDataGenerator:
                 path to the features volume, and the second item is the path
                 to the corresponding labels volume.
             block_shape: tuple len 3, shape of output blocks.
-            strides: int or tuple len 3, stride in each axis when extracting
-                blocks from the original volume. If an int, that stride is used
-                on all axes. Use `strides = block_shape` to generate
-                non-overlapping blocks.
+            strides: tuple or None, stride in each axis when extracting
+                blocks from the original volume. If `None`, stride is equal to
+                `block_shape` to generate non-overlapping blocks.
             x_dtype: str or dtype object, datatype of features output.
             y_dtype: str or dtype object, datatype of labels output.
             shuffle: boolean, shuffle list of filepaths.
@@ -713,10 +770,15 @@ class VolumeDataGenerator:
         return input_fn
 
 
-def _get_n_blocks(arr_shape, kernel_size, strides=1):
+def _get_n_blocks(arr_shape, kernel_size, strides=None):
     """Return number of blocks that will result from sliding a kernel across
     input array with a certain stride.
     """
+    if kernel_size is None or kernel_size == (None, None, None):
+        kernel_size = arr_shape
+    if strides is None:
+        strides = kernel_size
+
     def get_n(a, k, s):
         """Return number of blocks that result from length `a` of input
         array, length `k` of kernel, and stride `s`."""
