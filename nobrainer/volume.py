@@ -754,8 +754,7 @@ class VolumeDataGenerator:
                 # that last batch. This is necessary when training on multiple
                 # GPUs because the batch size must always be divisible by the
                 # number of GPUs.
-                dset = dset.apply(
-                    tf.contrib.data.batch_and_drop_remainder(batch_size))
+                dset = dset.batch(batch_size, drop_remainder=True)
             else:
                 # If not training on multiple GPUs, batch sizes do not have to
                 # be consistent.
