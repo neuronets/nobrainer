@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """HighRes3DNet implemented in TensorFlow.
 
+Implementation is influenced by [NiftyNet](http://www.niftynet.io/).
+
 Reference
 ---------
 Li W., Wang G., Fidon L., Ourselin S., Cardoso M.J., Vercauteren T. (2017)
@@ -37,7 +39,8 @@ def _resblock(inputs,
               filters,
               kernel_size,
               dilation_rate,
-              one_batchnorm):
+              paddings=None,
+              one_batchnorm=False):
     """Layer building block of residual network. This includes the residual
     connection.
 
@@ -52,6 +55,8 @@ def _resblock(inputs,
         filters : int, number of 3D convolution filters.
         kernel_size : int or tuple, size of 3D convolution kernel.
         dilation_rate : int or tuple, rate of dilution in 3D convolution.
+        paddings: list, paddings to apply immediately before elementwise
+            addition.
         one_batchnorm : bool, if true, only apply first batch normalization
             layer in each residually connected block. Empirically, only using
             first batch normalization layer allowed the model to model to be
@@ -107,6 +112,10 @@ def _resblock(inputs,
         conv2 = tf.layers.conv3d(
             relu2, filters=filters, kernel_size=kernel_size, padding='SAME',
             dilation_rate=dilation_rate)
+
+    if paddings is not None:
+        with tf.variable_scope('padding'):
+            inputs = tf.pad(inputs, paddings=paddings, mode='CONSTANT')
 
     with tf.variable_scope('add_{}'.format(layer_num)):
         return tf.add(conv2, inputs)
@@ -167,42 +176,60 @@ def model_fn(features,
     training = mode == tf.estimator.ModeKeys.TRAIN
 
     with tf.variable_scope('conv_0'):
-        conv = tf.layers.conv3d(
+        x = tf.layers.conv3d(
             volume, filters=16, kernel_size=3, padding='SAME')
     with tf.variable_scope('batchnorm_0'):
-        conv = tf.layers.batch_normalization(
-            conv, training=training, fused=FUSED_BATCH_NORM)
+        x = tf.layers.batch_normalization(
+            x, training=training, fused=FUSED_BATCH_NORM)
     with tf.variable_scope('relu_0'):
-        outputs = tf.nn.relu(conv)
+        x = tf.nn.relu(x)
 
     layer_num = 0
     one_batchnorm = params['one_batchnorm_per_resblock']
 
+    # 16-filter residually connected blocks.
     for ii in range(3):
         layer_num += 1
-        outputs = _resblock(
-            outputs, mode=mode, layer_num=layer_num, filters=16, kernel_size=3,
+        x = _resblock(
+            x, mode=mode, layer_num=layer_num, filters=16, kernel_size=3,
             dilation_rate=1, one_batchnorm=one_batchnorm)
 
-    for ii in range(3):
+    # 32-filter residually connected blocks. Pad inputs immediately before
+    # first elementwise sum to match shape of last dimension.
+    layer_num += 1
+    paddings = [[0, 0], [0, 0], [0, 0], [0, 0], [8, 8]]
+    x = _resblock(
+        x, mode=mode, layer_num=layer_num, filters=32, kernel_size=3,
+        dilation_rate=2, paddings=paddings, one_batchnorm=one_batchnorm)
+    for ii in range(2):
         layer_num += 1
-        outputs = _resblock(
-            outputs, mode=mode, layer_num=layer_num, filters=16, kernel_size=3,
+        x = _resblock(
+            x, mode=mode, layer_num=layer_num, filters=32, kernel_size=3,
             dilation_rate=2, one_batchnorm=one_batchnorm)
 
-    for ii in range(3):
+    # 64-filter residually connected blocks. Pad inputs immediately before
+    # first elementwise sum to match shape of last dimension.
+    layer_num += 1
+    paddings = [[0, 0], [0, 0], [0, 0], [0, 0], [16, 16]]
+    x = _resblock(
+        x, mode=mode, layer_num=layer_num, filters=64, kernel_size=3,
+        dilation_rate=4, paddings=paddings, one_batchnorm=one_batchnorm)
+    for ii in range(2):
         layer_num += 1
-        outputs = _resblock(
-            outputs, mode=mode, layer_num=layer_num, filters=16, kernel_size=3,
+        x = _resblock(
+            x, mode=mode, layer_num=layer_num, filters=64, kernel_size=3,
             dilation_rate=4, one_batchnorm=one_batchnorm)
 
+    with tf.variable_scope('conv_1'):
+        x = tf.layers.conv3d(x, filters=80, kernel_size=1, padding='SAME')
+
     if params['dropout_rate']:
-        outputs = tf.layers.dropout(
-            outputs, rate=params['dropout_rate'], training=training)
+        x = tf.layers.dropout(
+            x, rate=params['dropout_rate'], training=training)
 
     with tf.variable_scope('logits'):
         logits = tf.layers.conv3d(
-            outputs, filters=params['n_classes'], kernel_size=1,
+            x, filters=params['n_classes'], kernel_size=1,
             padding='SAME')
 
     predicted_classes = tf.argmax(logits, axis=-1)
