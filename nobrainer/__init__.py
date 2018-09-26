@@ -20,6 +20,8 @@ from nobrainer.io import read_mapping
 from nobrainer.io import read_volume
 from nobrainer.io import save_json
 
+import nobrainer.losses
+
 from nobrainer.metrics import dice
 from nobrainer.metrics import dice_numpy
 from nobrainer.metrics import hamming
