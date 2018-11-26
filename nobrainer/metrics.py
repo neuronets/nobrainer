@@ -10,91 +10,57 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.python.framework.ops import add_to_collections
 
-from nobrainer.util import _check_all_x_in_subset_numpy, _check_shapes_equal
-
-_EPSILON = 1e-7
+from nobrainer.util import _EPSILON
 
 
-def dice(u, v, axis=None, name=None):
+def dice(labels, predictions, axis=None, name=None):
     """Return the Dice coefficients between two Tensors. Perfect Dice is 1.0.
 
-                     2 * | intersection(A, B) |
-        Dice(A, B) = --------------------------
-                            |A| + |B|
+    The Dice coefficient between predictions `p` and labels `g` is
 
-    Args:
-        u, v: `Tensor`, input boolean tensors.
-        axis: `int` or `tuple`, the dimension(s) along which to compute Dice.
-        name: `str`, a name for the operation.
+    .. math::
+        \frac{\Sigma_i^N p_i g_i + \epsilon}
+            {\Sigma_i^N p_i^2 + \Sigma_i^N g_i^2 + \epsilon}
 
-    Returns:
-        `Tensor` of Dice coefficient(s).
+            where `\epsilon` is a small value for stability.
 
-    Notes:
-        This functions is similar to `scipy.spatial.distance.dice` but returns
-        `1 - scipy.spatial.distance.dice(u, v)`.
+    Parameters
+    ----------
+    labels: `Tensor`, input boolean tensor.
+    predictions: `Tensor`, input boolean tensor.
+    axis: `int` or `tuple`, the dimension(s) along which to compute Dice.
+    name: `str`, a name for the operation.
+
+    Returns
+    -------
+    `Tensor` of Dice coefficient(s).
     """
-    with tf.name_scope(name, 'dice', [u, v]):
-        u = tf.convert_to_tensor(u)
-        v = tf.convert_to_tensor(v)
-
-        # This is only the intersection when values are [0, 1].
-        intersection = tf.reduce_sum(u * v, axis=axis)
-        const = tf.constant(2, dtype=intersection.dtype)
-        numerator = tf.cast(tf.multiply(const, intersection), tf.float32)
-        denominator = tf.cast(
-            tf.reduce_sum(u, axis=axis) + tf.reduce_sum(v, axis=axis),
-            tf.float32)
-        denominator += _EPSILON
-        return tf.truediv(numerator, denominator)
-
-
-def dice_numpy(u, v, axis=None):
-    """Return the Dice coefficients between two ndarrays. Perfect Dice is 1.0.
-
-                     2 * | intersection(A, B) |
-        Dice(A, B) = --------------------------
-                            |A| + |B|
-
-    Args:
-        u, v: `ndarray`, input boolean ndarrays.
-        axis: `int` or `tuple`, the dimension(s) along which to compute Dice.
-
-    Returns:
-        `float` Dice coefficient or `ndarray` of Dice coefficients.
-
-    Notes:
-        This functions is similar to `scipy.spatial.distance.dice` but returns
-        `1 - scipy.spatial.distance.dice(u, v)`.
-    """
-    u = np.asarray(u)
-    v = np.asarray(v)
-    _check_shapes_equal(u, v)
-
-    subset = (0, 1)  # Values must be 0 or 1.
-    if u.dtype != bool:
-        _check_all_x_in_subset_numpy(u, subset)
-    if v.dtype != bool:
-        _check_all_x_in_subset_numpy(v, subset)
-
-    numerator = 2 * (u * v).sum(axis=axis)
-    denominator = u.sum(axis=axis) + v.sum(axis=axis) + _EPSILON
-    return numerator / denominator
+    with tf.variable_scope(name, 'dice', [predictions, labels]):
+        labels = tf.convert_to_tensor(labels)
+        predictions = tf.convert_to_tensor(predictions)
+        predictions = tf.to_float(predictions)
+        labels = tf.to_float(labels)
+        predictions.get_shape().assert_is_compatible_with(labels.get_shape())
+        intersection = tf.reduce_sum(predictions * labels, axis=axis)
+        union = (
+            tf.reduce_sum(predictions, axis=axis)
+            + tf.reduce_sum(labels, axis=axis))
+        return (2 * intersection + _EPSILON) / (union + _EPSILON)
 
 
 def streaming_dice(labels,
                    predictions,
+                   axis,
                    weights=None,
                    metrics_collections=None,
                    update_collections=None,
                    name=None):
-    """Calculates Dice coefficient between `labels` and `features`."""
-    dice_ = dice(labels, predictions, axis=(1, 2, 3))
-    # Remove zeros from dice before getting mean. Zero can be caused by labels
-    # not having any non-zero class labels.
-    dice_nonzero = tf.gather(
-        dice_, tf.where(tf.not_equal(dice_, tf.constant(0, tf.float32))))
-    mean_dice, update_op = tf.metrics.mean(dice_nonzero)
+    """Calculates Dice coefficient between `labels` and `features`.
+
+    Both tensors should have the same shape and should not be one-hot encoded.
+    """
+    values = dice(labels, predictions, axis=axis)
+    mean_dice, update_op = tf.metrics.mean(values)
 
     if metrics_collections:
         add_to_collections(metrics_collections, mean_dice)
@@ -104,7 +70,7 @@ def streaming_dice(labels,
     return mean_dice, update_op
 
 
-def hamming(u, v, axis=None, name=None, dtype=tf.float64):
+def hamming(labels, predictions, axis=None, name=None):
     """Return the Hamming distance between two Tensors.
 
     This operation cannot be used as a loss function because it uses `tf.cast`.
@@ -125,45 +91,30 @@ def hamming(u, v, axis=None, name=None, dtype=tf.float64):
         but accepts n-D tensors and adds an `axis` parameter.
     """
     with tf.name_scope(name, 'hamming', [u, v]):
-        u = tf.convert_to_tensor(u)
-        v = tf.convert_to_tensor(v)
-        u_ne_v = tf.not_equal(u, v)
-        return tf.reduce_mean(
-            tf.cast(u_ne_v, dtype=dtype), axis=axis)
-
-
-def hamming_numpy(u, v, axis=None):
-    """Return Hamming distance between two ndarrays.
-
-    Args:
-        u, v: `ndarray`, input ndarrays.
-        axis: `int` or `tuple`, the dimension(s) along which to compute Hamming
-            distance.
-
-    Returns:
-        `float` Hamming distance or `ndarray` of Hamming distances.
-
-    Notes:
-        This function is almost identical to `scipy.spatial.distance.hamming`
-        but accepts ndarrays and adds an `axis` parameter.
-    """
-    u_ne_v = u != v
-    return np.mean(u_ne_v, axis=axis)
+        labels = tf.convert_to_tensor(labels)
+        predictions = tf.convert_to_tensor(predictions)
+        ne = tf.not_equal(labels, predictions)
+        return tf.reduce_mean(tf.to_float(ne), axis=axis)
 
 
 def streaming_hamming(labels,
                       predictions,
+                      axis=None,
                       weights=None,
                       metrics_collections=None,
                       update_collections=None,
                       name=None):
-    """Calculates Hamming distance between `labels` and `features`."""
-    hamming_ = hamming(labels, predictions, axis=(1, 2, 3))
-    mean_hamming, update_op = tf.metrics.mean(hamming_)
+    """Calculates Hamming distance between `labels` and `features`.
+
+    Axis should be `(1, 2, 3)` for 3D segmentation problem, where 0 is the
+    batch dimension.
+    """
+    values = hamming(labels=labels, predictions=predictions, axis=axis)
+    mean_value, update_op = tf.metrics.mean(values)
 
     if metrics_collections:
-        add_to_collections(metrics_collections, mean_hamming)
+        add_to_collections(metrics_collections, mean_value)
     if update_collections:
         add_to_collections(update_collections, update_op)
 
-    return mean_hamming, update_op
+    return mean_value, update_op

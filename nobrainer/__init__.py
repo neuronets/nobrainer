@@ -21,13 +21,12 @@ from nobrainer.io import read_volume
 from nobrainer.io import save_json
 
 import nobrainer.losses
+import nobrainer.metrics
 
-from nobrainer.metrics import dice
-from nobrainer.metrics import dice_numpy
-from nobrainer.metrics import hamming
-from nobrainer.metrics import hamming_numpy
-from nobrainer.metrics import streaming_dice
-from nobrainer.metrics import streaming_hamming
+# from nobrainer.metrics import dice
+# from nobrainer.metrics import hamming
+# from nobrainer.metrics import streaming_dice
+# from nobrainer.metrics import streaming_hamming
 
 from nobrainer.models import get_estimator
 from nobrainer.models import HighRes3DNet

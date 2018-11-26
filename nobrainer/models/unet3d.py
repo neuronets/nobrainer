@@ -18,14 +18,14 @@ from tensorflow.python.estimator.canned.optimizers import (
     get_optimizer_instance
 )
 
-from nobrainer.metrics import streaming_dice
-from nobrainer.metrics import streaming_hamming
+from nobrainer import losses
+from nobrainer import metrics
 from nobrainer.models.util import check_optimizer_for_training
 from nobrainer.models.util import check_required_params
 from nobrainer.models.util import set_default_params
 
 FUSED_BATCH_NORM = True
-
+_regularizer = tf.contrib.layers.l2_regularizer(scale=0.1)
 
 def _conv_block(x, filters1, filters2, mode, layer_num, batchnorm=True):
     """Convolution block.
@@ -50,7 +50,7 @@ def _conv_block(x, filters1, filters2, mode, layer_num, batchnorm=True):
 
     with tf.variable_scope('conv_{}_0'.format(layer_num)):
         x = tf.layers.conv3d(
-            inputs=x, filters=filters1, kernel_size=(3, 3, 3), padding='SAME')
+            inputs=x, filters=filters1, kernel_size=(3, 3, 3), padding='SAME', kernel_regularizer=_regularizer)
 
     if batchnorm:
         with tf.variable_scope('batchnorm_{}_0'.format(layer_num)):
@@ -62,7 +62,7 @@ def _conv_block(x, filters1, filters2, mode, layer_num, batchnorm=True):
 
     with tf.variable_scope('conv_{}_1'.format(layer_num)):
         x = tf.layers.conv3d(
-            inputs=x, filters=filters2, kernel_size=(3, 3, 3), padding='SAME')
+            inputs=x, filters=filters2, kernel_size=(3, 3, 3), padding='SAME', kernel_regularizer=_regularizer)
 
     if batchnorm:
         with tf.variable_scope('batchnorm_{}_1'.format(layer_num)):
@@ -104,48 +104,57 @@ def model_fn(features, labels, mode, params, config=None):
     shortcut_1 = _conv_block(
         volume, filters1=32, filters2=64, mode=mode, layer_num=0, batchnorm=bn)
 
-    x = tf.layers.max_pooling3d(
-        inputs=shortcut_1, pool_size=(2, 2, 2), strides=(2, 2, 2),
-        padding='same')
+    with tf.variable_scope('maxpool_1'):
+        x = tf.layers.max_pooling3d(
+            inputs=shortcut_1, pool_size=(2, 2, 2), strides=(2, 2, 2),
+            padding='same')
+
     shortcut_2 = _conv_block(
         x, filters1=64, filters2=128, mode=mode, layer_num=1, batchnorm=bn)
 
-    x = tf.layers.max_pooling3d(
-        inputs=shortcut_2, pool_size=(2, 2, 2), strides=(2, 2, 2),
-        padding='same')
+    with tf.variable_scope('maxpool_2'):
+        x = tf.layers.max_pooling3d(
+            inputs=shortcut_2, pool_size=(2, 2, 2), strides=(2, 2, 2),
+            padding='same')
+
     shortcut_3 = _conv_block(
         x, filters1=128, filters2=256, mode=mode, layer_num=2, batchnorm=bn)
 
-    x = tf.layers.max_pooling3d(
-        inputs=shortcut_3, pool_size=(2, 2, 2), strides=(2, 2, 2),
-        padding='same')
+    with tf.variable_scope('maxpool_3'):
+        x = tf.layers.max_pooling3d(
+            inputs=shortcut_3, pool_size=(2, 2, 2), strides=(2, 2, 2),
+            padding='same')
+
     x = _conv_block(
         x, filters1=256, filters2=512, mode=mode, layer_num=3, batchnorm=bn)
 
     # start decoding
     with tf.variable_scope("upconv_0"):
         x = tf.layers.conv3d_transpose(
-            inputs=x, filters=512, kernel_size=(2, 2, 2), strides=(2, 2, 2))
+            inputs=x, filters=512, kernel_size=(2, 2, 2), strides=(2, 2, 2), kernel_regularizer=_regularizer)
 
-    x = tf.concat((shortcut_3, x), axis=-1)
+    with tf.variable_scope('concat_1'):
+        x = tf.concat((shortcut_3, x), axis=-1)
 
     x = _conv_block(
         x, filters1=256, filters2=256, mode=mode, layer_num=4, batchnorm=bn)
 
     with tf.variable_scope("upconv_1"):
         x = tf.layers.conv3d_transpose(
-            inputs=x, filters=256, kernel_size=(2, 2, 2), strides=(2, 2, 2))
+            inputs=x, filters=256, kernel_size=(2, 2, 2), strides=(2, 2, 2), kernel_regularizer=_regularizer)
 
-    x = tf.concat((shortcut_2, x), axis=-1)
+    with tf.variable_scope('concat_2'):
+        x = tf.concat((shortcut_2, x), axis=-1)
 
     x = _conv_block(
         x, filters1=128, filters2=128, mode=mode, layer_num=5, batchnorm=bn)
 
     with tf.variable_scope("upconv_2"):
         x = tf.layers.conv3d_transpose(
-            inputs=x, filters=128, kernel_size=(2, 2, 2), strides=(2, 2, 2))
+            inputs=x, filters=128, kernel_size=(2, 2, 2), strides=(2, 2, 2), kernel_regularizer=_regularizer)
 
-    x = tf.concat((shortcut_1, x), axis=-1)
+    with tf.variable_scope('concat_3'):
+        x = tf.concat((shortcut_1, x), axis=-1)
 
     x = _conv_block(
         x, filters1=64, filters2=64, mode=mode, layer_num=6, batchnorm=bn)
@@ -153,15 +162,16 @@ def model_fn(features, labels, mode, params, config=None):
     with tf.variable_scope('logits'):
         logits = tf.layers.conv3d(
             inputs=x, filters=params['n_classes'], kernel_size=(1, 1, 1),
-            padding='same', activation=None)
+            padding='same', activation=None, kernel_regularizer=_regularizer)
     # end decoding
 
-    predicted_classes = tf.argmax(logits, axis=-1)
+    predictions = tf.nn.softmax(logits=logits)
+    class_ids = tf.argmax(logits, axis=-1)
 
     if mode == tf.estimator.ModeKeys.PREDICT:
         predictions = {
-            'class_ids': predicted_classes,
-            'probabilities': tf.nn.softmax(logits),
+            'class_ids': class_ids,
+            'probabilities': predictions,
             'logits': logits}
         # Outputs for SavedModel.
         export_outputs = {
@@ -171,39 +181,48 @@ def model_fn(features, labels, mode, params, config=None):
             predictions=predictions,
             export_outputs=export_outputs)
 
-    loss = tf.losses.sparse_softmax_cross_entropy(
-        labels=labels,
-        logits=logits)
+    onehot_labels = tf.one_hot(labels, params['n_classes'])
+    # loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=onehot_labels, logits=logits)
+    # loss = tf.losses.softmax_cross_entropy(onehot_labels=onehot_labels, logits=logits)
+    # loss = losses.dice(labels=labels, predictions=predictions[..., 1], axis=(1, 2, 3))
+    loss = losses.tversky(labels=onehot_labels, predictions=predictions, axis=(1, 2, 3))
+    # loss = losses.generalized_dice(labels=onehot_labels, predictions=predictions, axis=(1, 2, 3))
 
-    # Add evaluation metrics for class 1.
-    labels = tf.cast(labels, predicted_classes.dtype)
-    labels_onehot = tf.one_hot(labels, params['n_classes'])
-    predictions_onehot = tf.one_hot(predicted_classes, params['n_classes'])
-    eval_metric_ops = {
-        'accuracy': tf.metrics.accuracy(labels, predicted_classes),
-        'dice': streaming_dice(
-            labels_onehot[..., 1], predictions_onehot[..., 1]),
-        'hamming': streaming_hamming(
-            labels_onehot[..., 1], predictions_onehot[..., 1]),
-    }
+    l2_loss = tf.losses.get_regularization_loss()
+    loss += l2_loss
+
+    # onehot_labels = tf.one_hot(labels, params['n_classes'])
+    # loss = losses.tversky(labels=onehot_labels, predictions=predictions, axis=(1, 2, 3))
 
     if mode == tf.estimator.ModeKeys.EVAL:
         return tf.estimator.EstimatorSpec(
             mode=mode,
             loss=loss,
-            eval_metric_ops=eval_metric_ops)
+            eval_metric_ops={
+                'dice': metrics.streaming_dice(
+                    labels, class_ids, axis=(1, 2, 3)),
+            })
 
     assert mode == tf.estimator.ModeKeys.TRAIN
 
-    global_step = tf.train.get_global_step()
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     with tf.control_dependencies(update_ops):
-        train_op = params['optimizer'].minimize(loss, global_step=global_step)
+        train_op = params['optimizer'].minimize(loss, global_step=tf.train.get_global_step())
+
+    dice_coefficients = tf.reduce_mean(
+        metrics.dice(
+            tf.one_hot(labels, params['n_classes']),
+            tf.one_hot(tf.argmax(predictions, axis=-1), params['n_classes']), axis=(1, 2, 3)),
+        axis=0)
+
+    logging_hook = tf.train.LoggingTensorHook(
+        {"loss" : loss, "dice": dice_coefficients}, every_n_iter=100)
 
     return tf.estimator.EstimatorSpec(
         mode=mode,
         loss=loss,
-        train_op=train_op)
+        train_op=train_op,
+        training_hooks=[logging_hook])
 
 
 class UNet3D(tf.estimator.Estimator):

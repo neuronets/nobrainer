@@ -6,6 +6,7 @@ Based on `keras.preprocessing.image`.
 
 import copy
 import numbers
+import os
 import random
 
 import numpy as np
@@ -13,7 +14,9 @@ from scipy import ndimage
 import tensorflow as tf
 
 from nobrainer.io import read_volume
-from nobrainer.util import _check_shapes_equal
+from nobrainer.util import validate_batch_size_for_multi_gpu
+
+_here = os.path.dirname(os.path.abspath(__file__))
 
 
 def binarize(a, threshold=0, upper=1, lower=0):
@@ -206,7 +209,8 @@ def itervolumes(filepaths,
         if normalizer is not None:
             features, labels = normalizer(features, labels)
 
-        _check_shapes_equal(features, labels)
+        if features.shape != labels.shape:
+            raise ValueError("Shape of features ({}) is not equal to shape of labels ({}).".format(features.shape, labels.shape))
 
         # Yield full volumes.
         if block_shape is None or block_shape == (None, None, None):
@@ -222,7 +226,39 @@ def itervolumes(filepaths,
                 arr=labels, kernel_size=block_shape, strides=strides)
 
             for ff, ll in zip(feature_gen, label_gen):
+                # TEMP: skip pair if labels are all zero. this prevents us
+                # from running train_and_evaluate because the number of samples
+                # is dynamic.
+                # if not ll.any():
+                #     continue
+
+                # Add channel axis (channel last).
                 yield ff[..., np.newaxis].astype(x_dtype), ll.astype(y_dtype)
+
+
+def match_clinical_histogram(source, filename='random'):
+    """
+
+    Parameters
+    ----------
+    a : ndarray
+    filename : name of `.npy` file with array of quantiles, values.
+    """
+    if filename == 'random':
+        filename = random.choice(['weak.npy', 'medium.npy', 'strong.npy'])
+        filename = os.path.join(_here, filename)
+
+    oldshape = source.shape
+    source = source.ravel()
+    s_values, bin_idx, s_counts = np.unique(source, return_inverse=True,
+                                            return_counts=True)
+    s_quantiles = np.cumsum(s_counts).astype(np.float64)
+    s_quantiles /= s_quantiles[-1]
+
+    t_quantiles, t_values = np.load(filename)
+
+    interp_t_values = np.interp(s_quantiles, t_quantiles, t_values)
+    return interp_t_values[bin_idx].reshape(oldshape)
 
 
 def normalize_zero_one(a):
@@ -436,6 +472,8 @@ class VolumeDataGenerator:
         reduce_contrast: boolean, reduce contrast by taking square root of
             (data + 1). One is added to the data before calculating square root
             to avoid amplifying values in range (0, 1).
+        match_clinical_histogram : boolean, match the histogram of a clinical
+            contrast-enhanced scan.
         salt_and_pepper: boolean, add random salt and pepper noise.
         brightness_range: float, add value in range
             [-brightness_range, brightness_range] to data.
@@ -496,6 +534,7 @@ class VolumeDataGenerator:
                  rotate=False,
                  gaussian=False,
                  reduce_contrast=False,
+                 match_clinical_histogram=False,
                  salt_and_pepper=False,
                  brightness_range=0.,
                  shift_range=0,
@@ -512,6 +551,7 @@ class VolumeDataGenerator:
         self.rotate = rotate
         self.gaussian = gaussian
         self.reduce_contrast = reduce_contrast
+        self.match_clinical_histogram = match_clinical_histogram
         self.salt_and_pepper = salt_and_pepper
         self.brightness_range = brightness_range
         self.shift_range = shift_range
@@ -617,6 +657,10 @@ class VolumeDataGenerator:
                 x = zoom(x, tz)
                 if y is not None:
                     y = zoom(y, tz)
+
+        if self.match_clinical_histogram:
+            if np.random.random() < 0.5:
+                x = match_clinical_histogram(x, filename='random')
 
         if self.salt_and_pepper:
             if np.random.random() < 0.5:
@@ -754,6 +798,7 @@ class VolumeDataGenerator:
                 # that last batch. This is necessary when training on multiple
                 # GPUs because the batch size must always be divisible by the
                 # number of GPUs.
+                validate_batch_size_for_multi_gpu(batch_size=batch_size)
                 dset = dset.batch(batch_size, drop_remainder=True)
             else:
                 # If not training on multiple GPUs, batch sizes do not have to
