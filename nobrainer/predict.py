@@ -70,7 +70,7 @@ def predict(inputs,
                 entropy predictions per iteration.
     """
     if n_samples < 1:
-        raise Exception('n-samples cannot be lower than 1.')
+        raise Exception('n_samples cannot be lower than 1.')
 
 
     predictor = _get_predictor(predictor)
