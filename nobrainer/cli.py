@@ -178,7 +178,7 @@ def create_parser():
         help="Number of sampling.")
     vpp.add_argument('--return-entropy', action='store_true',
         help = 'if you want to return entropy, add this flag.')
-    vpp.add_argument('--return_variance', action='store_true', 
+    vpp.add_argument('--return-variance', action='store_true', 
         help ='if you want to return variance, add this flag.')
     vpp.add_argument('--return_array_from_images', action = 'store_true', 
         help = 'if you want to return array instead of image, add this flag.')
