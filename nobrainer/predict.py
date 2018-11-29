@@ -183,7 +183,7 @@ def predict_from_array(inputs,
     progbar.update(0)
     for j in range(0, n_blocks, batch_size):
 
-        newPrediction = predictor( {'volume': features[j:j + batch_size]})
+        new_prediction = predictor( {'volume': features[j:j + batch_size]})
         prevMean = np.zeros_like(newPrediction['probabilities'])
         currMean = newPrediction['probabilities']
         
