@@ -185,7 +185,7 @@ def predict_from_array(inputs,
 
         new_prediction = predictor( {'volume': features[j:j + batch_size]})
         prev_mean = np.zeros_like(newPrediction['probabilities'])
-        currMean = newPrediction['probabilities']
+        curr_mean = newPrediction['probabilities']
         
         M = np.zeros_like(newPrediction['probabilities'])
         for n in range(1, n_samples):
