@@ -187,29 +187,29 @@ def predict_from_array(inputs,
         prev_mean = np.zeros_like(newPrediction['probabilities'])
         curr_mean = newPrediction['probabilities']
         
-        M = np.zeros_like(newPrediction['probabilities'])
+        M = np.zeros_like(new_prediction['probabilities'])
         for n in range(1, n_samples):
 
-            newPrediction = predictor( {'volume': features[j:j + batch_size]})
-            prevMean = currMean
-            currMean = prevMean + (newPrediction['probabilities'] - prevMean)/float(n+1)
-            M = M + np.multiply(prevMean - newPrediction['probabilities'], currMean - newPrediction['probabilities'])
+            new_prediction = predictor( {'volume': features[j:j + batch_size]})
+            prev_mean = curr_mean
+            curr_mean = prev_mean + (new_prediction['probabilities'] - prev_mean)/float(n+1)
+            M = M + np.multiply(prev_mean - new_prediction['probabilities'], curr_mean - new_prediction['probabilities'])
 
         progbar.add(1)
-        means[j:j + batch_size] = np.argmax(currMean, axis = -1 ) # max mean
+        means[j:j + batch_size] = np.argmax(curr_mean, axis = -1 ) # max mean
         variances[j:j + batch_size] = np.sum(M/n_samples, axis = -1)
-        entropies[j:j + batch_size] = -np.sum(np.multiply(np.log(currMean+0.001),currMean), axis = -1) # entropy
-    totalMeans =from_blocks(means, output_shape=inputs.shape)
-    totalVariance = from_blocks(variances, output_shape=inputs.shape)
-    totalEntropy = from_blocks(entropies, output_shape=inputs.shape)
+        entropies[j:j + batch_size] = -np.sum(np.multiply(np.log(curr_mean+0.001),curr_mean), axis = -1) # entropy
+    total_means =from_blocks(means, output_shape=inputs.shape)
+    total_variance = from_blocks(variances, output_shape=inputs.shape)
+    total_entropy = from_blocks(entropies, output_shape=inputs.shape)
 
-    mean_var_voxels = np.mean(totalVariance)
-    std_var_voxels = np.std(totalVariance)
+    mean_var_voxels = np.mean(total_variance)
+    std_var_voxels = np.std(total_variance)
 
     include_variance = ((n_samples > 1) and (return_variance))
     if include_variance:
         if return_entropy:
-            return totalMeans, totalVariance, totalEntropy
+            return total_means, total_variance, total_entropy
         else:
             return total_means, total_variance
     else:
