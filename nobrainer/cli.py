@@ -174,7 +174,7 @@ def create_parser():
         '-m', '--model', required=True, help="Path to saved model.")
     ###
     vpp.add_argument(
-        '--n-samples', type=int, default = 1,
+        '--n-samples', type=int, default=1,
         help="Number of sampling.")
     vpp.add_argument('--return_entropy', action='store_true',
         help = 'if you want to return entropy, add this flag.')
