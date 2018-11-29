@@ -149,7 +149,7 @@ def create_parser():
         help = 'if you want to return entropy, add this flag.')
     ppp.add_argument('--return-variance', action='store_true', 
         help ='if you want to return variance, add this flag.')
-    ppp.add_argument('--return_array_from_images', action = 'store_true', 
+    ppp.add_argument('--return-array-from-images', action = 'store_true', 
         help = 'if you want to return array instead of image, add this flag.')
     ppp.add_argument('--samplewise-minmax', action='store_true', 
         help = 'set normalizer to be minmax. NOTE, normalizer cannot be both minmax and zscore')
