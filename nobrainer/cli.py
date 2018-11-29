@@ -145,7 +145,7 @@ def create_parser():
     ppp.add_argument(
         '--n-samples', type=int, default = 1,
         help="Number of sampling.")
-    ppp.add_argument('--return_entropy', action='store_true',
+    ppp.add_argument('--return-entropy', action='store_true',
         help = 'if you want to return entropy, add this flag.')
     ppp.add_argument('--return_variance', action='store_true', 
         help ='if you want to return variance, add this flag.')
