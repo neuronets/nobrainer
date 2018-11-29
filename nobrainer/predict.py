@@ -216,7 +216,7 @@ def predict_from_array(inputs,
         if return_entropy:
             return total_means, total_entropy
         else:
-            return totalMeans,
+            return total_means,
 
 
 def predict_from_img(img,
