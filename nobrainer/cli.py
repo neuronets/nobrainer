@@ -176,7 +176,7 @@ def create_parser():
     vpp.add_argument(
         '--n-samples', type=int, default=1,
         help="Number of sampling.")
-    vpp.add_argument('--return_entropy', action='store_true',
+    vpp.add_argument('--return-entropy', action='store_true',
         help = 'if you want to return entropy, add this flag.')
     vpp.add_argument('--return_variance', action='store_true', 
         help ='if you want to return variance, add this flag.')
