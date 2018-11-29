@@ -211,7 +211,7 @@ def predict_from_array(inputs,
         if return_entropy:
             return totalMeans, totalVariance, totalEntropy
         else:
-            return totalMeans,totalVariance
+            return total_means, total_variance
     else:
         if return_entropy:
             return totalMeans, totalEntropy
