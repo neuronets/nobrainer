@@ -169,7 +169,7 @@ def predict_from_array(inputs,
         print(features.std())
     else:
         features = inputs
-    features = to_blocks(features, block_shape=block_shape) #NAO# This may be the clue.# This divides the image into cubes!
+    features = to_blocks(features, block_shape=block_shape)
     means = np.zeros_like(features)
     variances = np.zeros_like(features)
     entropies = np.zeros_like(features)
