@@ -20,7 +20,7 @@ def predict(inputs,
             block_shape,
             return_variance=False,
             return_entropy=False,
-            return_array_from_images=False, 
+            return_array_from_images=False,
             n_samples=1,
             normalizer=None,
             batch_size=4,
@@ -35,16 +35,16 @@ def predict(inputs,
         inputs: 3D array or Nibabel image or filepath or list of filepaths.
         predictor: path-like or TensorFlow Predictor object, if path, must be
             path to SavedModel.
-        return_variance: Boolean. If set True, it returns the running population 
+        return_variance: Boolean. If set True, it returns the running population
             variance along with mean. Note, if the n_samples is smaller or equal to 1,
             the variance will not be returned; instead it will return None
         return_entropy: Boolean. If set True, it returns the running entropy.
-            along with mean.       
+            along with mean.
         return_array_from_images: Boolean. If set True and the given input is either image,
             filepath, or filepaths, it will return arrays of [mean, variance, entropy]
             instead of images of them. Also, if the input is array, it will
             simply return array, whether or not this flag is True or False.
-        n_samples: The number of sampling. If set as 1, it will just return the 
+        n_samples: The number of sampling. If set as 1, it will just return the
             single prediction value. The default value is 1
         block_shape: tuple of length 3, shape of sub-volumes on which to
             predict.
@@ -57,13 +57,13 @@ def predict(inputs,
     Returns:
         If `inputs` is a:
             -3D numpy array, return an iterable of maximum 3 elements;
-                3D array of mean, variance(optional),and entropy(optional) of prediction. 
+                3D array of mean, variance(optional),and entropy(optional) of prediction.
                 if the flags for variance or entropy is set False, it won't be returned at all
                 The specific order of the elements are:
                 mean, variance(default=None) , entropy(default=None)
                 Note, variance is only defined when n_sample  > 1
-            - Nibabel image or filepath, return a set of Nibabel images of mean, variance, 
-                entropy of predictions or just the pure arrays of them, 
+            - Nibabel image or filepath, return a set of Nibabel images of mean, variance,
+                entropy of predictions or just the pure arrays of them,
                 if return_array_from_images is True.
             - list of filepaths, return generator that yields one set of Nibabel images
                 or arrays(if return_array_from_images is set True) of means, variance, and
@@ -82,7 +82,7 @@ def predict(inputs,
             block_shape=block_shape,
             return_variance=return_variance,
             return_entropy=return_entropy,
-            return_array_from_images=return_array_from_images, 
+            return_array_from_images=return_array_from_images,
             n_samples=n_samples,
             normalizer=normalizer,
             batch_size=batch_size)
@@ -93,7 +93,7 @@ def predict(inputs,
             block_shape=block_shape,
             return_variance=return_variance,
             return_entropy=return_entropy,
-            return_array_from_images=return_array_from_images, 
+            return_array_from_images=return_array_from_images,
             n_samples=n_samples,
             normalizer=normalizer,
             batch_size=batch_size,
@@ -105,7 +105,7 @@ def predict(inputs,
             block_shape=block_shape,
             return_variance=return_variance,
             return_entropy=return_entropy,
-            return_array_from_images=return_array_from_images, 
+            return_array_from_images=return_array_from_images,
             n_samples=n_samples,
             normalizer=normalizer,
             batch_size=batch_size,
@@ -117,7 +117,7 @@ def predict(inputs,
             block_shape=block_shape,
             nreturn_variance=return_variance,
             return_entropy=return_entropy,
-            return_array_from_images=return_array_from_images, 
+            return_array_from_images=return_array_from_images,
             n_samples=n_samples,
             normalizer=normalizer,
             batch_size=batch_size,
@@ -132,7 +132,7 @@ def predict_from_array(inputs,
                        block_shape,
                        return_variance=False,
                        return_entropy=False,
-                       return_array_from_images=False, 
+                       return_array_from_images=False,
                        n_samples=1,
                        normalizer=None,
                        batch_size=4):
@@ -147,12 +147,12 @@ def predict_from_array(inputs,
             variance along with mean. Note, if the n_samples is smaller or equal to 1,
             the variance will not be returned; instead it will return None
         return_entropy: Boolean. If set True, it returns the running entropy.
-            along with mean.       
+            along with mean.
         return_array_from_images: Boolean. If set True and the given input is either image,
             filepath, or filepaths, it will return arrays of [mean, variance, entropy]
             instead of images of them. Also, if the input is array, it will
             simply return array, whether or not this flag is True or False.
-        n_samples: The number of sampling. If set as 1, it will just return the 
+        n_samples: The number of sampling. If set as 1, it will just return the
             single prediction value.
         normalizer: callable, function that accepts an ndarray and returns an
             ndarray. Called before separating volume into blocks.
@@ -186,7 +186,7 @@ def predict_from_array(inputs,
         new_prediction = predictor( {'volume': features[j:j + batch_size]})
         prev_mean = np.zeros_like(newPrediction['probabilities'])
         curr_mean = newPrediction['probabilities']
-        
+
         M = np.zeros_like(new_prediction['probabilities'])
         for n in range(1, n_samples):
 
@@ -224,7 +224,7 @@ def predict_from_img(img,
                      block_shape,
                      return_variance=False,
                      return_entropy=False,
-                     return_array_from_images=False, 
+                     return_array_from_images=False,
                      n_samples=1,
                      normalizer=None,
                      batch_size=4,
@@ -236,16 +236,16 @@ def predict_from_img(img,
         predictor: TensorFlow Predictor object, predictor from previously
             trained model.
         block_shape: tuple of len 3, shape of blocks on which to predict.
-        return_variance: Boolean. If set True, it returns the running population 
+        return_variance: Boolean. If set True, it returns the running population
             variance along with mean. Note, if the n_samples is smaller or equal to 1,
             the variance will not be returned; instead it will return None
         return_entropy: Boolean. If set True, it returns the running entropy.
-            along with mean.       
+            along with mean.
         return_array_from_images: Boolean. If set True and the given input is either image,
             filepath, or filepaths, it will return arrays of [mean, variance, entropy]
             instead of images of them. Also, if the input is array, it will
             simply return array, whether or not this flag is True or False.
-        n_samples: The number of sampling. If set as 1, it will just return the 
+        n_samples: The number of sampling. If set as 1, it will just return the
             single prediction value.
         normalizer: callable, function that accepts an ndarray and returns an
             ndarray. Called before separating volume into blocks.
@@ -253,7 +253,7 @@ def predict_from_img(img,
         dtype: str or dtype object, dtype of features.
 
     Returns:
-        `nibabel.spatialimages.SpatialImage` or arrays of prediction of mean, 
+        `nibabel.spatialimages.SpatialImage` or arrays of prediction of mean,
             variance(optional) or entropy (optional).
     """
     if not isinstance(img, nib.spatialimages.SpatialImage):
@@ -268,7 +268,7 @@ def predict_from_img(img,
         block_shape=block_shape,
         return_variance=return_variance,
         return_entropy=return_entropy,
-        return_array_from_images=return_array_from_images, 
+        return_array_from_images=return_array_from_images,
         n_samples=n_samples,
         normalizer=normalizer,
         batch_size=batch_size)
@@ -302,7 +302,7 @@ def predict_from_filepath(filepath,
                           block_shape,
                           return_variance=False,
                           return_entropy=False,
-                          return_array_from_images=False, 
+                          return_array_from_images=False,
                           n_samples=1,
                           normalizer=None,
                           batch_size=4,
@@ -315,24 +315,21 @@ def predict_from_filepath(filepath,
         predictor: TensorFlow Predictor object, predictor from previously
             trained model.
         block_shape: tuple of len 3, shape of blocks on which to predict.
-        return_variance: Boolean. If set True, it returns the running population 
+        return_variance: Boolean. If set True, it returns the running population
             variance along with mean. Note, if the n_samples is smaller or equal to 1,
             the variance will not be returned; instead it will return None
-        return_entropy: Boolean. If set True, it returns the running entropy.
-            along with mean.       
+            along with mean.
         return_array_from_images: Boolean. If set True and the given input is either image,
             filepath, or filepaths, it will return arrays of [mean, variance, entropy]
             instead of images of them. Also, if the input is array, it will
             simply return array, whether or not this flag is True or False.
-        n_samples: The number of sampling. If set as 1, it will just return the 
+        n_samples: The number of sampling. If set as 1, it will just return the
             single prediction value.
         normalizer: callable, function that accepts an ndarray and returns an
             ndarray. Called before separating volume into blocks.
-        batch_size: int, number of sub-volumes per batch for prediction.
-        dtype: str or dtype object, dtype of features.
 
     Returns:
-        `nibabel.spatialimages.SpatialImage` or arrays of predictions of 
+        `nibabel.spatialimages.SpatialImage` or arrays of predictions of
         mean, variance(optional), and entropy (optional).
     """
     if not Path(filepath).is_file():
@@ -344,7 +341,7 @@ def predict_from_filepath(filepath,
         block_shape=block_shape,
         return_variance=return_variance,
         return_entropy=return_entropy,
-        return_array_from_images=return_array_from_images, 
+        return_array_from_images=return_array_from_images,
         n_samples=n_samples,
         normalizer=normalizer,
         batch_size=batch_size)
@@ -355,7 +352,7 @@ def predict_from_filepaths(filepaths,
                            block_shape,
                            return_variance=False,
                            return_entropy=False,
-                           return_array_from_images=False, 
+                           return_array_from_images=False,
                            n_samples=1,
                            normalizer=None,
                            batch_size=4,
@@ -383,7 +380,7 @@ def predict_from_filepaths(filepaths,
             block_shape=block_shape,
             return_variance=return_variance,
             return_entropy=return_entropy,
-            return_array_from_images=return_array_from_images, 
+            return_array_from_images=return_array_from_images,
             n_samples=n_samples,
             normalizer=normalizer,
             batch_size=batch_size,
@@ -411,7 +408,3 @@ def _get_predictor(predictor):
                 "Failed to load predictor. Is `predictor` a path to a saved"
                 " model?")
     return predictor
-
-
-
-

@@ -36,3 +36,7 @@ $ singularity exec --clean-env --bind /path/to/models:/models nobrainer.sqsh \
 ### Predict using trained models
 
 We are in the process of training robust models for brain extraction and brain labelling. Stay tuned for information on how to use these models.
+
+### Funding
+
+The nobrainer project is supported by NIH R01 EB020470.

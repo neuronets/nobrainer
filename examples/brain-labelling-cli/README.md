@@ -69,6 +69,7 @@ This call will use the SavedModel to predict labels from a T1.
 ```
 nobrainer predict --block-shape 128 128 128 --model=savedmodel T1.mgz parcellation.mgz
 ```
+<<<<<<< HEAD
 
 
 # Validate
@@ -80,3 +81,5 @@ This command should be run from the nobrainer directory:
 ```
 CUDA_VISIBLE_DEVICES=0 nobrainer validate --model=nobrainer/data/1528485348   --batch-size=4 --block-shape 32 32 32  --csv=nobrainer/data/test_validate.csv    --n-classes=50 --label-mapping=examples/brain-labelling-cli/50-class-mapping.csv
 ```
+=======
+>>>>>>> origin/master
