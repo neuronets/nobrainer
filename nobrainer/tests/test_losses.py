@@ -72,23 +72,24 @@ def test_hamming():
 
 def test_tversky():
     with tf.Session() as sess:
-        zeros = np.zeros((2, 2, 2), dtype=np.float32)
-        ones = np.ones((2, 2, 2), dtype=np.float32)
+        n_classes = 2
+        zeros = np.zeros((2, 2, n_classes), dtype=np.float32)
+        ones = np.ones((2, 2, n_classes), dtype=np.float32)
 
         # Perfect (all zero).
         ll = sess.run(losses.tversky(labels=zeros, predictions=zeros, axis=(1,)))
-        assert np.allclose(ll, 0)
+        assert np.allclose(ll, -n_classes)
 
         # Perfect (all one).
         ll = sess.run(losses.tversky(labels=ones, predictions=ones, axis=(1,)))
-        assert np.allclose(ll, 0)
+        assert np.allclose(ll, -n_classes)
 
         # All wrong.
         ll = sess.run(losses.tversky(labels=zeros, predictions=ones, axis=(1,)))
-        assert np.allclose(ll, 1)
+        assert np.allclose(ll, 0, atol=1e-06)
 
         # Half of the segmentation classes correct.
         half = zeros.copy()
         half[..., 0] = 1.
         ll = sess.run(losses.tversky(labels=half, predictions=ones, axis=(1,)))
-        assert np.allclose(ll, 0.5)
+        assert np.allclose(ll, -n_classes/2)
