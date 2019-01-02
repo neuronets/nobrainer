@@ -50,7 +50,7 @@ def dice(labels, predictions, axis, weights=1.0, scope=None, loss_collection=tf.
         intersection = tf.reduce_sum(tf.abs(predictions * labels), axis=axis)
         union = (tf.reduce_sum(predictions, axis=axis) +
                  tf.reduce_sum(labels, axis=axis))
-        losses = 1. - (2 * intersection + _EPSILON) / (union + _EPSILON)
+        losses = 1. - ((2 * intersection + _EPSILON) / (union + _EPSILON))
         return compute_weighted_loss(
             losses=losses,
             weights=weights,

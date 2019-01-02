@@ -25,7 +25,8 @@ from nobrainer.models.util import check_required_params
 from nobrainer.models.util import set_default_params
 
 FUSED_BATCH_NORM = True
-_regularizer = tf.contrib.layers.l2_regularizer(scale=0.1)
+_regularizer = tf.contrib.layers.l2_regularizer(scale=0.001)
+
 
 def _conv_block(x, filters1, filters2, mode, layer_num, batchnorm=True):
     """Convolution block.
@@ -165,7 +166,9 @@ def model_fn(features, labels, mode, params, config=None):
             padding='same', activation=None, kernel_regularizer=_regularizer)
     # end decoding
 
-    predictions = tf.nn.softmax(logits=logits)
+    with tf.variable_scope('predictions'):
+        predictions = tf.nn.softmax(logits=logits)
+
     class_ids = tf.argmax(logits, axis=-1)
 
     if mode == tf.estimator.ModeKeys.PREDICT:
@@ -182,17 +185,12 @@ def model_fn(features, labels, mode, params, config=None):
             export_outputs=export_outputs)
 
     onehot_labels = tf.one_hot(labels, params['n_classes'])
-    # loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=onehot_labels, logits=logits)
+
+    loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=onehot_labels, logits=logits)
     # loss = tf.losses.softmax_cross_entropy(onehot_labels=onehot_labels, logits=logits)
-    # loss = losses.dice(labels=labels, predictions=predictions[..., 1], axis=(1, 2, 3))
-    loss = losses.tversky(labels=onehot_labels, predictions=predictions, axis=(1, 2, 3))
-    # loss = losses.generalized_dice(labels=onehot_labels, predictions=predictions, axis=(1, 2, 3))
 
     l2_loss = tf.losses.get_regularization_loss()
     loss += l2_loss
-
-    # onehot_labels = tf.one_hot(labels, params['n_classes'])
-    # loss = losses.tversky(labels=onehot_labels, predictions=predictions, axis=(1, 2, 3))
 
     if mode == tf.estimator.ModeKeys.EVAL:
         return tf.estimator.EstimatorSpec(
@@ -211,8 +209,8 @@ def model_fn(features, labels, mode, params, config=None):
 
     dice_coefficients = tf.reduce_mean(
         metrics.dice(
-            tf.one_hot(labels, params['n_classes']),
-            tf.one_hot(tf.argmax(predictions, axis=-1), params['n_classes']), axis=(1, 2, 3)),
+            onehot_labels,
+            tf.one_hot(class_ids, axis=(1, 2, 3)),
         axis=0)
 
     logging_hook = tf.train.LoggingTensorHook(
