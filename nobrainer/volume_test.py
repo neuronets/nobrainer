@@ -11,7 +11,6 @@ from nobrainer.volume import flip
 from nobrainer.volume import from_blocks
 from nobrainer.volume import iterblocks_3d
 from nobrainer.volume import itervolumes
-from nobrainer.volume import match_histogram
 from nobrainer.volume import normalize_zero_one
 from nobrainer.volume import reduce_contrast
 from nobrainer.volume import replace
@@ -79,10 +78,6 @@ def test_iterblocks_3d():
 
 def test_itervolumes():
     itervolumes
-
-
-def test_match_histogram():
-    match_histogram
 
 
 def test_normalize_zero_one():
