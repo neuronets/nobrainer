@@ -158,9 +158,9 @@ def model_fn(features,
     eval_metric_ops = {
         'accuracy': tf.metrics.accuracy(labels, predicted_classes),
         'dice': streaming_dice(
-            labels_onehot[..., 1], predictions_onehot[..., 1]),
+            labels_onehot[..., 1], predictions_onehot[..., 1], axis=(1, 2, 3)),
         'hamming': streaming_hamming(
-            labels_onehot[..., 1], predictions_onehot[..., 1]),
+            labels_onehot[..., 1], predictions_onehot[..., 1], axis=(1, 2, 3)),
     }
 
     if mode == tf.estimator.ModeKeys.EVAL:

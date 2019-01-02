@@ -20,17 +20,19 @@ from nobrainer.io import read_mapping
 from nobrainer.io import read_volume
 from nobrainer.io import save_json
 
-from nobrainer.metrics import dice
-from nobrainer.metrics import dice_numpy
-from nobrainer.metrics import hamming
-from nobrainer.metrics import hamming_numpy
-from nobrainer.metrics import streaming_dice
-from nobrainer.metrics import streaming_hamming
+import nobrainer.losses
+import nobrainer.metrics
+
+# from nobrainer.metrics import dice
+# from nobrainer.metrics import hamming
+# from nobrainer.metrics import streaming_dice
+# from nobrainer.metrics import streaming_hamming
 
 from nobrainer.models import get_estimator
 from nobrainer.models import HighRes3DNet
 from nobrainer.models import MeshNet
 from nobrainer.models import QuickNAT
+from nobrainer.models import UNet3D
 
 from nobrainer.predict import predict
 
@@ -43,7 +45,6 @@ from nobrainer.volume import flip
 from nobrainer.volume import from_blocks
 from nobrainer.volume import iterblocks_3d
 from nobrainer.volume import itervolumes
-from nobrainer.volume import match_histogram
 from nobrainer.volume import normalize_zero_one
 from nobrainer.volume import reduce_contrast
 from nobrainer.volume import replace

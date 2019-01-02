@@ -20,6 +20,7 @@ def get_estimator(name):
         'highres3dnet': nobrainer.models.highres3dnet.HighRes3DNet,
         'meshnet': nobrainer.models.meshnet.MeshNet,
         'quicknat': nobrainer.models.quicknat.QuickNAT,
+        'unet3d': nobrainer.models.unet3d.UNet3D,
     }
 
     try:
