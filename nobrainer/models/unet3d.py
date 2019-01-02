@@ -211,7 +211,7 @@ def model_fn(features, labels, mode, params, config=None):
         metrics.dice(
             onehot_labels,
             tf.one_hot(class_ids, axis=(1, 2, 3)),
-        axis=0)
+        axis=0))
 
     logging_hook = tf.train.LoggingTensorHook(
         {"loss" : loss, "dice": dice_coefficients}, every_n_iter=100)
