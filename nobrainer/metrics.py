@@ -90,7 +90,7 @@ def hamming(labels, predictions, axis=None, name=None):
         This function is almost identical to `scipy.spatial.distance.hamming`
         but accepts n-D tensors and adds an `axis` parameter.
     """
-    with tf.name_scope(name, 'hamming', [u, v]):
+    with tf.name_scope(name, 'hamming', [labels, predictions]):
         labels = tf.convert_to_tensor(labels)
         predictions = tf.convert_to_tensor(predictions)
         ne = tf.not_equal(labels, predictions)
