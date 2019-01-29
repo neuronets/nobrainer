@@ -141,7 +141,7 @@ def model_fn(features,
         i=-1
         for v in tf.get_collection('ms'):
             i += 1
-            if params['prior_path'] is None:
+            if params['prior_path'] == None:
                 tf.add_to_collection('ms_prior',tf.Variable(tf.constant(0, dtype = v.dtype, shape = v.shape),trainable = False))
             else:
                 tf.add_to_collection('ms_prior',tf.Variable(tf.convert_to_tensor(prior_np[0][i], dtype = tf.float32),trainable = False))
@@ -178,7 +178,7 @@ def model_fn(features,
     tf.summary.scalar('n_examples', n_examples)
     
     if not params['only_kld']:
-        loss = nll_loss + (l2_loss + sigma_squared_loss - log_sigma_loss) / (n_examples*256*256*256)
+        loss = nll_loss + (l2_loss + sigma_squared_loss - log_sigma_loss) / float(n_examples)
     else:
         mse_m_loss = tf.add_n([tf.reduce_sum(tf.square(ms[i] - ms_prior[i])) for i in range(len(ms))], name = 'mse_m_loss')
         tf.summary.scalar('mse_m_loss', l2_loss)
