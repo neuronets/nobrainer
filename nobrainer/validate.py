@@ -102,6 +102,7 @@ def validate_from_filepaths(filepaths,
                             block_shape,
                             n_classes,
                             mapping_y,
+                            output_path,
                             return_variance=False,
                             return_entropy=False,
                             return_array_from_images=False,
@@ -145,12 +146,13 @@ def validate_from_filepaths(filepaths,
             dtype=dtype)
 
         outpath = Path(filepath[0])
+        output_path = Path(output_path)
         suffixes = ''.join(s for s in outpath.suffixes)
-        mean_path = outpath.parent / (outpath.stem + '_mean' + suffixes)
-        variance_path = outpath.parent / \
+        mean_path = output_path / (outpath.stem + '_mean' + suffixes)
+        variance_path = output_path / \
             (outpath.stem + '_variance' + suffixes)
-        entropy_path = outpath.parent / (outpath.stem + '_entropy' + suffixes)
-        dice_path = outpath.parent / (outpath.stem + '_dice.npy')
+        entropy_path = output_path / (outpath.stem + '_entropy' + suffixes)
+        dice_path = output_path / (outpath.stem + '_dice.npy')
         # if mean_path.is_file() or variance_path.is_file() or entropy_path.is_file():
         #     raise Exception(str(mean_path) + " or " + str(variance_path) +
         #                     " or " + str(entropy_path) + " already exists.")
