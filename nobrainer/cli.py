@@ -193,6 +193,9 @@ def create_parser():
              ". Header must be included. More than two columns are accepted,"
              " but only the first two columns are used.")
     vpp.add_argument(
+        '--output-path',
+        help="Path where validation outputs will be saved.")
+    vpp.add_argument(
         '-n', '--n-classes', required=True, type=int,
         help="Number of classes the model classifies.")
     ###
@@ -354,6 +357,7 @@ def validate(params):
         block_shape=params['block_shape'],
         n_classes=params['n_classes'],
         mapping_y=params['label_mapping'],
+        output_path=params['output_path'],
         return_variance=params['return_variance'],
         return_entropy=params['return_entropy'],
         return_array_from_images=params['return_array_from_images'],
