@@ -173,29 +173,4 @@ def validate_from_filepaths(filepaths,
         print('Dice: ' + str(np.mean(dice)))
         np.save(dice_path, dice)
 
-
-def test_validate():
-    test_data = Path(nobrainer.__file__).parent / "data"
-    test_input = test_data / "pac_1430_orig.nii.gz"
-    ground_truth = test_data / "pac_1430_aseg.nii.gz"
-    model = test_data / '1528485348' / 'saved_model.pb'
-    mapping_gt = test_data.parent.parent / 'examples' / 'brain-labelling-cli' / '50-class-mapping.csv'
-
-    outputs,dice = validate_from_filepath(
-        (test_input.as_posix(),ground_truth.as_posix()),
-        predictor = model.parent,
-        block_shape = (32,32,32),
-        return_variance=False,
-        return_entropy=False,
-        return_array_from_images = False,
-        n_classes =50,
-        mapping_y=mapping_gt,
-        n_samples=1,
-        normalizer=None,
-        batch_size=4,
-        dtype=DT_X)
-
-    print("Dice: ", dice)
-    assert(np.mean(dice) > 0.50)
-
 # CUDA_VISIBLE_DEVICES=0 nobrainer validate --model=nobrainer/data/1528485348   --batch-size=4 --block-shape 32 32 32  --csv=nobrainer/data/test_validate.csv    --n-classes=50 --label-mapping=examples/brain-labelling-cli/50-class-mapping.csv
