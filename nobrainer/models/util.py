@@ -25,6 +25,7 @@ def get_estimator(name):
 =======
 >>>>>>> origin/master
         'quicknat': nobrainer.models.quicknat.QuickNAT,
+        'unet3d': nobrainer.models.unet3d.UNet3D,
     }
 
     try:

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """HighRes3DNet implemented in TensorFlow.
 
+Implementation is influenced by [NiftyNet](http://www.niftynet.io/).
+
 Reference
 ---------
 Li W., Wang G., Fidon L., Ourselin S., Cardoso M.J., Vercauteren T. (2017)
@@ -17,18 +19,13 @@ from tensorflow.python.estimator.canned.optimizers import (
     get_optimizer_instance
 )
 
-from nobrainer.metrics import streaming_dice
-from nobrainer.metrics import streaming_hamming
+from nobrainer import losses
+from nobrainer import metrics
 from nobrainer.models.util import check_optimizer_for_training
 from nobrainer.models.util import check_required_params
 from nobrainer.models.util import set_default_params
 
 FUSED_BATCH_NORM = True
-
-# TODO: use `tensorflow.python.framework.test_util.is_gpu_available` to
-# determine data format. `channels_first` is typically faster on GPU, and
-# `channels_last` is typically faster on CPU.
-# TODO: Once the above todo is implemented, add `channel_format` arguments.
 
 
 def _resblock(inputs,
@@ -37,7 +34,8 @@ def _resblock(inputs,
               filters,
               kernel_size,
               dilation_rate,
-              one_batchnorm):
+              paddings=None,
+              one_batchnorm=False):
     """Layer building block of residual network. This includes the residual
     connection.
 
@@ -52,6 +50,8 @@ def _resblock(inputs,
         filters : int, number of 3D convolution filters.
         kernel_size : int or tuple, size of 3D convolution kernel.
         dilation_rate : int or tuple, rate of dilution in 3D convolution.
+        paddings: list, paddings to apply immediately before elementwise
+            addition.
         one_batchnorm : bool, if true, only apply first batch normalization
             layer in each residually connected block. Empirically, only using
             first batch normalization layer allowed the model to model to be
@@ -107,6 +107,10 @@ def _resblock(inputs,
         conv2 = tf.layers.conv3d(
             relu2, filters=filters, kernel_size=kernel_size, padding='SAME',
             dilation_rate=dilation_rate)
+
+    if paddings is not None:
+        with tf.variable_scope('padding'):
+            inputs = tf.pad(inputs, paddings=paddings, mode='CONSTANT')
 
     with tf.variable_scope('add_{}'.format(layer_num)):
         return tf.add(conv2, inputs)
@@ -167,50 +171,69 @@ def model_fn(features,
     training = mode == tf.estimator.ModeKeys.TRAIN
 
     with tf.variable_scope('conv_0'):
-        conv = tf.layers.conv3d(
+        x = tf.layers.conv3d(
             volume, filters=16, kernel_size=3, padding='SAME')
     with tf.variable_scope('batchnorm_0'):
-        conv = tf.layers.batch_normalization(
-            conv, training=training, fused=FUSED_BATCH_NORM)
+        x = tf.layers.batch_normalization(
+            x, training=training, fused=FUSED_BATCH_NORM)
     with tf.variable_scope('relu_0'):
-        outputs = tf.nn.relu(conv)
+        x = tf.nn.relu(x)
 
     layer_num = 0
     one_batchnorm = params['one_batchnorm_per_resblock']
 
+    # 16-filter residually connected blocks.
     for ii in range(3):
         layer_num += 1
-        outputs = _resblock(
-            outputs, mode=mode, layer_num=layer_num, filters=16, kernel_size=3,
+        x = _resblock(
+            x, mode=mode, layer_num=layer_num, filters=16, kernel_size=3,
             dilation_rate=1, one_batchnorm=one_batchnorm)
 
-    for ii in range(3):
+    # 32-filter residually connected blocks. Pad inputs immediately before
+    # first elementwise sum to match shape of last dimension.
+    layer_num += 1
+    paddings = [[0, 0], [0, 0], [0, 0], [0, 0], [8, 8]]
+    x = _resblock(
+        x, mode=mode, layer_num=layer_num, filters=32, kernel_size=3,
+        dilation_rate=2, paddings=paddings, one_batchnorm=one_batchnorm)
+    for ii in range(2):
         layer_num += 1
-        outputs = _resblock(
-            outputs, mode=mode, layer_num=layer_num, filters=16, kernel_size=3,
+        x = _resblock(
+            x, mode=mode, layer_num=layer_num, filters=32, kernel_size=3,
             dilation_rate=2, one_batchnorm=one_batchnorm)
 
-    for ii in range(3):
+    # 64-filter residually connected blocks. Pad inputs immediately before
+    # first elementwise sum to match shape of last dimension.
+    layer_num += 1
+    paddings = [[0, 0], [0, 0], [0, 0], [0, 0], [16, 16]]
+    x = _resblock(
+        x, mode=mode, layer_num=layer_num, filters=64, kernel_size=3,
+        dilation_rate=4, paddings=paddings, one_batchnorm=one_batchnorm)
+    for ii in range(2):
         layer_num += 1
-        outputs = _resblock(
-            outputs, mode=mode, layer_num=layer_num, filters=16, kernel_size=3,
+        x = _resblock(
+            x, mode=mode, layer_num=layer_num, filters=64, kernel_size=3,
             dilation_rate=4, one_batchnorm=one_batchnorm)
 
+    with tf.variable_scope('conv_1'):
+        x = tf.layers.conv3d(x, filters=80, kernel_size=1, padding='SAME')
+
     if params['dropout_rate']:
-        outputs = tf.layers.dropout(
-            outputs, rate=params['dropout_rate'], training=training)
+        x = tf.layers.dropout(
+            x, rate=params['dropout_rate'], training=training)
 
     with tf.variable_scope('logits'):
         logits = tf.layers.conv3d(
-            outputs, filters=params['n_classes'], kernel_size=1,
+            x, filters=params['n_classes'], kernel_size=1,
             padding='SAME')
 
+    predictions = tf.nn.softmax(logits=logits)
     predicted_classes = tf.argmax(logits, axis=-1)
 
     if mode == tf.estimator.ModeKeys.PREDICT:
         predictions = {
             'class_ids': predicted_classes,
-            'probabilities': tf.nn.softmax(logits),
+            'probabilities': predictions,
             'logits': logits}
         # Outputs for SavedModel.
         export_outputs = {
@@ -220,39 +243,45 @@ def model_fn(features,
             predictions=predictions,
             export_outputs=export_outputs)
 
-    loss = tf.losses.sparse_softmax_cross_entropy(
-        labels=labels,
-        logits=logits)
+    onehot_labels = tf.one_hot(labels, params['n_classes'])
+    # loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=onehot_labels, logits=logits)
+    # loss = tf.losses.softmax_cross_entropy(onehot_labels=onehot_labels, logits=logits)
 
-    # Add evaluation metrics for class 1.
-    labels = tf.cast(labels, predicted_classes.dtype)
-    labels_onehot = tf.one_hot(labels, params['n_classes'])
-    predictions_onehot = tf.one_hot(predicted_classes, params['n_classes'])
-    eval_metric_ops = {
-        'accuracy': tf.metrics.accuracy(labels, predicted_classes),
-        'dice': streaming_dice(
-            labels_onehot[..., 1], predictions_onehot[..., 1]),
-        'hamming': streaming_hamming(
-            labels_onehot[..., 1], predictions_onehot[..., 1]),
-    }
+    # loss = losses.dice(labels=labels, predictions=predictions[..., 1], axis=(1, 2, 3))
+    loss = losses.tversky(labels=onehot_labels, predictions=predictions, axis=(1, 2, 3))
+    # loss = losses.generalized_dice(labels=onehot_labels, predictions=predictions, axis=(1, 2, 3))
 
     if mode == tf.estimator.ModeKeys.EVAL:
         return tf.estimator.EstimatorSpec(
             mode=mode,
             loss=loss,
-            eval_metric_ops=eval_metric_ops)
+            eval_metric_ops={
+                'dice': metrics.streaming_dice(
+                    labels, predicted_classes, axis=(1, 2, 3)),
+            })
 
-    assert mode == tf.estimator.ModeKeys.TRAIN
+    assert mode == tf.estimator.ModeKeys.TRAIN, "unknown mode key {}".format("mode")
 
     global_step = tf.train.get_global_step()
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     with tf.control_dependencies(update_ops):
         train_op = params['optimizer'].minimize(loss, global_step=global_step)
 
+    # Get Dice score of each class.
+    dice_coefficients = tf.reduce_mean(
+        metrics.dice(
+            onehot_labels,
+            tf.one_hot(tf.argmax(predictions, axis=-1), params['n_classes']), axis=(1, 2, 3)),
+        axis=0)
+
+    logging_hook = tf.train.LoggingTensorHook(
+        {"loss" : loss, "dice": dice_coefficients}, every_n_iter=100)
+
     return tf.estimator.EstimatorSpec(
         mode=mode,
         loss=loss,
-        train_op=train_op)
+        train_op=train_op,
+        training_hooks=[logging_hook])
 
 
 class HighRes3DNet(tf.estimator.Estimator):
@@ -268,8 +297,7 @@ class HighRes3DNet(tf.estimator.Estimator):
         y = np.random.randint(0, 9, size=(shape), dtype=np.int32)
         dset_fn = lambda: tf.data.Dataset.from_tensors((X, y))
         estimator = nobrainer.models.HighRes3DNet(
-            n_classes=10, optimizer='Adam', learning_rate=0.001,
-        )
+            n_classes=10, optimizer='Adam', learning_rate=0.001)
         estimator.train(input_fn=dset_fn)
         ```
 
@@ -322,12 +350,10 @@ class HighRes3DNet(tf.estimator.Estimator):
             'dropout_rate': dropout_rate,
         }
 
-        _model_fn = model_fn
-
-        if multi_gpu:
-            params['optimizer'] = TowerOptimizer(params['optimizer'])
-            _model_fn = replicate_model_fn(_model_fn)
+        # if multi_gpu:
+        #     params['optimizer'] = TowerOptimizer(params['optimizer'])
+        #     _model_fn = replicate_model_fn(_model_fn)
 
         super(HighRes3DNet, self).__init__(
-            model_fn=_model_fn, model_dir=model_dir, params=params,
+            model_fn=model_fn, model_dir=model_dir, params=params,
             config=config, warm_start_from=warm_start_from)

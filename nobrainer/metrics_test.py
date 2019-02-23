@@ -6,9 +6,7 @@ import scipy as sp
 import tensorflow as tf
 
 from nobrainer.metrics import dice
-from nobrainer.metrics import dice_numpy
 from nobrainer.metrics import hamming
-from nobrainer.metrics import hamming_numpy
 
 
 def test_dice():
@@ -36,10 +34,6 @@ def test_dice():
     # Test TensorFlow implementation.
     np.testing.assert_almost_equal(1 - test_dices, true_dices)
 
-    # Test NumPy implementation.
-    test_dices_np = dice_numpy(foo, bar, axis=-1)
-    np.testing.assert_almost_equal(1 - test_dices_np, true_dices)
-
 
 def test_hamming():
     shape = (2, 10)
@@ -64,7 +58,3 @@ def test_hamming():
 
     # Test TensorFlow implementation.
     np.testing.assert_almost_equal(test_hammings, true_hammings)
-
-    # Test NumPy implementation.
-    test_hammings_np = hamming_numpy(foo, bar, axis=-1)
-    np.testing.assert_almost_equal(test_hammings_np, true_hammings)
