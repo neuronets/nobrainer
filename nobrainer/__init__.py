@@ -32,6 +32,8 @@ from nobrainer.models import get_estimator
 from nobrainer.models import HighRes3DNet
 from nobrainer.models import MeshNet
 from nobrainer.models import QuickNAT
+from nobrainer.models import MeshNetWN
+from nobrainer.models import MeshNetVWN
 from nobrainer.models import UNet3D
 
 from nobrainer.predict import predict

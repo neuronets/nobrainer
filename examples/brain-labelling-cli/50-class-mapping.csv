@@ -7,7 +7,7 @@ original,new,label
 8,4,Left-Cerebellum-Cortex
 10,5,Left-Thalamus-Proper
 11,6,Left-Caudate
-12,7,Left-Putamen 
+12,7,Left-Putamen
 13,8,Left-Pallidum
 14,2,3rd-Ventricle
 15,2,4th-Ventricle
@@ -31,7 +31,12 @@ original,new,label
 58,13,Right-Accumbens-area
 60,14,Right-VentralDC
 72,2,5th-Ventricle
-192,15,Corpus_Callosum 
+192,15,Corpus_Callosum
+251,15,CC_Posterior
+252,15,CC_Mid_Posterior
+253,15,CC_Central
+254,15,CC_Mid_Anterior
+255,15,CC_Anterior
 1001,16,ctx-lh-bankssts
 1002,17,ctx-lh-caudalanteriorcingulate
 1003,18,ctx-lh-caudalmiddlefrontal
@@ -67,7 +72,7 @@ original,new,label
 1034,48,ctx-lh-transversetemporal
 1035,49,ctx-lh-insula
 2001,16,ctx-rh-bankssts
-2002,17,ctx-rh-caudalanteriorcingulate 
+2002,17,ctx-rh-caudalanteriorcingulate
 2003,18,ctx-rh-caudalmiddlefrontal
 2005,19,ctx-rh-cuneus
 2006,20,ctx-rh-entorhinal

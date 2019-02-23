@@ -152,7 +152,7 @@ def itervolumes(filepaths,
                 x_dtype=np.float32,
                 y_dtype=np.int32,
                 strides=None,
-                shuffle=True,
+                shuffle=False,
                 normalizer=None):
     """Yield tuples of numpy arrays `(features, labels)` from a list of
     filepaths to neuroimaging files.

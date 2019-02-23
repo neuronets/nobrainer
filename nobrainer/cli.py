@@ -13,8 +13,10 @@ from nobrainer.io import read_csv
 from nobrainer.io import read_mapping
 from nobrainer.models.util import get_estimator
 from nobrainer.predict import predict as _predict
+from nobrainer.validate import validate_from_filepaths
 from nobrainer.train import train as _train
 from nobrainer.volume import VolumeDataGenerator
+from nobrainer.volume import zscore, normalize_zero_one
 
 
 def create_parser():
@@ -33,7 +35,7 @@ def create_parser():
         '-n', '--n-classes', required=True, type=int,
         help="Number of classes to classify")
     m.add_argument(
-        '-m', '--model', required=True, choices={'highres3dnet', 'meshnet'},
+        '-m', '--model', required=True, choices={'highres3dnet', 'meshnet', 'meshnetwn', 'meshnetvwn'},
         help="Model to use")
     m.add_argument(
         '--model-opts', type=json.loads, default={},
@@ -139,7 +141,64 @@ def create_parser():
              " value if memory is insufficient.")
     ppp.add_argument(
         '-m', '--model', required=True, help="Path to saved model.")
+    ###
+    ppp.add_argument(
+        '--n-samples', type=int, default = 1,
+        help="Number of sampling.")
+    ppp.add_argument('--return-entropy', action='store_true',
+        help = 'if you want to return entropy, add this flag.')
+    ppp.add_argument('--return-variance', action='store_true',
+        help ='if you want to return variance, add this flag.')
+    ppp.add_argument('--return-array-from-images', action = 'store_true',
+        help = 'if you want to return array instead of image, add this flag.')
+    ppp.add_argument('--samplewise-minmax', action='store_true',
+        help = 'set normalizer to be minmax. NOTE, normalizer cannot be both minmax and zscore')
+    ppp.add_argument('--samplewise-zscore', action='store_true',
+        help = 'set normalizer to be zscore. NOTE, normalizer cannot be both minmax and zscore')
+    ###
 
+
+    # Validation subparser
+    vp = subparsers.add_parser('validate', help="Validate model using input images and ground truth images.")
+    vp.add_argument('--csv', help="Filepath to csv containing image and ground truth on each line.")
+    vpp = vp.add_argument_group('validation arguments')
+    vpp.add_argument(
+        '-b', '--block-shape', nargs=3, required=True, type=int,
+        help="Shape of blocks on which predict. Non-overlapping blocks of this"
+             " shape are taken from the inputs for prediction.")
+    vpp.add_argument(
+        '--batch-size', default=4, type=int,
+        help="Number of sub-volumes per batch for prediction. Use a smaller"
+             " value if memory is insufficient.")
+    vpp.add_argument(
+        '-m', '--model', required=True, help="Path to saved model.")
+    ###
+    vpp.add_argument(
+        '--n-samples', type=int, default=1,
+        help="Number of sampling.")
+    vpp.add_argument('--return-entropy', action='store_true',
+        help = 'if you want to return entropy, add this flag.')
+    vpp.add_argument('--return-variance', action='store_true',
+        help ='if you want to return variance, add this flag.')
+    vpp.add_argument('--return-array-from-images', action = 'store_true',
+        help = 'if you want to return array instead of image, add this flag.')
+    vpp.add_argument('--samplewise-minmax', action='store_true',
+        help = 'set normalizer to be minmax. NOTE, normalizer cannot be both minmax and zscore')
+    vpp.add_argument('--samplewise-zscore', action='store_true',
+        help = 'set normalizer to be zscore. NOTE, normalizer cannot be both minmax and zscore')
+    vpp.add_argument(
+        '--label-mapping',
+        help="Path to CSV mapping file. First column contains original labels,"
+             " and second column contains new labels in range [0, n_classes-1]"
+             ". Header must be included. More than two columns are accepted,"
+             " but only the first two columns are used.")
+    vpp.add_argument(
+        '--output-path',
+        help="Path where validation outputs will be saved.")
+    vpp.add_argument(
+        '-n', '--n-classes', required=True, type=int,
+        help="Number of classes the model classifies.")
+    ###
     # Save subparser
     sp = subparsers.add_parser('save', help="Save model as SavedModel (.pb)")
     sp.add_argument('savedir', help="Path in which to save SavedModel.")
@@ -243,12 +302,68 @@ def train(params):
 
 
 def predict(params):
-    img = _predict(
+    normalizer = None
+    sm = params["samplewise_minmax"]
+    sz = params["samplewise_zscore"]
+    if sm and sz:
+        raise Exception("Normalizer cannot be both minmax and zscore")
+    if sm:
+        normalizer = normalize_zero_one
+    if sz:
+        normalizer = zscore
+
+    imgs = _predict(
         inputs=params['input'],
         predictor=params['model'],
         block_shape=params['block_shape'],
+        return_variance=params['return_variance'],
+        return_entropy=params['return_entropy'],
+        return_array_from_images=params['return_array_from_images'],
+        normalizer=normalizer,
+        n_samples=params['n_samples'],
         batch_size=params['batch_size'])
-    nib.save(img, params['output'])
+
+    outpath = Path(params['output'])
+    suffixes = '.'.join(s for s in outpath.suffixes)
+    variance_path = outpath.parent / (outpath.stem + '_variance.' + suffixes)
+    entropy_path = outpath.parent / (outpath.stem + '_entropy.' + suffixes)
+
+    nib.save(imgs[0], params['output']) # fix
+    if not params['return_array_from_images']:
+        include_variance = ((params['n_samples'] > 1) and (return_variance))
+        include_entropy = ((params['n_samples'] > 1) and (return_entropy))
+        if include_variance and return_entropy:
+            nib.save(imgs[1], str(variance_path))
+            nib.save(imgs[2], str(entropy_path))
+        elif include_variance:
+            nib.save(imgs[1], str(variance_path))
+        elif include_entropy:
+            nib.save(imgs[1], str(entropy_path))
+
+def validate(params):
+    normalizer = None
+    sm = params["samplewise_minmax"]
+    sz = params["samplewise_zscore"]
+    if sm and sz:
+        raise Exception("Normalizer cannot be both minmax and zscore")
+    if sm:
+        normalizer = normalize_zero_one
+    if sz:
+        normalizer = zscore
+    print(params['model'])
+    validate_from_filepaths(
+        filepaths=read_csv(params['csv']),
+        predictor=params['model'],
+        block_shape=params['block_shape'],
+        n_classes=params['n_classes'],
+        mapping_y=params['label_mapping'],
+        output_path=params['output_path'],
+        return_variance=params['return_variance'],
+        return_entropy=params['return_entropy'],
+        return_array_from_images=params['return_array_from_images'],
+        n_samples=params['n_samples'],
+        normalizer=normalizer,
+        batch_size=params['batch_size'])
 
 
 def save(params):
@@ -300,6 +415,9 @@ def main(args=None):
                 "model directory not found: {}".format(params['modeldir']))
         save(params)
 
+    elif params['subparser_name'] == 'validate':
+        params['block_shape'] = tuple(params['block_shape'])
+        validate(params)
     else:
         # should never get to this point.
         raise ValueError("invalid subparser.")
