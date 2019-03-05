@@ -1,254 +1,82 @@
-# -*- coding: utf-8 -*-
-"""MeshNet implemented in TensorFlow.
+"""Model definition for MeshNet.
 
-Reference
----------
-Fedorov, A., Johnson, J., Damaraju, E., Ozerin, A., Calhoun, V., & Plis, S.
-(2017, May). End-to-end learning of brain tissue segmentation from imperfect
-labeling. IJCNN 2017. (pp. 3785-3792). IEEE.
+Implemented according to the [MeshNet manuscript](https://arxiv.org/abs/1612.00940)
 """
 
 import tensorflow as tf
-from tensorflow.contrib.estimator import TowerOptimizer
-from tensorflow.contrib.estimator import replicate_model_fn
-from tensorflow.python.estimator.canned.optimizers import (
-    get_optimizer_instance
-)
-
-from nobrainer.metrics import streaming_dice
-from nobrainer.metrics import streaming_hamming
-from nobrainer.models.util import check_optimizer_for_training
-from nobrainer.models.util import check_required_params
-from nobrainer.models.util import set_default_params
-
-FUSED_BATCH_NORM = True
+from tensorflow.keras import layers
 
 
-def _layer(inputs,
-           mode,
-           layer_num,
-           filters,
-           kernel_size,
-           dilation_rate,
-           dropout_rate):
-    """Layer building block of MeshNet.
+def meshnet(n_classes, input_shape, receptive_field=67, filters=71, activation='relu', dropout_rate=0.25, batch_size=None, name='meshnet'):
+    """Instantiate MeshNet model.
 
-    Performs 3D convolution, activation, batch normalization, and dropout on
-    `inputs` tensor.
+    Parameters
+    ----------
+    n_classes: int, number of classes to classify. For binary applications, use
+        a value of 1.
+    input_shape: list or tuple of four ints, the shape of the input data. Omit
+        the batch dimension, and include the number of channels.
+    receptive_field: {37, 67, 129}, the receptive field of the model. According
+        to the MeshNet manuscript, the receptive field should be similar to your
+        input shape. The actual receptive field is the cube of the value provided.
+    filters: int, number of filters per volumetric convolution. The original
+        MeshNet manuscript uses 21 filters for a binary segmentation task
+        (i.e., brain extraction) and 71 filters for a multi-class segmentation task.
+    activation: str or optimizer object, the non-linearity to use.
+    dropout_rate: float between 0 and 1, the fraction of input units to drop.
+    batch_size: int, number of samples in each batch. This must be set when
+        training on TPUs.
+    name: str, name to give to the resulting model object.
 
-    Args:
-        inputs : float `Tensor`, input tensor.
-        mode : string, a TensorFlow mode key.
-        layer_num : int, value to append to each operator name. This should be
-            the layer number in the network.
-        filters : int, number of 3D convolution filters.
-        kernel_size : int or tuple, size of 3D convolution kernel.
-        dilation_rate : int or tuple, rate of dilution in 3D convolution.
-        dropout_rate : float, the dropout rate between 0 and 1.
+    Returns
+    -------
+    Model object.
 
-    Returns:
-        `Tensor` of same type as `inputs`.
+    Raises
+    ------
+    ValueError if receptive field is not an allowable value.
     """
-    training = mode == tf.estimator.ModeKeys.TRAIN
 
-    with tf.variable_scope('layer_{}'.format(layer_num)):
-        conv = tf.layers.conv3d(
-            inputs, filters=filters, kernel_size=kernel_size,
-            padding='SAME', dilation_rate=dilation_rate, activation=None)
-        activation = tf.nn.relu(conv)
-        bn = tf.layers.batch_normalization(
-            activation, training=training, fused=FUSED_BATCH_NORM)
-        return tf.layers.dropout(bn, rate=dropout_rate, training=training)
+    if receptive_field not in {37, 67, 129}:
+        raise ValueError("unknown receptive field. Legal values are 37, 67, and 129.")
 
+    def one_layer(x, layer_num, dilation_rate=(1, 1, 1)):
+        x = layers.Conv3D(filters, kernel_size=(3, 3, 3), padding='same', dilation_rate=dilation_rate, name='layer{}/conv3d'.format(layer_num))(x)
+        x = layers.BatchNormalization(name='layer{}/batchnorm'.format(layer_num))(x)
+        x = layers.Activation(activation, name='layer{}/activation'.format(layer_num))(x)
+        x = layers.Dropout(dropout_rate, name='layer{}/dropout'.format(layer_num))(x)
+        return x
 
-def model_fn(features,
-             labels,
-             mode,
-             params,
-             config=None):
-    """MeshNet model function.
+    inputs = layers.Input(shape=input_shape, batch_size=batch_size, name='inputs')
 
-    Args:
-        features: 5D float `Tensor`, input tensor. This is the first item
-            returned from the `input_fn` passed to `train`, `evaluate`, and
-            `predict`. Use `NDHWC` format.
-        labels: 4D float `Tensor`, labels tensor. This is the second item
-            returned from the `input_fn` passed to `train`, `evaluate`, and
-            `predict`. Labels should not be one-hot encoded.
-        mode: Optional. Specifies if this training, evaluation or prediction.
-        params: `dict` of parameters.
-            - n_classes: (required) number of classes to classify.
-            - optimizer: instance of TensorFlow optimizer. Required if
-                training.
-            - n_filters: number of filters to use in each convolution. The
-                original implementation used 21 filters to classify brainmask
-                and 71 filters for the multi-class problem.
-            - dropout_rate: rate of dropout. For example, 0.1 would drop 10% of
-                input units.
-        config: configuration object.
+    if receptive_field == 37:
+        x = one_layer(inputs, 1)
+        x = one_layer(x, 2)
+        x = one_layer(x, 3)
+        x = one_layer(x, 4, dilation_rate=(2, 2, 2))
+        x = one_layer(x, 5, dilation_rate=(4, 4, 4))
+        x = one_layer(x, 6, dilation_rate=(8, 8, 8))
+        x = one_layer(x, 7)
+    elif receptive_field == 67:
+        x = one_layer(inputs, 1)
+        x = one_layer(x, 2)
+        x = one_layer(x, 3, dilation_rate=(2, 2, 2))
+        x = one_layer(x, 4, dilation_rate=(4, 4, 4))
+        x = one_layer(x, 5, dilation_rate=(8, 8, 8))
+        x = one_layer(x, 6, dilation_rate=(16, 16, 16))
+        x = one_layer(x, 7)
+    elif receptive_field == 129:
+        x = one_layer(inputs, 1)
+        x = one_layer(x, 2, dilation_rate=(2, 2, 2))
+        x = one_layer(x, 3, dilation_rate=(4, 4, 4))
+        x = one_layer(x, 4, dilation_rate=(8, 8, 8))
+        x = one_layer(x, 5, dilation_rate=(16, 16, 16))
+        x = one_layer(x, 6, dilation_rate=(32, 32, 32))
+        x = one_layer(x, 7)
 
-    Returns:
-        `tf.estimator.EstimatorSpec`
+    x = layers.Conv3D(filters=n_classes, kernel_size=(1, 1, 1), padding='same', name='classification/conv3d')(x)
 
-    Raises:
-        `ValueError` if required parameters are not in `params`.
-    """
-    volume = features
-    if isinstance(volume, dict):
-        volume = features['volume']
+    final_activation = 'sigmoid' if n_classes <= 2 else 'softmax'
+    x = layers.Activation(final_activation, name='classification/activation')(x)
 
-    required_keys = {'n_classes'}
-    default_params = {
-        'optimizer': None,
-        'n_filters': 21,
-        'dropout_rate': 0.25,
-    }
-    check_required_params(params=params, required_keys=required_keys)
-    set_default_params(params=params, defaults=default_params)
-    check_optimizer_for_training(optimizer=params['optimizer'], mode=mode)
-
-    tf.logging.debug("Parameters for model:")
-    tf.logging.debug(params)
-
-    # Dilation rate by layer.
-    dilation_rates = (
-        (1, 1, 1),
-        (1, 1, 1),
-        (1, 1, 1),
-        (2, 2, 2),
-        (4, 4, 4),
-        (8, 8, 8),
-        (1, 1, 1))
-
-    outputs = volume
-
-    for ii, dilation_rate in enumerate(dilation_rates):
-        outputs = _layer(
-            outputs, mode=mode, layer_num=ii + 1, filters=params['n_filters'],
-            kernel_size=3, dilation_rate=dilation_rate,
-            dropout_rate=params['dropout_rate'])
-
-    with tf.variable_scope('logits'):
-        logits = tf.layers.conv3d(
-            inputs=outputs, filters=params['n_classes'], kernel_size=(1, 1, 1),
-            padding='SAME', activation=None)
-    predicted_classes = tf.argmax(logits, axis=-1)
-
-    if mode == tf.estimator.ModeKeys.PREDICT:
-        predictions = {
-            'class_ids': predicted_classes,
-            'probabilities': tf.nn.softmax(logits),
-            'logits': logits,
-        }
-        export_outputs = {
-            'outputs': tf.estimator.export.PredictOutput(predictions)}
-        return tf.estimator.EstimatorSpec(
-            mode=mode,
-            predictions=predictions,
-            export_outputs=export_outputs)
-
-    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
-        labels=labels, logits=logits)
-    loss = tf.reduce_mean(cross_entropy)
-
-    # Add evaluation metrics for class 1.
-    labels = tf.cast(labels, predicted_classes.dtype)
-    labels_onehot = tf.one_hot(labels, params['n_classes'])
-    predictions_onehot = tf.one_hot(predicted_classes, params['n_classes'])
-    eval_metric_ops = {
-        'accuracy': tf.metrics.accuracy(labels, predicted_classes),
-        'dice': streaming_dice(
-            labels_onehot[..., 1], predictions_onehot[..., 1], axis=(1, 2, 3)),
-        'hamming': streaming_hamming(
-            labels_onehot[..., 1], predictions_onehot[..., 1], axis=(1, 2, 3)),
-    }
-
-    if mode == tf.estimator.ModeKeys.EVAL:
-        return tf.estimator.EstimatorSpec(
-            mode=mode, loss=loss, eval_metric_ops=eval_metric_ops)
-
-    assert mode == tf.estimator.ModeKeys.TRAIN
-
-    global_step = tf.train.get_global_step()
-    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-    with tf.control_dependencies(update_ops):
-        train_op = params['optimizer'].minimize(loss, global_step=global_step)
-
-    return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
-
-
-class MeshNet(tf.estimator.Estimator):
-    """MeshNet model.
-
-    Example:
-        ```python
-        import numpy as np
-        import tensorflow as tf
-
-        shape = (1, 10, 10, 10)  # Batch of 1.
-        X = np.random.rand(*shape, 1).astype(np.float32)
-        y = np.random.randint(0, 9, size=(shape), dtype=np.int32)
-        dset_fn = lambda: tf.data.Dataset.from_tensors((X, y))
-        estimator = nobrainer.models.MeshNet(
-            n_classes=10, optimizer='Adam', n_filters=71, dropout_rate=0.25,
-            learning_rate=0.001,
-        )
-        estimator.train(input_fn=dset_fn)
-        ```
-
-    Args:
-        n_classes: int, number of classes to classify.
-        optimizer: instance of TensorFlow optimizer or string of optimizer
-            name. Required if training.
-        n_filters: int (default 21), number of filters to use in each
-            convolution. The original implementation used 21 filters to
-            classify brainmask and 71 filters for the multi-class problem.
-        dropout_rate: float in range [0, 1] (default 0.25). Rate of dropout.For
-            example, 0.1 would drop 10% of input units.
-        learning_rate: float, only required if `optimizer` is a string.
-        model_dir: Directory to save model parameters, graph, etc. This can
-            also be used to load checkpoints from the directory in an estimator
-            to continue training a previously saved model. If PathLike object,
-            the path will be resolved. If None, the model_dir in config will be
-            used if set. If both are set, they must be same. If both are None,
-            a temporary directory will be used.
-        config: Configuration object.
-        warm_start_from: Optional string filepath to a checkpoint to warm-start
-            from, or a `tf.estimator.WarmStartSettings` object to fully
-            configure warm-starting. If the string filepath is provided instead
-            of a `WarmStartSettings`, then all variables are warm-started, and
-            it is assumed that vocabularies and Tensor names are unchanged.
-        multi_gpu: boolean, if true, optimizer is wrapped in
-            `tf.contrib.estimator.TowerOptimizer` and model function is wrapped
-            in `tf.contrib.estimator.replicate_model_fn()`.
-    """
-    def __init__(self,
-                 n_classes,
-                 optimizer=None,
-                 n_filters=21,
-                 dropout_rate=0.25,
-                 learning_rate=None,
-                 model_dir=None,
-                 config=None,
-                 warm_start_from=None,
-                 multi_gpu=False):
-        params = {
-            'n_classes': n_classes,
-            # If an instance of an optimizer is passed in, this will just
-            # return it.
-            'optimizer': (
-                None if optimizer is None
-                else get_optimizer_instance(optimizer, learning_rate)),
-            'n_filters': n_filters,
-            'dropout_rate': dropout_rate,
-        }
-
-        _model_fn = model_fn
-
-        if multi_gpu:
-            params['optimizer'] = TowerOptimizer(params['optimizer'])
-            _model_fn = replicate_model_fn(_model_fn)
-
-        super(MeshNet, self).__init__(
-            model_fn=_model_fn, model_dir=model_dir, params=params,
-            config=config, warm_start_from=warm_start_from)
+    return tf.keras.Model(inputs=inputs, outputs=x, name=name)
