@@ -1,120 +1,133 @@
-# -*- coding: utf-8 -*-
-"""Metrics implemented in TensorFlow and NumPy. Functions that end in
-`_numpy` are implemented in NumPy for eager computation.
+"""Implementations of metrics for 3D semantic segmentation."""
 
-Functions that have the prefix `streaming_` are meant to be used when
-evaluating TensorFlow estimators with `estimator.eval()`.
-"""
-
-import numpy as np
 import tensorflow as tf
-from tensorflow.python.framework.ops import add_to_collections
-
-from nobrainer.util import _EPSILON
 
 
-def dice(labels, predictions, axis=None, name=None):
-    """Return the Dice coefficients between two Tensors. Perfect Dice is 1.0.
+def average_volume_difference():
+    raise NotImplementedError()
 
-    The Dice coefficient between predictions `p` and labels `g` is
 
-    .. math::
-        \frac{\Sigma_i^N p_i g_i + \epsilon}
-            {\Sigma_i^N p_i^2 + \Sigma_i^N g_i^2 + \epsilon}
+def dice(y_true, y_pred, axis=(1, 2, 3, 4)):
+    """Calculate Dice similarity between labels and predictions.
 
-            where `\epsilon` is a small value for stability.
+    Dice similarity is in [0, 1], where 1 is perfect overlap and 0 is no
+    overlap. If both labels and predictions are empty (e.g., all background),
+    then Dice similarity is 1.
 
-    Parameters
-    ----------
-    labels: `Tensor`, input boolean tensor.
-    predictions: `Tensor`, input boolean tensor.
-    axis: `int` or `tuple`, the dimension(s) along which to compute Dice.
-    name: `str`, a name for the operation.
+    If we assume the inputs are rank 5 [`(batch, x, y, z, classes)`], then an
+    axis parameter of `(1, 2, 3)` will result in a tensor that contains a Dice
+    score for every class in every item in the batch. The shape of this tensor
+    will be `(batch, classes)`. If the inputs only have one class (e.g., binary
+    segmentation), then an axis parameter of `(1, 2, 3, 4)` should be used.
+    This will result in a tensor of shape `(batch,)`, where every value is the
+    Dice similarity for that prediction.
+
+    Implemented according to https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4533825/#Equ6
 
     Returns
     -------
-    `Tensor` of Dice coefficient(s).
+    Tensor of Dice similarities.
+
+    Citations
+    ---------
+    Taha AA, Hanbury A. Metrics for evaluating 3D medical image segmentation:
+        analysis, selection, and tool. BMC Med Imaging. 2015;15:29. Published 2015
+        Aug 12. doi:10.1186/s12880-015-0068-x
     """
-    with tf.variable_scope(name, 'dice', [predictions, labels]):
-        labels = tf.convert_to_tensor(labels)
-        predictions = tf.convert_to_tensor(predictions)
-        predictions = tf.to_float(predictions)
-        labels = tf.to_float(labels)
-        predictions.get_shape().assert_is_compatible_with(labels.get_shape())
-        intersection = tf.reduce_sum(predictions * labels, axis=axis)
-        union = (
-            tf.reduce_sum(predictions, axis=axis)
-            + tf.reduce_sum(labels, axis=axis))
-        return (2 * intersection + _EPSILON) / (union + _EPSILON)
+    y_pred = tf.convert_to_tensor(y_pred)
+    y_true = tf.cast(y_true, y_pred.dtype)
+    eps = tf.keras.backend.epsilon()
+
+    intersection = tf.reduce_sum(y_true * y_pred, axis=axis)
+    summation = tf.reduce_sum(y_true, axis=axis) + tf.reduce_sum(y_pred, axis=axis)
+    return (2 * intersection + eps) / (summation + eps)
 
 
-def streaming_dice(labels,
-                   predictions,
-                   axis,
-                   weights=None,
-                   metrics_collections=None,
-                   update_collections=None,
-                   name=None):
-    """Calculates Dice coefficient between `labels` and `features`.
+def generalized_dice(y_true, y_pred, axis=(1, 2, 3)):
+    """Calculate Generalized Dice similarity. This is useful for multi-class
+    predictions.
 
-    Both tensors should have the same shape and should not be one-hot encoded.
+    If we assume the inputs are rank 5 [`(batch, x, y, z, classes)`], then an
+    axis parameter of `(1, 2, 3)` should be used. This will result in a tensor
+    of shape `(batch,)`, where every value is the Generalized Dice similarity
+    for that prediction, across all classes.
+
+    Returns
+    -------
+    Tensor of Generalized Dice similarities.
     """
-    values = dice(labels, predictions, axis=axis)
-    mean_dice, update_op = tf.metrics.mean(values)
+    y_pred = tf.convert_to_tensor(y_pred)
+    y_true = tf.cast(y_true, y_pred.dtype)
 
-    if metrics_collections:
-        add_to_collections(metrics_collections, mean_dice)
-    if update_collections:
-        add_to_collections(update_collections, update_op)
+    if y_true.get_shape().ndims < 2 or y_pred.get_shape().ndims < 2:
+        raise ValueError("y_true and y_pred must be at least rank 2.")
 
-    return mean_dice, update_op
+    epsilon = tf.keras.backend.epsilon()
+    w = tf.math.reciprocal(tf.square(tf.reduce_sum(y_true, axis=axis)) + epsilon)
+    num = 2 * tf.reduce_sum(w * tf.reduce_sum(y_true * y_pred, axis=axis), axis=-1)
+    den = tf.reduce_sum(w * tf.reduce_sum(y_true + y_pred, axis=axis), axis=-1)
+    return (num + epsilon) / (den + epsilon)
 
 
-def hamming(labels, predictions, axis=None, name=None):
-    """Return the Hamming distance between two Tensors.
+def hamming(y_true, y_pred, axis=(1, 2, 3)):
+    y_pred = tf.convert_to_tensor(y_pred)
+    y_true = tf.cast(y_true, y_pred.dtype)
+    return tf.reduce_mean(tf.not_equal(y_pred, y_true), axis=axis)
 
-    This operation cannot be used as a loss function because it uses `tf.cast`.
 
-    Args:
-        u, v: `Tensor`, input tensors.
-        axis: `int` or `tuple`, the dimension(s) along which to compute Hamming
-            distance.
-        name: `str`, a name for the operation.
-        dtype: `str` or dtype object, specified output type of the operation.
-            Defaults to `tf.float64`.
+def haussdorf():
+    raise NotADirectoryError()
 
-    Returns:
-        `Tensor` of Hamming distance(s).
 
-    Notes:
-        This function is almost identical to `scipy.spatial.distance.hamming`
-        but accepts n-D tensors and adds an `axis` parameter.
+def jaccard(y_true, y_pred, axis=(1, 2, 3, 4)):
+    """Calculate Jaccard similarity between labels and predictions.
+
+    Jaccard similarity is in [0, 1], where 1 is perfect overlap and 0 is no
+    overlap. If both labels and predictions are empty (e.g., all background),
+    then Jaccard similarity is 1.
+
+    If we assume the inputs are rank 5 [`(batch, x, y, z, classes)`], then an
+    axis parameter of `(1, 2, 3)` will result in a tensor that contains a Jaccard
+    score for every class in every item in the batch. The shape of this tensor
+    will be `(batch, classes)`. If the inputs only have one class (e.g., binary
+    segmentation), then an axis parameter of `(1, 2, 3, 4)` should be used.
+    This will result in a tensor of shape `(batch,)`, where every value is the
+    Jaccard similarity for that prediction.
+
+    Implemented according to https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4533825/#Equ7
+
+    Returns
+    -------
+    Tensor of Jaccard similarities.
+
+    Citations
+    ---------
+    Taha AA, Hanbury A. Metrics for evaluating 3D medical image segmentation:
+        analysis, selection, and tool. BMC Med Imaging. 2015;15:29. Published 2015
+        Aug 12. doi:10.1186/s12880-015-0068-x
     """
-    with tf.name_scope(name, 'hamming', [labels, predictions]):
-        labels = tf.convert_to_tensor(labels)
-        predictions = tf.convert_to_tensor(predictions)
-        ne = tf.not_equal(labels, predictions)
-        return tf.reduce_mean(tf.to_float(ne), axis=axis)
+    y_pred = tf.convert_to_tensor(y_pred)
+    y_true = tf.cast(y_true, y_pred.dtype)
+    eps = tf.keras.backend.epsilon()
+
+    intersection = tf.reduce_sum(y_true * y_pred, axis=axis)
+    union = tf.reduce_sum(y_true, axis=axis) + tf.reduce_sum(y_pred, axis=axis)
+    return (intersection + eps) / (union - intersection + eps)
 
 
-def streaming_hamming(labels,
-                      predictions,
-                      axis=None,
-                      weights=None,
-                      metrics_collections=None,
-                      update_collections=None,
-                      name=None):
-    """Calculates Hamming distance between `labels` and `features`.
+def tversky(y_true, y_pred, axis=(1, 2, 3), alpha=0.3, beta=0.7):
+    y_pred = tf.convert_to_tensor(y_pred)
+    y_true = tf.cast(y_true, y_pred.dtype)
 
-    Axis should be `(1, 2, 3)` for 3D segmentation problem, where 0 is the
-    batch dimension.
-    """
-    values = hamming(labels=labels, predictions=predictions, axis=axis)
-    mean_value, update_op = tf.metrics.mean(values)
+    if y_true.get_shape().ndims < 2 or y_pred.get_shape().ndims < 2:
+        raise ValueError("y_true and y_pred must be at least rank 2.")
 
-    if metrics_collections:
-        add_to_collections(metrics_collections, mean_value)
-    if update_collections:
-        add_to_collections(update_collections, update_op)
+    eps = tf.keras.backend.epsilon()
 
-    return mean_value, update_op
+    num = tf.reduce_sum(y_pred * y_true, axis=axis)
+    den = (
+        num
+        + alpha * tf.reduce_sum(y_pred * (1 - y_true), axis=axis)
+        + beta * tf.reduce_sum((1 - y_pred) * y_true, axis=axis))
+    # Sum over classes.
+    return tf.reduce_sum((num + eps) / (den + eps), axis=-1)

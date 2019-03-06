@@ -1,20 +1,6 @@
-# Nobrainer container specification.
-
-ARG TF_VERSION="1.12.0"
-# Use "gpu-py3" to build GPU-enabled container and "py3" for non-GPU container.
-ARG TF_ENV="gpu-py3"
-FROM tensorflow/tensorflow:${TF_VERSION}-${TF_ENV}
-
-COPY . /opt/nobrainer
-RUN \
-    # Extras do not have to be installed because the only extra is tensorflow,
-    # which is installed in the base image.
-    pip install --no-cache-dir -e /opt/nobrainer \
-    && rm -rf ~/.cache/pip/* \
-    && useradd --no-user-group --create-home --shell /bin/bash neuro
-
-USER neuro
-WORKDIR /home/neuro
-ENTRYPOINT ["/usr/bin/python"]
-
+FROM tensorflow/tensorflow:nightly-gpu-py3-jupyter
+COPY [".", "/opt/nobrainer"]
+RUN pip install --no-cache-dir click nibabel numpy pytest scipy scikit-image seaborn \
+    && pip install --no-cache-dir --editable /opt/nobrainer
+ENTRYPOINT ["jupyter-notebook", "--ip=0.0.0.0", "--no-browser"]
 LABEL maintainer="Jakub Kaczmarzyk <jakubk@mit.edu>"

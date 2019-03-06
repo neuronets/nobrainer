@@ -1,0 +1,2 @@
+include versioneer.py
+include nobrainer/_version.py

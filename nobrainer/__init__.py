@@ -1,59 +1,26 @@
-# -*- coding: utf-8 -*-
-"""Top-level module imports for nobrainer."""
+from distutils.version import LooseVersion
 
-import warnings
-# Ignore FutureWarning (from h5py in this case).
-warnings.simplefilter(action='ignore', category=FutureWarning)
+import tensorflow as tf
 
-try:
-    import tensorflow
-except ImportError:
-    raise ImportError(
-        "TensorFlow cannot be found. Please re-install nobrainer with either"
-        " the [cpu] or [gpu] extras, or install TensorFlow separately. Please"
-        " see https://www.tensorflow.org/install/ for installation"
-        " instructions.")
+# For tensorflow<2.0
+# tf.enable_eager_execution()
 
-from nobrainer.io import read_csv
-from nobrainer.io import read_json
-from nobrainer.io import read_mapping
-from nobrainer.io import read_volume
-from nobrainer.io import save_json
+if LooseVersion(tf.__version__) < LooseVersion("1.13.1"):
+    raise ValueError(
+        "tensorflow>=1.13.1 must be installed but found version {}"
+        .format(tf.__version__))
+del LooseVersion
 
+from nobrainer._version import get_versions
+__version__ = get_versions()['version']
+del get_versions
+
+import nobrainer.io
+import nobrainer.layers
 import nobrainer.losses
 import nobrainer.metrics
-
-# from nobrainer.metrics import dice
-# from nobrainer.metrics import hamming
-# from nobrainer.metrics import streaming_dice
-# from nobrainer.metrics import streaming_hamming
-
-from nobrainer.models import get_estimator
-from nobrainer.models import HighRes3DNet
-from nobrainer.models import MeshNet
-from nobrainer.models import QuickNAT
-from nobrainer.models import MeshNetWN
-from nobrainer.models import MeshNetVWN
-from nobrainer.models import UNet3D
-
-from nobrainer.predict import predict
-
-from nobrainer.train import train
-
-from nobrainer.volume import binarize
-from nobrainer.volume import change_brightness
-from nobrainer.volume import downsample
-from nobrainer.volume import flip
-from nobrainer.volume import from_blocks
-from nobrainer.volume import iterblocks_3d
-from nobrainer.volume import itervolumes
-from nobrainer.volume import normalize_zero_one
-from nobrainer.volume import reduce_contrast
-from nobrainer.volume import replace
-from nobrainer.volume import rotate
-from nobrainer.volume import salt_and_pepper
-from nobrainer.volume import shift
-from nobrainer.volume import to_blocks
-from nobrainer.volume import zoom
-from nobrainer.volume import zscore
-from nobrainer.volume import VolumeDataGenerator
+import nobrainer.models
+import nobrainer.training
+import nobrainer.transform
+import nobrainer.utils
+import nobrainer.volume

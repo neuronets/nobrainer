@@ -1,239 +1,300 @@
-# -*- coding: utf-8 -*-
-"""Loss functions implemented in TensorFlow.
-
-Non-differentiable operations (e.g., argmax) are not allowed.
-
-The implementations here are heavily inspired by the official implementations
-in `tensorflow.python.ops.losses.losses_impl`.
-"""
+"""Implementations of loss functions for 3D semantic segmentation."""
 
 import tensorflow as tf
-from tensorflow.python.ops.losses.losses_impl import _safe_div
-from tensorflow.python.ops.losses.losses_impl import compute_weighted_loss
-from tensorflow.python.ops.losses.losses_impl import Reduction
+from tensorflow.python.keras.losses import Loss
+from tensorflow.python.keras.losses import LossFunctionWrapper
+from tensorflow.python.keras.utils.losses_utils import ReductionV2
 
-from nobrainer.util import _EPSILON
+from nobrainer import metrics
 
 
-def dice(labels, predictions, axis, weights=1.0, scope=None, loss_collection=tf.GraphKeys.LOSSES, reduction=Reduction.SUM_BY_NONZERO_WEIGHTS):
-    """Dice loss for binary segmentation. The Dice loss is one minus the Dice
-    coefficient, and therefore this loss converges towards zero.
+def dice(y_true, y_pred, axis=(1, 2, 3, 4)):
+    return 1. - metrics.dice(y_true=y_true, y_pred=y_pred, axis=axis)
 
-    The Dice loss between predictions `p` and labels `g` is
 
-    .. math::
+class Dice(Loss):
+    """Computes one minus the Dice similarity between labels and predictions.
+    For example, if `y_true` is [0., 0., 1., 1.] and `y_pred` is [1., 1., 1., 0.]
+    then the Dice loss is 0.6. The Dice similarity between these tensors is 0.4.
 
-        1 - \frac{2 \Sigma_i^N p_i g_i + \epsilon}
-            {\Sigma_i^N p_i^2 + \Sigma_i^N g_i^2 + \epsilon}
+    Use this loss only for binary semantic segmentation tasks. The default value
+    for the axis parameter is meant for models which output a shape of
+    `(batch, x, y, z, 1)`. Values in `y_true` and `y_pred` should be in the
+    range [0, 1].
 
-    where `\epsilon` is a small value for stability.
+    Usage:
 
-    Parameters
-    ----------
-    labels: float `Tensor`
-    predictions: float `Tensor`
+    ```python
+    dice = nobrainer.losses.Dice(axis=None)
+    loss = dice([0., 0., 1., 1.], [1., 1., 1., 0.])
+    print('Loss: ', loss.numpy())  # Loss: 0.6
+    ```
 
-    References
-    ----------
-    https://arxiv.org/pdf/1606.04797.pdf
+    Usage with tf.keras API:
+    ```python
+    model = tf.keras.Model(inputs, outputs)
+    model.compile('sgd', loss=nobrainer.losses.Dice())
+    ```
     """
-    if labels is None:
-        raise ValueError("labels must not be None.")
-    if predictions is None:
-        raise ValueError("predictions must not be None.")
-    with tf.name_scope(scope, "dice",
-                       (predictions, labels, weights)) as scope:
-        predictions = tf.to_float(predictions)
-        labels = tf.to_float(labels)
-        predictions.get_shape().assert_is_compatible_with(labels.get_shape())
 
-        intersection = tf.reduce_sum(tf.abs(predictions * labels), axis=axis)
-        union = (tf.reduce_sum(predictions, axis=axis) +
-                 tf.reduce_sum(labels, axis=axis))
-        losses = 1. - ((2 * intersection + _EPSILON) / (union + _EPSILON))
-        return compute_weighted_loss(
-            losses=losses,
-            weights=weights,
-            scope=scope,
-            loss_collection=loss_collection,
-            reduction=reduction)
+    def __init__(self,
+                 axis=(1, 2, 3, 4),
+                 reduction=ReductionV2.SUM_OVER_BATCH_SIZE,
+                 name='dice'):
+        super(Dice, self).__init__(reduction=reduction, name=name)
+        self.axis = axis
+
+    def call(self, y_true, y_pred):
+        """Calculates the Dice loss."""
+        y_pred = tf.convert_to_tensor(y_pred)
+        y_true = tf.cast(y_true, y_pred.dtype)
+        return dice(y_true=y_true, y_pred=y_pred, axis=self.axis)
 
 
-def generalized_dice(labels, predictions, axis, weights=1.0, scope=None, loss_collection=tf.GraphKeys.LOSSES, reduction=Reduction.SUM_BY_NONZERO_WEIGHTS):
-    """Generalized Dice loss for multiclass segmentation.
+def focal(y_true, y_pred):
+    raise NotImplementedError()
 
-    Tensors should be one-hot encoded.
 
-    The Generalized Dice loss between labels `g` and predictions `p` is
-
-    .. math::
-        1 - 2 \frac{\Sigma_l^C w_l \Sigma_n g_{ln} p_{ln}}
-            {\Sigma_l^C w_l \Sigma_n g_{ln} + p_{ln}}
-
-        w_l = \frac{1}{(\Sigma_n^N g_{ln})^2}
-
-    where `C` is the number of classes, and `w_l` is the weight of class `l`.
-
-    References
-    ----------
-    https://arxiv.org/pdf/1707.03237.pdf
+def focal_tversky(y_true, y_pred):
     """
-    if labels is None:
-        raise ValueError("labels must not be None.")
-    if predictions is None:
-        raise ValueError("predictions must not be None.")
-    with tf.name_scope(scope, "generalized_dice",
-                       (predictions, labels, weights)) as scope:
-        predictions = tf.to_float(predictions)
-        labels = tf.to_float(labels)
-        predictions.get_shape().assert_is_compatible_with(labels.get_shape())
-
-        # Calculate weights per class. Shape of this weight tensor should be
-        # `(batch, n_classes)`
-        w = tf.reciprocal(tf.square(tf.reduce_sum(labels, axis=axis)) + 1)
-
-        # Outer reduce_sum axis sums across classes.
-        num = 2 * tf.reduce_sum(
-            w * tf.reduce_sum(tf.abs(labels * predictions), axis=axis), axis=-1)
-        # Outer reduce_sum axis sums across classes.
-        den = tf.reduce_sum(
-            w * tf.reduce_sum(labels + predictions, axis=axis), axis=-1)
-
-        # Shape of losses at this point is (batch,).
-        losses = 1 - (num + _EPSILON) / (den + _EPSILON)
-
-        return compute_weighted_loss(
-            losses=losses,
-            weights=weights,
-            scope=scope,
-            loss_collection=loss_collection,
-            reduction=reduction)
-
-
-def hamming(labels, predictions, axis, weights=1.0, scope=None, loss_collection=tf.GraphKeys.LOSSES, reduction=Reduction.SUM_BY_NONZERO_WEIGHTS):
-    """Hamming loss for binary or multiclass segmentation.
-
-    The Hamming loss is the fraction of unequal samples. This function implements
-    a continuous approximation. The Hamming loss between predictions `p` and labels `g`
-    is
-
-    .. math::
-        g (1 - p) + (1 - g) p
-
-    Parameters
-    ----------
-
-    Returns
-    -------
+    https://arxiv.org/pdf/1810.07842.pdf
     """
-    # https://stackoverflow.com/a/45249829/5666087
-    if labels is None:
-        raise ValueError("labels must not be None.")
-    if predictions is None:
-        raise ValueError("predictions must not be None.")
-    with tf.name_scope(scope, "hamming",
-                       (predictions, labels, weights)) as scope:
-        predictions = tf.to_float(predictions)
-        labels = tf.to_float(labels)
-        predictions.get_shape().assert_is_compatible_with(labels.get_shape())
-        losses = tf.reduce_mean(
-            labels * (1 - predictions) + (1 - labels) * predictions, axis=axis)
-        return compute_weighted_loss(
-            losses=losses,
-            weights=weights,
-            scope=scope,
-            loss_collection=loss_collection,
-            reduction=reduction)
+    raise NotImplementedError()
 
 
-def jaccard(labels, predictions, axis, weights=1.0, scope=None, loss_collection=tf.GraphKeys.LOSSES, reduction=Reduction.SUM_BY_NONZERO_WEIGHTS):
-    """Jaccard distance loss for binary segmentation.
+def generalized_dice(y_true, y_pred, axis=(1, 2, 3)):
+    return 1. - metrics.generalized_dice(y_true=y_true, y_pred=y_pred, axis=axis)
 
-    The Jaccard loss between labels `g` and predictions `p` is
 
-    .. math::
-        1 - \frac{|p \cap g| + \epsilon}{|p| + |g| - |p \cap g| + \epsilon}
+class GeneralizedDice(Loss):
+    """Computes one minus the generalized Dice similarity between labels and
+    predictions. For example, if `y_true` is [[0., 0., 1., 1.]] and `y_pred` is
+    [[1., 1., 1., 0.]] then the generalized Dice loss is 0.60. The generalized
+    Dice similarity between these tensors is 0.40.
 
+    Use this loss for binary or multi-class semantic segmentation tasks. The
+    default value for the axis parameter is meant for models which output a
+    shape of `(batch, x, y, z, n_classes)`. Values in `y_true` and `y_pred`
+    should be in the range [0, 1].
+
+    Usage:
+
+    ```python
+    generalized_dice = nobrainer.losses.GeneralizedDice(axis=1)
+    generalized_dice([[0., 0., 1., 1.]], [[1., 1., 1., 0.]])
+    print('Loss: ', loss.numpy())  # Loss: 0.60
+    ```
+
+    Usage with tf.keras API:
+    ```python
+    model = tf.keras.Model(inputs, outputs)
+    model.compile('sgd', loss=nobrainer.losses.GeneralizedDice())
+    ```
     """
-    if labels is None:
-        raise ValueError("labels must not be None.")
-    if predictions is None:
-        raise ValueError("predictions must not be None.")
-    with tf.name_scope(scope, "jaccard",
-                       (predictions, labels, weights)) as scope:
-        predictions = tf.to_float(predictions)
-        labels = tf.to_float(labels)
-        predictions.get_shape().assert_is_compatible_with(labels.get_shape())
-        intersection = tf.reduce_sum(tf.abs(predictions * labels), axis=axis)
-        denominator = (
-            tf.reduce_sum(labels, axis=axis)
-            + tf.reduce_sum(predictions, axis=axis)
-            - intersection)
-        losses = 1 - (intersection + _EPSILON) / (denominator + _EPSILON)
-        return compute_weighted_loss(
-            losses=losses,
-            weights=weights,
-            scope=scope,
-            loss_collection=loss_collection,
-            reduction=reduction)
+
+    def __init__(self,
+                 axis=(1, 2, 3),
+                 reduction=ReductionV2.SUM_OVER_BATCH_SIZE,
+                 name='generalized_dice'):
+        super(GeneralizedDice, self).__init__(reduction=reduction, name=name)
+        self.axis = axis
+
+    def call(self, y_true, y_pred):
+        """Calculates the generalized Dice loss."""
+        y_pred = tf.convert_to_tensor(y_pred)
+        y_true = tf.cast(y_true, y_pred.dtype)
+        return generalized_dice(y_true=y_true, y_pred=y_pred, axis=self.axis)
 
 
-def tversky(labels, predictions, axis, alpha=0.3, beta=0.7, weights=1.0, scope=None, loss_collection=tf.GraphKeys.LOSSES, reduction=Reduction.SUM_BY_NONZERO_WEIGHTS):
-    """Tversky loss for binary or multiclass segmentation.
+def jaccard(y_true, y_pred, axis=(1, 2, 3, 4)):
+    return 1. - metrics.jaccard(y_true=y_true, y_pred=y_pred, axis=axis)
 
-    Segmentation classes must be in last dimension. Labels should be one-hot
-    encoded.
 
-    Identical to Dice loss when alpha = beta = 0.5. The Tversky loss converges
-    to `-C`, where `C` is the number of predicted classes.
+class Jaccard(Loss):
+    """Computes one minus the Jaccard similarity between labels and predictions.
+    For example, if `y_true` is [0., 0., 1., 1.] and `y_pred` is [1., 1., 1., 0.]
+    then the Jaccard loss is 0.75. The Jaccard similarity between these tensors
+    is 0.25.
 
-    The Tversky loss between predictions `p` and labels `g` is
+    Use this loss only for binary semantic segmentation tasks. The default value
+    for the axis parameter is meant for models which output a shape of
+    `(batch, x, y, z, 1)`. Values in `y_true` and `y_pred` should be in the
+    range [0, 1].
 
-    .. math::
-        \frac{\Sigma_i^N p_{0i} g_{0i} + \epsilon}
-            {\Sigma_i^N p_{0i} g_{0i}
-             + \alpha \Sigma_i^N p_{0i} g_{1i}
-             + \beta \Sigma_i^N p_{1i} g_{0i}
-             + \epsilon}
+    Usage:
 
-    where `p_{0i}` is the probability that voxel `i` belongs to foreground,
-    `p_{1i}` is the probability that voxel `i` belongs to background, `g_{0i}`
-    is the probability that voxel `i` of the ground truth belongs to foreground,
-    `g_{1i}` is the probability that voxel `i` of the ground truth belongs
-    to background, and `\epsilon` is a small value for stability.
+    ```python
+    jaccard = nobrainer.losses.Jaccard(axis=None)
+    loss = jaccard([0., 0., 1., 1.], [1., 1., 1., 0.])
+    print('Loss: ', loss.numpy())  # Loss: 0.75
+    ```
 
-    Parameters
-    ----------
-    labels: float `Tensor`, one-hot-encoded ground truth.
-    predictions: float `Tensor`
-    axis
-    alpha: `float`
-    beta: `float`, according to the reference, a larger `beta` should emphasize
-        recall.
-
-    References
-    ----------
-    https://arxiv.org/abs/1706.05721
+    Usage with tf.keras API:
+    ```python
+    model = tf.keras.Model(inputs, outputs)
+    model.compile('sgd', loss=nobrainer.losses.Jaccard())
+    ```
     """
-    if labels is None:
-        raise ValueError("labels must not be None.")
-    if predictions is None:
-        raise ValueError("predictions must not be None.")
-    with tf.name_scope(scope, "tversky",
-                       (predictions, labels, weights)) as scope:
-        predictions = tf.to_float(predictions)
-        labels = tf.to_float(labels)
-        predictions.get_shape().assert_is_compatible_with(labels.get_shape())
-        num = tf.reduce_sum(tf.abs(predictions * labels), axis=axis)
-        den = (
-            num
-            + alpha * tf.reduce_sum(predictions * (1 - labels), axis=axis)
-            + beta * tf.reduce_sum((1 - predictions) * labels, axis=axis))
 
-        losses = - tf.reduce_sum((num + _EPSILON) / (den + _EPSILON), axis=-1)
-        return compute_weighted_loss(
-            losses=losses,
-            weights=weights,
-            scope=scope,
-            loss_collection=loss_collection,
-            reduction=reduction)
+    def __init__(self,
+                 axis=(1, 2, 3, 4),
+                 reduction=ReductionV2.SUM_OVER_BATCH_SIZE,
+                 name='jaccard'):
+        super(Jaccard, self).__init__(reduction=reduction, name=name)
+        self.axis = axis
+
+    def call(self, y_true, y_pred):
+        """Calculates the Jaccard loss."""
+        y_pred = tf.convert_to_tensor(y_pred)
+        y_true = tf.cast(y_true, y_pred.dtype)
+        return jaccard(y_true=y_true, y_pred=y_pred, axis=self.axis)
+
+
+def tversky(y_true, y_pred, axis=(1, 2, 3), alpha=0.3, beta=0.7):
+    n_classes = tf.cast(tf.shape(y_pred)[-1], tf.float32)
+    # Scores are in dynamic range of [0, n_classes].
+    scores = metrics.tversky(y_true=y_true, y_pred=y_pred, axis=axis, alpha=alpha, beta=beta)
+    return 1. - (scores / n_classes)
+
+
+class Tversky(Loss):
+    """Computes Tversky loss between labels and predictions.
+
+    Use this loss for binary or multi-class semantic segmentation tasks. The
+    default value for the axis parameter is meant for binary or multi-class
+    predictions. Values in `y_true` and `y_pred` should be in the range [0, 1].
+    The default values for alpha and beta are set according to recommendations
+    in the Tverky loss manuscript.
+
+    Usage with tf.keras API:
+    ```python
+    model = tf.keras.Model(inputs, outputs)
+    model.compile('sgd', loss=nobrainer.losses.Tversky())
+    ```
+    """
+
+    def __init__(self,
+                 axis=(1, 2, 3),
+                 alpha=0.3,
+                 beta=0.7,
+                 reduction=ReductionV2.SUM_OVER_BATCH_SIZE,
+                 name='tversky'):
+        super(Tversky, self).__init__(reduction=reduction, name=name)
+        self.axis = axis
+        self.alpha = alpha
+        self.beta = beta
+
+    def call(self, y_true, y_pred):
+        """Calculates the Jaccard loss."""
+        y_pred = tf.convert_to_tensor(y_pred)
+        y_true = tf.cast(y_true, y_pred.dtype)
+        return tversky(y_true=y_true, y_pred=y_pred, axis=self.axis, alpha=self.alpha, beta=self.beta)
+
+
+def variational(y_true, y_pred, model, n_examples=1, prior_model=None):
+    """"""
+
+    def _maybe_get_layer_attr(model, layer_attribute):
+        """Get a list of values for a particular attribute for each layer in a
+        model.
+        """
+        attr_values = []
+        for layer in model.layers:
+            try:
+                this_val = getattr(layer, layer_attribute)
+                attr_values.append(this_val)
+            except AttributeError:
+                pass
+        return attr_values
+
+    # fuzz factor for numerical stability
+    eps = tf.keras.backend.epsilon()
+
+    # The objects ms and sigmas are lists of tensors.
+    ms = _maybe_get_layer_attr(model, 'kernel_m') \
+            + _maybe_get_layer_attr(model, 'bias_m')
+    sigmas = _maybe_get_layer_attr(model, 'kernel_sigma') \
+            + _maybe_get_layer_attr(model, 'bias_sigma')
+
+    if not ms:
+        raise ValueError(
+            "Could not find any layers with name kernel_m or bias_m. Check if"
+            " you are using a variational network.")
+    if not sigmas:
+        raise ValueError(
+            "Could not find any layers with name kernel_sigma or bias_sigma."
+            " Check if you are using a variational network.")
+
+    # If no priors, initialize mean 0 and sigmas 1.
+    if prior_model is None:
+        ms_prior = [
+            tf.constant(0, dtype=v.dtype, shape=v.shape)
+            for v in ms]
+        # QUESTION: should iterate over sigmas instead of ms? The original
+        # implementation iterates over ms.
+        sigmas_prior = [
+            tf.constant(1, dtype=v.dtype, shape=v.shape)
+            for v in ms]
+    else:
+        # TODO: add priors from existing Keras model.
+        raise NotImplementedError("loss with model priors not implemented yet.")
+
+    # negative log-likelihood
+    nll_loss = tf.reduce_mean(
+        tf.keras.backend.categorical_crossentropy(
+            target=y_true, output=y_pred, from_logits=False))
+
+    l2_loss = tf.add_n(
+        [
+            tf.reduce_sum((tf.square(ms[i] - ms_prior[i])) / ((tf.square(sigmas_prior[i]) + eps) * 2.0))
+            for i, _ in enumerate(ms)],
+        name='l2_loss')
+
+    sigma_squared_loss = tf.add_n(
+        [
+            tf.reduce_sum(tf.square(sigmas[i]) / ((tf.square(sigmas_prior[i]) + eps) * 2.0))
+            for i in range(len(sigmas))],
+        name='sigma_squared_loss')
+
+    log_sigma_loss = tf.add_n(
+        [
+            tf.reduce_sum(tf.log(v + eps)) for v in sigmas],
+        name='log_sigmas_loss')
+
+    loss = nll_loss + (l2_loss + sigma_squared_loss - log_sigma_loss) / float(n_examples)
+
+    return loss
+
+
+class Variational(LossFunctionWrapper):
+    """Computes the loss for a variational model.
+
+    Use this loss for binary of multi-class segmentation.
+    """
+
+    def __init__(self,
+                 model,
+                 n_examples=1,
+                 prior_model=None,
+                 reduction=ReductionV2.SUM_OVER_BATCH_SIZE,
+                 name='variational'):
+        super().__init__(
+            variational, model=model, n_examples=n_examples, prior_model=prior_model)
+
+
+def get(loss):
+    """Wrapper for `tf.keras.losses.get` that includes Nobrainer's losses."""
+    objects = {
+        'dice': dice,
+        'Dice': Dice,
+        'focal': focal,
+        'focal_tversky': focal_tversky,
+        'jaccard': jaccard,
+        'Jaccard': Jaccard,
+        'tversky': tversky,
+        'Tversky': Tversky,
+        'variational': variational,
+        'Variational': Variational,
+    }
+    with tf.keras.utils.CustomObjectScope(objects):
+        return tf.keras.losses.get(loss)
