@@ -4,6 +4,7 @@ import tensorflow as tf
 
 from nobrainer.models.highresnet import highresnet
 from nobrainer.models.meshnet import meshnet
+from nobrainer.models.meshnet import meshnet_vwn
 from nobrainer.models.unet import unet
 
 
@@ -29,6 +30,14 @@ def test_meshnet():
     model_test(meshnet, n_classes=1, input_shape=(1, 32, 32, 32, 1), kwds={'receptive_field': 37})
     model_test(meshnet, n_classes=1, input_shape=(1, 32, 32, 32, 1), kwds={'receptive_field': 67})
     model_test(meshnet, n_classes=1, input_shape=(1, 32, 32, 32, 1), kwds={'receptive_field': 129})
+    with pytest.raises(ValueError):
+        model_test(meshnet, n_classes=1, input_shape=(1, 32, 32, 32, 1), kwds={'receptive_field': 50})
+
+
+def test_meshnet_vwn():
+    model_test(meshnet_vwn, n_classes=1, input_shape=(1, 32, 32, 32, 1), kwds={'receptive_field': 37})
+    model_test(meshnet_vwn, n_classes=1, input_shape=(1, 32, 32, 32, 1), kwds={'receptive_field': 67})
+    model_test(meshnet_vwn, n_classes=1, input_shape=(1, 32, 32, 32, 1), kwds={'receptive_field': 129})
     with pytest.raises(ValueError):
         model_test(meshnet, n_classes=1, input_shape=(1, 32, 32, 32, 1), kwds={'receptive_field': 50})
 
