@@ -108,7 +108,7 @@ def unet(n_classes, input_shape, activation='relu', batchnorm=False, batch_size=
 
     x = layers.Conv3D(filters=n_classes, kernel_size=1)(x)
 
-    final_activation = 'sigmoid' if n_classes <= 2 else 'softmax'
+    final_activation = 'sigmoid' if n_classes == 1 else 'softmax'
     x = layers.Activation(final_activation)(x)
 
     return tf.keras.Model(inputs=inputs, outputs=x, name=name)

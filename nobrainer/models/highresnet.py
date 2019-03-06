@@ -56,7 +56,7 @@ def highresnet(n_classes, input_shape, activation='relu', dropout_rate=0, name='
 
     x = layers.Conv3D(filters=n_classes, kernel_size=(1, 1, 1), padding='same')(x)
 
-    final_activation = 'sigmoid' if n_classes <= 2 else 'softmax'
+    final_activation = 'sigmoid' if n_classes == 1 else 'softmax'
     x = layers.Activation(final_activation)(x)
 
     # QUESTION: where should dropout go?
