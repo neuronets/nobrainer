@@ -3,6 +3,8 @@ import tensorflow as tf
 
 from nobrainer.layers import ZeroPadding3DChannels
 
+tf.enable_eager_execution()
+
 
 def test_zeropadding3dchannels():
     # This test function is a much shorter version of
