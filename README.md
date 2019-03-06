@@ -10,7 +10,7 @@ The Nobrainer project is supported by NIH R01 EB020470 and is distributed under 
 
 ## Guide Jupyter Notebooks [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kaczmarj/nobrainer)
 
-Please refer to the Jupyter notebooks in the [guide]('/guide') directory to get started with _Nobrainer_. [Try them out](https://colab.research.google.com/github/kaczmarj/nobrainer) in Google Collaboratory!
+Please refer to the Jupyter notebooks in the [guide](/guide) directory to get started with _Nobrainer_. [Try them out](https://colab.research.google.com/github/kaczmarj/nobrainer) in Google Collaboratory!
 
 ## Installing Nobrainer
 
