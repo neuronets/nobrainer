@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Keras Bayesian convolution layers.
+"""Keras variational convolution layers, which also incorporate weight
+noramlization. The acronym VWN stands for variational weight normalization.
 
 The layers in this file learn distributions of weights (i.e., the mean and
 variance of Gaussian distributions).
 
-This file has been modified to support nD convolutions with variational weights.
-The original version of this file can be found at
+This file was modified from the standard `tf.keras.layers.convolutional`
+module. The original version of this file can be found at
 https://github.com/tensorflow/tensorflow/blob/507ffd071f0a2af8a9f5678dae225e50479b44c9/tensorflow/python/keras/layers/convolutional.py
 """
 
@@ -41,8 +42,9 @@ from tensorflow.python.ops import nn
 from tensorflow.python.ops import nn_ops
 
 
-class VariationalConv(Layer):
-  """Abstract nD convolution layer (private, used as implementation base).
+class VWNConv(Layer):
+  """Abstract nD variational convolution layer that implements weight
+  normalization (private, used as implementation base).
 
   This layer creates a convolution kernel that is convolved
   (actually cross-correlated) with the layer input to produce a tensor of
@@ -115,7 +117,7 @@ class VariationalConv(Layer):
                trainable=True,
                name=None,
                **kwargs):
-    super(VariationalConv, self).__init__(
+    super(VWNConv, self).__init__(
         trainable=trainable,
         name=name,
         activity_regularizer=regularizers.get(activity_regularizer),
@@ -186,13 +188,12 @@ class VariationalConv(Layer):
         constraint=None,
         trainable=True,
         dtype=self.dtype)
-    # tf.summary.histogram(self.g.name,self.g)
+    tf.summary.histogram(self.g.name, self.g)
     self.v_norm = nn.l2_normalize(
         self.v, [i for i in range(len(self.kernel_size) + 1)])
 
     self.kernel_m = tf.multiply(self.g, self.v_norm, name='kernel_m')
-    # tf.summary.histogram(self.kernel_m.name,self.kernel_m)
-    # tf.add_to_collection('ms',self.kernel_m)
+    tf.summary.histogram(self.kernel_m.name, self.kernel_m)
     self.kernel_a = self.add_weight(
         name='kernel_a',
         shape=kernel_shape,
@@ -201,11 +202,10 @@ class VariationalConv(Layer):
         constraint=None,
         trainable=True,
         dtype=self.dtype)
-    # tf.summary.histogram(self.kernel_a.name,self.kernel_a)
+    tf.summary.histogram(self.kernel_a.name, self.kernel_a)
     self.kernel_sigma = tf.abs(self.kernel_a, name='kernel_sigma')
-    # tf.summary.histogram(self.kernel_sigma.name,self.kernel_sigma)
-    # tf.add_to_collection('sigmas',self.kernel_sigma)
-    # tf.summary.scalar(self.kernel_sigma.name, tf.reduce_mean(self.kernel_sigma))
+    tf.summary.histogram(self.kernel_sigma.name, self.kernel_sigma)
+    tf.summary.scalar(self.kernel_sigma.name, tf.reduce_mean(self.kernel_sigma))
     self.kernel = self.kernel_m
 
     if self.use_bias:
@@ -217,8 +217,7 @@ class VariationalConv(Layer):
             constraint=self.bias_constraint,
             trainable=True,
             dtype=self.dtype)
-        # tf.summary.histogram(self.bias_m.name,self.bias_m)
-        # tf.add_to_collection('ms',self.bias_m)
+        tf.summary.histogram(self.bias_m.name, self.bias_m)
         self.bias_a = self.add_weight(
             name='bias_a',
             shape=(self.filters,),
@@ -227,9 +226,9 @@ class VariationalConv(Layer):
             constraint=None,
             trainable=True,
             dtype=self.dtype)
-        tf.summary.histogram(self.bias_a.name,self.bias_a)
+        tf.summary.histogram(self.bias_a.name, self.bias_a)
         self.bias_sigma = tf.abs(self.bias_a, name='bias_sigma')
-        tf.summary.histogram(self.bias_sigma.name,self.bias_sigma)
+        tf.summary.histogram(self.bias_sigma.name, self.bias_sigma)
         # tf.add_to_collection('sigmas',self.bias_sigma)
         tf.summary.scalar(self.bias_sigma.name, tf.reduce_mean(self.bias_sigma))
         self.bias = self.bias_m
@@ -266,13 +265,12 @@ class VariationalConv(Layer):
     # This performs two convolution operations
     outputs_mean = self._convolution_op(inputs, self.kernel_m)
     outputs_var = self._convolution_op(tf.square(inputs), tf.square(self.kernel_sigma))
-    outputs_e = tf.random_normal(shape=tf.shape(self.g), dtype=self.dtype)
-
-    def apply_variational_dropout():
-      return outputs_mean + tf.sqrt(outputs_var + backend.epsilon()) * outputs_e
 
     if self.use_bias:
       if self.data_format == 'channels_first':
+        # TODO: test the channels first implementation.
+        raise NotImplementedError(
+            "The data format 'channels_first' is not supported yet.")
         if self.rank == 1:
           # nn.bias_add does not accept a 1D input tensor.
           bias_m = array_ops.reshape(self.bias_m, (1, self.filters, 1))
@@ -288,7 +286,23 @@ class VariationalConv(Layer):
         # outputs = nn.bias_add(outputs, self.bias, data_format='NHWC')
         outputs_mean = nn.bias_add(outputs_mean, self.bias_m, data_format='NHWC')
         outputs_var = nn.bias_add(outputs_var, tf.square(self.bias_sigma), data_format='NHWC')
-    outputs = tf.cond(self.is_mc, apply_variational_dropout, lambda: outputs_mean)
+
+    def apply_variational_approximation():
+      # The value rand allows us to sample a random value from our learned
+      # distribution.
+      rand = tf.random_normal(shape=tf.shape(self.g), dtype=self.dtype)
+      return outputs_mean + tf.sqrt(outputs_var + backend.epsilon()) * rand
+
+    # If is_mc is true, we sample a weight from the learned gaussian
+    # distribution. If not, we choose the most likely weight (i.e., the mean
+    # of the distribution). A side effect of this, though, is that we always
+    # have to do two convolutional operations (one for mean and the other for
+    # variance).
+    outputs = tf.cond(
+        self.is_mc,
+        true_fn=apply_variational_approximation,
+        false_fn=lambda: outputs_mean)
+
     if self.activation is not None:
       return self.activation(outputs)
     return outputs
@@ -342,7 +356,7 @@ class VariationalConv(Layer):
         'bias_constraint': constraints.serialize(self.bias_constraint),
         # TODO (kaczmarj): add is_mc and a_initializer.
     }
-    base_config = super(VariationalConv, self).get_config()
+    base_config = super(VWConv, self).get_config()
     return dict(list(base_config.items()) + list(config.items()))
 
   def _compute_causal_padding(self):
@@ -355,10 +369,9 @@ class VariationalConv(Layer):
     return causal_padding
 
 
-# QUESTION (kaczmarj): what happens if we do this... maybe change it ConvMC ?
-# @keras_export('keras.layers.Conv1D', 'keras.layers.Convolution1D')
-class VariationalConv1D(VariationalConv):
-  """1D convolution layer (e.g. temporal convolution).
+class VWNConv1D(VWNConv):
+  """1D variational convolution layer that implements weight normalization
+  (e.g. temporal convolution).
 
   This layer creates a convolution kernel that is convolved
   with the layer input over a single spatial (or temporal) dimension
@@ -436,7 +449,7 @@ class VariationalConv1D(VariationalConv):
                kernel_constraint=None,
                bias_constraint=None,
                **kwargs):
-    super(VariationalConv1D, self).__init__(
+    super(VWNConv1D, self).__init__(
         rank=1,
         filters=filters,
         kernel_size=kernel_size,
@@ -459,12 +472,12 @@ class VariationalConv1D(VariationalConv):
   def call(self, inputs):
     if self.padding == 'causal':
       inputs = array_ops.pad(inputs, self._compute_causal_padding())
-    return super(VariationalConv1D, self).call(inputs)
+    return super(VWNConv1D, self).call(inputs)
 
 
-# @keras_export('keras.layers.Conv2D', 'keras.layers.Convolution2D')
-class VariationalConv2D(VariationalConv):
-  """2D convolution layer (e.g. spatial convolution over images).
+class VWNConv2D(VWNConv):
+  """2D variational convolution layer that implements weight normalization
+  (e.g. spatial convolution over images).
 
   This layer creates a convolution kernel that is convolved
   with the layer input to produce a tensor of
@@ -556,7 +569,7 @@ class VariationalConv2D(VariationalConv):
                kernel_constraint=None,
                bias_constraint=None,
                **kwargs):
-    super(VariationalConv2D, self).__init__(
+    super(VWNConv2D, self).__init__(
         rank=2,
         filters=filters,
         kernel_size=kernel_size,
@@ -577,9 +590,9 @@ class VariationalConv2D(VariationalConv):
         **kwargs)
 
 
-# @keras_export('keras.layers.Conv3D', 'keras.layers.Convolution3D')
-class VariationalConv3D(VariationalConv):
-  """3D convolution layer (e.g. spatial convolution over volumes).
+class VWNConv3D(VWNConv):
+  """3D variational convolution layer that implements weight normalization
+  (e.g. spatial convolution over volumes).
 
   This layer creates a convolution kernel that is convolved
   with the layer input to produce a tensor of
@@ -678,7 +691,7 @@ class VariationalConv3D(VariationalConv):
                kernel_constraint=None,
                bias_constraint=None,
                **kwargs):
-    super(VariationalConv3D, self).__init__(
+    super(VWNConv3D, self).__init__(
         rank=3,
         filters=filters,
         kernel_size=kernel_size,
@@ -700,7 +713,6 @@ class VariationalConv3D(VariationalConv):
 
 
 # Aliases
-
-VariationalConvolution1D = VariationalConv1D
-VariationalConvolution2D = VariationalConv2D
-VariationalConvolution3D = VariationalConv3D
+VariationalWeightNormConvolution1D = VWNConv1D
+VariationalWeightNormConvolution2D = VWNConv2D
+VariationalWeightNormConvolution3D = VWNConv3D
