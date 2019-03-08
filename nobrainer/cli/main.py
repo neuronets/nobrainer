@@ -10,6 +10,7 @@ import sys
 import click
 import nibabel as nib
 import numpy as np
+import skimage
 import tensorflow as tf
 
 from nobrainer import __version__
@@ -135,6 +136,26 @@ def predict(*, infile, outfile, model, block_shape, verbose):
             "Output file already exists. Will not overwrite {}".format(outfile))
 
     x, affine = _read_volume(infile, dtype=np.float32, return_affine=True)
+    if x.ndim != 3:
+        raise ValueError("Input volume must be rank 3, got rank {}".format(x.ndim))
+    original_shape = x.shape
+    # TODO: make this more general. For now, all of our models are trained on
+    # blocks with dimensions 128x128x128, which are taken easily from a volume
+    # with dimensions 256x256x256.
+    required_shape = (256, 256, 256)
+    must_resize = False
+    if x.shape != required_shape:
+        must_resize = True
+        if verbose:
+            click.echo("Resizing volume from shape {} to shape {}".format(x.shape, required_shape))
+        x = skimage.transform.resize(
+            x,
+            output_shape=required_shape,
+            order=1,  # linear
+            mode='constant',
+            preserve_range=True,
+            anti_aliasing=False)
+
     x = _standardize_numpy(x)
     x_blocks = _to_blocks_numpy(x, block_shape=block_shape)
     x_blocks = x_blocks[..., None]  # Add grayscale channel.
@@ -154,6 +175,17 @@ def predict(*, infile, outfile, model, block_shape, verbose):
         y_blocks = y_blocks.argmax(-1)
 
     y = _from_blocks_numpy(y_blocks, x.shape)
+
+    if must_resize:
+        if verbose:
+            click.echo("Resizing volume from shape {} to shape {}".format(y.shape, original_shape))
+        y = skimage.transform.resize(
+            y,
+            output_shape=original_shape,
+            order=0,  # nearest neighbor
+            mode='constant',
+            preserve_range=True,
+            anti_aliasing=False)
 
     img = nib.spatialimages.SpatialImage(y.astype(np.int32), affine=affine)
     nib.save(img, outfile)
