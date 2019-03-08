@@ -471,3 +471,93 @@ def get_steps_per_epoch(n_volumes, volume_shape, block_shape, batch_size):
     steps = n_blocks_per_volume * n_volumes / batch_size
     steps = math.ceil(steps)
     return steps
+
+
+# Below this line, we implement methods similar to those above but using Numpy.
+# This is particularly useful when we use models to predict, because it is
+# usually more pleasant to predict on Numpy arrays.
+
+
+def standardize_numpy(a):
+    """Standard score array.
+
+    Implements `(x - mean(x)) / stdev(x)`.
+
+    Parameters
+    ----------
+    x: array, values to standardize.
+
+    Returns
+    -------
+    Array of standardized values. Output has mean 0 and standard deviation 1.
+    """
+    a = np.asarray(a)
+    return (a - a.mean()) / a.std()
+
+
+def from_blocks_numpy(a, output_shape):
+    """Combine 4D array of non-overlapping blocks `a` into 3D array of shape
+    `output_shape`.
+
+    For the reverse of this function, see `to_blocks_numpy`.
+
+    Parameters
+    ----------
+    a: array-like, 4D array of blocks with shape (N, *block_shape), where N is
+        the number of blocks.
+    output_shape: tuple of len 3, shape of the combined array.
+
+    Returns
+    -------
+    Rank 3 array with shape `output_shape`.
+    """
+    a = np.asarray(a)
+
+    if a.ndim != 4:
+        raise ValueError("This function only works for 4D arrays.")
+    if len(output_shape) != 3:
+        raise ValueError("output_shape must have three values.")
+
+    n_blocks = a.shape[0]
+    block_shape = a.shape[1:]
+    ncbrt = np.cbrt(n_blocks).round(6)
+    if not ncbrt.is_integer():
+        raise ValueError("Cubed root of number of blocks is not an integer")
+    ncbrt = int(ncbrt)
+    intershape = (ncbrt, ncbrt, ncbrt, *block_shape)
+
+    return (
+        a.reshape(intershape)
+        .transpose((0, 3, 1, 4, 2, 5))
+        .reshape(output_shape))
+
+
+def to_blocks_numpy(a, block_shape):
+    """Return new array of non-overlapping blocks of shape `block_shape` from
+    array `a`.
+
+    For the reverse of this function (blocks to array), see `from_blocks_numpy`.
+
+    Parameters
+    ----------
+    a: array-like, 3D array to block
+    block_shape: tuple of len 3, shape of non-overlapping blocks.
+
+    Returns
+    -------
+    Rank 4 array with shape `(N, *block_shape)`, where N is the number of
+    blocks.
+    """
+    a = np.asarray(a)
+    orig_shape = np.asarray(a.shape)
+
+    if a.ndim != 3:
+        raise ValueError("This function only supports 3D arrays.")
+    if len(block_shape) != 3:
+        raise ValueError("block_shape must have three values.")
+
+    blocks = orig_shape // block_shape
+    inter_shape = tuple(e for tup in zip(blocks, block_shape) for e in tup)
+    new_shape = (-1,) + block_shape
+    perm = (0, 2, 4, 1, 3, 5)
+    return a.reshape(inter_shape).transpose(perm).reshape(new_shape)
