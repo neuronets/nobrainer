@@ -2,21 +2,28 @@
 
 import inspect
 import json
+import logging
 import os
 import pprint
 import sys
 
 import click
+import nibabel as nib
+import numpy as np
 import tensorflow as tf
 
 from nobrainer import __version__
 from nobrainer.io import convert as _convert
 from nobrainer.io import verify_features_labels as _verify_features_labels
 from nobrainer.io import read_csv as _read_csv
+from nobrainer.io import read_volume as _read_volume
 from nobrainer.losses import get as _get_loss
 from nobrainer.training import train as _train
+from nobrainer.volume import from_blocks_numpy as _from_blocks_numpy
 from nobrainer.volume import get_dataset as _get_dataset
 from nobrainer.volume import get_steps_per_epoch as _get_steps_per_epoch
+from nobrainer.volume import standardize_numpy as _standardize_numpy
+from nobrainer.volume import to_blocks_numpy as _to_blocks_numpy
 
 
 _option_kwds = {
@@ -108,10 +115,50 @@ def merge():
 
 
 @cli.command()
-def predict():
-    """Predict labels from features using a trained model."""
-    click.echo("Not implemented yet. In the future, this command will be used for prediction.")
-    sys.exit(-2)
+@click.argument('infile')
+@click.argument('outfile')
+@click.option('-m', '--model', type=click.Path(exists=True), required=True, help='Path to model HDF5 file.', **_option_kwds)
+@click.option('-b', '--block-shape', default=(128, 128, 128), type=int, nargs=3, help='Shape of sub-volumes on which to predict.', **_option_kwds)
+@click.option('-v', '--verbose', is_flag=True, help='Print progress bar.', **_option_kwds)
+def predict(*, infile, outfile, model, block_shape, verbose):
+    """Predict labels from features using a trained model.
+
+    The predictions are saved to OUTFILE.
+    """
+
+    # Supress most logging messages.
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    tf.get_logger().setLevel(logging.ERROR)
+
+    if os.path.exists(outfile):
+        raise FileExistsError(
+            "Output file already exists. Will not overwrite {}".format(outfile))
+
+    x, affine = _read_volume(infile, dtype=np.float32, return_affine=True)
+    x = _standardize_numpy(x)
+    x_blocks = _to_blocks_numpy(x, block_shape=block_shape)
+    x_blocks = x_blocks[..., None]  # Add grayscale channel.
+
+    model = tf.keras.models.load_model(model, compile=False)
+    if verbose:
+        click.echo("Predicting ...")
+    y_blocks = model.predict(x_blocks, batch_size=1, verbose=verbose)
+
+    # Binarize segmentation.
+    y_blocks = y_blocks > 0.3
+
+    # Collapse the last dimension, depending on number of output classes.
+    if y_blocks.shape[-1] == 1:
+        y_blocks = y_blocks.squeeze(-1)
+    else:
+        y_blocks = y_blocks.argmax(-1)
+
+    y = _from_blocks_numpy(y_blocks, x.shape)
+
+    img = nib.spatialimages.SpatialImage(y.astype(np.int32), affine=affine)
+    nib.save(img, outfile)
+    if verbose:
+        click.echo("Output saved to {}".format(outfile))
 
 
 @cli.command()
@@ -242,6 +289,6 @@ def evaluate():
     sys.exit(-2)
 
 
-# TODO: For debugging only.
+# For debugging only.
 if __name__ == '__main__':
     cli()
