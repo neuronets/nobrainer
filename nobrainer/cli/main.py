@@ -127,9 +127,10 @@ def predict(*, infile, outfile, model, block_shape, verbose):
     The predictions are saved to OUTFILE.
     """
 
-    # Supress most logging messages.
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-    tf.get_logger().setLevel(logging.ERROR)
+    if not verbose:
+        # Supress most logging messages.
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+        tf.get_logger().setLevel(logging.ERROR)
 
     if os.path.exists(outfile):
         raise FileExistsError(
