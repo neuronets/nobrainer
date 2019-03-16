@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.com/kaczmarj/nobrainer.svg?branch=master)](https://travis-ci.com/kaczmarj/nobrainer)
 
-Nobrainer is a deep learning framework for 3D image processing. It implements several 3D convolutional models from recent literature, methods for loading and augmenting volumetric data than can be used with any TensorFlow or Keras model, losses and metrics for 3D data, and simple utilities for model training, evaluation, prediction, and transfer learning.
+Nobrainer is a deep learning framework for 3D image processing. It implements several 3D convolutional models from recent literature, methods for loading and augmenting volumetric data that can be used with any TensorFlow or Keras model, losses and metrics for 3D data, and simple utilities for model training, evaluation, prediction, and transfer learning.
 
 Soon, Nobrainer will also provide pre-trained models for brain extraction, brain segmentation, and other tasks.
 
