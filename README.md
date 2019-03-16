@@ -2,11 +2,11 @@
 
 [![Build Status](https://travis-ci.com/kaczmarj/nobrainer.svg?branch=master)](https://travis-ci.com/kaczmarj/nobrainer)
 
-Nobrainer is a deep learning framework for 3D image processing. It implements several 3D convolutional models from recent literature, methods for loading and augmenting volumetric data that can be used with any TensorFlow or Keras model, losses and metrics for 3D data, and simple utilities for model training, evaluation, prediction, and transfer learning.
+_Nobrainer_ is a deep learning framework for 3D image processing. It implements several 3D convolutional models from recent literature, methods for loading and augmenting volumetric data that can be used with any TensorFlow or Keras model, losses and metrics for 3D data, and simple utilities for model training, evaluation, prediction, and transfer learning.
 
-Soon, Nobrainer will also provide pre-trained models for brain extraction, brain segmentation, and other tasks.
+Soon, _Nobrainer_ will also provide pre-trained models for brain extraction, brain segmentation, and other tasks.
 
-The Nobrainer project is supported by NIH R01 EB020470 and is distributed under the Apache 2.0 license.
+The _Nobrainer_ project is supported by NIH R01 EB020470 and is distributed under the Apache 2.0 license.
 
 ## Guide Jupyter Notebooks [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kaczmarj/nobrainer)
 
@@ -16,10 +16,22 @@ Please refer to the Jupyter notebooks in the [guide](/guide) directory to get st
 
 ### Container
 
-We recommend using the official _Nobrainer_ Docker container, which includes all of the dependencies necessary to use the framework.
+We recommend using the official _Nobrainer_ Docker container, which includes all of the dependencies necessary to use the framework. Please see the available images on [DockerHub](https://hub.docker.com/r/kaczmarj/nobrainer)
+
+#### GPU support
+
+The _Nobrainer_ containers with GPU support use CUDA 10, which requires Linux NVIDIA drivers `>=410.48`.
 
 ```
-$ docker pull kaczmarj/nobrainer
+$ docker pull kaczmarj/nobrainer:latest-gpu
+$ singularity pull docker://kaczmarj/nobrainer:latest-gpu
+```
+
+#### CPU only
+
+```
+$ docker pull kaczmarj/nobrainer:latest
+$ singularity pull docker://kaczmarj/nobrainer:latest
 ```
 
 ### pip
@@ -43,4 +55,4 @@ $ pip install --no-cache-dir nobrainer[gpu]
 
 ## Questions or issues
 
-If you have questions about Nobrainer or encounter any issues using the framework, please submit a GitHub issue. If you have a feature request, we encourage you to submit a pull request.
+If you have questions about _Nobrainer_ or encounter any issues using the framework, please submit a GitHub issue. If you have a feature request, we encourage you to submit a pull request.
