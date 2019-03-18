@@ -173,6 +173,7 @@ def binarize(x):
     -------
     Tensor of binarized values.
     """
+    x = tf.convert_to_tensor(x)
     return tf.cast(x > 0, dtype=x.dtype)
 
 
@@ -192,6 +193,7 @@ def replace(x, mapping, zero=True):
     -------
     Modified tensor.
     """
+    x = tf.convert_to_tensor(x, dtype=tf.int32)
     keys = tf.convert_to_tensor(list(mapping.keys()))
     vals = tf.convert_to_tensor(list(mapping.values()))
 
@@ -199,15 +201,19 @@ def replace(x, mapping, zero=True):
     sidx = tf.argsort(keys)
     ks = tf.gather(keys, sidx)
     vs = tf.gather(vals, sidx)
-    idx = tf.searchsorted(keys, x)
+
+    idx = tf.searchsorted(ks, tf.reshape(x, (-1,)))
+    idx = tf.reshape(idx, x.shape)
 
     # Zero values that are equal to len(vs).
-    idx = tf.multiply(idx, tf.to_int32(idx != len(vs)))
-    mask = tf.gather(ks, idx) == x
+    idx = tf.multiply(idx, tf.cast(tf.not_equal(idx, len(vs)), tf.int32))
+    mask = tf.equal(tf.gather(ks, idx), x)
     out = tf.where(mask, tf.gather(vs, idx), x)
 
     if zero:
-        raise NotImplementedError("")
+        # Zero values in the data array that are not in the mapping values.
+        mask = tf.reduce_any(tf.equal(tf.expand_dims(out, -1), tf.expand_dims(vals, 0)), -1)
+        out = tf.multiply(out, tf.cast(mask, tf.int32))
 
     return out
 
@@ -225,12 +231,15 @@ def standardize(x):
     -------
     Tensor of standardized values. Output has mean 0 and standard deviation 1.
     """
+    x = tf.convert_to_tensor(x)
+    if x.dtype != tf.float64:
+        x = tf.cast(x, tf.float32)
     mean, var = tf.nn.moments(x, axes=None)
     std = tf.sqrt(var)
     return (x - mean) / std
 
 
-def to_blocks(x, volume_shape, block_shape):
+def to_blocks(x, block_shape):
     """Split tensor into non-overlapping blocks of shape `block_shape`.
 
     For the reverse of this function, see `from_blocks`.
@@ -244,6 +253,7 @@ def to_blocks(x, volume_shape, block_shape):
     -------
     Tensor with shape `(n_blocks, *block_shape)`.
     """
+    x = tf.convert_to_tensor(x)
     volume_shape = np.array(x.shape)
 
     if isinstance(block_shape, int) == 1:
@@ -280,9 +290,10 @@ def from_blocks(x, output_shape):
     -------
     Tensor with shape `output_shape`.
     """
+    x = tf.convert_to_tensor(x)
     n_blocks = x.shape[0]
     block_shape = x.shape[1:]
-    cbrt = np.cbrt(n_blocks).round(6)
+    ncbrt = np.cbrt(n_blocks).round(6)
     if not ncbrt.is_integer():
         raise ValueError("Cubed root of number of blocks is not an integer")
     ncbrt = int(ncbrt)
