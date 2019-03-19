@@ -97,8 +97,11 @@ def get_dataset(file_pattern, n_classes, batch_size, volume_shape,
     datset = dataset.prefetch(buffer_size=batch_size)
 
     # Batch the dataset, so each iteration gives `batch_size` elements. We drop
-    # the remainder so that when training on multiple GPUs,
-    dataset = dataset.batch(batch_size=batch_size, drop_remainder=True)
+    # the remainder so that when training on multiple GPUs, the batch will
+    # always be evenly divisible by the number of GPUs. Otherwise, the last
+    # batch might have fewer than `batch_size` elements and will cause errors.
+    if batch_size is not None:
+        dataset = dataset.batch(batch_size=batch_size, drop_remainder=True)
 
     # Optionally shuffle. We also optionally shuffle the list of files.
     # The TensorFlow recommend shuffling and then repeating.
