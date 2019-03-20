@@ -120,46 +120,23 @@ def apply_random_transform(features, labels):
     interpolated trilinearly, and labels are interpolated with nearest
     neighbors.
     """
+    if len(features.shape) != 3 or len(labels.shape) != 3:
+        raise ValueError("features and labels must be rank 3")
+    if features.shape != labels.shape:
+        raise ValueError("shape of features and labels must be the same.")
     # Rotate -180 degrees to 180 degrees in three dimensions.
     rotation = tf.random.uniform(
         shape=[3], minval=-np.pi, maxval=np.pi, dtype=tf.float32)
 
     # Translate at most 5% in any direction, so there's less chance of
     # important data going out of view.
-    maxval = 0.05 * features.shape[0].value
+    maxval = 0.05 * features.shape[0]
     translation = tf.random.uniform(
         shape=[3], minval=-maxval, maxval=maxval, dtype=tf.float32)
 
-    volume_shape = np.asarray([s.value for s in features.shape])
+    volume_shape = np.asarray(features.shape)
     matrix = get_affine(volume_shape=volume_shape, rotation=rotation, translation=translation)
     return warp_features_labels(features=features, labels=labels, matrix=matrix)
-
-
-def apply_random_transform_dataset(features, labels):
-    """Apply a random rigid transformation to `features` and `labels`.
-
-    The same transformation is applied to features and labels. Features are
-    interpolated trilinearly, and labels are interpolated with nearest
-    neighbors.
-
-    Returns
-    -------
-    `tf.data.Dataset` of randomly transformed features and labels.
-    """
-    # Rotate -180 degrees to 180 degrees in three dimensions.
-    rotation = tf.random.uniform(
-        shape=[3], minval=-np.pi, maxval=np.pi, dtype=tf.float32)
-
-    # Translate at most 5% in any direction, so there's less chance of
-    # important data going out of view.
-    maxval = 0.05 * features.shape[0].value
-    translation = tf.random.uniform(
-        shape=[3], minval=-maxval, maxval=maxval, dtype=tf.float32)
-
-    volume_shape = np.asarray([s.value for s in features.shape])
-    matrix = get_affine(volume_shape=volume_shape, rotation=rotation, translation=translation)
-    x, y = warp_features_labels(features=features, labels=labels, matrix=matrix)
-    return tf.data.Dataset.from_tensor_slices((x, y))
 
 
 def binarize(x):
