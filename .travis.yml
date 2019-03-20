@@ -2,7 +2,10 @@ dist: xenial
 language: python
 python:
   - "3.6"
+branches:
+  only:
+    - master
 install:
   - pip install --no-cache-dir --editable=".[dev]" tf-nightly
 script:
-  - pytest --cov=nobrainer nobrainer
+  - pytest --verbose --cov=nobrainer nobrainer
