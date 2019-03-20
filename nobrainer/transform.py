@@ -92,11 +92,11 @@ def get_affine(volume_shape, rotation=[0, 0, 0], translation=[0, 0, 0]):
     volume_shape = tf.cast(volume_shape, tf.float32)
     rotation = tf.cast(rotation, tf.float32)
     translation = tf.cast(translation, tf.float32)
-    if volume_shape.shape[0].value != 3:
+    if volume_shape.shape[0] != 3:
         raise ValueError("`volume_shape` must have three values")
-    if rotation.shape[0].value != 3:
+    if rotation.shape[0] != 3:
         raise ValueError("`rotation` must have three values")
-    if translation.shape[0].value != 3:
+    if translation.shape[0] != 3:
         raise ValueError("`translation` must have three values")
 
     # ROTATION
@@ -181,8 +181,7 @@ def _get_coordinates(volume_shape):
     if len(volume_shape) != 3:
         raise ValueError("shape must have 3 items.")
     dtype = tf.float32
-    # rows, cols, depth = np.array(volume_shape)
-    rows, cols, depth = [s.value for s in volume_shape]
+    rows, cols, depth = volume_shape
 
     out = tf.meshgrid(
         tf.range(rows, dtype=dtype),
@@ -281,7 +280,12 @@ def _get_voxels(volume, coords):
     x = tf.cast(volume, tf.float32)
     coords = tf.cast(coords, tf.float32)
 
-    rows, cols, depth = [s.value for s in x.shape]
+    if len(x.shape) != 3:
+        raise ValueError("`volume` must be rank 3")
+    if len(coords.shape) != 2 or coords.shape[1] != 3:
+        raise ValueError("`coords` must have shape `(N, 3)`.")
+
+    rows, cols, depth = x.shape
 
     # Points in flattened array representation.
     fcoords = coords[:, 0] * cols * depth + coords[:, 1] * depth + coords[:, 2]
