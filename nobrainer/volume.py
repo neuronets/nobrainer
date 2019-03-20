@@ -173,7 +173,7 @@ def replace(x, mapping, zero=True):
     -------
     Modified tensor.
     """
-    x = tf.convert_to_tensor(x, dtype=tf.int32)
+    x = tf.cast(x, dtype=tf.int32)
     keys = tf.convert_to_tensor(list(mapping.keys()))
     vals = tf.convert_to_tensor(list(mapping.values()))
 
@@ -341,8 +341,7 @@ def _get_preprocess_fn(n_classes, block_shape=None, mapping=None, augment=False)
 
 
 def _preprocess_binary(features, labels, n_classes=1, block_shape=None):
-    """Creates a `Dataset` of `features` and `labels` preprocessed for binary
-    segmentation.
+    """Preprocesses `features` and `labels` for binary segmentation.
 
     Features are standard-scored (mean 0 and standard deviation of 1). Labels
     are binarized (i.e., values above 0 are set to 1). Then, non-overlapping
@@ -370,7 +369,7 @@ def _preprocess_binary(features, labels, n_classes=1, block_shape=None):
     x = tf.convert_to_tensor(x)
     x = standardize(x)
     if block_shape is not None:
-        x = to_blocks(x, volume_shape=x.shape, block_shape=block_shape)
+        x = to_blocks(x, block_shape=block_shape)
     else:
         x = tf.expand_dims(x, axis=0)
     x = tf.expand_dims(x, axis=-1)  # Add grayscale channel.
@@ -378,13 +377,13 @@ def _preprocess_binary(features, labels, n_classes=1, block_shape=None):
     y = tf.convert_to_tensor(y)
     y = binarize(y)
     if block_shape is not None:
-        y = to_blocks(y, volume_shape=y.shape, block_shape=block_shape)
+        y = to_blocks(y, block_shape=block_shape)
     else:
         y = tf.expand_dims(y, axis=0)
     if n_classes == 1:
         y = tf.expand_dims(y, axis=-1)
     elif n_classes == 2:
-        y = tf.one_hot(tf.to_int32(y), n_classes, dtype=tf.float32)
+        y = tf.one_hot(tf.cast(y, tf.int32), n_classes, dtype=tf.float32)
     else:
         raise ValueError("`n_classes` must be 1 or 2 for binary segmentation.")
 
@@ -392,8 +391,7 @@ def _preprocess_binary(features, labels, n_classes=1, block_shape=None):
 
 
 def _preprocess_multiclass(features, labels, n_classes, block_shape=None, mapping=None):
-    """Creates a `Dataset` of `features` and `labels` preprocessed for
-    multiclass segmentation.
+    """Preprocesses `features` and `labels` for multiclass segmentation.
 
     Features are standard-scored (mean 0 and standard deviation of 1). If a
     mapping is provided, values in labels are replaced according to the mapping.
@@ -429,7 +427,7 @@ def _preprocess_multiclass(features, labels, n_classes, block_shape=None, mappin
     x = tf.convert_to_tensor(x)
     x = standardize(x)
     if block_shape is not None:
-        x = to_blocks(x, volume_shape=x.shape, block_shape=block_shape)
+        x = to_blocks(x, block_shape=block_shape)
     else:
         x = tf.expand_dims(x, axis=0)
     x = tf.expand_dims(x, axis=-1)  # Add grayscale channel.
@@ -438,11 +436,11 @@ def _preprocess_multiclass(features, labels, n_classes, block_shape=None, mappin
     if mapping is not None:
         y = replace(y, mapping=mapping)
     if block_shape is not None:
-        y = to_blocks(y, volume_shape=y.shape, block_shape=block_shape)
+        y = to_blocks(y, block_shape=block_shape)
     else:
         y = tf.expand_dims(y, axis=0)
 
-    y = tf.one_hot(tf.to_int32(y), n_classes, dtype=tf.float32)
+    y = tf.one_hot(tf.cast(y, tf.int32), n_classes, dtype=tf.float32)
     return x, y
 
 
