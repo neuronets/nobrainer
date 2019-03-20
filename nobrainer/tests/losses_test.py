@@ -40,9 +40,9 @@ def test_dice():
     dices = np.empty(x.shape[0])
     for i in range(x.shape[0]):
         dices[i] = scipy.spatial.distance.dice(x[i].flatten(), y[i].flatten())
-    assert_allclose(losses.dice(x, y, axis=(1, 2, 3, 4)), dices)
-    assert_allclose(losses.Dice(axis=(1, 2, 3, 4))(x, y), dices.mean())
-    assert_allclose(losses.Dice(axis=(1, 2, 3, 4))(y, x), dices.mean())
+    assert_allclose(losses.dice(x, y, axis=(1, 2, 3, 4)), dices, rtol=1e-05)
+    assert_allclose(losses.Dice(axis=(1, 2, 3, 4))(x, y), dices.mean(), rtol=1e-05)
+    assert_allclose(losses.Dice(axis=(1, 2, 3, 4))(y, x), dices.mean(), rtol=1e-05)
 
 
 def test_generalized_dice():
