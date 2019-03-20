@@ -19,6 +19,7 @@ from nobrainer.io import verify_features_labels as _verify_features_labels
 from nobrainer.io import read_csv as _read_csv
 from nobrainer.io import read_volume as _read_volume
 from nobrainer.losses import get as _get_loss
+from nobrainer.prediction import _transform_and_predict
 from nobrainer.training import train as _train
 from nobrainer.utils import _get_all_cpus
 from nobrainer.volume import from_blocks_numpy as _from_blocks_numpy
@@ -123,8 +124,12 @@ def merge():
 @click.argument('outfile')
 @click.option('-m', '--model', type=click.Path(exists=True), required=True, help='Path to model HDF5 file.', **_option_kwds)
 @click.option('-b', '--block-shape', default=(128, 128, 128), type=int, nargs=3, help='Shape of sub-volumes on which to predict.', **_option_kwds)
+@click.option('-r', '--resize-features-to', default=(256, 256, 256), type=int, nargs=3, help='Resize features to this size before taking blocks and predicting.', **_option_kwds)
+@click.option('-t', '--threshold', type=float, default=0.3, help='Threshold used to binarize model output. Only used in binary prediction and must be in (0, 1).', **_option_kwds)
+@click.option('-l', '--largest-label', is_flag=True, help='Zero out all values not connected to the largest contiguous label (not including 0 values). This remove false positives in binary prediction.', **_option_kwds)
+@click.option('--rotate-and-predict', is_flag=True, help='Average the prediction with a prediction on a rotated (and subsequently un-rotated) volume. This can produce a better overall prediction.', **_option_kwds)
 @click.option('-v', '--verbose', is_flag=True, help='Print progress bar.', **_option_kwds)
-def predict(*, infile, outfile, model, block_shape, verbose):
+def predict(*, infile, outfile, model, block_shape, resize_features_to, threshold, largest_label, rotate_and_predict, verbose):
     """Predict labels from features using a trained model.
 
     The predictions are saved to OUTFILE.
@@ -143,10 +148,7 @@ def predict(*, infile, outfile, model, block_shape, verbose):
     if x.ndim != 3:
         raise ValueError("Input volume must be rank 3, got rank {}".format(x.ndim))
     original_shape = x.shape
-    # TODO: make this more general. For now, all of our models are trained on
-    # blocks with dimensions 128x128x128, which are taken easily from a volume
-    # with dimensions 256x256x256.
-    required_shape = (256, 256, 256)
+    required_shape = resize_features_to
     must_resize = False
     if x.shape != required_shape:
         must_resize = True
@@ -167,18 +169,45 @@ def predict(*, infile, outfile, model, block_shape, verbose):
     model = tf.keras.models.load_model(model, compile=False)
     if verbose:
         click.echo("Predicting ...")
-    y_blocks = model.predict(x_blocks, batch_size=1, verbose=verbose)
-
-    # Binarize segmentation.
-    y_blocks = y_blocks > 0.3
+    try:
+        y_blocks = model.predict(x_blocks, batch_size=1, verbose=verbose)
+    except Exception:
+        click.echo(
+            click.style("ERROR: prediction failed. See error trace.", fg='red'))
+        raise
 
     # Collapse the last dimension, depending on number of output classes.
-    if y_blocks.shape[-1] == 1:
+    is_binary_prediction = y_blocks.shape[-1] == 1
+    if is_binary_prediction:
         y_blocks = y_blocks.squeeze(-1)
     else:
         y_blocks = y_blocks.argmax(-1)
 
     y = _from_blocks_numpy(y_blocks, x.shape)
+
+    # Rotate the volume, predict, undo the rotation, and average with original
+    # prediction.
+    if rotate_and_predict:
+        if not is_binary_prediction:
+            raise ValueError(
+                "Cannot transform and predict on multi-class output.")
+        if verbose:
+            click.echo("Predicting on rotated volume ...")
+        y_other = _transform_and_predict(
+            model=model,
+            x=x,
+            block_shape=block_shape,
+            rotation=[np.pi/4, np.pi/4, 0],
+            translation=[0, 0, 0],
+            verbose=verbose)
+        if verbose:
+            click.echo("Averaging predictions ...")
+        y = np.mean([y, y_other], axis=0)
+
+    if is_binary_prediction:
+        if threshold <= 0 or threshold >= 1:
+            raise ValueError("Threshold must be in (0, 1).")
+        y = y > threshold
 
     if must_resize:
         if verbose:
@@ -190,6 +219,22 @@ def predict(*, infile, outfile, model, block_shape, verbose):
             mode='constant',
             preserve_range=True,
             anti_aliasing=False)
+
+    if largest_label:
+        if not is_binary_prediction:
+            raise ValueError(
+                "Removing all labels except the largest is only allowed with binary prediction.")
+        if verbose:
+            click.echo("Removing all labels except largest ...")
+        labels, n_labels = skimage.measure.label(y, return_num=True)
+        # Do not consider 0 values.
+        d = {(labels == label).sum(): label for label in range(1, n_labels+1)}
+        largest_label = d[max(d.keys())]
+        if verbose:
+            click.echo(
+                "Zeroed {} region(s) not contiguous with largest label."
+                .format(n_labels - 2))
+        y = (labels == largest_label).astype(np.int32)
 
     img = nib.spatialimages.SpatialImage(y.astype(np.int32), affine=affine)
     nib.save(img, outfile)
@@ -241,6 +286,9 @@ def train(*,
           multi_gpu,
           num_parallel_calls):
     """Train a model."""
+
+    if num_parallel_calls == -1:
+        num_parallel_calls = _get_all_cpus()
 
     dataset = _get_dataset(
         file_pattern=tfrecords_pattern,
