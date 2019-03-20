@@ -186,7 +186,7 @@ def replace(x, mapping, zero=True):
     idx = tf.reshape(idx, x.shape)
 
     # Zero values that are equal to len(vs).
-    idx = tf.multiply(idx, tf.cast(tf.not_equal(idx, len(vs)), tf.int32))
+    idx = tf.multiply(idx, tf.cast(tf.not_equal(idx, vs.shape[0]), tf.int32))
     mask = tf.equal(tf.gather(ks, idx), x)
     out = tf.where(mask, tf.gather(vs, idx), x)
 
