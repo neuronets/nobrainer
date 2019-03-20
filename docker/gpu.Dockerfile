@@ -50,6 +50,7 @@ RUN apt-get update \
         python3-wheel \
     && rm -rf /var/lib/apt/lists/* \
     && pip3 install --no-cache-dir --editable /opt/nobrainer[gpu] \
-    && ln -s $(which python3) /usr/local/bin/python
+    && ln -s $(which python3) /usr/local/bin/python \
+    && ln -sf /opt/nobrainer/models /models
 ENTRYPOINT ["nobrainer"]
 LABEL maintainer="Jakub Kaczmarzyk <jakubk@mit.edu>"
