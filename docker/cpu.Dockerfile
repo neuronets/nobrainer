@@ -1,4 +1,5 @@
 FROM debian:buster-slim
+ARG DEBIAN_FRONTEND="noninteractive"
 ENV LANG="C.UTF-8"
 COPY [".", "/opt/nobrainer"]
 RUN apt-get update \

@@ -12,6 +12,8 @@ ARG ARCH
 ARG CUDA
 ARG CUDNN=7.4.1.5-1
 
+ARG DEBIAN_FRONTEND="noninteractive"
+
 # Needed for string substitution
 SHELL ["/bin/bash", "-c"]
 
