@@ -96,6 +96,7 @@ def convert(volume_filepaths, tfrecords_template="tfrecords/data_shard-{shard:03
     except Exception:
         raise ValueError("invalid 'tfrecords_template'. This template must contain the key 'shard'.")
 
+    tfrecords_template = os.path.abspath(tfrecords_template)
     _dirname = os.path.dirname(tfrecords_template)
     if not os.path.exists(_dirname):
         raise ValueError("directory does not exist: {}".format(_dirname))
