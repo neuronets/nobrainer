@@ -2,6 +2,7 @@
 
 from collections import namedtuple
 import csv
+import multiprocessing
 import os
 import tempfile
 
@@ -103,4 +104,6 @@ def _get_all_cpus():
     nproc = os.environ.get('SLURM_CPUS_ON_NODE', None)
     if nproc is not None:
         nproc = int(nproc)
+    else:
+        nproc = multiprocessing.cpu_count()
     return nproc
