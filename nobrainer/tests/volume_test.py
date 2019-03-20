@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.testing import assert_allclose
 from numpy.testing import assert_array_equal
 import pytest
 import tensorflow as tf
@@ -42,6 +43,28 @@ def test_apply_random_transform():
     assert not np.array_equal(y, y1)
     assert not np.array_equal(x0, x1)
     assert not np.array_equal(y0, y1)
+
+    # Test that new iterations yield different augmentations.
+    x = np.arange(64).reshape(1, 4, 4, 4).astype(np.float32)
+    y = np.random.randint(0, 2, size=(1, 4, 4, 4)).astype(np.float32)
+    dataset = tf.data.Dataset.from_tensor_slices((x, y))
+    # sanity check
+    x0, y0 = next(iter(dataset))
+    x1, y1 = next(iter(dataset))
+    assert_array_equal(x[0], x0)
+    assert_array_equal(x0, x1)
+    assert_array_equal(y[0], y0)
+    assert_array_equal(y0, y1)
+    dataset = dataset.map(volume.apply_random_transform)
+    x0, y0 = next(iter(dataset))
+    x1, y1 = next(iter(dataset))
+    assert not np.array_equal(x0, x1)
+    assert not np.array_equal(y0, y1)
+    assert_array_equal(np.unique(y0), [0, 1])
+    assert_array_equal(np.unique(y1), [0, 1])
+    # Naive test that features were interpolated without nearest neighbor.
+    assert np.any(x0 % 1)
+    assert np.any(x1 % 1)
 
 
 def test_binarize():
@@ -144,14 +167,93 @@ def test_get_preprocess_fn():
     assert False
 
 
-@pytest.mark.xfail
 def test_preprocess_binary():
-    assert False
+    shape = (10, 10, 10)
+    x = np.random.randn(*shape).astype(np.float32)
+    y = np.random.randint(0, 256, size=shape).astype(np.float32)
+    x0, y0 = volume._preprocess_binary(x, y, n_classes=1, block_shape=None)
+    assert_array_equal(x0.shape, [1, *shape, 1])
+    assert_array_equal(x0.shape, y0.shape)
+    assert_array_equal(np.unique(y0), [0, 1])
+    assert_allclose(np.mean(x0), 0, atol=1e-07)
+    assert_allclose(np.std(x0), 1, atol=1e-07)
+
+    x0, y0 = volume._preprocess_binary(x, y, n_classes=2)
+    assert_array_equal(x0.shape, [1, *shape, 1])
+    assert_array_equal(y0.shape, [1, *shape, 2])
+    assert_allclose(np.mean(x0), 0, atol=1e-07)
+    assert_allclose(np.std(x0), 1, atol=1e-07)
+    # All one-hot encoded items sum to 1.
+    assert (np.sum(y0, -1) == 1).all()
+
+    block_shape=(5, 5, 5)
+    x0, y0 = volume._preprocess_binary(
+        x, y, n_classes=1, block_shape=block_shape)
+    assert_array_equal(x0.shape, [8, *block_shape, 1])
+    assert_array_equal(y0.shape, [8, *block_shape, 1])
+    assert_allclose(np.mean(x0), 0, atol=1e-07)
+    assert_allclose(np.std(x0), 1, atol=1e-07)
+
+    block_shape=(5, 5, 5)
+    x0, y0 = volume._preprocess_binary(
+        x, y, n_classes=2, block_shape=block_shape)
+    assert_array_equal(x0.shape, [8, *block_shape, 1])
+    assert_array_equal(y0.shape, [8, *block_shape, 2])
+    assert_allclose(np.mean(x0), 0, atol=1e-07)
+    assert_allclose(np.std(x0), 1, atol=1e-07)
+    # All one-hot encoded items sum to 1.
+    assert (np.sum(y0, -1) == 1).all()
+
+    with pytest.raises(ValueError):
+        volume._preprocess_binary(x, y, n_classes=3)
+    with pytest.raises(ValueError):
+        volume._preprocess_binary(x, y, n_classes=0)
 
 
 @pytest.mark.xfail
 def test_preprocess_multiclass():
-    assert False
+    shape = (10, 10, 10)
+    x = np.random.randn(*shape).astype(np.float32)
+    y = np.random.randint(0, 21, size=shape).astype(np.float32)
+    x0, y0 = volume._preprocess_multiclass(x, y, n_classes=3, block_shape=None)
+    assert_array_equal(x0.shape, [1, *shape, 1])
+    assert_array_equal(y0.shape, [1, *shape, 3])
+    assert_array_equal(np.unique(y0), [0, 1])
+    assert_allclose(np.mean(x0), 0, atol=1e-07)
+    assert_allclose(np.std(x0), 1, atol=1e-07)
+
+    block_shape=(5, 5, 5)
+    x0, y0 = volume._preprocess_multiclass(
+        x, y, n_classes=20, block_shape=block_shape)
+    assert_array_equal(x0.shape, [8, *block_shape, 1])
+    assert_array_equal(y0.shape, [8, *block_shape, 20])
+    assert_allclose(np.mean(x0), 0, atol=1e-07)
+    assert_allclose(np.std(x0), 1, atol=1e-07)
+
+    y = np.array([0, 1, 2, 3]).reshape(1, 2, 2).astype(np.float32)
+    x = y.copy()
+    x0, y0 = volume._preprocess_multiclass(x, y, n_classes=4)
+    assert (np.sum(y0, -1) == 1).all()
+    assert_array_equal(x0.shape, [1, 1, 2, 2, 1])
+    assert_array_equal(y0.shape, [1, 1, 2, 2, 4])
+
+    y = np.array([0, 1, 2, 3]).reshape(1, 2, 2).astype(np.float32)
+    x = y.copy()
+    mapping = {3: 2, 2: 1}
+    x0, y0 = volume._preprocess_multiclass(x, y, n_classes=4, mapping=mapping)
+    assert_array_equal(y0.numpy().argmax(-1).flatten(), [0, 1, 1, 2])
+
+    # Test that label values not in mapping values are zeroed.
+    mapping = {3: 2}
+    x0, y0 = volume._preprocess_multiclass(x, y, n_classes=4, mapping=mapping)
+    assert_array_equal(y0.numpy().argmax(-1).flatten(), [0, 0, 2, 2])
+
+    with pytest.raises(ValueError):
+        volume._preprocess_binary(x, y, n_classes=2)
+    with pytest.raises(ValueError):
+        volume._preprocess_binary(x, y, n_classes=1)
+    with pytest.raises(ValueError):
+        volume._preprocess_binary(x, y, n_classes=0)
 
 
 def test_get_steps_per_epoch():
