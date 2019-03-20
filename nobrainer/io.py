@@ -9,6 +9,8 @@ import nibabel as nib
 import numpy as np
 import tensorflow as tf
 
+from nobrainer.utils import _get_all_cpus
+
 _TFRECORDS_FEATURES_DTYPE = 'float32'
 
 
@@ -110,6 +112,8 @@ def convert(volume_filepaths, tfrecords_template="tfrecords/data_shard-{shard:03
     print("Converting {} pairs of files to {} TFRecords.".format(len(volume_filepaths), len(volume_filepaths_shards)))
     progbar = tf.keras.utils.Progbar(len(volume_filepaths_shards), verbose=verbose)
     progbar.update(0)
+    if num_parallel_calls is None:
+        num_parallel_calls = _get_all_cpus()
     with multiprocessing.Pool(num_parallel_calls) as p:
         for _ in p.imap(map_fn, volume_filepaths_shards, chunksize=2):
             progbar.add(1)
@@ -261,6 +265,8 @@ def verify_features_labels(volume_filepaths, volume_shape=(256, 256, 256), check
     progbar = tf.keras.utils.Progbar(len(volume_filepaths), verbose=verbose)
     progbar.update(0)
     map_fn = functools.partial(_verify_features_labels_pair, volume_shape=volume_shape, check_shape=check_shape, check_labels_int=check_labels_int, check_labels_gte_zero=check_labels_gte_zero)
+    if num_parallel_calls is None:
+        num_parallel_calls = _get_all_cpus()
     with multiprocessing.Pool(num_parallel_calls) as p:
         outputs = []
         for valid in p.imap(map_fn, volume_filepaths, chunksize=2):

@@ -97,8 +97,11 @@ def get_dataset(file_pattern, n_classes, batch_size, volume_shape,
     datset = dataset.prefetch(buffer_size=batch_size)
 
     # Batch the dataset, so each iteration gives `batch_size` elements. We drop
-    # the remainder so that when training on multiple GPUs,
-    dataset = dataset.batch(batch_size=batch_size, drop_remainder=True)
+    # the remainder so that when training on multiple GPUs, the batch will
+    # always be evenly divisible by the number of GPUs. Otherwise, the last
+    # batch might have fewer than `batch_size` elements and will cause errors.
+    if batch_size is not None:
+        dataset = dataset.batch(batch_size=batch_size, drop_remainder=True)
 
     # Optionally shuffle. We also optionally shuffle the list of files.
     # The TensorFlow recommend shuffling and then repeating.
@@ -120,46 +123,23 @@ def apply_random_transform(features, labels):
     interpolated trilinearly, and labels are interpolated with nearest
     neighbors.
     """
+    if len(features.shape) != 3 or len(labels.shape) != 3:
+        raise ValueError("features and labels must be rank 3")
+    if features.shape != labels.shape:
+        raise ValueError("shape of features and labels must be the same.")
     # Rotate -180 degrees to 180 degrees in three dimensions.
     rotation = tf.random.uniform(
         shape=[3], minval=-np.pi, maxval=np.pi, dtype=tf.float32)
 
     # Translate at most 5% in any direction, so there's less chance of
     # important data going out of view.
-    maxval = 0.05 * features.shape[0].value
+    maxval = 0.05 * features.shape[0]
     translation = tf.random.uniform(
         shape=[3], minval=-maxval, maxval=maxval, dtype=tf.float32)
 
-    volume_shape = np.asarray([s.value for s in features.shape])
+    volume_shape = np.asarray(features.shape)
     matrix = get_affine(volume_shape=volume_shape, rotation=rotation, translation=translation)
     return warp_features_labels(features=features, labels=labels, matrix=matrix)
-
-
-def apply_random_transform_dataset(features, labels):
-    """Apply a random rigid transformation to `features` and `labels`.
-
-    The same transformation is applied to features and labels. Features are
-    interpolated trilinearly, and labels are interpolated with nearest
-    neighbors.
-
-    Returns
-    -------
-    `tf.data.Dataset` of randomly transformed features and labels.
-    """
-    # Rotate -180 degrees to 180 degrees in three dimensions.
-    rotation = tf.random.uniform(
-        shape=[3], minval=-np.pi, maxval=np.pi, dtype=tf.float32)
-
-    # Translate at most 5% in any direction, so there's less chance of
-    # important data going out of view.
-    maxval = 0.05 * features.shape[0].value
-    translation = tf.random.uniform(
-        shape=[3], minval=-maxval, maxval=maxval, dtype=tf.float32)
-
-    volume_shape = np.asarray([s.value for s in features.shape])
-    matrix = get_affine(volume_shape=volume_shape, rotation=rotation, translation=translation)
-    x, y = warp_features_labels(features=features, labels=labels, matrix=matrix)
-    return tf.data.Dataset.from_tensor_slices((x, y))
 
 
 def binarize(x):
@@ -173,6 +153,7 @@ def binarize(x):
     -------
     Tensor of binarized values.
     """
+    x = tf.convert_to_tensor(x)
     return tf.cast(x > 0, dtype=x.dtype)
 
 
@@ -192,6 +173,7 @@ def replace(x, mapping, zero=True):
     -------
     Modified tensor.
     """
+    x = tf.convert_to_tensor(x, dtype=tf.int32)
     keys = tf.convert_to_tensor(list(mapping.keys()))
     vals = tf.convert_to_tensor(list(mapping.values()))
 
@@ -199,15 +181,19 @@ def replace(x, mapping, zero=True):
     sidx = tf.argsort(keys)
     ks = tf.gather(keys, sidx)
     vs = tf.gather(vals, sidx)
-    idx = tf.searchsorted(keys, x)
+
+    idx = tf.searchsorted(ks, tf.reshape(x, (-1,)))
+    idx = tf.reshape(idx, x.shape)
 
     # Zero values that are equal to len(vs).
-    idx = tf.multiply(idx, tf.to_int32(idx != len(vs)))
-    mask = tf.gather(ks, idx) == x
+    idx = tf.multiply(idx, tf.cast(tf.not_equal(idx, len(vs)), tf.int32))
+    mask = tf.equal(tf.gather(ks, idx), x)
     out = tf.where(mask, tf.gather(vs, idx), x)
 
     if zero:
-        raise NotImplementedError("")
+        # Zero values in the data array that are not in the mapping values.
+        mask = tf.reduce_any(tf.equal(tf.expand_dims(out, -1), tf.expand_dims(vals, 0)), -1)
+        out = tf.multiply(out, tf.cast(mask, tf.int32))
 
     return out
 
@@ -225,12 +211,15 @@ def standardize(x):
     -------
     Tensor of standardized values. Output has mean 0 and standard deviation 1.
     """
+    x = tf.convert_to_tensor(x)
+    if x.dtype != tf.float64:
+        x = tf.cast(x, tf.float32)
     mean, var = tf.nn.moments(x, axes=None)
     std = tf.sqrt(var)
     return (x - mean) / std
 
 
-def to_blocks(x, volume_shape, block_shape):
+def to_blocks(x, block_shape):
     """Split tensor into non-overlapping blocks of shape `block_shape`.
 
     For the reverse of this function, see `from_blocks`.
@@ -244,6 +233,7 @@ def to_blocks(x, volume_shape, block_shape):
     -------
     Tensor with shape `(n_blocks, *block_shape)`.
     """
+    x = tf.convert_to_tensor(x)
     volume_shape = np.array(x.shape)
 
     if isinstance(block_shape, int) == 1:
@@ -280,9 +270,10 @@ def from_blocks(x, output_shape):
     -------
     Tensor with shape `output_shape`.
     """
+    x = tf.convert_to_tensor(x)
     n_blocks = x.shape[0]
     block_shape = x.shape[1:]
-    cbrt = np.cbrt(n_blocks).round(6)
+    ncbrt = np.cbrt(n_blocks).round(6)
     if not ncbrt.is_integer():
         raise ValueError("Cubed root of number of blocks is not an integer")
     ncbrt = int(ncbrt)

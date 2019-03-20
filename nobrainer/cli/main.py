@@ -67,6 +67,8 @@ def convert(*, csv, tfrecords_template, volume_shape, volumes_per_shard, to_ras,
     # TODO: improve docs.
     volume_filepaths = _read_csv(csv)
     num_parallel_calls = None if num_parallel_calls == -1 else num_parallel_calls
+    if num_parallel_calls is None:
+        num_parallel_calls = _get_all_cpus()
 
     _dirname = os.path.dirname(tfrecords_template)
     if not os.path.exists(_dirname):
