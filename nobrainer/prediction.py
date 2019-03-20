@@ -148,7 +148,10 @@ def predict_from_array(inputs,
         features = normalizer(inputs)
     else:
         features = inputs
-    features = to_blocks_numpy(features, block_shape=block_shape)
+    if block_shape is not None:
+        features = to_blocks_numpy(features, block_shape=block_shape)
+    else:
+        features = features[None]  # Add batch dimension.
 
     # Add a dimension for single channel.
     features = features[..., None]
