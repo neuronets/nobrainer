@@ -14,7 +14,7 @@ def train(model, dataset, optimizer, loss, steps_per_epoch, model_kwds={}, n_epo
     """
 
     # TODO: add checks.
-    n_classes = dataset.output_shapes[1][-1].value  # last dimension of labels
+    n_classes = dataset.output_shapes[1][-1]  # last dimension of labels
     input_shape = dataset.output_shapes[0][1:]  # remove batch dimension
 
     if metrics is None:

@@ -76,7 +76,11 @@ def test_convert(csv_of_volumes, tmp_path):
     files = io.read_csv(csv_of_volumes, skip_header=False)
     tfrecords_template = str(tmp_path / 'data-{shard:03d}.tfrecords')
     volumes_per_shard = 12
-    io.convert(files, tfrecords_template=tfrecords_template, volumes_per_shard=volumes_per_shard)
+    io.convert(
+        files,
+        tfrecords_template=tfrecords_template,
+        volumes_per_shard=volumes_per_shard,
+        num_parallel_calls=1)
 
     paths = list(tmp_path.glob('data-*.tfrecords'))
     paths = sorted(paths)
@@ -101,7 +105,8 @@ def test_convert(csv_of_volumes, tmp_path):
 
 def test_verify_features_labels(csv_of_volumes):
     files = io.read_csv(csv_of_volumes, skip_header=False)
-    io.verify_features_labels(files, volume_shape=(8, 8, 8))
+    io.verify_features_labels(
+        files, volume_shape=(8, 8, 8), num_parallel_calls=1)
 
 
 def test_is_gzipped(tmp_path):

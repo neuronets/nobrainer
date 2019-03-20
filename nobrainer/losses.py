@@ -195,8 +195,7 @@ def variational(y_true, y_pred, model, n_examples=1, prior_model=None):
     """"""
 
     def _maybe_get_layer_attr(model, layer_attribute):
-        """Get a list of values for a particular attribute for each layer in a
-        model.
+        """Get the value for a particular attribute for each layer in a model.
         """
         attr_values = []
         for layer in model.layers:

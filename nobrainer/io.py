@@ -96,6 +96,7 @@ def convert(volume_filepaths, tfrecords_template="tfrecords/data_shard-{shard:03
     except Exception:
         raise ValueError("invalid 'tfrecords_template'. This template must contain the key 'shard'.")
 
+    tfrecords_template = os.path.abspath(tfrecords_template)
     _dirname = os.path.dirname(tfrecords_template)
     if not os.path.exists(_dirname):
         raise ValueError("directory does not exist: {}".format(_dirname))
@@ -114,9 +115,15 @@ def convert(volume_filepaths, tfrecords_template="tfrecords/data_shard-{shard:03
     progbar.update(0)
     if num_parallel_calls is None:
         num_parallel_calls = _get_all_cpus()
-    with multiprocessing.Pool(num_parallel_calls) as p:
-        for _ in p.imap(map_fn, volume_filepaths_shards, chunksize=2):
+
+    if num_parallel_calls == 1:
+        for vf in volume_filepaths_shards:
+            map_fn(vf)
             progbar.add(1)
+    else:
+        with multiprocessing.Pool(num_parallel_calls) as p:
+            for _ in p.imap(map_fn, volume_filepaths_shards, chunksize=2):
+                progbar.add(1)
 
 
 def _convert(tfrecords_path_volume_filepaths, to_ras=True, gzip_compressed=True):
@@ -267,11 +274,18 @@ def verify_features_labels(volume_filepaths, volume_shape=(256, 256, 256), check
     map_fn = functools.partial(_verify_features_labels_pair, volume_shape=volume_shape, check_shape=check_shape, check_labels_int=check_labels_int, check_labels_gte_zero=check_labels_gte_zero)
     if num_parallel_calls is None:
         num_parallel_calls = _get_all_cpus()
-    with multiprocessing.Pool(num_parallel_calls) as p:
-        outputs = []
-        for valid in p.imap(map_fn, volume_filepaths, chunksize=2):
+
+    outputs = []
+    if num_parallel_calls == 1:
+        for vf in volume_filepaths:
+            valid = map_fn(vf)
             outputs.append(valid)
             progbar.add(1)
+    else:
+        with multiprocessing.Pool(num_parallel_calls) as p:
+            for valid in p.imap(map_fn, volume_filepaths, chunksize=2):
+                outputs.append(valid)
+                progbar.add(1)
     invalid_files = [pair for valid, pair in zip(outputs, volume_filepaths) if not valid]
     return invalid_files
 
