@@ -11,14 +11,37 @@ def test_get_dataset():
     assert False
 
 
-@pytest.mark.xfail
 def test_apply_random_transform():
-    assert False
+    shape = (10, 10, 10)
+    x = np.ones(shape).astype(np.float32)
+    y = np.random.randint(0, 2, size=shape).astype(np.float32)
+    x, y = volume.apply_random_transform(x, y)
+    x = x.numpy()
+    y = y.numpy()
 
+    # Test that values were not changed in the labels.
+    assert_array_equal(np.unique(y), [0, 1])
+    assert x.shape == shape
+    assert y.shape == shape
 
-@pytest.mark.xfail
-def test_apply_random_transform_dataset():
-    assert False
+    with pytest.raises(ValueError):
+        x, y = volume.apply_random_transform(
+            np.ones((10, 10, 10)), np.ones((10, 10, 12)))
+    with pytest.raises(ValueError):
+        x, y = volume.apply_random_transform(
+            np.ones((10, 10)), np.ones((10, 10)))
+
+    shape = (10, 10, 10)
+    x = np.random.randn(*shape).astype(np.float32)
+    y = np.random.randint(0, 2, size=shape).astype(np.float32)
+    x0, y0 = volume.apply_random_transform(x, y)
+    x1, y1 = volume.apply_random_transform(x, y)
+    assert not np.array_equal(x, x0)
+    assert not np.array_equal(x, x1)
+    assert not np.array_equal(y, y0)
+    assert not np.array_equal(y, y1)
+    assert not np.array_equal(x0, x1)
+    assert not np.array_equal(y0, y1)
 
 
 def test_binarize():
@@ -131,6 +154,20 @@ def test_preprocess_multiclass():
     assert False
 
 
-@pytest.mark.xfail
 def test_get_steps_per_epoch():
-    assert False
+    nsteps = volume.get_steps_per_epoch(
+        n_volumes=1, volume_shape=(256, 256, 256), block_shape=(64, 64, 64),
+        batch_size=1)
+    assert nsteps == 64
+    nsteps = volume.get_steps_per_epoch(
+        n_volumes=1, volume_shape=(256, 256, 256), block_shape=(64, 64, 64),
+        batch_size=64)
+    assert nsteps == 1
+    nsteps = volume.get_steps_per_epoch(
+        n_volumes=1, volume_shape=(256, 256, 256), block_shape=(64, 64, 64),
+        batch_size=63)
+    assert nsteps == 2
+    nsteps = volume.get_steps_per_epoch(
+        n_volumes=10, volume_shape=(256, 256, 256), block_shape=(128, 128, 128),
+        batch_size=4)
+    assert nsteps == 20
