@@ -417,7 +417,7 @@ def _get_model(path):
         " format?")
 
 
-def _transform_and_predict(model, x, block_shape, rotation, translation=[0, 0, 0]):
+def _transform_and_predict(model, x, block_shape, rotation, translation=[0, 0, 0], verbose=False):
     """Predict on rigidly transformed features.
 
     The rigid transformation is applied to the volumes prior to prediction, and
@@ -433,6 +433,7 @@ def _transform_and_predict(model, x, block_shape, rotation, translation=[0, 0, 0
         including the batch or channel dimensions.
     rotation: tuple of length 3, rotation angle in radians in each dimension.
     translation: tuple of length 3, units of translation in each dimension.
+    verbose: bool, whether to print progress bar.
 
     Returns
     -------
@@ -442,13 +443,13 @@ def _transform_and_predict(model, x, block_shape, rotation, translation=[0, 0, 0
 
     x = np.asarray(x).astype(np.float32)
     affine = get_affine(x.shape, rotation=rotation, translation=translation)
-    inverse_affine = np.linalg.inv(affine)
+    inverse_affine = tf.linalg.inv(affine)
     x_warped = warp(x, affine, order=1)
 
     x_warped_blocks = to_blocks_numpy(x_warped, block_shape)
     x_warped_blocks = x_warped_blocks[..., np.newaxis]  # add grayscale channel
     x_warped_blocks = standardize_numpy(x_warped_blocks)
-    y = model.predict(x_warped_blocks, batch_size=1)
+    y = model.predict(x_warped_blocks, batch_size=1, verbose=verbose)
 
     n_classes = y.shape[-1]
     if n_classes == 1:
@@ -461,6 +462,6 @@ def _transform_and_predict(model, x, block_shape, rotation, translation=[0, 0, 0
             "This function is not compatible with multi-class predictions.")
 
     y = from_blocks_numpy(y, x.shape)
-    y = warp(y, inverse_affine, order=0)
+    y = warp(y, inverse_affine, order=0).numpy()
 
     return y
