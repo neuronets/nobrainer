@@ -173,7 +173,7 @@ def replace(x, mapping, zero=True):
     -------
     Modified tensor.
     """
-    x = tf.convert_to_tensor(x, dtype=tf.int32)
+    x = tf.cast(x, dtype=tf.int32)
     keys = tf.convert_to_tensor(list(mapping.keys()))
     vals = tf.convert_to_tensor(list(mapping.values()))
 
@@ -186,7 +186,7 @@ def replace(x, mapping, zero=True):
     idx = tf.reshape(idx, x.shape)
 
     # Zero values that are equal to len(vs).
-    idx = tf.multiply(idx, tf.cast(tf.not_equal(idx, len(vs)), tf.int32))
+    idx = tf.multiply(idx, tf.cast(tf.not_equal(idx, vs.shape[0]), tf.int32))
     mask = tf.equal(tf.gather(ks, idx), x)
     out = tf.where(mask, tf.gather(vs, idx), x)
 
@@ -341,8 +341,7 @@ def _get_preprocess_fn(n_classes, block_shape=None, mapping=None, augment=False)
 
 
 def _preprocess_binary(features, labels, n_classes=1, block_shape=None):
-    """Creates a `Dataset` of `features` and `labels` preprocessed for binary
-    segmentation.
+    """Preprocesses `features` and `labels` for binary segmentation.
 
     Features are standard-scored (mean 0 and standard deviation of 1). Labels
     are binarized (i.e., values above 0 are set to 1). Then, non-overlapping
@@ -370,7 +369,7 @@ def _preprocess_binary(features, labels, n_classes=1, block_shape=None):
     x = tf.convert_to_tensor(x)
     x = standardize(x)
     if block_shape is not None:
-        x = to_blocks(x, volume_shape=x.shape, block_shape=block_shape)
+        x = to_blocks(x, block_shape=block_shape)
     else:
         x = tf.expand_dims(x, axis=0)
     x = tf.expand_dims(x, axis=-1)  # Add grayscale channel.
@@ -378,13 +377,13 @@ def _preprocess_binary(features, labels, n_classes=1, block_shape=None):
     y = tf.convert_to_tensor(y)
     y = binarize(y)
     if block_shape is not None:
-        y = to_blocks(y, volume_shape=y.shape, block_shape=block_shape)
+        y = to_blocks(y, block_shape=block_shape)
     else:
         y = tf.expand_dims(y, axis=0)
     if n_classes == 1:
         y = tf.expand_dims(y, axis=-1)
     elif n_classes == 2:
-        y = tf.one_hot(tf.to_int32(y), n_classes, dtype=tf.float32)
+        y = tf.one_hot(tf.cast(y, tf.int32), n_classes, dtype=tf.float32)
     else:
         raise ValueError("`n_classes` must be 1 or 2 for binary segmentation.")
 
@@ -392,8 +391,7 @@ def _preprocess_binary(features, labels, n_classes=1, block_shape=None):
 
 
 def _preprocess_multiclass(features, labels, n_classes, block_shape=None, mapping=None):
-    """Creates a `Dataset` of `features` and `labels` preprocessed for
-    multiclass segmentation.
+    """Preprocesses `features` and `labels` for multiclass segmentation.
 
     Features are standard-scored (mean 0 and standard deviation of 1). If a
     mapping is provided, values in labels are replaced according to the mapping.
@@ -429,7 +427,7 @@ def _preprocess_multiclass(features, labels, n_classes, block_shape=None, mappin
     x = tf.convert_to_tensor(x)
     x = standardize(x)
     if block_shape is not None:
-        x = to_blocks(x, volume_shape=x.shape, block_shape=block_shape)
+        x = to_blocks(x, block_shape=block_shape)
     else:
         x = tf.expand_dims(x, axis=0)
     x = tf.expand_dims(x, axis=-1)  # Add grayscale channel.
@@ -438,11 +436,11 @@ def _preprocess_multiclass(features, labels, n_classes, block_shape=None, mappin
     if mapping is not None:
         y = replace(y, mapping=mapping)
     if block_shape is not None:
-        y = to_blocks(y, volume_shape=y.shape, block_shape=block_shape)
+        y = to_blocks(y, block_shape=block_shape)
     else:
         y = tf.expand_dims(y, axis=0)
 
-    y = tf.one_hot(tf.to_int32(y), n_classes, dtype=tf.float32)
+    y = tf.one_hot(tf.cast(y, tf.int32), n_classes, dtype=tf.float32)
     return x, y
 
 
@@ -462,3 +460,93 @@ def get_steps_per_epoch(n_volumes, volume_shape, block_shape, batch_size):
     steps = n_blocks_per_volume * n_volumes / batch_size
     steps = math.ceil(steps)
     return steps
+
+
+# Below this line, we implement methods similar to those above but using Numpy.
+# This is particularly useful when we use models to predict, because it is
+# usually more pleasant to predict on Numpy arrays.
+
+
+def standardize_numpy(a):
+    """Standard score array.
+
+    Implements `(x - mean(x)) / stdev(x)`.
+
+    Parameters
+    ----------
+    x: array, values to standardize.
+
+    Returns
+    -------
+    Array of standardized values. Output has mean 0 and standard deviation 1.
+    """
+    a = np.asarray(a)
+    return (a - a.mean()) / a.std()
+
+
+def from_blocks_numpy(a, output_shape):
+    """Combine 4D array of non-overlapping blocks `a` into 3D array of shape
+    `output_shape`.
+
+    For the reverse of this function, see `to_blocks_numpy`.
+
+    Parameters
+    ----------
+    a: array-like, 4D array of blocks with shape (N, *block_shape), where N is
+        the number of blocks.
+    output_shape: tuple of len 3, shape of the combined array.
+
+    Returns
+    -------
+    Rank 3 array with shape `output_shape`.
+    """
+    a = np.asarray(a)
+
+    if a.ndim != 4:
+        raise ValueError("This function only works for 4D arrays.")
+    if len(output_shape) != 3:
+        raise ValueError("output_shape must have three values.")
+
+    n_blocks = a.shape[0]
+    block_shape = a.shape[1:]
+    ncbrt = np.cbrt(n_blocks).round(6)
+    if not ncbrt.is_integer():
+        raise ValueError("Cubed root of number of blocks is not an integer")
+    ncbrt = int(ncbrt)
+    intershape = (ncbrt, ncbrt, ncbrt, *block_shape)
+
+    return (
+        a.reshape(intershape)
+        .transpose((0, 3, 1, 4, 2, 5))
+        .reshape(output_shape))
+
+
+def to_blocks_numpy(a, block_shape):
+    """Return new array of non-overlapping blocks of shape `block_shape` from
+    array `a`.
+
+    For the reverse of this function (blocks to array), see `from_blocks_numpy`.
+
+    Parameters
+    ----------
+    a: array-like, 3D array to block
+    block_shape: tuple of len 3, shape of non-overlapping blocks.
+
+    Returns
+    -------
+    Rank 4 array with shape `(N, *block_shape)`, where N is the number of
+    blocks.
+    """
+    a = np.asarray(a)
+    orig_shape = np.asarray(a.shape)
+
+    if a.ndim != 3:
+        raise ValueError("This function only supports 3D arrays.")
+    if len(block_shape) != 3:
+        raise ValueError("block_shape must have three values.")
+
+    blocks = orig_shape // block_shape
+    inter_shape = tuple(e for tup in zip(blocks, block_shape) for e in tup)
+    new_shape = (-1,) + block_shape
+    perm = (0, 2, 4, 1, 3, 5)
+    return a.reshape(inter_shape).transpose(perm).reshape(new_shape)
