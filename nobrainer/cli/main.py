@@ -15,6 +15,7 @@ from nobrainer.io import verify_features_labels as _verify_features_labels
 from nobrainer.io import read_csv as _read_csv
 from nobrainer.losses import get as _get_loss
 from nobrainer.training import train as _train
+from nobrainer.utils import _get_all_cpus
 from nobrainer.volume import get_dataset as _get_dataset
 from nobrainer.volume import get_steps_per_epoch as _get_steps_per_epoch
 
@@ -59,6 +60,8 @@ def convert(*, csv, tfrecords_template, volume_shape, volumes_per_shard, to_ras,
     # TODO: improve docs.
     volume_filepaths = _read_csv(csv)
     num_parallel_calls = None if num_parallel_calls == -1 else num_parallel_calls
+    if num_parallel_calls is None:
+        num_parallel_calls = _get_all_cpus()
 
     _dirname = os.path.dirname(tfrecords_template)
     if not os.path.exists(_dirname):
