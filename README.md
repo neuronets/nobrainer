@@ -23,9 +23,9 @@ The _Nobrainer_ project is supported by NIH R01 EB020470 and is distributed unde
 - [Package layout](#package-layout)
 - [Questions or issues](#questions-or-issues)
 
-## Guide Jupyter Notebooks
+## Guide Jupyter Notebooks [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kaczmarj/nobrainer)
 
-Please refer to the Jupyter notebooks in the [guide](/guide) directory to get started with _Nobrainer_. [Try them out](https://colab.research.google.com/github/kaczmarj/nobrainer) in Google Collaboratory! [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kaczmarj/nobrainer)
+Please refer to the Jupyter notebooks in the [guide](/guide) directory to get started with _Nobrainer_. [Try them out](https://colab.research.google.com/github/kaczmarj/nobrainer) in Google Collaboratory!
 
 ## Installation
 
