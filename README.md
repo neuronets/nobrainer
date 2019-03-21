@@ -12,7 +12,7 @@ The _Nobrainer_ project is supported by NIH R01 EB020470 and is distributed unde
 
 ## Table of contents
 
-- [Guide Jupyter Notebooks](#guide-jupyter-notebooks)
+- [Guide Jupyter Notebooks](#guide-jupyter-notebooks-)
 - [Installation](#installation)
   - [Container](#container)
     - [GPU support](#gpu-support)
