@@ -4,7 +4,7 @@
 
 ![Model's prediction of brain mask](https://github.com/kaczmarj/nobrainer-models/blob/master/images/brain-extraction/unet-best-prediction.png?raw=true)
 ![Model's prediction of brain mask](https://github.com/kaczmarj/nobrainer-models/blob/master/images/brain-extraction/unet-worst-prediction.png?raw=true)
-<sub>__Figure__: In the first column are T1-weighted brain scans, in the middle are a trained model's predictions, and on the right are binarized FreeSurfer segmentations. Despite the model being trained on binarized FreeSurfer segmentations, the model outperforms FreeSurfer in the bottom scan, which exhibits motion distortion. It took about three seconds for the model to predict each brainmask using an NVIDIA GTX 1080Ti. It takes about 90 seconds on a recent CPU.</sub>
+<sub>__Figure__: In the first column are T1-weighted brain scans, in the middle are a trained model's predictions, and on the right are binarized FreeSurfer segmentations. Despite being trained on binarized FreeSurfer segmentations, the model outperforms FreeSurfer in the bottom scan, which exhibits motion distortion. It took about three seconds for the model to predict each brainmask using an NVIDIA GTX 1080Ti. It takes about 70 seconds on a recent CPU.</sub>
 
 _Nobrainer_ is a deep learning framework for 3D image processing. It implements several 3D convolutional models from recent literature, methods for loading and augmenting volumetric data that can be used with any TensorFlow or Keras model, losses and metrics for 3D data, and simple utilities for model training, evaluation, prediction, and transfer learning.
 
@@ -12,11 +12,25 @@ _Nobrainer_ also provides pre-trained models for brain extraction, brain segment
 
 The _Nobrainer_ project is supported by NIH R01 EB020470 and is distributed under the Apache 2.0 license.
 
+## Table of contents
+
+- [Guide Jupyter Notebooks](#guide-jupyter-notebooks-open-in-colabhttpscolabresearchgooglecomassetscolab-badgesvghttpscolabresearchgooglecomgithubkaczmarjnobrainer)
+- [Installation](#installation)
+  - [Container](#container)
+    - [GPU support](#gpu-support)
+    - [CPU only](#cpu-only)
+  - [pip](#pip)
+- [Using pre-trained networks](#using-pre-trained-networks)
+  - [Predicting a brainmask for a T1-weighted brain scan](#predicting-a-brainmask-for-a-t1-weighted-brain-scan)
+- [Package layout](#package-layout)
+- [Questions or issues](#questions-or-issues)
+
+
 ## Guide Jupyter Notebooks [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kaczmarj/nobrainer)
 
 Please refer to the Jupyter notebooks in the [guide](/guide) directory to get started with _Nobrainer_. [Try them out](https://colab.research.google.com/github/kaczmarj/nobrainer) in Google Collaboratory!
 
-## Installing Nobrainer
+## Installation
 
 ### Container
 
@@ -58,56 +72,56 @@ In the base case, we run the T1w scan through the model for predition.
 
 ```bash
 # Get sample T1w scan.
-wget -O sub-01_T1w.nii.gz https://openneuro.org/crn/datasets/ds000001/snapshots/00006/files/sub-01:anat:sub-01_T1w.nii.gz
+wget -nc https://dl.dropbox.com/s/g1vn5p3grifro4d/T1w.nii.gz
 docker run --rm -v $PWD:/data kaczmarj/nobrainer \
   predict \
     --model=/models/brain-extraction-unet-128iso-model.h5 \
     --verbose \
-    /data/sub-01_T1w.nii.gz \
-    /data/sub-01_brainmask.nii.gz
-```
-
-Because the network was trained on randomly rotated data, it should be agnostic to orientation. Therefore, we can rotate the volume, predict on it, undo the rotation in the prediction, and average the prediction with that from the original volume. This can lead to a better overall prediction but will at least double the processing time. To enable this, use the flag `--rotate-and-predict` in `nobrainer predict`.
-
-```bash
-# Get sample T1w scan.
-wget -O sub-01_T1w.nii.gz https://openneuro.org/crn/datasets/ds000001/snapshots/00006/files/sub-01:anat:sub-01_T1w.nii.gz
-docker run --rm -v $PWD:/data kaczmarj/nobrainer \
-  predict \
-    --model=/models/brain-extraction-unet-128iso-model.h5 \
-    --rotate-and-predict \
-    --verbose \
-    /data/sub-01_T1w.nii.gz \
-    /data/sub-01_brainmask_withrotation.nii.gz
+    /data/T1w.nii.gz \
+    /data/brainmask.nii.gz
 ```
 
 For binary segmentation where we expect one predicted region, as is the case with brain extraction, we can reduce false positives by removing all predictions not connected to the largest contiguous label.
 
 ```bash
 # Get sample T1w scan.
-wget -O sub-01_T1w.nii.gz https://openneuro.org/crn/datasets/ds000001/snapshots/00006/files/sub-01:anat:sub-01_T1w.nii.gz
+wget -nc https://dl.dropbox.com/s/g1vn5p3grifro4d/T1w.nii.gz
 docker run --rm -v $PWD:/data kaczmarj/nobrainer \
   predict \
     --model=/models/brain-extraction-unet-128iso-model.h5 \
     --largest-label \
     --verbose \
-    /data/sub-01_T1w.nii.gz \
-    /data/sub-01_brainmask_largestonly.nii.gz
+    /data/T1w.nii.gz \
+    /data/brainmask-largestlabel.nii.gz
+```
+
+Because the network was trained on randomly rotated data, it should be agnostic to orientation. Therefore, we can rotate the volume, predict on it, undo the rotation in the prediction, and average the prediction with that from the original volume. This can lead to a better overall prediction but will at least double the processing time. To enable this, use the flag `--rotate-and-predict` in `nobrainer predict`.
+
+```bash
+# Get sample T1w scan.
+wget -nc https://dl.dropbox.com/s/g1vn5p3grifro4d/T1w.nii.gz
+docker run --rm -v $PWD:/data kaczmarj/nobrainer \
+  predict \
+    --model=/models/brain-extraction-unet-128iso-model.h5 \
+    --rotate-and-predict \
+    --verbose \
+    /data/T1w.nii.gz \
+    /data/brainmask-withrotation.nii.gz
 ```
 
 Combining the above, we can usually achieve the best brain extraction by using `--rotate-and-predict` in conjunction with `--largest-label`.
 
 ```bash
 # Get sample T1w scan.
-wget -O sub-01_T1w.nii.gz https://openneuro.org/crn/datasets/ds000001/snapshots/00006/files/sub-01:anat:sub-01_T1w.nii.gz
+wget -nc https://dl.dropbox.com/s/g1vn5p3grifro4d/T1w.nii.gz
 docker run --rm -v $PWD:/data kaczmarj/nobrainer \
   predict \
     --model=/models/brain-extraction-unet-128iso-model.h5 \
-    --rotate-and-predict \
     --largest-label \
+    --rotate-and-predict \
     --verbose \
-    /data/sub-01_T1w.nii.gz \
-    /data/sub-01_brainmask_maybebest.nii.gz
+    /data/T1w.nii.gz \
+    /data/brainmask-maybebest.nii.gz
 ```
 
 ## Package layout
