@@ -1,3 +1,5 @@
+from distutils.version import LooseVersion
+
 import numpy as np
 from numpy.testing import assert_allclose
 from numpy.testing import assert_array_equal
@@ -126,10 +128,19 @@ def test_variational():
 
 
 def test_get():
-    assert losses.get('dice') is losses.dice
-    assert losses.get('Dice') is losses.Dice
-    assert losses.get('jaccard') is losses.jaccard
-    assert losses.get('Jaccard') is losses.Jaccard
-    assert losses.get('tversky') is losses.tversky
-    assert losses.get('Tversky') is losses.Tversky
-    assert losses.get('binary_crossentropy')
+    if LooseVersion(tf.__version__) < LooseVersion("1.14.1-dev20190408"):
+        assert losses.get('dice') is losses.dice
+        assert losses.get('Dice') is losses.Dice
+        assert losses.get('jaccard') is losses.jaccard
+        assert losses.get('Jaccard') is losses.Jaccard
+        assert losses.get('tversky') is losses.tversky
+        assert losses.get('Tversky') is losses.Tversky
+        assert losses.get('binary_crossentropy')
+    else:
+        assert losses.get('dice') is losses.dice
+        assert isinstance(losses.get('Dice'), losses.Dice)
+        assert losses.get('jaccard') is losses.jaccard
+        assert isinstance(losses.get('Jaccard'), losses.Jaccard)
+        assert losses.get('tversky') is losses.tversky
+        assert isinstance(losses.get('Tversky'), losses.Tversky)
+        assert losses.get('binary_crossentropy')
