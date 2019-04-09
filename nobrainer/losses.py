@@ -2,8 +2,10 @@
 
 import tensorflow as tf
 from tensorflow.python.keras.losses import Loss
-from tensorflow.python.keras.losses import LossFunctionWrapper
-from tensorflow.python.keras.utils.losses_utils import ReductionV2
+try:
+    from tensorflow.python.keras.utils.losses_utils import ReductionV2
+except ImportError:
+    from tensorflow.python.ops.losses.losses_impl import ReductionV2
 
 from nobrainer import metrics
 
@@ -265,7 +267,7 @@ def variational(y_true, y_pred, model, n_examples=1, prior_model=None):
     return loss
 
 
-class Variational(LossFunctionWrapper):
+class Variational(Loss):
     """Computes the loss for a variational model.
 
     Use this loss for binary of multi-class segmentation.
@@ -277,8 +279,16 @@ class Variational(LossFunctionWrapper):
                  prior_model=None,
                  reduction=ReductionV2.SUM_OVER_BATCH_SIZE,
                  name='variational'):
-        super().__init__(
-            variational, model=model, n_examples=n_examples, prior_model=prior_model)
+        super().__init__(reduction=reduction, name=name)
+        self.model = model
+        self.n_examples = n_examples
+        self.prior_model = prior_model
+
+    def call(self, y_true, y_pred):
+        """Calculates the variational loss."""
+        y_pred = tf.convert_to_tensor(y_pred)
+        y_true = tf.cast(y_true, y_pred.dtype)
+        return variational(y_true=y_true, y_pred=y_pred, model=model, n_examples=n_examples, prior_model=prior_model)
 
 
 def get(loss):
