@@ -5,6 +5,7 @@ from tensorflow.python.keras.losses import Loss
 try:
     from tensorflow.python.keras.utils.losses_utils import ReductionV2
 except ImportError:
+    # for tensorflow 1.13.1
     from tensorflow.python.ops.losses.losses_impl import ReductionV2
 
 from nobrainer import metrics
