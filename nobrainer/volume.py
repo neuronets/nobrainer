@@ -116,6 +116,35 @@ def get_dataset(file_pattern, n_classes, batch_size, volume_shape,
     return dataset
 
 
+def apply_random_permutation(features, labels):
+    """Apply a random permutation to `features`. The `labels` tensor is not
+    altered.
+    """
+    def permute_values(x):
+
+        def normalize(x, max_value=12):
+            """Normalize array values to [0, max_value]."""
+            min_ = tf.reduce_min(x)
+            max_ = tf.reduce_max(x)
+            return (x - min_) * (max_value / (max_ - min_))
+
+        def _replace(x, keys, values):
+            sidx = tf.argsort(keys)
+            ks = tf.gather(keys, sidx)
+            vs = tf.gather(values, sidx)
+            idx = tf.searchsorted(ks, tf.reshape(x, (-1,)))
+            idx = tf.reshape(idx, x.shape)
+            return tf.gather(vs, idx)
+
+        x = normalize(x)
+        x = tf.round(x)
+        uniq, _ = tf.unique(tf.reshape(x, (-1,)))
+        uniq_shuffled = tf.random.shuffle(uniq)
+        return _replace(x, keys=uniq, values=uniq_shuffled)
+
+    return permute_values(features), labels
+
+
 def apply_random_transform(features, labels):
     """Apply a random rigid transformation to `features` and `labels`.
 
@@ -321,7 +350,10 @@ def _get_preprocess_fn(n_classes, block_shape=None, mapping=None, augment=False)
                     tf.random.uniform((1,)) > 0.5,
                     true_fn=lambda: apply_random_transform(features, labels),
                     false_fn=lambda: (features, labels))
-                # features, labels = apply_random_transform(features, labels)
+                features, labels = tf.cond(
+                    tf.random.uniform((1,)) > 0.5,
+                    true_fn=lambda: apply_random_permutation(features, labels),
+                    false_fn=lambda: (features, labels))
             features, labels = _preprocess_binary(
                 features=features, labels=labels, n_classes=n_classes, block_shape=block_shape)
             return features, labels
@@ -332,6 +364,10 @@ def _get_preprocess_fn(n_classes, block_shape=None, mapping=None, augment=False)
                 features, labels = tf.cond(
                     tf.random.uniform((1,)) > 0.5,
                     true_fn=lambda: apply_random_transform(features, labels),
+                    false_fn=lambda: (features, labels))
+                features, labels = tf.cond(
+                    tf.random.uniform((1,)) > 0.75,
+                    true_fn=lambda: apply_random_permutation(features, labels),
                     false_fn=lambda: (features, labels))
             features, labels = _preprocess_multiclass(
                 features=features, labels=labels, n_classes=n_classes, block_shape=block_shape, mapping=mapping)
