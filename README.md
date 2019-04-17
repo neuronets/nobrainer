@@ -1,12 +1,12 @@
 # Nobrainer
 
-[![Build Status](https://travis-ci.com/kaczmarj/nobrainer.svg?branch=master)](https://travis-ci.com/kaczmarj/nobrainer)
+[![Build Status](https://travis-ci.com/neuronets/nobrainer.svg?branch=master)](https://travis-ci.com/neuronets/nobrainer)
 
-![Model's prediction of brain mask](https://github.com/kaczmarj/nobrainer-models/blob/master/images/brain-extraction/unet-best-prediction.png?raw=true) ![Model's prediction of brain mask](https://github.com/kaczmarj/nobrainer-models/blob/master/images/brain-extraction/unet-worst-prediction.png?raw=true) <sub>__Figure__: In the first column are T1-weighted brain scans, in the middle are a trained model's predictions, and on the right are binarized FreeSurfer segmentations. Despite being trained on binarized FreeSurfer segmentations, the model outperforms FreeSurfer in the bottom scan, which exhibits motion distortion. It took about three seconds for the model to predict each brainmask using an NVIDIA GTX 1080Ti. It takes about 70 seconds on a recent CPU.</sub>
+![Model's prediction of brain mask](https://github.com/neuronets/nobrainer-models/blob/master/images/brain-extraction/unet-best-prediction.png?raw=true) ![Model's prediction of brain mask](https://github.com/neuronets/nobrainer-models/blob/master/images/brain-extraction/unet-worst-prediction.png?raw=true) <sub>__Figure__: In the first column are T1-weighted brain scans, in the middle are a trained model's predictions, and on the right are binarized FreeSurfer segmentations. Despite being trained on binarized FreeSurfer segmentations, the model outperforms FreeSurfer in the bottom scan, which exhibits motion distortion. It took about three seconds for the model to predict each brainmask using an NVIDIA GTX 1080Ti. It takes about 70 seconds on a recent CPU.</sub>
 
 _Nobrainer_ is a deep learning framework for 3D image processing. It implements several 3D convolutional models from recent literature, methods for loading and augmenting volumetric data that can be used with any TensorFlow or Keras model, losses and metrics for 3D data, and simple utilities for model training, evaluation, prediction, and transfer learning.
 
-_Nobrainer_ also provides pre-trained models for brain extraction, brain segmentation, and other tasks. Please see the [_Nobrainer_ models](https://github.com/kaczmarj/nobrainer-models) repository for more information.
+_Nobrainer_ also provides pre-trained models for brain extraction, brain segmentation, and other tasks. Please see the [_Nobrainer_ models](https://github.com/neuronets/nobrainer-models) repository for more information.
 
 The _Nobrainer_ project is supported by NIH R01 EB020470 and is distributed under the Apache 2.0 license.
 
@@ -26,9 +26,9 @@ The _Nobrainer_ project is supported by NIH R01 EB020470 and is distributed unde
 - [Package layout](#package-layout)
 - [Questions or issues](#questions-or-issues)
 
-## Guide Jupyter Notebooks [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kaczmarj/nobrainer)
+## Guide Jupyter Notebooks [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/neuronets/nobrainer)
 
-Please refer to the Jupyter notebooks in the [guide](/guide) directory to get started with _Nobrainer_. [Try them out](https://colab.research.google.com/github/kaczmarj/nobrainer) in Google Collaboratory!
+Please refer to the Jupyter notebooks in the [guide](/guide) directory to get started with _Nobrainer_. [Try them out](https://colab.research.google.com/github/neuronets/nobrainer) in Google Collaboratory!
 
 ## Installation
 
@@ -64,11 +64,11 @@ $ pip install --no-cache-dir nobrainer[gpu]
 
 ## Using pre-trained networks
 
-Pre-trained networks are available in the [_Nobrainer_ models](https://github.com/kaczmarj/nobrainer-models) repository. Prediction can be done on the command-line with `nobrainer predict` or in Python.
+Pre-trained networks are available in the [_Nobrainer_ models](https://github.com/neuronets/nobrainer-models) repository. Prediction can be done on the command-line with `nobrainer predict` or in Python.
 
 ### Predicting a brainmask for a T1-weighted brain scan
 
-In the following examples, we will use a 3D U-Net trained for brain extraction and documented in [_Nobrainer_ models](https://github.com/kaczmarj/nobrainer-models#brain-extraction).
+In the following examples, we will use a 3D U-Net trained for brain extraction and documented in [_Nobrainer_ models](https://github.com/neuronets/nobrainer-models#brain-extraction).
 
 In the base case, we run the T1w scan through the model for prediction.
 

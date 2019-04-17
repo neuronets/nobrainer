@@ -2,10 +2,36 @@
 
 import tensorflow as tf
 from tensorflow.python.keras.losses import Loss
-from tensorflow.python.keras.losses import LossFunctionWrapper
-from tensorflow.python.keras.utils.losses_utils import ReductionV2
+try:
+    from tensorflow.python.keras.utils.losses_utils import ReductionV2
+except ImportError:
+    # for tensorflow 1.13.1
+    from tensorflow.python.ops.losses.losses_impl import ReductionV2
 
 from nobrainer import metrics
+
+# Implemented with help from
+# https://github.com/umbertogriffo/focal-loss-keras/blob/master/losses.py
+# TODO(kaczmarj): add alpha parameter. According to the focal loss paper,
+# results are slightly better with this weighting parameter.
+def binary_focal(y_true, y_pred, gamma=2., axis=(1, 2, 3, 4)):
+    """Computes the binary focal loss between labels and predictions.
+
+    Reference
+    ---------
+    https://arxiv.org/pdf/1708.02002.pdf
+    """
+    pt_1 = tf.where(tf.equal(y_true, 1), y_pred, tf.ones_like(y_pred))
+    pt_0 = tf.where(tf.equal(y_true, 0), y_pred, tf.zeros_like(y_pred))
+
+    # Clip to prevent NaN loss.
+    eps = tf.keras.backend.epsilon()
+    pt_1 = tf.clip_by_value(pt_1, eps, 1. - eps)
+    pt_0 = tf.clip_by_value(pt_0, eps, 1. - eps)
+
+    return - (
+        tf.reduce_sum(tf.pow(1. - pt_1, gamma) * tf.log(pt_1), axis=axis)
+        + tf.reduce_sum(tf.pow(pt_0, gamma) * tf.log(1. - pt_0), axis=axis))
 
 
 def dice(y_true, y_pred, axis=(1, 2, 3, 4)):
@@ -49,10 +75,6 @@ class Dice(Loss):
         y_pred = tf.convert_to_tensor(y_pred)
         y_true = tf.cast(y_true, y_pred.dtype)
         return dice(y_true=y_true, y_pred=y_pred, axis=self.axis)
-
-
-def focal(y_true, y_pred):
-    raise NotImplementedError()
 
 
 def focal_tversky(y_true, y_pred):
@@ -265,7 +287,7 @@ def variational(y_true, y_pred, model, n_examples=1, prior_model=None):
     return loss
 
 
-class Variational(LossFunctionWrapper):
+class Variational(Loss):
     """Computes the loss for a variational model.
 
     Use this loss for binary of multi-class segmentation.
@@ -277,16 +299,24 @@ class Variational(LossFunctionWrapper):
                  prior_model=None,
                  reduction=ReductionV2.SUM_OVER_BATCH_SIZE,
                  name='variational'):
-        super().__init__(
-            variational, model=model, n_examples=n_examples, prior_model=prior_model)
+        super().__init__(reduction=reduction, name=name)
+        self.model = model
+        self.n_examples = n_examples
+        self.prior_model = prior_model
+
+    def call(self, y_true, y_pred):
+        """Calculates the variational loss."""
+        y_pred = tf.convert_to_tensor(y_pred)
+        y_true = tf.cast(y_true, y_pred.dtype)
+        return variational(y_true=y_true, y_pred=y_pred, model=model, n_examples=n_examples, prior_model=prior_model)
 
 
 def get(loss):
     """Wrapper for `tf.keras.losses.get` that includes Nobrainer's losses."""
     objects = {
+        'binary_focal': binary_focal,
         'dice': dice,
         'Dice': Dice,
-        'focal': focal,
         'focal_tversky': focal_tversky,
         'jaccard': jaccard,
         'Jaccard': Jaccard,

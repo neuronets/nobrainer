@@ -34,6 +34,7 @@ def test_meshnet():
         model_test(meshnet, n_classes=1, input_shape=(1, 32, 32, 32, 1), kwds={'receptive_field': 50})
 
 
+@pytest.mark.skip("this overloads memory on travis ci")
 def test_meshnet_vwn():
     model_test(meshnet_vwn, n_classes=1, input_shape=(1, 32, 32, 32, 1), kwds={'receptive_field': 37})
     model_test(meshnet_vwn, n_classes=1, input_shape=(1, 32, 32, 32, 1), kwds={'receptive_field': 67})
