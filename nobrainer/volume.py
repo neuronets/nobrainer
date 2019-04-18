@@ -351,7 +351,7 @@ def _get_preprocess_fn(n_classes, block_shape=None, mapping=None, augment=False)
                     true_fn=lambda: apply_random_transform(features, labels),
                     false_fn=lambda: (features, labels))
                 features, labels = tf.cond(
-                    tf.random.uniform((1,)) > 0.5,
+                    tf.random.uniform((1,)) > 0.9,
                     true_fn=lambda: apply_random_permutation(features, labels),
                     false_fn=lambda: (features, labels))
             features, labels = _preprocess_binary(
@@ -366,7 +366,7 @@ def _get_preprocess_fn(n_classes, block_shape=None, mapping=None, augment=False)
                     true_fn=lambda: apply_random_transform(features, labels),
                     false_fn=lambda: (features, labels))
                 features, labels = tf.cond(
-                    tf.random.uniform((1,)) > 0.75,
+                    tf.random.uniform((1,)) > 0.9,
                     true_fn=lambda: apply_random_permutation(features, labels),
                     false_fn=lambda: (features, labels))
             features, labels = _preprocess_multiclass(
