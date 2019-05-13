@@ -1,3 +1,5 @@
+from distutils.version import LooseVersion
+
 import numpy as np
 from numpy.testing import assert_allclose
 from numpy.testing import assert_array_equal
@@ -6,6 +8,25 @@ import scipy.spatial.distance
 import tensorflow as tf
 
 from nobrainer import losses
+
+def test_binary_focal():
+    x = np.zeros(4)
+    y = np.zeros(4)
+    out = losses.binary_focal(x, y, axis=None).numpy()
+    assert_allclose(out, 0, atol=1e-07)
+
+    x = np.ones(4)
+    y = np.ones(4)
+    out = losses.binary_focal(x, y, axis=None).numpy()
+    assert_allclose(out, 0, atol=1e-07)
+
+    x = np.ones((2, 4, 4, 4, 1), dtype=np.float32)
+    x[:, :2, 2:] = 0.
+    y = np.random.rand(*x.shape).astype(np.float32)
+    out = losses.binary_focal(x, y, gamma=0.).numpy()
+    ref = tf.keras.losses.binary_crossentropy(x, y).numpy().sum((1, 2, 3))
+    assert_allclose(ref, out, rtol=1e-04)
+    assert out.shape == (2,)
 
 
 def test_dice():
@@ -126,10 +147,19 @@ def test_variational():
 
 
 def test_get():
-    assert losses.get('dice') is losses.dice
-    assert losses.get('Dice') is losses.Dice
-    assert losses.get('jaccard') is losses.jaccard
-    assert losses.get('Jaccard') is losses.Jaccard
-    assert losses.get('tversky') is losses.tversky
-    assert losses.get('Tversky') is losses.Tversky
-    assert losses.get('binary_crossentropy')
+    if LooseVersion(tf.__version__) < LooseVersion("1.14.1-dev20190408"):
+        assert losses.get('dice') is losses.dice
+        assert losses.get('Dice') is losses.Dice
+        assert losses.get('jaccard') is losses.jaccard
+        assert losses.get('Jaccard') is losses.Jaccard
+        assert losses.get('tversky') is losses.tversky
+        assert losses.get('Tversky') is losses.Tversky
+        assert losses.get('binary_crossentropy')
+    else:
+        assert losses.get('dice') is losses.dice
+        assert isinstance(losses.get('Dice'), losses.Dice)
+        assert losses.get('jaccard') is losses.jaccard
+        assert isinstance(losses.get('Jaccard'), losses.Jaccard)
+        assert losses.get('tversky') is losses.tversky
+        assert isinstance(losses.get('Tversky'), losses.Tversky)
+        assert losses.get('binary_crossentropy')
