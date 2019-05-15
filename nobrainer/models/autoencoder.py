@@ -68,7 +68,7 @@ def autoencoder(input_shape, encoding_dim=512, n_base_filters=16, batchnorm=True
 	
 	# Decoder
 	x = layers.Reshape((1, 1, 1, encoding_dim))(x)
-	for i in range(n_layers-1,0,-1):
+	for i in range(n_layers)[::-1]:
 		n_filters = min(n_base_filters*(2**(i)), encoding_dim)
 
 		x = ConvTranspose(n_filters, **conv_transpose_kwds)(x)
