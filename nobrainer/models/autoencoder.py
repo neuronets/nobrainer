@@ -42,11 +42,13 @@ def autoencoder(input_shape, encoding_dim=512, n_base_filters=16, batchnorm=True
 	}
 
 	dimensions = input_shape[:-1]
-	if not dimensions[1:]==dimensions[:-1]:
+	n_dims = len(dimensions)
+
+	if not (n_dims in [2,3] and dimensions[1:]==dimensions[:-1]):
 		raise ValueError('Dimensions should be of square or cube!')
 
-	Conv = getattr(layers, 'Conv{}D'.format(len(dimensions)))
-	ConvTranspose = getattr(layers, 'Conv{}DTranspose'.format(len(dimensions)))
+	Conv = getattr(layers, 'Conv{}D'.format(n_dims))
+	ConvTranspose = getattr(layers, 'Conv{}DTranspose'.format(n_dims))
 	n_layers = int(math.log(dimensions[0], 2))
 
 	# Input layer
