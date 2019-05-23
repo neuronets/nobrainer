@@ -44,7 +44,7 @@ def autoencoder(input_shape, encoding_dim=512, n_base_filters=16, batchnorm=True
     n_dims = len(dimensions)
 
     if not (n_dims in [2,3] and dimensions[1:]==dimensions[:-1]):
-    raise ValueError('Dimensions should be of square or cube!')
+        raise ValueError('Dimensions should be of square or cube!')
 
     Conv = getattr(layers, 'Conv{}D'.format(n_dims))
     ConvTranspose = getattr(layers, 'Conv{}DTranspose'.format(n_dims))
@@ -55,12 +55,12 @@ def autoencoder(input_shape, encoding_dim=512, n_base_filters=16, batchnorm=True
 
     # Encoder
     for i in range(n_layers):
-    n_filters = min(n_base_filters*(2**(i)), encoding_dim)
+        n_filters = min(n_base_filters*(2**(i)), encoding_dim)
 
-    x = Conv(n_filters, **conv_kwds)(x)
-    if batchnorm:
-    x = layers.BatchNormalization()(x)
-    x = layers.ReLU()(x)
+        x = Conv(n_filters, **conv_kwds)(x)
+        if batchnorm:
+            x = layers.BatchNormalization()(x)
+            x = layers.ReLU()(x)
 
     # Encoding of the input image
     encoding = x = layers.Flatten(name='Encoding')(x)
@@ -68,12 +68,12 @@ def autoencoder(input_shape, encoding_dim=512, n_base_filters=16, batchnorm=True
     # Decoder
     x = layers.Reshape((1,)*n_dims+(encoding_dim,))(x)
     for i in range(n_layers)[::-1]:
-    n_filters = min(n_base_filters*(2**(i)), encoding_dim)
+        n_filters = min(n_base_filters*(2**(i)), encoding_dim)
 
-    x = ConvTranspose(n_filters, **conv_transpose_kwds)(x)
-    if batchnorm:
-    x = layers.BatchNormalization()(x)
-    x = layers.LeakyReLU()(x)
+        x = ConvTranspose(n_filters, **conv_transpose_kwds)(x)
+        if batchnorm:
+            x = layers.BatchNormalization()(x)
+            x = layers.LeakyReLU()(x)
 
     # Output layer
     outputs = Conv(1, 3, activation='sigmoid', padding='same')(x)
