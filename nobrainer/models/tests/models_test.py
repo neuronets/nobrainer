@@ -6,7 +6,7 @@ from nobrainer.models.highresnet import highresnet
 from nobrainer.models.meshnet import meshnet
 from nobrainer.models.meshnet import meshnet_vwn
 from nobrainer.models.unet import unet
-
+from nobrainer.models.autoencoder import autoencoder
 
 def model_test(model_cls, n_classes, input_shape, kwds={}):
     """Tests for models."""
@@ -45,3 +45,17 @@ def test_meshnet_vwn():
 
 def test_unet():
     model_test(unet, n_classes=1, input_shape=(1, 32, 32, 32, 1))
+
+
+def test_autoencoder():
+    """Special test for autoencoder."""
+
+    input_shape=(1,32,32,32,1)
+    x = 10 * np.random.random(input_shape)
+
+    model = autoencoder(input_shape[1:], encoding_dim=128, n_base_filters=32)
+    model.compile(tf.train.AdamOptimizer(), 'mse')
+    model.fit(x, x)
+
+    actual_output = model.predict(x)
+    assert actual_output.shape == x.shape
