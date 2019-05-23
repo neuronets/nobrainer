@@ -2,7 +2,7 @@ from nobrainer.models.highresnet import highresnet
 from nobrainer.models.meshnet import meshnet
 from nobrainer.models.meshnet import meshnet_vwn
 from nobrainer.models.unet import unet
-
+from nobrainer.models.autoencoder import autoencoder
 
 def get(name):
     """Return callable that creates a particular `tf.keras.Model`.
@@ -22,6 +22,7 @@ def get(name):
         'highresnet': highresnet,
         'meshnet': meshnet,
         'unet': unet,
+        'autoencoder': autoencoder
     }
 
     try:
