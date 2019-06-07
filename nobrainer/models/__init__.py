@@ -3,7 +3,7 @@ from .highresnet import highresnet
 from .meshnet import meshnet
 from .progressivegan import progressivegan
 from .unet import unet
-
+from .dcgan import dcgan
 
 def get(name):
     """Return callable that creates a particular `tf.keras.Model`.
@@ -25,6 +25,7 @@ def get(name):
         "unet": unet,
         "autoencoder": autoencoder,
         "progressivegan": progressivegan,
+        "dcgan": dcgan
     }
 
     try:
