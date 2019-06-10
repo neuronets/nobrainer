@@ -10,7 +10,7 @@ def dcgan(output_shape, z_dim=256, n_base_filters=16, batchnorm=True, batch_size
 
     Parameters
     ----------
-    output_shape: list or tuple of four ints, the shape of the output images. Omit
+    output_shape: list or tuple of four ints, the shape of the output images. Should be scaled to [0,1]. Omit
         the batch dimension, and include the number of channels. Currently, only squares and cubes supported.
     z_dim: int, the dimensions of the encoding of the latent code. This would translate
         to a latent code of dimensions encoding_dimx1.
@@ -71,10 +71,9 @@ def dcgan(output_shape, z_dim=256, n_base_filters=16, batchnorm=True, batch_size
 
     generator = models.Model(inputs=[z_input], outputs=[outputs], name=name+'_generator')
 
-    # PatchGAN Discriminator
+    # PatchGAN Discriminator with output of 8x8(x8)
     inputs =  layers.Input(shape=(output_shape), batch_size=batch_size)
     x = inputs
-
     for i in range(n_layers-3):
         n_filters = min(n_base_filters*(2**(i)), z_dim)
 
