@@ -75,7 +75,7 @@ In the base case, we run the T1w scan through the model for prediction.
 ```bash
 # Get sample T1w scan.
 wget -nc https://dl.dropbox.com/s/g1vn5p3grifro4d/T1w.nii.gz
-docker run --rm -v $PWD:/data kaczmarj/nobrainer \
+docker run --rm -v $PWD:/data -v nobrainer-models:/models kaczmarj/nobrainer \
   predict \
     --model=/models/brain-extraction-unet-128iso-model.h5 \
     --verbose \
@@ -88,7 +88,7 @@ For binary segmentation where we expect one predicted region, as is the case wit
 ```bash
 # Get sample T1w scan.
 wget -nc https://dl.dropbox.com/s/g1vn5p3grifro4d/T1w.nii.gz
-docker run --rm -v $PWD:/data kaczmarj/nobrainer \
+docker run --rm -v $PWD:/data -v nobrainer-models:/models kaczmarj/nobrainer \
   predict \
     --model=/models/brain-extraction-unet-128iso-model.h5 \
     --largest-label \
@@ -102,7 +102,7 @@ Because the network was trained on randomly rotated data, it should be agnostic 
 ```bash
 # Get sample T1w scan.
 wget -nc https://dl.dropbox.com/s/g1vn5p3grifro4d/T1w.nii.gz
-docker run --rm -v $PWD:/data kaczmarj/nobrainer \
+docker run --rm -v $PWD:/data -v nobrainer-models:/models kaczmarj/nobrainer \
   predict \
     --model=/models/brain-extraction-unet-128iso-model.h5 \
     --rotate-and-predict \
@@ -116,7 +116,7 @@ Combining the above, we can usually achieve the best brain extraction by using `
 ```bash
 # Get sample T1w scan.
 wget -nc https://dl.dropbox.com/s/g1vn5p3grifro4d/T1w.nii.gz
-docker run --rm -v $PWD:/data kaczmarj/nobrainer \
+docker run --rm -v $PWD:/data -v nobrainer-models:/models kaczmarj/nobrainer \
   predict \
     --model=/models/brain-extraction-unet-128iso-model.h5 \
     --largest-label \
