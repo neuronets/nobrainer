@@ -67,9 +67,14 @@ $ pip install --no-cache-dir nobrainer[gpu]
 
 ## Using pre-trained networks
 
-Pre-trained networks are available in the [_Nobrainer_ models](https://github.com/neuronets/nobrainer-models) repository and can be cloned into the working directory.
-```
-$ git clone https://github.com/neuronets/nobrainer-models
+Pre-trained networks are available in the [_Nobrainer_ models](https://github.com/neuronets/nobrainer-models/releases) repository as releases and can be downloaded into the working directory. 
+
+```bash
+# Specify release version and model name
+git clone https://github.com/neuronets/nobrainer-models
+RELEASE=0.1
+MODEL_NAME=brain-extraction-unet-128iso-model.h5
+wget https://github.com/neuronets/nobrainer-models/releases/download/$RELEASE/$MODEL_NAME -P nobrainer-models
 ```
 
 ### Predicting a brainmask for a T1-weighted brain scan
@@ -79,12 +84,11 @@ In the following examples, we will use a 3D U-Net trained for brain extraction a
 In the base case, we run the T1w scan through the model for prediction using Docker in the working directory.
 
 ```bash
-# Get sample T1w scan.
+# Get sample T1w scan and run docker
 wget -nc https://dl.dropbox.com/s/g1vn5p3grifro4d/T1w.nii.gz
-# Run docker container to predict on T1w scan
-docker run --rm -v $PWD:/data -v nobrainer-models:/models kaczmarj/nobrainer \
+docker run --rm -v $PWD:/data kaczmarj/nobrainer \
   predict \
-    --model=/models/brain-extraction-unet-128iso-model.h5 \
+    --model=/data/nobrainer-models/brain-extraction-unet-128iso-model.h5 \
     --verbose \
     /data/T1w.nii.gz \
     /data/brainmask.nii.gz
@@ -93,12 +97,11 @@ docker run --rm -v $PWD:/data -v nobrainer-models:/models kaczmarj/nobrainer \
 For binary segmentation where we expect one predicted region, as is the case with brain extraction, we can reduce false positives by removing all predictions not connected to the largest contiguous label.
 
 ```bash
-# Get sample T1w scan.
+# Get sample T1w scan and run docker
 wget -nc https://dl.dropbox.com/s/g1vn5p3grifro4d/T1w.nii.gz
-# Run docker container to predict on T1w scan
-docker run --rm -v $PWD:/data -v nobrainer-models:/models kaczmarj/nobrainer \
+docker run --rm -v $PWD:/data kaczmarj/nobrainer \
   predict \
-    --model=/models/brain-extraction-unet-128iso-model.h5 \
+    --model=/data/nobrainer-models/brain-extraction-unet-128iso-model.h5 \
     --largest-label \
     --verbose \
     /data/T1w.nii.gz \
@@ -108,12 +111,11 @@ docker run --rm -v $PWD:/data -v nobrainer-models:/models kaczmarj/nobrainer \
 Because the network was trained on randomly rotated data, it should be agnostic to orientation. Therefore, we can rotate the volume, predict on it, undo the rotation in the prediction, and average the prediction with that from the original volume. This can lead to a better overall prediction but will at least double the processing time. To enable this, use the flag `--rotate-and-predict` in `nobrainer predict`.
 
 ```bash
-# Get sample T1w scan.
+# Get sample T1w scan and run docker
 wget -nc https://dl.dropbox.com/s/g1vn5p3grifro4d/T1w.nii.gz
-# Run docker container to predict on T1w scan
-docker run --rm -v $PWD:/data -v nobrainer-models:/models kaczmarj/nobrainer \
+docker run --rm -v $PWD:/data kaczmarj/nobrainer \
   predict \
-    --model=/models/brain-extraction-unet-128iso-model.h5 \
+    --model=/data/nobrainer-models/brain-extraction-unet-128iso-model.h5 \
     --rotate-and-predict \
     --verbose \
     /data/T1w.nii.gz \
@@ -123,12 +125,11 @@ docker run --rm -v $PWD:/data -v nobrainer-models:/models kaczmarj/nobrainer \
 Combining the above, we can usually achieve the best brain extraction by using `--rotate-and-predict` in conjunction with `--largest-label`.
 
 ```bash
-# Get sample T1w scan.
+# Get sample T1w scan and run docker
 wget -nc https://dl.dropbox.com/s/g1vn5p3grifro4d/T1w.nii.gz
-# Run docker container to predict on T1w scan
-docker run --rm -v $PWD:/data -v nobrainer-models:/models kaczmarj/nobrainer \
+docker run --rm -v $PWD:/data kaczmarj/nobrainer \
   predict \
-    --model=/models/brain-extraction-unet-128iso-model.h5 \
+    --model=/data/nobrainer-models/brain-extraction-unet-128iso-model.h5 \
     --largest-label \
     --rotate-and-predict \
     --verbose \
