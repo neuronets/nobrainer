@@ -9,25 +9,6 @@ import tensorflow as tf
 
 from nobrainer import losses
 
-def test_binary_focal():
-    x = np.zeros(4)
-    y = np.zeros(4)
-    out = losses.binary_focal(x, y, axis=None).numpy()
-    assert_allclose(out, 0, atol=1e-07)
-
-    x = np.ones(4)
-    y = np.ones(4)
-    out = losses.binary_focal(x, y, axis=None).numpy()
-    assert_allclose(out, 0, atol=1e-07)
-
-    x = np.ones((2, 4, 4, 4, 1), dtype=np.float32)
-    x[:, :2, 2:] = 0.
-    y = np.random.rand(*x.shape).astype(np.float32)
-    out = losses.binary_focal(x, y, gamma=0.).numpy()
-    ref = tf.keras.losses.binary_crossentropy(x, y).numpy().sum((1, 2, 3))
-    assert_allclose(ref, out, rtol=1e-04)
-    assert out.shape == (2,)
-
 
 def test_dice():
     x = np.zeros(4)
