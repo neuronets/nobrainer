@@ -170,9 +170,9 @@ def _convert(tfrecords_path_volume_filepaths, to_ras=True, gzip_compressed=True)
         return tf.train.Example(features=tf.train.Features(feature=feature))
 
     if gzip_compressed:
-        options = tf.io.TFRecordOptions(compression_type=tf.io.TFRecordCompressionType.GZIP)
+        options = tf.io.TFRecordOptions(compression_type="GZIP")
     else:
-        options = None
+        options = tf.io.TFRecordOptions(compression_type="")
 
     with tf.io.TFRecordWriter(tfrecords_path, options=options) as writer:
         for fpath, lpath in volume_filepaths:
