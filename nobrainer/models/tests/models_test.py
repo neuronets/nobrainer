@@ -15,7 +15,7 @@ def model_test(model_cls, n_classes, input_shape, kwds={}):
 
     # Assume every model class has n_classes and input_shape arguments.
     model = model_cls(n_classes=n_classes, input_shape=input_shape[1:], **kwds)
-    model.compile(tf.train.AdamOptimizer(), 'binary_crossentropy')
+    model.compile(tf.optimizers.Adam(), 'binary_crossentropy')
     model.fit(x, y)
 
     actual_output = model.predict(x)
@@ -54,7 +54,7 @@ def test_autoencoder():
     x = 10 * np.random.random(input_shape)
 
     model = autoencoder(input_shape[1:], encoding_dim=128, n_base_filters=32)
-    model.compile(tf.train.AdamOptimizer(), 'mse')
+    model.compile(tf.optimizers.Adam(), 'mse')
     model.fit(x, x)
 
     actual_output = model.predict(x)

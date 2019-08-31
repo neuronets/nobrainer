@@ -10,29 +10,6 @@ except ImportError:
 
 from nobrainer import metrics
 
-# Implemented with help from
-# https://github.com/umbertogriffo/focal-loss-keras/blob/master/losses.py
-# TODO(kaczmarj): add alpha parameter. According to the focal loss paper,
-# results are slightly better with this weighting parameter.
-def binary_focal(y_true, y_pred, gamma=2., axis=(1, 2, 3, 4)):
-    """Computes the binary focal loss between labels and predictions.
-
-    Reference
-    ---------
-    https://arxiv.org/pdf/1708.02002.pdf
-    """
-    pt_1 = tf.where(tf.equal(y_true, 1), y_pred, tf.ones_like(y_pred))
-    pt_0 = tf.where(tf.equal(y_true, 0), y_pred, tf.zeros_like(y_pred))
-
-    # Clip to prevent NaN loss.
-    eps = tf.keras.backend.epsilon()
-    pt_1 = tf.clip_by_value(pt_1, eps, 1. - eps)
-    pt_0 = tf.clip_by_value(pt_0, eps, 1. - eps)
-
-    return - (
-        tf.reduce_sum(tf.pow(1. - pt_1, gamma) * tf.log(pt_1), axis=axis)
-        + tf.reduce_sum(tf.pow(pt_0, gamma) * tf.log(1. - pt_0), axis=axis))
-
 
 def dice(y_true, y_pred, axis=(1, 2, 3, 4)):
     return 1. - metrics.dice(y_true=y_true, y_pred=y_pred, axis=axis)
@@ -314,7 +291,6 @@ class Variational(Loss):
 def get(loss):
     """Wrapper for `tf.keras.losses.get` that includes Nobrainer's losses."""
     objects = {
-        'binary_focal': binary_focal,
         'dice': dice,
         'Dice': Dice,
         'focal_tversky': focal_tversky,
