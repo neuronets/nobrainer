@@ -7,9 +7,6 @@ import tensorflow as tf
 
 from nobrainer import metrics
 
-# TF 2.0 compatibility
-tf.enable_eager_execution()
-
 
 def test_dice():
     x = np.zeros(4)

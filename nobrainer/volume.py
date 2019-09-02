@@ -1,6 +1,7 @@
 """Volume processing methods."""
 
 import glob
+import itertools
 import math
 
 import numpy as np
@@ -244,7 +245,7 @@ def to_blocks(x, block_shape):
     block_shape = np.asarray(block_shape)
     blocks = volume_shape // block_shape
 
-    inter_shape = tuple(e for tup in zip(blocks, block_shape) for e in tup)
+    inter_shape = list(itertools.chain(*zip(blocks, block_shape)))
     new_shape = (-1, *block_shape)
     perm = (0, 2, 4, 1, 3, 5)  # 3D only
     return tf.reshape(
