@@ -10,7 +10,9 @@ FROM nvidia/cuda${ARCH:+-$ARCH}:${CUDA}-base-ubuntu${UBUNTU_VERSION} as base
 # (but their default value is retained if set previously)
 ARG ARCH
 ARG CUDA
-ARG CUDNN=7.4.1.5-1
+# CUDNN version should be updated regularly. Check the TensorFlow GPU
+# Dockerfiles for correct version number.
+ARG CUDNN=7.6.2.24-1
 
 ARG DEBIAN_FRONTEND="noninteractive"
 
@@ -36,23 +38,29 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# For CUDA profiling, TensorFlow requires CUPTI.
 ENV LD_LIBRARY_PATH="/usr/local/cuda/extras/CUPTI/lib64:$LD_LIBRARY_PATH"
+
+# Link the libcuda stub to the location where tensorflow is searching for it and reconfigure
+# dynamic linker run-time bindings
+RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 \
+    && echo "/usr/local/cuda/lib64/stubs" > /etc/ld.so.conf.d/z-cuda-stubs.conf \
+    && ldconfig
 
 ENV LANG="C.UTF-8"
 COPY [".", "/opt/nobrainer"]
 RUN apt-get update \
     && apt-get install --yes --quiet --no-install-recommends \
+        ca-certificates \
+        curl \
         git \
         python3 \
-        python3-h5py \
-        python3-numpy \
-        python3-pip \
-        python3-scipy \
-        python3-setuptools \
-        python3-wheel \
+        python3-distutils \
     && rm -rf /var/lib/apt/lists/* \
+    && curl -fsSL https://bootstrap.pypa.io/get-pip.py | python3 - \
+    && apt-get autoremove --yes --quiet --purge curl \
     && pip3 install --no-cache-dir --editable /opt/nobrainer[gpu] \
     && ln -s $(which python3) /usr/local/bin/python \
     && ln -sf /opt/nobrainer/models /models
 ENTRYPOINT ["nobrainer"]
-LABEL maintainer="Jakub Kaczmarzyk <jakubk@mit.edu>"
+LABEL maintainer="Jakub Kaczmarzyk <jakub.kaczmarzyk@gmail.com>"
