@@ -58,7 +58,7 @@ RUN apt-get update \
         python3-distutils \
     && rm -rf /var/lib/apt/lists/* \
     && curl -fsSL https://bootstrap.pypa.io/get-pip.py | python3 - \
-    && apt-get autoremove --yes --quiet --purge curl \
+    && apt-get autoremove --yes --quiet --purge ca-certificates curl \
     && pip3 install --no-cache-dir --editable /opt/nobrainer[gpu] \
     && ln -s $(which python3) /usr/local/bin/python \
     && ln -sf /opt/nobrainer/models /models
