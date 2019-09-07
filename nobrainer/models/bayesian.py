@@ -1,14 +1,16 @@
-"""Model definition for MeshNet.
-
-Implemented according to the [MeshNet manuscript](https://arxiv.org/abs/1612.00940)
-"""
+"""Implementations of Bayesian neural networks."""
 
 import tensorflow as tf
-from tensorflow.keras import layers
+import tensorflow_probability as tfp
+
+tfl = tf.layers
+tfpl = tfp.layers
 
 
-def meshnet(n_classes, input_shape, receptive_field=67, filters=71, activation='relu', dropout_rate=0.25, batch_size=None, name='meshnet'):
-    """Instantiate MeshNet model.
+def variational_meshnet(n_classes, input_shape, receptive_field=67, filters=71, activation='relu', is_mc=False, batch_size=None, name='meshnet_vwn'):
+    """Instantiate variational MeshNet model.
+
+    Please see https://arxiv.org/abs/1805.10863 for more information.
 
     Parameters
     ----------
@@ -23,7 +25,10 @@ def meshnet(n_classes, input_shape, receptive_field=67, filters=71, activation='
         MeshNet manuscript uses 21 filters for a binary segmentation task
         (i.e., brain extraction) and 71 filters for a multi-class segmentation task.
     activation: str or optimizer object, the non-linearity to use.
-    dropout_rate: float between 0 and 1, the fraction of input units to drop.
+    is_mc: bool, if true, apply variational approximation in the variational
+        convolution layers. If false, will use the most likely weight (i.e.,
+        the mean of the weight gaussian) instead of sampling a weight from the
+        gaussian distribution.
     batch_size: int, number of samples in each batch. This must be set when
         training on TPUs.
     name: str, name to give to the resulting model object.
@@ -41,13 +46,20 @@ def meshnet(n_classes, input_shape, receptive_field=67, filters=71, activation='
         raise ValueError("unknown receptive field. Legal values are 37, 67, and 129.")
 
     def one_layer(x, layer_num, dilation_rate=(1, 1, 1)):
-        x = layers.Conv3D(filters, kernel_size=(3, 3, 3), padding='same', dilation_rate=dilation_rate, name='layer{}/conv3d'.format(layer_num))(x)
-        x = layers.BatchNormalization(name='layer{}/batchnorm'.format(layer_num))(x)
+        # Normally, meshnet has layers of
+        # conv -> batchnorm --> activation --> dropout
+        # but for the variational model, we do not include batchnorm and
+        # dropout. The variational convolution implements weightnorm, which
+        # gives similar benefits as batchnorm without the extra trainable
+        # parameters.
+		# TODO: implement correct behavior for is_mc.
+        tfpl.Convolution3DReparametrization(
+        	filters, kernel_size=3, padding='same', dilation_rate=dilation_rate, activation=activation,
+			name='layer{}/vwnconv3d'.format(layer_num))(x)
         x = layers.Activation(activation, name='layer{}/activation'.format(layer_num))(x)
-        x = layers.Dropout(dropout_rate, name='layer{}/dropout'.format(layer_num))(x)
         return x
 
-    inputs = layers.Input(shape=input_shape, batch_size=batch_size, name='inputs')
+    inputs = tfl.Input(shape=input_shape, batch_size=batch_size, name='inputs')
 
     if receptive_field == 37:
         x = one_layer(inputs, 1)
@@ -74,7 +86,9 @@ def meshnet(n_classes, input_shape, receptive_field=67, filters=71, activation='
         x = one_layer(x, 6, dilation_rate=(32, 32, 32))
         x = one_layer(x, 7)
 
-    x = layers.Conv3D(filters=n_classes, kernel_size=(1, 1, 1), padding='same', name='classification/conv3d')(x)
+	# TODO; implement is_mc behavior.
+    x = tfpl.Convolution3DReparametrization(
+		filters=n_classes, kernel_size=1, padding='same', name='classification/vwnconv3d')(x)
 
     final_activation = 'sigmoid' if n_classes == 1 else 'softmax'
     x = layers.Activation(final_activation, name='classification/activation')(x)
