@@ -26,17 +26,18 @@ class BernoulliDropout(tfkl.Layer):
       [https://www.cs.toronto.edu/~hinton/absps/JMLRdropout.pdf]
         (https://www.cs.toronto.edu/~hinton/absps/JMLRdropout.pdf)
     """
-    def __init__(self, keep_prob, is_monte_carlo, scale_during_training=True, name='bernoulli_dropout'):
-        self.keep_prob = keep_prob
+    def __init__(self, rate, is_monte_carlo, scale_during_training=True, name='bernoulli_dropout'):
+        self.rate = rate
         self.is_monte_carlo = is_monte_carlo
         self.scale_during_training = scale_during_training
+        self.keep_prob = 1.0 - rate
         super().__init__(self, name=name)
 
     def call(self, x):
         inference = x
 
         def apply_bernoulli_dropout():
-            d = tf.nn.dropout(inference, self.keep_prob)
+            d = tf.nn.dropout(inference, rate=self.rate)
             return d * self.keep_prob if self.scale_during_training else d
 
         if self.scale_during_training:
