@@ -111,53 +111,28 @@ def _get_all_cpus():
 
 
 class StreamingStats:
-    """Calculate mean, variance, and entropy of streaming data.
-
-    Example
-    -------
-    s = StreamingStats()
-    x = [2, 4, 6, 8, 10]
-    for j in x:
-        s.update(j)
-    s.mean == sum(x) / len(x)
-    """
 
     def __init__(self):
-        self._current_mean = None
-        self._M = 0.0
-        self._steps = 0
-        self._shape = None
+        self._n_samples = 0
+        self._prev_mean = 0.0
+        self._curr_mean = 0.0
+        self._M = 0
 
-    def update(self, values):
-        values = np.asarray(values)
-        if self._shape is None:
-            self._shape = values.shape
-        if values.shape != self._shape:
-            raise ValueError("Shape mismatch. Expected {} but received {}".format(self._shape, values.shape))
-        if self._steps == 0:
-            self._current_mean = values
-        previous_mean = self._current_mean
-        current_mean = previous_mean + (values - previous_mean) / (self._steps + 1)
-        new_M = self._M + (previous_mean - values) * (current_mean - values)
-        # Only update the values if the computation above succeeded.
-        self._current_mean = current_mean
-        self._M = new_M
-        self._steps += 1
+    def update(self, x):
+        if self._n_samples == 0:
+            self._curr_mean = x
+        else:
+            self._prev_mean = self._curr_mean
+            self._curr_mean = self._prev_mean + (x - self._prev_mean) / (self._n_samples + 1)
+            self._M = self._M + (self._prev_mean - x) * (self._curr_mean - x)
+        self._n_samples += 1
         return self
 
-    def reset(self):
-        self._steps = 0
-        self._current_mean = None
-        self._M = 0.0
-        self._shape = None
+    def entropy(self):
+        return -np.log(self._curr_mean + 1e-07) * self._curr_mean
 
-    @property
     def mean(self):
-        return self._current_mean
+        return self._curr_mean
 
-    def variance(self, axis=-1):
-        return np.sum(self._M / self._steps, axis=axis)
-
-    def entropy(self, axis=-1):
-        eps = 1e-07
-        return -np.sum(self.mean * np.log(self.mean + eps), axis=axis)
+    def var(self):
+        return self._M / self._n_samples
