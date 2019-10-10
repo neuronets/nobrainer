@@ -5,8 +5,12 @@ tfkl = tfk.layers
 
 
 class BernoulliDropout(tfkl.Layer):
-    """ Bernoulli Dropout.
-    Outputs the input element multiplied by a random variable sampled from a Bernoulli distribution with either mean keep_prob (scale_during_training False) or mean 1 (scale_during_training True)
+    """Bernoulli dropout layer.
+
+    Outputs the input element multiplied by a random variable
+    sampled from a Bernoulli distribution with either mean keep_prob
+    (scale_during_training False) or mean 1 (scale_during_training True)
+
     Arguments:
         incoming : A `Tensor`. The incoming tensor.
         keep_prob : A float representing the probability that each element
@@ -26,27 +30,28 @@ class BernoulliDropout(tfkl.Layer):
         self.keep_prob = keep_prob
         self.is_monte_carlo = is_monte_carlo
         self.scale_during_training = scale_during_training
-        self.name = name
+        super().__init__(self, name=name)
 
     def call(self, x):
         inference = x
 
         def apply_bernoulli_dropout():
-            if self.scale_during_training:
-                return tf.nn.dropout(inference, self.keep_prob)
-            else:
-                return tf.scalar_mul(self.keep_prob, tf.nn.dropout(inference, self.keep_prob))
+            d = tf.nn.dropout(inference, self.keep_prob)
+            return d * self.keep_prob if self.scale_during_training else d
 
         if self.scale_during_training:
-            expectation =  inference
+            expectation = inference
         else:
-            expectation =  tf.scalar_mul(self.keep_prob, inference)
-        inference = tf.cond(self.is_monte_carlo, apply_bernoulli_dropout, lambda: expectation)
-    return inference
+            expectation = self.keep_prob * inference
+
+        if self.is_monte_carlo:
+            return apply_bernoulli_dropout()
+        else:
+            return expectation
 
 
 class ConcreteDropout(tfkl.Layer):
-    """ Concrete Dropout.
+    """Concrete Dropout.
     Outputs the input element multiplied by a random variable sampled from a concrete distribution
     Arguments:
         incoming : A `Tensor`. The incoming tensor.
@@ -66,14 +71,14 @@ class ConcreteDropout(tfkl.Layer):
         self.n_filters = n_filters
         self.temperature = temperature
         self.use_expectation = use_expectation
-        self.name = name
+        super().__init__(self, name=name)
 
     def build(self, input_shape):
-        initial_p = 0.9
-        if n_filters is not None:
-            self.add_variable("p", shape=[self.n_filters] initializer=initial_p)
+        initial_p = tfk.initializers.Constant(0.9)
+        if self.n_filters is not None:
+            self.p = self.add_weight("p", shape=[self.n_filters], initializer=initial_p)
         else:
-            self.add_variable("p", shape=[] initializer=initial_p)
+            self.p = self.add_weight("p", shape=[], initializer=initial_p)
         self.p = tf.clip_by_value(self.p, 0.05, 0.95)
 
     def call(self, x):
@@ -94,4 +99,4 @@ class ConcreteDropout(tfkl.Layer):
         if not self.use_expectation:
             expectation = inference
         inference = tf.cond(self.is_monte_carlo, apply_concrete_dropout, lambda: expectation)
-    return inference
+        return inference
