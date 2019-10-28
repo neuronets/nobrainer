@@ -111,28 +111,76 @@ def _get_all_cpus():
 
 
 class StreamingStats:
+    """Object to calculate statistics on streaming data.
+
+    Compatible with scalars and n-dimensional arrays.
+
+    Examples
+    --------
+
+    ```python
+    >>> s = StreamingStats()
+    >>> s.update(10).update(20)
+    >>> s.mean()
+    15.0
+    ```
+
+    ```python
+    >>> import numpy as np
+    >>> a = np.array([[0, 2], [4, 8]])
+    >>> b = np.array([[2, 4], [8, 16]])
+    >>> s = StreamingStats()
+    >>> s.update(a).update(b)
+    >>> s.mean()
+    array([[ 1.,  3.],
+       [ 6., 12.]])
+    ```
+    """
 
     def __init__(self):
         self._n_samples = 0
-        self._prev_mean = 0.0
-        self._curr_mean = 0.0
-        self._M = 0
+        self._current_mean = 0.0
+        self._M = 0.0
 
-    def update(self, x):
+    def update(self, value):
+        """Update the statistics with the next value.
+
+        Parameters
+        ----------
+        value: scalar, array-like
+
+        Returns
+        -------
+        Modified instance.
+        """
         if self._n_samples == 0:
-            self._curr_mean = x
+            self._current_mean = value
         else:
-            self._prev_mean = self._curr_mean
-            self._curr_mean = self._prev_mean + (x - self._prev_mean) / (self._n_samples + 1)
-            self._M = self._M + (self._prev_mean - x) * (self._curr_mean - x)
+            prev_mean = self._current_mean
+            curr_mean = prev_mean + (value - prev_mean) / (self._n_samples + 1)
+            _M = self._M + (prev_mean - value) * (curr_mean - value)
+            # Set the instance attributes after computation in case there are
+            # errors during computation.
+            self._current_mean = curr_mean
+            self._M = _M
         self._n_samples += 1
         return self
 
-    def entropy(self):
-        return -np.log(self._curr_mean + 1e-07) * self._curr_mean
-
     def mean(self):
-        return self._curr_mean
+        """Return current mean of streaming data."""
+        return self._current_mean
 
     def var(self):
+        """Return current variance of streaming data."""
         return self._M / self._n_samples
+
+    def std(self):
+        """Return current standard deviation of streaming data."""
+        return self.var() ** 0.5
+
+    def entropy(self):
+        """Return current entropy of streaming data."""
+        eps = 1e-07
+        mult = np.multiply(np.log(self.mean() + eps), self.mean())
+        return -mult
+        # return -np.sum(mult, axis=axis)
