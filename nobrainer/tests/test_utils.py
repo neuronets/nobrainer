@@ -29,26 +29,19 @@ def test_get_all_cpus():
 
 
 def test_streaming_stats():
-    # batch, depth, height, width, classes.
-    x = np.random.rand(5, 8, 8, 8, 20)
-    x[0] *= 0.2
-    x[1] *= 0.5
-    x[2] *= 0.8
-    x[3] *= 1.1
-    x = np.clip(x, 0, 1, out=x)
+    # TODO: add entropy
+    ss = nbutils.StreamingStats()
+    xs = np.random.random_sample((100))
+    for x in xs:
+        ss.update(x)
+    assert_allclose(xs.mean(), ss.mean())
+    assert_allclose(xs.std(), ss.std())
+    assert_allclose(xs.var(), ss.var())
 
-    s = nbutils.StreamingStats()
-    for i in range(x.shape[0]):
-        s.update(x[i])
-    assert_allclose(s.mean, np.mean(x, axis=0))
-
-    s.reset()
-    x = [1, 2, 3, 11, 12, 13]
-    for i in x:
-        s.update(i)
-    assert_allclose(s.mean, np.mean(x))
-    assert_allclose(s.variance(), np.var(x))
-
-    # Shape mismatch.
-    with pytest.raises(ValueError):
-        s.update([10, 10])
+    ss = nbutils.StreamingStats()
+    xs = np.random.random_sample((10, 5, 5, 5))
+    for x in xs:
+        ss.update(x)
+    assert_allclose(xs.mean(0), ss.mean())
+    assert_allclose(xs.std(0), ss.std())
+    assert_allclose(xs.var(0), ss.var())
