@@ -11,21 +11,24 @@ class BernoulliDropout(tfkl.Layer):
     sampled from a Bernoulli distribution with either mean keep_prob
     (scale_during_training False) or mean 1 (scale_during_training True)
 
-    Arguments:
-        incoming : A `Tensor`. The incoming tensor.
-        keep_prob : A float representing the probability that each element
-            is kept.
-        scale_during_training : A boolean value determining whether scaling is performed during training or testing
-        mc : A boolean Tensor correponding to whether or not Monte-Carlo sampling will be used to calculate the networks output
-        name : A name for this layer (optional).
-    References:
-        Dropout: A Simple Way to Prevent Neural Networks from Overfitting.
+    Parameters
+    ----------
+    rate :
+    is_monte_carlo : A boolean Tensor correponding to whether or not Monte-Carlo sampling will be used to calculate the networks output
+    scale_during_training : A boolean value determining whether scaling is performed during training or testing
+    name : A name for this layer (optional).
+
+    References
+    ----------
+    Dropout: A Simple Way to Prevent Neural Networks from Overfitting.
         N. Srivastava, G. Hinton, A. Krizhevsky, I. Sutskever & R. Salakhutdinov,
         (2014), Journal of Machine Learning Research, 5(Jun)(2), 1929-1958.
-    Links:
-      [https://www.cs.toronto.edu/~hinton/absps/JMLRdropout.pdf]
-        (https://www.cs.toronto.edu/~hinton/absps/JMLRdropout.pdf)
+
+    Links
+    -----
+    [https://www.cs.toronto.edu/~hinton/absps/JMLRdropout.pdf](https://www.cs.toronto.edu/~hinton/absps/JMLRdropout.pdf)
     """
+
     def __init__(self, rate, is_monte_carlo, scale_during_training=True, name='bernoulli_dropout'):
         self.rate = rate
         self.is_monte_carlo = is_monte_carlo
@@ -53,20 +56,26 @@ class BernoulliDropout(tfkl.Layer):
 
 class ConcreteDropout(tfkl.Layer):
     """Concrete Dropout.
+
     Outputs the input element multiplied by a random variable sampled from a concrete distribution
-    Arguments:
-        incoming : A `Tensor`. The incoming tensor.
-        mc : A boolean Tensor correponding to whether or not Monte-Carlo sampling will be used to calculate the networks output
-        name : A name for this layer (optional).
-    References:
-        Concrete Dropout.
-       Y. Gal, J. Hron & A. Kendall,
-       Advances in Neural Information Processing Systems.
-       2017.
-    Links:
-      [http://papers.nips.cc/paper/6949-concrete-dropout.pdf]
-        (http://papers.nips.cc/paper/6949-concrete-dropout.pdf)
+
+    Parameters
+    ----------
+    is_monte_carlo : A boolean Tensor correponding to whether or not Monte-Carlo sampling will be used to calculate the networks output
+    n_filters
+    temperature
+    use_expectation
+    name : A name for this layer (optional).
+
+    References
+    ----------
+    Concrete Dropout. Y. Gal, J. Hron & A. Kendall, Advances in Neural Information Processing Systems. 2017.
+
+    Links
+    -----
+    [http://papers.nips.cc/paper/6949-concrete-dropout.pdf](http://papers.nips.cc/paper/6949-concrete-dropout.pdf)
     """
+
     def __init__(self, is_monte_carlo, n_filters=None, temperature=0.02, use_expectation=True, name='concrete_dropout'):
         self.is_monte_carlo = is_monte_carlo
         self.n_filters = n_filters
