@@ -1,7 +1,14 @@
+"""Dropout layers in `tf.keras`."""
+
+import math
+
 import tensorflow as tf
 
 tfk = tf.keras
 tfkl = tfk.layers
+
+# TODO: add `K.in_train_phase`.
+# TODO: add `get_config` and `compute_output_shape` instance methods.
 
 
 class BernoulliDropout(tfkl.Layer):
@@ -13,7 +20,7 @@ class BernoulliDropout(tfkl.Layer):
 
     Parameters
     ----------
-    rate :
+    rate : float between 0 and 1, drop probability.
     is_monte_carlo : A boolean Tensor correponding to whether or not Monte-Carlo sampling will be used to calculate the networks output
     scale_during_training : A boolean value determining whether scaling is performed during training or testing
     name : A name for this layer (optional).
@@ -37,21 +44,15 @@ class BernoulliDropout(tfkl.Layer):
         super().__init__(self, name=name)
 
     def call(self, x):
-        inference = x
 
         def apply_bernoulli_dropout():
-            d = tf.nn.dropout(inference, rate=self.rate)
-            return d * self.keep_prob if self.scale_during_training else d
-
-        if self.scale_during_training:
-            expectation = inference
-        else:
-            expectation = self.keep_prob * inference
+            d = tf.nn.dropout(x, rate=self.rate)
+            return d if self.scale_during_training else d * self.keep_prob
 
         if self.is_monte_carlo:
             return apply_bernoulli_dropout()
-        else:
-            return expectation
+
+        return x if self.scale_during_training else self.keep_prob * x
 
 
 class ConcreteDropout(tfkl.Layer):
@@ -62,7 +63,6 @@ class ConcreteDropout(tfkl.Layer):
     Parameters
     ----------
     is_monte_carlo : A boolean Tensor correponding to whether or not Monte-Carlo sampling will be used to calculate the networks output
-    n_filters
     temperature
     use_expectation
     name : A name for this layer (optional).
@@ -100,13 +100,44 @@ class ConcreteDropout(tfkl.Layer):
             z = tf.nn.sigmoid(
                 (tf.log(p + eps) - tf.log(1.0 - p + eps) + tf.log(noise + eps) - tf.log(1.0 - noise + eps))
                 / temperature)
-            return tf.multiply(x, z)
+            return x * z
 
-        if self.n_filters is not None:
-            expectation = tf.multiply(self.p, inference)
+        if self.is_monte_carlo:
+            return apply_concrete_dropout()
         else:
-            expectation = tf.scalar_mul(self.p, inference)
-        if not self.use_expectation:
-            expectation = inference
-        inference = tf.cond(self.is_monte_carlo, apply_concrete_dropout, lambda: expectation)
-        return inference
+            return inference * self.p if self.use_expectation else inference
+
+
+class GaussianDropout(tfkl.Layer):
+    """Gaussian Dropout.
+
+    Parameters
+    ----------
+
+    References
+    ----------
+    Dropout: A Simple Way to Prevent Neural Networks from Overfitting.
+    N. Srivastava, G. Hinton, A. Krizhevsky, I. Sutskever & R. Salakhutdinov,
+    (2014), Journal of Machine Learning Research, 5(Jun)(2), 1929-1958.
+
+    Links
+    -----
+    [https://www.cs.toronto.edu/~hinton/absps/JMLRdropout.pdf](https://www.cs.toronto.edu/~hinton/absps/JMLRdropout.pdf)
+    """
+
+    def __init__(self, rate, is_monte_carlo, scale_during_training=True name='gaussian_dropout'):
+        self.rate = rate
+        self.is_monte_carlo = is_monte_carlo
+        super().__init__(self, name=name)
+
+    def call(self, x):
+
+        if self.scale_during_training:
+            stddev = math.sqrt(self.rate / (1.0 - self.rate))
+        else:
+            stddev = math.sqrt(self.rate * (1.0 - self.rate))
+
+        def apply_gaussian_dropout():
+            return x * tf.random_normal(tf.shape(x), mean=1.0, stddev=stddev)
+
+        return apply_concrete_dropout() if self.is_monte_carlo else x
