@@ -1,3 +1,6 @@
+import functools
+import math
+import multiprocessing as mp
 from pathlib import Path
 
 import numpy as np
@@ -172,7 +175,7 @@ def _write_tfrecords(protobuf_iterator, filename, compressed=True):
 
 
 def write(features_labels, filename_template, examples_per_shard,
-            scalar_label, compressed=True, num_parallel_calls=None, chunksize=2, verbose=1):
+            scalar_label, compressed=True, num_parallel_calls=None, chunksize=1, verbose=1):
     """Write to TFRecords files."""
     n_examples = len(features_labels)
     n_shards = math.ceil(n_examples / examples_per_shard)
@@ -180,17 +183,22 @@ def write(features_labels, filename_template, examples_per_shard,
 
     proto_iterators = [_ProtoIterator(s, scalar_label=scalar_label) for s in shards]
     # Set up positional arguments for the core writer function.
-    iterable = [(p, template.format(shard=j)) for j, p in enumerate(proto_iterators)]
+    iterable = [(p, filename_template.format(shard=j)) for j, p in enumerate(proto_iterators)]
     map_fn = functools.partial(_write_tfrecords, compressed=True)
 
-    def func(iterator_filename):
+    # This is a hack to allow multiprocessing to pickle
+    # the _func object. Pickles don't like local functions.
+    global _func
+
+    def _func(iterator_filename):
         iterator, filename = iterator_filename
         map_fn(protobuf_iterator=iterator, filename=filename)
 
     progbar = tf.keras.utils.Progbar(target=len(iterable), verbose=verbose)
+    progbar.update(0)
     # TODO: add num_parallel_calls value here.
     with mp.Pool() as p:
-        for _ in p.imap_unordered(func, iterable=iterable, chunksize=chunksize):
+        for _ in p.imap_unordered(_func, iterable=iterable, chunksize=chunksize):
             progbar.add(1)
 
 
