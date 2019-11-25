@@ -2,6 +2,7 @@ import functools
 import math
 import multiprocessing as mp
 from pathlib import Path
+import warnings
 
 import numpy as np
 import tensorflow as tf
@@ -9,6 +10,55 @@ import tensorflow as tf
 from nobrainer.io import read_volume
 
 _TFRECORDS_DTYPE = "float32"
+
+
+def write(features_labels, filename_template, examples_per_shard,
+            scalar_label, compressed=True, num_parallel_calls=None, chunksize=1, verbose=1):
+    """Write to TFRecords files."""
+    n_examples = len(features_labels)
+    n_shards = math.ceil(n_examples / examples_per_shard)
+    shards = np.array_split(features_labels, n_shards)
+
+    proto_iterators = [_ProtoIterator(s, scalar_label=scalar_label) for s in shards]
+    # Set up positional arguments for the core writer function.
+    iterable = [(p, filename_template.format(shard=j)) for j, p in enumerate(proto_iterators)]
+    map_fn = functools.partial(_write_tfrecords, compressed=True)
+
+    # This is a hack to allow multiprocessing to pickle
+    # the _func object. Pickles don't like local functions.
+    global _func
+
+    def _func(iterator_filename):
+        iterator, filename = iterator_filename
+        map_fn(protobuf_iterator=iterator, filename=filename)
+
+    progbar = tf.keras.utils.Progbar(target=len(iterable), verbose=verbose)
+    progbar.update(0)
+    # TODO: add num_parallel_calls value here.
+    with mp.Pool() as p:
+        for _ in p.imap_unordered(_func, iterable=iterable, chunksize=chunksize):
+            progbar.add(1)
+
+
+def parse_example_fn(volume_shape, scalar_label=False):
+    """"""
+    @tf.function
+    def parse_example(serialized):
+        """"""
+        features = {
+            "feature/shape": tf.io.FixedLenFeature(shape=[], dtype=tf.string),
+            "feature/value": tf.io.FixedLenFeature(shape=[], dtype=tf.string),
+            "label/value": tf.io.FixedLenFeature(shape=[], dtype=tf.string),
+            "label/rank": tf.io.FixedLenFeature(shape=[], dtype=tf.int64)}
+        e = tf.io.parse_single_example(serialized=serialized, features=features)
+        x = tf.io.decode_raw(e["feature/value"], _TFRECORDS_DTYPE)
+        y = tf.io.decode_raw(e["label/value"], _TFRECORDS_DTYPE)
+        xshape = tf.cast(tf.io.decode_raw(e["feature/shape"], _TFRECORDS_DTYPE), tf.int32)
+        x = tf.reshape(x, shape=volume_shape)
+        if not scalar_label:
+            y = tf.reshape(y, shape=volume_shape)
+        return x, y
+    return parse_example
 
 
 def _bytes_feature(value):
@@ -135,6 +185,14 @@ class _ProtoIterator:
             if no_exist:
                 raise ValueError("Some files do not exist: {}".format(", ".join(no_exist)))
 
+        if scalar_label:
+            for _, y in self.features_labels:
+                if isinstance(y, str):
+                    warnings.warn(
+                        "`scalar_label=True` was passed, but an existing file was"
+                        " found for a label. Did you mean to pass `scalar_label=False`?")
+                    break
+
     def __iter__(self):
         self._j = 0
         return self
@@ -172,55 +230,3 @@ def _write_tfrecords(protobuf_iterator, filename, compressed=True):
     with tf.io.TFRecordWriter(filename, options=options) as f:
         for proto_string in protobuf_iterator:
             f.write(proto_string)
-
-
-def write(features_labels, filename_template, examples_per_shard,
-            scalar_label, compressed=True, num_parallel_calls=None, chunksize=1, verbose=1):
-    """Write to TFRecords files."""
-    n_examples = len(features_labels)
-    n_shards = math.ceil(n_examples / examples_per_shard)
-    shards = np.array_split(features_labels, n_shards)
-
-    proto_iterators = [_ProtoIterator(s, scalar_label=scalar_label) for s in shards]
-    # Set up positional arguments for the core writer function.
-    iterable = [(p, filename_template.format(shard=j)) for j, p in enumerate(proto_iterators)]
-    map_fn = functools.partial(_write_tfrecords, compressed=True)
-
-    # This is a hack to allow multiprocessing to pickle
-    # the _func object. Pickles don't like local functions.
-    global _func
-
-    def _func(iterator_filename):
-        iterator, filename = iterator_filename
-        map_fn(protobuf_iterator=iterator, filename=filename)
-
-    progbar = tf.keras.utils.Progbar(target=len(iterable), verbose=verbose)
-    progbar.update(0)
-    # TODO: add num_parallel_calls value here.
-    with mp.Pool() as p:
-        for _ in p.imap_unordered(_func, iterable=iterable, chunksize=chunksize):
-            progbar.add(1)
-
-
-@tf.function
-def _parse_example(serialized):
-    features = {
-        "feature/shape": tf.io.FixedLenFeature(shape=[], dtype=tf.string),
-        "feature/value": tf.io.FixedLenFeature(shape=[], dtype=tf.string),
-        "label/value": tf.io.FixedLenFeature(shape=[], dtype=tf.string),
-        "label/rank": tf.io.FixedLenFeature(shape=[], dtype=tf.int64),
-    }
-    e = tf.io.parse_single_example(serialized=serialized, features=features)
-
-    x = tf.io.decode_raw(e["feature/value"], _TFRECORDS_DTYPE)
-    y = tf.io.decode_raw(e["label/value"], _TFRECORDS_DTYPE)
-    xshape = tf.cast(tf.io.decode_raw(e["feature/shape"], _TFRECORDS_DTYPE), tf.int32)
-    x = tf.reshape(x, shape=xshape)
-
-    if e["label/rank"] != 0:
-        ee = tf.io.parse_single_example(serialized=serialized, features={
-            "label/shape": tf.io.FixedLenFeature(shape=[], dtype=tf.string)})
-        yshape = tf.cast(tf.io.decode_raw(ee["label/shape"], _TFRECORDS_DTYPE), tf.int32)
-        y = tf.reshape(y, shape=yshape)
-
-    return x, y
