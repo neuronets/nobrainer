@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import tensorflow as tf
 
@@ -99,21 +101,61 @@ def _to_proto(feature, label, feature_affine, label_affine=None):
     return tf.train.Example(features=tf.train.Features(feature=d))
 
 
-def _iter_proto_strings(features_labels, scalar_label=False):
-    """
+class _ProtoIterator:
+    """Iterator of protobuf strings.
 
+    Parameters
+    ----------
+
+    This custom iterator is used instead of a generator for use in
+    multiprocessing. Generators cannot be pickled, and so cannot be used in
+    multiprocessing workflows. Please see
+    https://stackoverflow.com/a/7180424/5666087 for more information.
     """
-    if scalar_label:
-        for xpath, y in features_labels:
-            x, affine = read_volume(xpath, return_affine=True, dtype=_TFRECORDS_DTYPE)
+    def __init__(self, features_labels, scalar_label=False):
+        self.features_labels = features_labels
+        self.scalar_label = scalar_label
+        self._j = 0
+
+        no_exist = []
+        for x, _ in self.features_labels:
+            if not Path(x).exists():
+                no_exist.append(x)
+        if no_exist:
+            raise ValueError("Some files do not exist: {}".format(", ".join(no_exist)))
+
+        if not scalar_label:
+            no_exist = []
+            for _, y in self.features_labels:
+                if not Path(y).exists():
+                    no_exist.append(y)
+            if no_exist:
+                raise ValueError("Some files do not exist: {}".format(", ".join(no_exist)))
+
+    def __iter__(self):
+        self._j = 0
+        return self
+
+    def __next__(self):
+        index = self._j
+        serialized = self._serialize(index)
+        self._j += 1
+        return serialized
+
+    def _serialize(self, index):
+        try:
+            x, y = self.features_labels[index]
+        except IndexError:
+            raise StopIteration
+        if self.scalar_label:
+            x, affine = read_volume(x, return_affine=True, dtype=_TFRECORDS_DTYPE)
             proto = _to_proto(feature=x, label=y, feature_affine=affine, label_affine=None)
-            yield proto.SerializeToString()
-    else:
-        for xpath, ypath in features_labels:
-            x, affine_x = nobrainer.io.read_volume(xpath, return_affine=True, dtype=_TFRECORDS_DTYPE)
-            y, affine_y = nobrainer.io.read_volume(ypath, return_affine=True, dtype=_TFRECORDS_DTYPE)
+            return proto.SerializeToString()
+        else:
+            x, affine_x = nobrainer.io.read_volume(x, return_affine=True, dtype=_TFRECORDS_DTYPE)
+            y, affine_y = nobrainer.io.read_volume(y, return_affine=True, dtype=_TFRECORDS_DTYPE)
             proto = _to_proto(feature=x, label=y, feature_affine=affine_x, label_affine=affine_y)
-            yield proto.SerializeToString()
+            return proto.SerializeToString()
 
 
 def _write_tfrecords(protobuf_iterator, filename, compressed=True):
@@ -124,9 +166,32 @@ def _write_tfrecords(protobuf_iterator, filename, compressed=True):
         options = tf.io.TFRecordOptions(compression_type="GZIP")
     else:
         options = None
-    with tf.io.TFRecordWriter('foobar.tfrec', options=options) as f:
+    with tf.io.TFRecordWriter(filename, options=options) as f:
         for proto_string in protobuf_iterator:
             f.write(proto_string)
+
+
+def write(features_labels, filename_template, examples_per_shard,
+            scalar_label, compressed=True, num_parallel_calls=None, chunksize=2, verbose=1):
+    """Write to TFRecords files."""
+    n_examples = len(features_labels)
+    n_shards = math.ceil(n_examples / examples_per_shard)
+    shards = np.array_split(features_labels, n_shards)
+
+    proto_iterators = [_ProtoIterator(s, scalar_label=scalar_label) for s in shards]
+    # Set up positional arguments for the core writer function.
+    iterable = [(p, template.format(shard=j)) for j, p in enumerate(proto_iterators)]
+    map_fn = functools.partial(_write_tfrecords, compressed=True)
+
+    def func(iterator_filename):
+        iterator, filename = iterator_filename
+        map_fn(protobuf_iterator=iterator, filename=filename)
+
+    progbar = tf.keras.utils.Progbar(target=len(iterable), verbose=verbose)
+    # TODO: add num_parallel_calls value here.
+    with mp.Pool() as p:
+        for _ in p.imap_unordered(func, iterable=iterable, chunksize=chunksize):
+            progbar.add(1)
 
 
 @tf.function
