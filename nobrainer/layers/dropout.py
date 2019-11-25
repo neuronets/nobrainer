@@ -86,6 +86,7 @@ class ConcreteDropout(tfkl.Layer):
     def build(self, input_shape):
         initial_p = tfk.initializers.Constant(0.9)
         if self.n_filters is not None:
+
             self.p = self.add_weight("p", shape=[self.n_filters], initializer=initial_p)
         else:
             self.p = self.add_weight("p", shape=[], initializer=initial_p)
@@ -125,7 +126,7 @@ class GaussianDropout(tfkl.Layer):
     [https://www.cs.toronto.edu/~hinton/absps/JMLRdropout.pdf](https://www.cs.toronto.edu/~hinton/absps/JMLRdropout.pdf)
     """
 
-    def __init__(self, rate, is_monte_carlo, scale_during_training=True name='gaussian_dropout'):
+    def __init__(self, rate, is_monte_carlo, scale_during_training=True, name='gaussian_dropout'):
         self.rate = rate
         self.is_monte_carlo = is_monte_carlo
         super().__init__(self, name=name)
