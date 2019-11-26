@@ -13,15 +13,24 @@ _TFRECORDS_DTYPE = "float32"
 
 
 def write(features_labels, filename_template, examples_per_shard,
-            scalar_label, compressed=True, num_parallel_calls=None, chunksize=1, verbose=1):
+        compressed=True, num_parallel_calls=None, chunksize=1, verbose=1):
     """Write to TFRecords files."""
     n_examples = len(features_labels)
     n_shards = math.ceil(n_examples / examples_per_shard)
     shards = np.array_split(features_labels, n_shards)
 
-    proto_iterators = [_ProtoIterator(s, scalar_label=scalar_label) for s in shards]
+    # Test that the `filename_template` has a `shard` formatting key.
+    try:
+        filename_template.format(shard=0)
+    except Exception:
+        raise ValueError("`filename_template` must include a string formatting key 'shard' that accepts an integer.")
+
+    # This is the object that returns a protocol buffer string of the feature and label on each iteration.
+    # It is pickle-able, unlike a generator.
+    proto_iterators = [_ProtoIterator(s) for s in shards]
     # Set up positional arguments for the core writer function.
     iterable = [(p, filename_template.format(shard=j)) for j, p in enumerate(proto_iterators)]
+    # Set keyword arguments so the resulting function accepts one positional argument.
     map_fn = functools.partial(_write_tfrecords, compressed=True)
 
     # This is a hack to allow multiprocessing to pickle
@@ -128,7 +137,7 @@ def _get_label_dict(y, affine=None):
     for j, s in enumerate(y.shape):
         label["label/shape/dim{}".format(j)] = _int64_feature(s)
     if y.ndim:
-        feature["feature/shape"] = _bytes_feature(np.array(y.shape).astype(_TFRECORDS_DTYPE).tobytes())
+        label["feature/shape"] = _bytes_feature(np.array(y.shape).astype(_TFRECORDS_DTYPE).tobytes())
 
     if affine is None and y.ndim != 0:
         raise ValueError("Affine is required when label is not scalar.")
@@ -165,9 +174,20 @@ class _ProtoIterator:
     multiprocessing workflows. Please see
     https://stackoverflow.com/a/7180424/5666087 for more information.
     """
-    def __init__(self, features_labels, scalar_label=False):
+    def __init__(self, features_labels):
         self.features_labels = features_labels
-        self.scalar_label = scalar_label
+
+        # Try to "intelligently" deduce if the labels are scalars or not.
+        # An alternative here would be to check if these point to existing
+        # files, though it is possible to have existing filenames that
+        # are integers or floats.
+        labels = [y for _, y in features_labels]
+        scalars = list(map(_is_int_or_float, labels))
+        if any(scalars) and not all(scalars):
+            raise ValueError(
+                "Some labels were detected as scalars, while others were not."
+                " Labels must be all scalars or all filenames of volumes.")
+        self.scalar_label = all(scalars)
         self._j = 0
 
         no_exist = []
@@ -177,21 +197,13 @@ class _ProtoIterator:
         if no_exist:
             raise ValueError("Some files do not exist: {}".format(", ".join(no_exist)))
 
-        if not scalar_label:
+        if not self.scalar_label:
             no_exist = []
             for _, y in self.features_labels:
                 if not Path(y).exists():
                     no_exist.append(y)
             if no_exist:
                 raise ValueError("Some files do not exist: {}".format(", ".join(no_exist)))
-
-        if scalar_label:
-            for _, y in self.features_labels:
-                if isinstance(y, str):
-                    warnings.warn(
-                        "`scalar_label=True` was passed, but an existing file was"
-                        " found for a label. Did you mean to pass `scalar_label=False`?")
-                    break
 
     def __iter__(self):
         self._j = 0
@@ -213,8 +225,8 @@ class _ProtoIterator:
             proto = _to_proto(feature=x, label=y, feature_affine=affine, label_affine=None)
             return proto.SerializeToString()
         else:
-            x, affine_x = nobrainer.io.read_volume(x, return_affine=True, dtype=_TFRECORDS_DTYPE)
-            y, affine_y = nobrainer.io.read_volume(y, return_affine=True, dtype=_TFRECORDS_DTYPE)
+            x, affine_x = read_volume(x, return_affine=True, dtype=_TFRECORDS_DTYPE)
+            y, affine_y = read_volume(y, return_affine=True, dtype=_TFRECORDS_DTYPE)
             proto = _to_proto(feature=x, label=y, feature_affine=affine_x, label_affine=affine_y)
             return proto.SerializeToString()
 
@@ -230,3 +242,19 @@ def _write_tfrecords(protobuf_iterator, filename, compressed=True):
     with tf.io.TFRecordWriter(filename, options=options) as f:
         for proto_string in protobuf_iterator:
             f.write(proto_string)
+
+
+def _is_int_or_float(value):
+    if isinstance(value, (int, float)):
+        return True
+    try:
+        float(value)
+        return True
+    except (TypeError, ValueError):
+        pass
+    try:
+        int(value)
+        return True
+    except (TypeError, ValueError):
+        pass
+    return False
