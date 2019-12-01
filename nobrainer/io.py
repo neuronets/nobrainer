@@ -40,9 +40,11 @@ def read_mapping(filepath, skip_header=True, delimiter=','):
             "mapping values must be integers but non-integer encountered")
 
 
-def read_volume(filepath, dtype=None, return_affine=False):
+def read_volume(filepath, dtype=None, return_affine=False, to_ras=False):
     """Return numpy array of data from a neuroimaging file."""
     img = nib.load(filepath)
+    if to_ras:
+        img = nib.as_closest_canonical(img)
     data = img.get_fdata(caching='unchanged')
     if dtype is not None:
         data = data.astype(dtype)

@@ -16,6 +16,7 @@ _TFRECORDS_DTYPE = "float32"
 # TODO: add to_ras
 
 def write(features_labels, filename_template, examples_per_shard,
+        to_ras=True,
         compressed=True, processes=None, chunksize=1, verbose=1):
     """Write to TFRecords files."""
     n_examples = len(features_labels)
@@ -178,8 +179,9 @@ class _ProtoIterator:
     multiprocessing workflows. Please see
     https://stackoverflow.com/a/7180424/5666087 for more information.
     """
-    def __init__(self, features_labels):
+    def __init__(self, features_labels, to_ras=True):
         self.features_labels = features_labels
+        self.to_ras = to_ras
 
         # Try to "intelligently" deduce if the labels are scalars or not.
         # An alternative here would be to check if these point to existing
@@ -225,12 +227,12 @@ class _ProtoIterator:
         except IndexError:
             raise StopIteration
         if self.scalar_label:
-            x, affine = read_volume(x, return_affine=True, dtype=_TFRECORDS_DTYPE)
+            x, affine = read_volume(x, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras)
             proto = _to_proto(feature=x, label=y, feature_affine=affine, label_affine=None)
             return proto.SerializeToString()
         else:
-            x, affine_x = read_volume(x, return_affine=True, dtype=_TFRECORDS_DTYPE)
-            y, affine_y = read_volume(y, return_affine=True, dtype=_TFRECORDS_DTYPE)
+            x, affine_x = read_volume(x, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras)
+            y, affine_y = read_volume(y, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras)
             proto = _to_proto(feature=x, label=y, feature_affine=affine_x, label_affine=affine_y)
             return proto.SerializeToString()
 
