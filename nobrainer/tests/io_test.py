@@ -72,37 +72,6 @@ def test_read_volume(tmp_path):
     assert np.array_equal(affine, affine_loaded)
 
 
-def test_convert(csv_of_volumes, tmp_path):
-    files = io.read_csv(csv_of_volumes, skip_header=False)
-    tfrecords_template = str(tmp_path / 'data-{shard:03d}.tfrecords')
-    volumes_per_shard = 12
-    io.convert(
-        files,
-        tfrecords_template=tfrecords_template,
-        volumes_per_shard=volumes_per_shard,
-        num_parallel_calls=1)
-
-    paths = list(tmp_path.glob('data-*.tfrecords'))
-    paths = sorted(paths)
-    assert len(paths) == 9
-    assert (tmp_path / 'data-008.tfrecords').is_file()
-
-    dset = tf.data.TFRecordDataset(list(map(str, paths)), compression_type='GZIP')
-    dset = dset.map(io.get_parse_fn(volume_shape=(8, 8, 8), include_affines=True))
-
-    for ref, test in zip(files, dset):
-        x, y = ref
-        x, x_aff = io.read_volume(x, return_affine=True)
-        y, y_aff = io.read_volume(y, return_affine=True)
-        assert np.array_equal(x, test[0])
-        assert np.array_equal(y, test[1])
-        assert np.array_equal(x_aff, test[2])
-        assert np.array_equal(y_aff, test[3])
-
-    with pytest.raises(ValueError):
-        io.convert(files, tfrecords_template="data/foobar-{}.tfrecords")
-
-
 def test_verify_features_labels(csv_of_volumes):
     files = io.read_csv(csv_of_volumes, skip_header=False)
     io.verify_features_labels(

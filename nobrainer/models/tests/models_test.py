@@ -8,6 +8,7 @@ from nobrainer.models.meshnet import meshnet_vwn
 from nobrainer.models.unet import unet
 from nobrainer.models.autoencoder import autoencoder
 
+
 def model_test(model_cls, n_classes, input_shape, kwds={}):
     """Tests for models."""
     x = 10 * np.random.random(input_shape)

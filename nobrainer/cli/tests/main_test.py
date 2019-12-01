@@ -9,10 +9,10 @@ import numpy as np
 import pytest
 
 from nobrainer.cli import main as climain
-from nobrainer.io import convert
 from nobrainer.io import read_csv
 from nobrainer.io import read_volume
 from nobrainer.models.meshnet import meshnet
+from nobrainer.tfrecord import write
 from nobrainer.utils import get_data
 
 
@@ -76,7 +76,7 @@ def test_train():
         nib.Nifti1Image(np.ones((20, 20, 20)), np.eye(4)).to_filename(str(xpath))
         nib.Nifti1Image(np.ones((20, 20, 20)), np.eye(4)).to_filename(str(ypath))
         files = [(str(xpath), str(ypath))]
-        convert(files, tfrecords_template='data-{shard:03d}.tf')
+        write(files, filename_template='data-{shard:03d}.tf', examples_per_shard=10)
 
         args = """\
     train --model=meshnet --tfrecords-pattern={} --n-classes=1 --batch-size=1

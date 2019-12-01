@@ -15,12 +15,12 @@ import skimage.transform
 import tensorflow as tf
 
 from nobrainer import __version__
-from nobrainer.io import convert as _convert
 from nobrainer.io import verify_features_labels as _verify_features_labels
 from nobrainer.io import read_csv as _read_csv
 from nobrainer.io import read_volume as _read_volume
 from nobrainer.losses import get as _get_loss
 from nobrainer.prediction import _transform_and_predict
+from nobrainer.tfrecord import write as _write_tfrecord
 from nobrainer.training import train as _train
 from nobrainer.utils import _get_all_cpus
 from nobrainer.volume import from_blocks_numpy as _from_blocks_numpy
@@ -97,13 +97,13 @@ def convert(*, csv, tfrecords_template, volume_shape, volumes_per_shard, to_ras,
                 click.echo(pair[1])
             sys.exit(-1)
 
-    _convert(
-        volume_filepaths=volume_filepaths,
-        tfrecords_template=tfrecords_template,
-        volumes_per_shard=volumes_per_shard,
-        to_ras=to_ras,
-        gzip_compressed=gzip,
-        num_parallel_calls=num_parallel_calls,
+    _write_tfrecord(
+        features_labels=volume_filepaths,
+        filename_template=tfrecords_template,
+        examples_per_shard=volumes_per_shard,
+        # to_ras=to_ras,
+        compressed=gzip,
+        processes=num_parallel_calls,
         verbose=verbose)
 
     click.echo(click.style('Finished conversion to TFRecords.', fg='green'))

@@ -8,12 +8,15 @@ import numpy as np
 import tensorflow as tf
 
 from nobrainer.io import read_volume
+from nobrainer.utils import _get_all_cpus
+
 
 _TFRECORDS_DTYPE = "float32"
 
+# TODO: add to_ras
 
 def write(features_labels, filename_template, examples_per_shard,
-        compressed=True, num_parallel_calls=None, chunksize=1, verbose=1):
+        compressed=True, processes=None, chunksize=1, verbose=1):
     """Write to TFRecords files."""
     n_examples = len(features_labels)
     n_shards = math.ceil(n_examples / examples_per_shard)
@@ -43,8 +46,9 @@ def write(features_labels, filename_template, examples_per_shard,
 
     progbar = tf.keras.utils.Progbar(target=len(iterable), verbose=verbose)
     progbar.update(0)
-    # TODO: add num_parallel_calls value here.
-    with mp.Pool() as p:
+    if processes is None:
+        processes = _get_all_cpus()
+    with mp.Pool(processes) as p:
         for _ in p.imap_unordered(_func, iterable=iterable, chunksize=chunksize):
             progbar.add(1)
 
