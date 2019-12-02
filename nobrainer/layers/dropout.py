@@ -8,7 +8,6 @@ tfk = tf.keras
 tfkl = tfk.layers
 
 # TODO: add `K.in_train_phase`.
-# TODO: add `get_config` and `compute_output_shape` instance methods.
 
 
 class BernoulliDropout(tfkl.Layer):
@@ -91,8 +90,9 @@ class ConcreteDropout(tfkl.Layer):
 
     def build(self, input_shape):
         initial_p = tfk.initializers.Constant(0.9)
-        self.p = self.add_weight(shape=input_shape[-1:], initializer=initial_p, trainable=True)
-        self.p = tf.clip_by_value(self.p, 0.05, 0.95)
+        self.p = self.add_weight(name="p", shape=input_shape[-1:], initializer=initial_p, trainable=True)
+        # TODO: where should this go? Or should it be removed?
+        # self.p = tf.clip_by_value(self.p, 0.05, 0.95)
 
     def call(self, x):
         inference = x
