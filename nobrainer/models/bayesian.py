@@ -62,9 +62,9 @@ def variational_meshnet(n_classes, input_shape, receptive_field=67, filters=71, 
         if dropout is None:
             pass
         elif dropout == "bernoulli":
-            x = BernoulliDropout(rate=0.5, is_monte_carlo=is_monte_carlo, scale_during_training=False)(x)
+            x = BernoulliDropout(rate=0.5, is_monte_carlo=is_monte_carlo, scale_during_training=False, name='layer{}/bernoulli_dropout'.format(layer_num))(x)
         elif dropout == "concrete":
-            x = ConcreteDropout(is_monte_carlo=is_monte_carlo, temperature=0.02, use_expectation=is_monte_carlo)(x)
+            x = ConcreteDropout(is_monte_carlo=is_monte_carlo, temperature=0.02, use_expectation=is_monte_carlo, name='layer{}/concrete_dropout'.format(layer_num))(x)
         else:
             raise ValueError("unknown dropout layer, {}".format(dropout))
         x = tfkl.Activation(activation, name='layer{}/activation'.format(layer_num))(x)
