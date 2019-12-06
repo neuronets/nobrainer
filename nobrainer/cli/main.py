@@ -10,7 +10,8 @@ import sys
 import click
 import nibabel as nib
 import numpy as np
-import skimage
+import skimage.measure
+import skimage.transform
 import tensorflow as tf
 
 from nobrainer import __version__
