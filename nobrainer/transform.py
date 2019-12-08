@@ -191,13 +191,15 @@ def _get_coordinates(volume_shape):
     return tf.reshape(tf.stack(out, axis=3), shape=(-1, 3))
 
 
-def _nearest_neighbor_interpolation(volume, coords):
+def _nearest_neighbor_interpolation(volume, coords, output_shape=None):
     """Three-dimensional nearest neighbors interpolation."""
     volume_f = _get_voxels(volume=volume, coords=tf.round(coords))
-    return tf.reshape(volume_f, volume.shape)
+    shape = tf.shape(volume) if output_shape is None else tf.TensorShape(output_shape)
+    return tf.reshape(volume_f, shape=shape)
 
 
-def _trilinear_interpolation(volume, coords):
+@tf.function
+def _trilinear_interpolation(volume, coords, output_shape=None):
     """Trilinear interpolation.
 
     Implemented according to:
@@ -209,10 +211,10 @@ def _trilinear_interpolation(volume, coords):
     coords_floor = tf.floor(coords)
 
     shape = tf.shape(volume)
+
     xlen = shape[0]
     ylen = shape[1]
     zlen = shape[2]
-    # xlen, ylen, zlen = tf.shape(volume)
 
     max_x = xlen - 1
     max_y = ylen - 1
@@ -226,14 +228,6 @@ def _trilinear_interpolation(volume, coords):
     z0 = tf.cast(coords_floor[:, 2], tf.int32)
     z1 = z0 + 1
 
-    # Clip values to the size of the volume array.
-    x0 = tf.clip_by_value(x0, 0, xlen - 1)
-    x1 = tf.clip_by_value(x1, 0, xlen - 1)
-    y0 = tf.clip_by_value(y0, 0, ylen - 1)
-    y1 = tf.clip_by_value(y1, 0, ylen - 1)
-    z0 = tf.clip_by_value(z0, 0, zlen - 1)
-    z1 = tf.clip_by_value(z1, 0, zlen - 1)
-
     # Get the indices at corners of cube.
     i000 = x0 * ylen * zlen + y0 * zlen + z0
     i001 = x0 * ylen * zlen + y0 * zlen + z1
@@ -244,8 +238,20 @@ def _trilinear_interpolation(volume, coords):
     i110 = x1 * ylen * zlen + y1 * zlen + z0
     i111 = x1 * ylen * zlen + y1 * zlen + z1
 
-    # Get volume values at corners of cube.
     volume_flat = tf.reshape(volume, [-1])
+    volume_flat = tf.concat([[0], volume_flat, [0]], axis=0)
+    size = tf.size(volume_flat)
+
+    i000 = tf.clip_by_value(i000, 0, size - 1)
+    i001 = tf.clip_by_value(i001, 0, size - 1)
+    i010 = tf.clip_by_value(i010, 0, size - 1)
+    i011 = tf.clip_by_value(i011, 0, size - 1)
+    i100 = tf.clip_by_value(i100, 0, size - 1)
+    i101 = tf.clip_by_value(i101, 0, size - 1)
+    i110 = tf.clip_by_value(i110, 0, size - 1)
+    i111 = tf.clip_by_value(i111, 0, size - 1)
+
+    # Get volume values at corners of cube.
     c000 = tf.gather(volume_flat, i000)
     c001 = tf.gather(volume_flat, i001)
     c010 = tf.gather(volume_flat, i010)
@@ -272,9 +278,19 @@ def _trilinear_interpolation(volume, coords):
     # Interpolate along z-axis.
     c = c0 * (1 - zd) + c1 * zd
 
-    return tf.reshape(c, volume.shape)
+    # Zero image data that was out of frame.
+    shape = tf.cast(tf.shape(volume), dtype=tf.float32)
+    rows = shape[0]
+    cols = shape[1]
+    depth = shape[2]
+    outofframe = tf.reduce_any(coords < 0, -1) | (coords[:, 0] > rows) | (coords[:, 1] > cols) | (coords[:, 2] > depth)
+    c = tf.multiply(c, tf.cast(tf.logical_not(outofframe), dtype=c.dtype))
+
+    shape = tf.shape(volume) if output_shape is None else tf.TensorShape(output_shape)
+    return tf.reshape(c, shape=shape)
 
 
+@tf.function
 def _get_voxels(volume, coords):
     """Get voxels from volume at points. These voxels are in a flat tensor."""
     x = tf.cast(volume, tf.float32)
