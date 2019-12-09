@@ -210,16 +210,6 @@ def _trilinear_interpolation(volume, coords, output_shape=None):
     coords = tf.cast(coords, tf.float32)
     coords_floor = tf.floor(coords)
 
-    shape = tf.shape(volume)
-
-    xlen = shape[0]
-    ylen = shape[1]
-    zlen = shape[2]
-
-    max_x = xlen - 1
-    max_y = ylen - 1
-    max_z = zlen - 1
-
     # Get lattice points. x0 is point below x, and x1 is point above x. Same for y and z.
     x0 = tf.cast(coords_floor[:, 0], tf.int32)
     x1 = x0 + 1
@@ -227,6 +217,21 @@ def _trilinear_interpolation(volume, coords, output_shape=None):
     y1 = y0 + 1
     z0 = tf.cast(coords_floor[:, 2], tf.int32)
     z1 = z0 + 1
+
+    # Clip values to the size of the volume array.
+    shape = tf.shape(volume)
+    xlen = shape[0]
+    ylen = shape[1]
+    zlen = shape[2]
+    max_x = xlen - 1
+    max_y = ylen - 1
+    max_z = zlen - 1
+    x0 = tf.clip_by_value(x0, 0, max_x)
+    x1 = tf.clip_by_value(x1, 0, max_x)
+    y0 = tf.clip_by_value(y0, 0, max_y)
+    y1 = tf.clip_by_value(y1, 0, max_y)
+    z0 = tf.clip_by_value(z0, 0, max_z)
+    z1 = tf.clip_by_value(z1, 0, max_z)
 
     # Get the indices at corners of cube.
     i000 = x0 * ylen * zlen + y0 * zlen + z0
@@ -239,17 +244,7 @@ def _trilinear_interpolation(volume, coords, output_shape=None):
     i111 = x1 * ylen * zlen + y1 * zlen + z1
 
     volume_flat = tf.reshape(volume, [-1])
-    volume_flat = tf.concat([[0], volume_flat, [0]], axis=0)
     size = tf.size(volume_flat)
-
-    i000 = tf.clip_by_value(i000, 0, size - 1)
-    i001 = tf.clip_by_value(i001, 0, size - 1)
-    i010 = tf.clip_by_value(i010, 0, size - 1)
-    i011 = tf.clip_by_value(i011, 0, size - 1)
-    i100 = tf.clip_by_value(i100, 0, size - 1)
-    i101 = tf.clip_by_value(i101, 0, size - 1)
-    i110 = tf.clip_by_value(i110, 0, size - 1)
-    i111 = tf.clip_by_value(i111, 0, size - 1)
 
     # Get volume values at corners of cube.
     c000 = tf.gather(volume_flat, i000)
