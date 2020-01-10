@@ -38,19 +38,21 @@ def write(features_labels, filename_template, examples_per_shard,
     map_fn = functools.partial(_write_tfrecords, compressed=True)
 
     # This is a hack to allow multiprocessing to pickle
-    # the _func object. Pickles don't like local functions.
-    global _func
+    # the __writer_func object. Pickles don't like local functions.
+    global __writer_func
 
-    def _func(iterator_filename):
+    def __writer_func(iterator_filename):
         iterator, filename = iterator_filename
         map_fn(protobuf_iterator=iterator, filename=filename)
 
     progbar = tf.keras.utils.Progbar(target=len(iterable), verbose=verbose)
     progbar.update(0)
     if processes is None:
-        processes = _get_all_cpus()
+        # Get number of processes allocated to the current process.
+        # Note the difference from `os.cpu_count()`.
+        processes = len(os.sched_getaffinity(0))
     with mp.Pool(processes) as p:
-        for _ in p.imap_unordered(_func, iterable=iterable, chunksize=chunksize):
+        for _ in p.imap_unordered(__writer_func, iterable=iterable, chunksize=chunksize):
             progbar.add(1)
 
 
@@ -67,7 +69,9 @@ def parse_example_fn(volume_shape, scalar_label=False):
         e = tf.io.parse_single_example(serialized=serialized, features=features)
         x = tf.io.decode_raw(e["feature/value"], _TFRECORDS_DTYPE)
         y = tf.io.decode_raw(e["label/value"], _TFRECORDS_DTYPE)
-        xshape = tf.cast(tf.io.decode_raw(e["feature/shape"], _TFRECORDS_DTYPE), tf.int32)
+        # TODO: this line does not work. The shape cannot be determined
+        # dynamically... for now.
+        # xshape = tf.cast(tf.io.decode_raw(e["feature/shape"], _TFRECORDS_DTYPE), tf.int32)
         x = tf.reshape(x, shape=volume_shape)
         if not scalar_label:
             y = tf.reshape(y, shape=volume_shape)
