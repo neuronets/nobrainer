@@ -68,29 +68,6 @@ def test_save():
     assert False
 
 
-def test_train():
-    runner = CliRunner()
-    with runner.isolated_filesystem():
-        xpath = 'features.nii.gz'
-        ypath = 'labels.nii.gz'
-        nib.Nifti1Image(np.ones((20, 20, 20)), np.eye(4)).to_filename(str(xpath))
-        nib.Nifti1Image(np.ones((20, 20, 20)), np.eye(4)).to_filename(str(ypath))
-        files = [(str(xpath), str(ypath))]
-        write(files, filename_template='data-{shard:03d}.tf', examples_per_shard=10)
-
-        args = """\
-    train --model=meshnet --tfrecords-pattern={} --n-classes=1 --batch-size=1
-        --volume-shape 20 20 20 --block-shape 10 10 10 --n-epochs=1 --n-volumes=1
-        --loss=dice --learning-rate=1e-05
-    """.format('data-*.tf')
-
-        result = runner.invoke(climain.cli, args.split())
-        print(result.output)
-        assert result.exit_code == 0
-        assert Path('logs').is_dir()
-        assert Path('checkpoints').is_dir()
-
-
 @pytest.mark.xfail
 def test_evaluate():
     assert False
