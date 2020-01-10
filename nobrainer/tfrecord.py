@@ -1,6 +1,7 @@
 import functools
 import math
 import multiprocessing as mp
+import os
 from pathlib import Path
 import warnings
 
@@ -8,12 +9,9 @@ import numpy as np
 import tensorflow as tf
 
 from nobrainer.io import read_volume
-from nobrainer.utils import _get_all_cpus
-
 
 _TFRECORDS_DTYPE = "float32"
 
-# TODO: add to_ras
 
 def write(features_labels, filename_template, examples_per_shard,
         to_ras=True,

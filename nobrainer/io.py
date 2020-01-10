@@ -9,8 +9,6 @@ import nibabel as nib
 import numpy as np
 import tensorflow as tf
 
-from nobrainer.utils import _get_all_cpus
-
 _TFRECORDS_FEATURES_DTYPE = 'float32'
 
 
@@ -92,7 +90,9 @@ def verify_features_labels(volume_filepaths, volume_shape=(256, 256, 256), check
     progbar.update(0)
     map_fn = functools.partial(_verify_features_labels_pair, volume_shape=volume_shape, check_shape=check_shape, check_labels_int=check_labels_int, check_labels_gte_zero=check_labels_gte_zero)
     if num_parallel_calls is None:
-        num_parallel_calls = _get_all_cpus()
+        # Get number of processes allocated to the current process.
+        # Note the difference from `os.cpu_count()`.
+        num_parallel_calls = len(os.sched_getaffinity(0))
 
     outputs = []
     if num_parallel_calls == 1:

@@ -16,9 +16,3 @@ def test_get_data():
     for x, y in files:
         assert Path(x).is_file()
         assert Path(y).is_file()
-
-
-def test_get_all_cpus():
-    assert nbutils._get_all_cpus() == multiprocessing.cpu_count()
-    os.environ['SLURM_CPUS_ON_NODE'] = "128"
-    assert nbutils._get_all_cpus() == 128

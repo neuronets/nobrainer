@@ -21,7 +21,6 @@ from nobrainer.io import read_volume as _read_volume
 from nobrainer.losses import get as _get_loss
 from nobrainer.prediction import _transform_and_predict
 from nobrainer.tfrecord import write as _write_tfrecord
-from nobrainer.utils import _get_all_cpus
 from nobrainer.volume import from_blocks_numpy as _from_blocks_numpy
 from nobrainer.volume import get_dataset as _get_dataset
 from nobrainer.volume import get_steps_per_epoch as _get_steps_per_epoch
