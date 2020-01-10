@@ -21,7 +21,6 @@ from nobrainer.io import read_volume as _read_volume
 from nobrainer.losses import get as _get_loss
 from nobrainer.prediction import _transform_and_predict
 from nobrainer.tfrecord import write as _write_tfrecord
-from nobrainer.training import train as _train
 from nobrainer.utils import _get_all_cpus
 from nobrainer.volume import from_blocks_numpy as _from_blocks_numpy
 from nobrainer.volume import get_dataset as _get_dataset
@@ -71,7 +70,9 @@ def convert(*, csv, tfrecords_template, volume_shape, volumes_per_shard, to_ras,
     volume_filepaths = _read_csv(csv)
     num_parallel_calls = None if num_parallel_calls == -1 else num_parallel_calls
     if num_parallel_calls is None:
-        num_parallel_calls = _get_all_cpus()
+        # Get number of processes allocated to the current process.
+        # Note the difference from `os.cpu_count()`.
+        num_parallel_calls = len(os.sched_getaffinity(0))
 
     _dirname = os.path.dirname(tfrecords_template)
     if not os.path.exists(_dirname):
