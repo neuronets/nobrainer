@@ -1,9 +1,11 @@
 """Main command-line interface for nobrainer."""
 
+import datetime
 import inspect
 import json
 import logging
 import os
+import platform
 import pprint
 import sys
 
@@ -13,6 +15,7 @@ import numpy as np
 import skimage.measure
 import skimage.transform
 import tensorflow as tf
+import tensorflow_probability as tfp
 
 from nobrainer import __version__
 from nobrainer.io import verify_features_labels as _verify_features_labels
@@ -257,6 +260,34 @@ def evaluate():
     """Evaluate a model's predictions against known labels."""
     click.echo("Not implemented yet. In the future, this command will be used for evaluation.")
     sys.exit(-2)
+
+
+@cli.command()
+def info():
+    """Return information about this system."""
+    uname = platform.uname()
+    s = f"""\
+Python:
+ Version: {platform.python_version()}
+ Implementation: {platform.python_implementation()}
+ 64-bit: {sys.maxsize > 2**32}
+ Packages:
+  Nobrainer: {__version__}
+  Nibabel: {nib.__version__}
+  Numpy: {np.__version__}
+  TensorFlow: {tf.__version__}
+   GPU support: {tf.test.is_built_with_gpu_support()}
+   GPU available: {bool(tf.config.list_physical_devices('GPU'))}
+  TensorFlow-Probability: {tfp.__version__}
+
+System:
+ OSType: {uname.system}
+ Release: {uname.release}
+ Version: {uname.version}
+ Architecture: {uname.machine}
+
+Timestamp: {datetime.datetime.utcnow().strftime('%Y/%m/%d %T')}"""
+    click.echo(s)
 
 
 # For debugging only.
