@@ -9,4 +9,4 @@ install:
   - pip install --no-cache-dir --editable=".[cpu,dev]"
 script:
   - travis_wait pytest --verbose --cov nobrainer
-  - cd guide && bash _run_tests.sh
+  - cd guide && bash .run_tests.sh
