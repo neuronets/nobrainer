@@ -124,3 +124,12 @@ def test_save():
 @pytest.mark.xfail
 def test_evaluate():
     assert False
+
+
+def test_info():
+    runner = CliRunner()
+    result = runner.invoke(climain.cli, ["info"])
+    assert result.exit_code == 0
+    assert "Python" in result.output
+    assert "System" in result.output
+    assert "Timestamp" in result.output
