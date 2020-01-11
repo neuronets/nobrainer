@@ -9,3 +9,11 @@ install:
   - pip install --no-cache-dir --editable=".[cpu,dev]"
 script:
   - travis_wait pytest --verbose --cov=nobrainer nobrainer
+  - |
+    cd guide
+    jupyter-nbconvert --to script *.ipynb
+    # Remove anything from `model.fit` and below in scripts.
+    # Model fitting may crash travis.
+    sed -i -e '/model.fit/,$d; /get_ipython/d' *.py
+    for f in *.py; do echo print\(\"++ FINISHED $f ++\"\) >> $f; done
+    for script in *.py; do python $script; done
