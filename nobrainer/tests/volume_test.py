@@ -27,10 +27,10 @@ def test_apply_random_transform():
 
     with pytest.raises(ValueError):
         x, y = volume.apply_random_transform(
-            np.ones((10, 10, 10)), np.ones((10, 10, 12)))
+            np.ones((10, 10, 10)), np.ones((10, 10, 12))
+        )
     with pytest.raises(ValueError):
-        x, y = volume.apply_random_transform(
-            np.ones((10, 10)), np.ones((10, 10)))
+        x, y = volume.apply_random_transform(np.ones((10, 10)), np.ones((10, 10)))
 
     shape = (10, 10, 10)
     x = np.random.randn(*shape).astype(np.float32)
@@ -70,10 +70,18 @@ def test_apply_random_transform():
 
 
 def test_binarize():
-    x = [ 0.49671415, -0.1382643 ,  0.64768854,  1.52302986, -0.23415337,
-       -0.23413696,  1.57921282,  0.76743473]
-    x = np.asarray(x, dtype='float64')
-    expected = np.array([ True, False,  True,  True, False, False,  True,  True])
+    x = [
+        0.49671415,
+        -0.1382643,
+        0.64768854,
+        1.52302986,
+        -0.23415337,
+        -0.23413696,
+        1.57921282,
+        0.76743473,
+    ]
+    x = np.asarray(x, dtype="float64")
+    expected = np.array([True, False, True, True, False, False, True, True])
     result = volume.binarize(x)
     assert_array_equal(expected, result)
     assert result.dtype == tf.float64
@@ -81,7 +89,7 @@ def test_binarize():
     assert_array_equal(expected, result)
     assert result.dtype == tf.float32
 
-    x = np.asarray([-2,  0,  2,  0,  2, -2, -1,  1], dtype=np.int32)
+    x = np.asarray([-2, 0, 2, 0, 2, -2, -1, 1], dtype=np.int32)
     expected = np.array([False, False, True, False, True, False, False, True])
     result = volume.binarize(x)
     assert_array_equal(expected, result)
@@ -93,24 +101,13 @@ def test_binarize():
 
 def test_replace():
     data = np.arange(5)
-    mapping = {
-        0: 10,
-        1: 20,
-        2: 30,
-        3: 40,
-        4: 30,
-    }
+    mapping = {0: 10, 1: 20, 2: 30, 3: 40, 4: 30}
     output = volume.replace(data, mapping)
     assert_array_equal(output, [10, 20, 30, 40, 30])
 
     # Test that overlapping keys and values gives correct result.
     data = np.arange(5)
-    mapping = {
-        0: 1,
-        1: 2,
-        2: 3,
-        3: 4,
-    }
+    mapping = {0: 1, 1: 2, 2: 3, 3: 4}
     output = volume.replace(data, mapping)
     assert_array_equal(output, [1, 2, 3, 4, 4])
 
@@ -141,14 +138,9 @@ def test_standardize():
 def test_to_blocks():
     x = np.arange(8).reshape(2, 2, 2)
     outputs = volume.to_blocks(x, (1, 1, 1)).numpy()
-    expected = np.array([[[[0]]],
-                       [[[1]]],
-                       [[[2]]],
-                       [[[3]]],
-                       [[[4]]],
-                       [[[5]]],
-                       [[[6]]],
-                       [[[7]]]])
+    expected = np.array(
+        [[[[0]]], [[[1]]], [[[2]]], [[[3]]], [[[4]]], [[[5]]], [[[6]]], [[[7]]]]
+    )
     assert_array_equal(outputs, expected)
     outputs = volume.to_blocks(x, (2, 2, 2)).numpy()
     assert_array_equal(outputs, x[None])
@@ -188,17 +180,15 @@ def test_preprocess_binary():
     # All one-hot encoded items sum to 1.
     assert (np.sum(y0, -1) == 1).all()
 
-    block_shape=(5, 5, 5)
-    x0, y0 = volume._preprocess_binary(
-        x, y, n_classes=1, block_shape=block_shape)
+    block_shape = (5, 5, 5)
+    x0, y0 = volume._preprocess_binary(x, y, n_classes=1, block_shape=block_shape)
     assert_array_equal(x0.shape, [8, *block_shape, 1])
     assert_array_equal(y0.shape, [8, *block_shape, 1])
     assert_allclose(np.mean(x0), 0, atol=1e-07)
     assert_allclose(np.std(x0), 1, atol=1e-07)
 
-    block_shape=(5, 5, 5)
-    x0, y0 = volume._preprocess_binary(
-        x, y, n_classes=2, block_shape=block_shape)
+    block_shape = (5, 5, 5)
+    x0, y0 = volume._preprocess_binary(x, y, n_classes=2, block_shape=block_shape)
     assert_array_equal(x0.shape, [8, *block_shape, 1])
     assert_array_equal(y0.shape, [8, *block_shape, 2])
     assert_allclose(np.mean(x0), 0, atol=1e-07)
@@ -224,9 +214,8 @@ def test_preprocess_multiclass():
     assert_allclose(np.mean(x0), 0, atol=1e-07)
     assert_allclose(np.std(x0), 1, atol=1e-07)
 
-    block_shape=(5, 5, 5)
-    x0, y0 = volume._preprocess_multiclass(
-        x, y, n_classes=20, block_shape=block_shape)
+    block_shape = (5, 5, 5)
+    x0, y0 = volume._preprocess_multiclass(x, y, n_classes=20, block_shape=block_shape)
     assert_array_equal(x0.shape, [8, *block_shape, 1])
     assert_array_equal(y0.shape, [8, *block_shape, 20])
     assert_allclose(np.mean(x0), 0, atol=1e-07)
@@ -260,18 +249,30 @@ def test_preprocess_multiclass():
 
 def test_get_steps_per_epoch():
     nsteps = volume.get_steps_per_epoch(
-        n_volumes=1, volume_shape=(256, 256, 256), block_shape=(64, 64, 64),
-        batch_size=1)
+        n_volumes=1,
+        volume_shape=(256, 256, 256),
+        block_shape=(64, 64, 64),
+        batch_size=1,
+    )
     assert nsteps == 64
     nsteps = volume.get_steps_per_epoch(
-        n_volumes=1, volume_shape=(256, 256, 256), block_shape=(64, 64, 64),
-        batch_size=64)
+        n_volumes=1,
+        volume_shape=(256, 256, 256),
+        block_shape=(64, 64, 64),
+        batch_size=64,
+    )
     assert nsteps == 1
     nsteps = volume.get_steps_per_epoch(
-        n_volumes=1, volume_shape=(256, 256, 256), block_shape=(64, 64, 64),
-        batch_size=63)
+        n_volumes=1,
+        volume_shape=(256, 256, 256),
+        block_shape=(64, 64, 64),
+        batch_size=63,
+    )
     assert nsteps == 2
     nsteps = volume.get_steps_per_epoch(
-        n_volumes=10, volume_shape=(256, 256, 256), block_shape=(128, 128, 128),
-        batch_size=4)
+        n_volumes=10,
+        volume_shape=(256, 256, 256),
+        block_shape=(128, 128, 128),
+        batch_size=4,
+    )
     assert nsteps == 20

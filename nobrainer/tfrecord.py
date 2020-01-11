@@ -13,9 +13,16 @@ from nobrainer.io import read_volume
 _TFRECORDS_DTYPE = "float32"
 
 
-def write(features_labels, filename_template, examples_per_shard,
-        to_ras=True,
-        compressed=True, processes=None, chunksize=1, verbose=1):
+def write(
+    features_labels,
+    filename_template,
+    examples_per_shard,
+    to_ras=True,
+    compressed=True,
+    processes=None,
+    chunksize=1,
+    verbose=1,
+):
     """Write to TFRecords files."""
     n_examples = len(features_labels)
     n_shards = math.ceil(n_examples / examples_per_shard)
@@ -25,13 +32,17 @@ def write(features_labels, filename_template, examples_per_shard,
     try:
         filename_template.format(shard=0)
     except Exception:
-        raise ValueError("`filename_template` must include a string formatting key 'shard' that accepts an integer.")
+        raise ValueError(
+            "`filename_template` must include a string formatting key 'shard' that accepts an integer."
+        )
 
     # This is the object that returns a protocol buffer string of the feature and label on each iteration.
     # It is pickle-able, unlike a generator.
     proto_iterators = [_ProtoIterator(s) for s in shards]
     # Set up positional arguments for the core writer function.
-    iterable = [(p, filename_template.format(shard=j)) for j, p in enumerate(proto_iterators)]
+    iterable = [
+        (p, filename_template.format(shard=j)) for j, p in enumerate(proto_iterators)
+    ]
     # Set keyword arguments so the resulting function accepts one positional argument.
     map_fn = functools.partial(_write_tfrecords, compressed=True)
 
@@ -50,12 +61,15 @@ def write(features_labels, filename_template, examples_per_shard,
         # Note the difference from `os.cpu_count()`.
         processes = len(os.sched_getaffinity(0))
     with mp.Pool(processes) as p:
-        for _ in p.imap_unordered(__writer_func, iterable=iterable, chunksize=chunksize):
+        for _ in p.imap_unordered(
+            __writer_func, iterable=iterable, chunksize=chunksize
+        ):
             progbar.add(1)
 
 
 def parse_example_fn(volume_shape, scalar_label=False):
     """"""
+
     @tf.function
     def parse_example(serialized):
         """"""
@@ -63,7 +77,8 @@ def parse_example_fn(volume_shape, scalar_label=False):
             "feature/shape": tf.io.FixedLenFeature(shape=[], dtype=tf.string),
             "feature/value": tf.io.FixedLenFeature(shape=[], dtype=tf.string),
             "label/value": tf.io.FixedLenFeature(shape=[], dtype=tf.string),
-            "label/rank": tf.io.FixedLenFeature(shape=[], dtype=tf.int64)}
+            "label/rank": tf.io.FixedLenFeature(shape=[], dtype=tf.int64),
+        }
         e = tf.io.parse_single_example(serialized=serialized, features=features)
         x = tf.io.decode_raw(e["feature/value"], _TFRECORDS_DTYPE)
         y = tf.io.decode_raw(e["label/value"], _TFRECORDS_DTYPE)
@@ -76,13 +91,14 @@ def parse_example_fn(volume_shape, scalar_label=False):
         else:
             y = tf.reshape(y, shape=[1])
         return x, y
+
     return parse_example
 
 
 def _bytes_feature(value):
     """Returns a bytes_list from a string / byte."""
     if isinstance(value, type(tf.constant(0))):
-        value = value.numpy() # BytesList won't unpack a string from an EagerTensor.
+        value = value.numpy()  # BytesList won't unpack a string from an EagerTensor.
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
 
@@ -98,12 +114,12 @@ def _int64_feature(value):
 
 def _dtype_to_bytes(dtype):
     if isinstance(dtype, str):
-        return dtype.encode('utf-8')
+        return dtype.encode("utf-8")
     try:
         s = str(dtype.name)
     except AttributeError:
         s = str(dtype)
-    return s.encode('utf-8')
+    return s.encode("utf-8")
 
 
 def _get_feature_dict(x, affine):
@@ -113,21 +129,26 @@ def _get_feature_dict(x, affine):
     feature = {
         "feature/value": _bytes_feature(x.tobytes()),
         "feature/dtype": _bytes_feature(_dtype_to_bytes(x.dtype)),
-        "feature/rank": _int64_feature(x.ndim)}
+        "feature/rank": _int64_feature(x.ndim),
+    }
 
     for j, s in enumerate(x.shape):
         feature["feature/shape/dim{}".format(j)] = _int64_feature(s)
 
     if x.ndim:
-        feature["feature/shape"] = _bytes_feature(np.array(x.shape).astype(_TFRECORDS_DTYPE).tobytes())
+        feature["feature/shape"] = _bytes_feature(
+            np.array(x.shape).astype(_TFRECORDS_DTYPE).tobytes()
+        )
 
     affine = np.asarray(affine)
     affine = affine.astype(_TFRECORDS_DTYPE)
-    feature.update({
-        "feature/affine/value": _bytes_feature(affine.tobytes()),
-        "feature/affine/dtype": _bytes_feature(_dtype_to_bytes(affine.dtype)),
-        "feature/affine/rank": _int64_feature(affine.ndim),
-    })
+    feature.update(
+        {
+            "feature/affine/value": _bytes_feature(affine.tobytes()),
+            "feature/affine/dtype": _bytes_feature(_dtype_to_bytes(affine.dtype)),
+            "feature/affine/rank": _int64_feature(affine.ndim),
+        }
+    )
     for j, s in enumerate(affine.shape):
         feature["feature/affine/shape/dim{}".format(j)] = _int64_feature(s)
 
@@ -141,12 +162,15 @@ def _get_label_dict(y, affine=None):
     label = {
         "label/value": _bytes_feature(y.tobytes()),
         "label/dtype": _bytes_feature(_dtype_to_bytes(y.dtype)),
-        "label/rank": _int64_feature(y.ndim)}
+        "label/rank": _int64_feature(y.ndim),
+    }
 
     for j, s in enumerate(y.shape):
         label["label/shape/dim{}".format(j)] = _int64_feature(s)
     if y.ndim:
-        label["feature/shape"] = _bytes_feature(np.array(y.shape).astype(_TFRECORDS_DTYPE).tobytes())
+        label["feature/shape"] = _bytes_feature(
+            np.array(y.shape).astype(_TFRECORDS_DTYPE).tobytes()
+        )
 
     if affine is None and y.ndim != 0:
         raise ValueError("Affine is required when label is not scalar.")
@@ -154,11 +178,13 @@ def _get_label_dict(y, affine=None):
     if affine is not None:
         affine = np.asarray(affine)
         affine = affine.astype(_TFRECORDS_DTYPE)
-        label.update({
-            "label/affine/value": _bytes_feature(affine.tobytes()),
-            "label/affine/dtype": _bytes_feature(_dtype_to_bytes(affine.dtype)),
-            "label/affine/rank": _int64_feature(affine.ndim),
-        })
+        label.update(
+            {
+                "label/affine/value": _bytes_feature(affine.tobytes()),
+                "label/affine/dtype": _bytes_feature(_dtype_to_bytes(affine.dtype)),
+                "label/affine/rank": _int64_feature(affine.ndim),
+            }
+        )
         for j, s in enumerate(affine.shape):
             label["label/affine/shape/dim{}".format(j)] = _int64_feature(s)
 
@@ -183,6 +209,7 @@ class _ProtoIterator:
     multiprocessing workflows. Please see
     https://stackoverflow.com/a/7180424/5666087 for more information.
     """
+
     def __init__(self, features_labels, to_ras=True):
         self.features_labels = features_labels
         self.to_ras = to_ras
@@ -208,7 +235,9 @@ class _ProtoIterator:
                 if not Path(y).exists():
                     no_exist.append(y)
             if no_exist:
-                raise ValueError("Some files do not exist: {}".format(", ".join(no_exist)))
+                raise ValueError(
+                    "Some files do not exist: {}".format(", ".join(no_exist))
+                )
 
     def __iter__(self):
         self._j = 0
@@ -226,13 +255,23 @@ class _ProtoIterator:
         except IndexError:
             raise StopIteration
         if self.scalar_label:
-            x, affine = read_volume(x, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras)
-            proto = _to_proto(feature=x, label=y, feature_affine=affine, label_affine=None)
+            x, affine = read_volume(
+                x, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras
+            )
+            proto = _to_proto(
+                feature=x, label=y, feature_affine=affine, label_affine=None
+            )
             return proto.SerializeToString()
         else:
-            x, affine_x = read_volume(x, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras)
-            y, affine_y = read_volume(y, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras)
-            proto = _to_proto(feature=x, label=y, feature_affine=affine_x, label_affine=affine_y)
+            x, affine_x = read_volume(
+                x, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras
+            )
+            y, affine_y = read_volume(
+                y, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras
+            )
+            proto = _to_proto(
+                feature=x, label=y, feature_affine=affine_x, label_affine=affine_y
+            )
             return proto.SerializeToString()
 
 
@@ -270,5 +309,6 @@ def _labels_all_scalar(labels):
     if any(scalars) and not all(scalars):
         raise ValueError(
             "Some labels were detected as scalars, while others were not."
-            " Labels must be all scalars or all filenames of volumes.")
+            " Labels must be all scalars or all filenames of volumes."
+        )
     return all(scalars)

@@ -7,7 +7,16 @@ import tensorflow as tf
 from tensorflow.keras import layers
 
 
-def meshnet(n_classes, input_shape, receptive_field=67, filters=71, activation='relu', dropout_rate=0.25, batch_size=None, name='meshnet'):
+def meshnet(
+    n_classes,
+    input_shape,
+    receptive_field=67,
+    filters=71,
+    activation="relu",
+    dropout_rate=0.25,
+    batch_size=None,
+    name="meshnet",
+):
     """Instantiate MeshNet model.
 
     Parameters
@@ -41,13 +50,21 @@ def meshnet(n_classes, input_shape, receptive_field=67, filters=71, activation='
         raise ValueError("unknown receptive field. Legal values are 37, 67, and 129.")
 
     def one_layer(x, layer_num, dilation_rate=(1, 1, 1)):
-        x = layers.Conv3D(filters, kernel_size=(3, 3, 3), padding='same', dilation_rate=dilation_rate, name='layer{}/conv3d'.format(layer_num))(x)
-        x = layers.BatchNormalization(name='layer{}/batchnorm'.format(layer_num))(x)
-        x = layers.Activation(activation, name='layer{}/activation'.format(layer_num))(x)
-        x = layers.Dropout(dropout_rate, name='layer{}/dropout'.format(layer_num))(x)
+        x = layers.Conv3D(
+            filters,
+            kernel_size=(3, 3, 3),
+            padding="same",
+            dilation_rate=dilation_rate,
+            name="layer{}/conv3d".format(layer_num),
+        )(x)
+        x = layers.BatchNormalization(name="layer{}/batchnorm".format(layer_num))(x)
+        x = layers.Activation(activation, name="layer{}/activation".format(layer_num))(
+            x
+        )
+        x = layers.Dropout(dropout_rate, name="layer{}/dropout".format(layer_num))(x)
         return x
 
-    inputs = layers.Input(shape=input_shape, batch_size=batch_size, name='inputs')
+    inputs = layers.Input(shape=input_shape, batch_size=batch_size, name="inputs")
 
     if receptive_field == 37:
         x = one_layer(inputs, 1)
@@ -74,9 +91,14 @@ def meshnet(n_classes, input_shape, receptive_field=67, filters=71, activation='
         x = one_layer(x, 6, dilation_rate=(32, 32, 32))
         x = one_layer(x, 7)
 
-    x = layers.Conv3D(filters=n_classes, kernel_size=(1, 1, 1), padding='same', name='classification/conv3d')(x)
+    x = layers.Conv3D(
+        filters=n_classes,
+        kernel_size=(1, 1, 1),
+        padding="same",
+        name="classification/conv3d",
+    )(x)
 
-    final_activation = 'sigmoid' if n_classes == 1 else 'softmax'
-    x = layers.Activation(final_activation, name='classification/activation')(x)
+    final_activation = "sigmoid" if n_classes == 1 else "softmax"
+    x = layers.Activation(final_activation, name="classification/activation")(x)
 
     return tf.keras.Model(inputs=inputs, outputs=x, name=name)

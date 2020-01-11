@@ -4,12 +4,15 @@ import tensorflow as tf
 
 if LooseVersion(tf.__version__) < LooseVersion("1.13.1"):
     raise ValueError(
-        "tensorflow>=1.13.1 must be installed but found version {}"
-        .format(tf.__version__))
+        "tensorflow>=1.13.1 must be installed but found version {}".format(
+            tf.__version__
+        )
+    )
 del LooseVersion, tf
 
 from nobrainer._version import get_versions
-__version__ = get_versions()['version']
+
+__version__ = get_versions()["version"]
 del get_versions
 
 import nobrainer.io

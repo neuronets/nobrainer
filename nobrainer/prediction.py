@@ -17,14 +17,16 @@ from nobrainer.volume import to_blocks
 from nobrainer.volume import to_blocks_numpy
 
 
-def predict(inputs,
-             model,
-             block_shape,
-             batch_size=1,
-             normalizer=None,
-             n_samples=1,
-             return_variance=False,
-             return_entropy=False):
+def predict(
+    inputs,
+    model,
+    block_shape,
+    batch_size=1,
+    normalizer=None,
+    n_samples=1,
+    return_variance=False,
+    return_entropy=False,
+):
     """Return predictions from `inputs`.
 
     This is a general prediction method that can accept various types of
@@ -64,7 +66,7 @@ def predict(inputs,
             entropy predictions per iteration.
     """
     if n_samples < 1:
-        raise Exception('n_samples cannot be lower than 1.')
+        raise Exception("n_samples cannot be lower than 1.")
 
     model = _get_model(model)
 
@@ -77,7 +79,8 @@ def predict(inputs,
             normalizer=normalizer,
             n_samples=n_samples,
             return_variance=return_variance,
-            return_entropy=return_entropy)
+            return_entropy=return_entropy,
+        )
     elif isinstance(inputs, nib.spatialimages.SpatialImage):
         out = predict_from_img(
             img=inputs,
@@ -87,7 +90,8 @@ def predict(inputs,
             normalizer=normalizer,
             n_samples=n_samples,
             return_variance=return_variance,
-            return_entropy=return_entropy)
+            return_entropy=return_entropy,
+        )
     elif isinstance(inputs, str):
         out = predict_from_filepath(
             filepath=inputs,
@@ -97,7 +101,8 @@ def predict(inputs,
             normalizer=normalizer,
             n_samples=n_samples,
             return_variance=return_variance,
-            return_entropy=return_entropy)
+            return_entropy=return_entropy,
+        )
     elif isinstance(inputs, (list, tuple)):
         out = predict_from_filepaths(
             filepaths=inputs,
@@ -107,20 +112,23 @@ def predict(inputs,
             normalizer=normalizer,
             n_samples=n_samples,
             return_variance=return_variance,
-            return_entropy=return_entropy)
+            return_entropy=return_entropy,
+        )
     else:
         raise TypeError("Input to predict is not a valid type")
     return out
 
 
-def predict_from_array(inputs,
-                     model,
-                     block_shape,
-                     batch_size=1,
-                     normalizer=None,
-                     n_samples=1,
-                     return_variance=False,
-                     return_entropy=False):
+def predict_from_array(
+    inputs,
+    model,
+    block_shape,
+    batch_size=1,
+    normalizer=None,
+    n_samples=1,
+    return_variance=False,
+    return_entropy=False,
+):
     """Return a prediction given a filepath and an ndarray of features.
 
     Parameters
@@ -174,8 +182,7 @@ def predict_from_array(inputs,
         outputs = from_blocks_numpy(outputs, output_shape=inputs.shape)
         return outputs
 
-    raise NotImplementedError(
-        "Predicting from Bayesian nets is not implemented yet.")
+    raise NotImplementedError("Predicting from Bayesian nets is not implemented yet.")
 
     means = np.zeros_like(features)
     variances = np.zeros_like(features)
@@ -184,24 +191,31 @@ def predict_from_array(inputs,
     progbar.update(0)
     for j in range(0, n_blocks, batch_size):
 
-        this_x = features[j:j + batch_size]
+        this_x = features[j : j + batch_size]
 
         new_prediction = model.predict(this_x, batch_size=1, verbose=0)
 
-        prev_mean = np.zeros_like(new_prediction['probabilities'])
-        curr_mean = new_prediction['probabilities']
+        prev_mean = np.zeros_like(new_prediction["probabilities"])
+        curr_mean = new_prediction["probabilities"]
 
-        M = np.zeros_like(new_prediction['probabilities'])
+        M = np.zeros_like(new_prediction["probabilities"])
         for n in range(1, n_samples):
 
             new_prediction = model.predict(this_x)
             prev_mean = curr_mean
-            curr_mean = prev_mean + (new_prediction['probabilities'] - prev_mean)/float(n+1)
-            M = M + np.multiply(prev_mean - new_prediction['probabilities'], curr_mean - new_prediction['probabilities'])
+            curr_mean = prev_mean + (
+                new_prediction["probabilities"] - prev_mean
+            ) / float(n + 1)
+            M = M + np.multiply(
+                prev_mean - new_prediction["probabilities"],
+                curr_mean - new_prediction["probabilities"],
+            )
 
-        means[j:j + batch_size] = np.argmax(curr_mean, axis = -1 ) # max mean
-        variances[j:j + batch_size] = np.sum(M/n_samples, axis = -1)
-        entropies[j:j + batch_size] = -np.sum(np.multiply(np.log(curr_mean+0.001),curr_mean), axis = -1) # entropy
+        means[j : j + batch_size] = np.argmax(curr_mean, axis=-1)  # max mean
+        variances[j : j + batch_size] = np.sum(M / n_samples, axis=-1)
+        entropies[j : j + batch_size] = -np.sum(
+            np.multiply(np.log(curr_mean + 0.001), curr_mean), axis=-1
+        )  # entropy
         progbar.add(1)
 
     total_means = from_blocks_numpy(means, output_shape=inputs.shape)
@@ -211,7 +225,7 @@ def predict_from_array(inputs,
     mean_var_voxels = np.mean(total_variance)
     std_var_voxels = np.std(total_variance)
 
-    include_variance = ((n_samples > 1) and (return_variance))
+    include_variance = (n_samples > 1) and (return_variance)
     if include_variance:
         if return_entropy:
             return total_means, total_variance, total_entropy
@@ -221,17 +235,19 @@ def predict_from_array(inputs,
         if return_entropy:
             return total_means, total_entropy
         else:
-            return total_means,
+            return (total_means,)
 
 
-def predict_from_img(img,
-                     model,
-                     block_shape,
-                     batch_size=1,
-                     normalizer=None,
-                     n_samples=1,
-                     return_variance=False,
-                     return_entropy=False):
+def predict_from_img(
+    img,
+    model,
+    block_shape,
+    batch_size=1,
+    normalizer=None,
+    n_samples=1,
+    return_variance=False,
+    return_entropy=False,
+):
     """Return a prediction given a Nibabel image instance and a predictor.
 
     Parameters
@@ -270,34 +286,47 @@ def predict_from_img(img,
         normalizer=normalizer,
         n_samples=n_samples,
         return_variance=return_variance,
-        return_entropy=return_entropy)
+        return_entropy=return_entropy,
+    )
 
     if isinstance(y, np.ndarray):
         return nib.spatialimages.SpatialImage(
-            dataobj=y, affine=img.affine, header=img.header, extra=img.extra)
+            dataobj=y, affine=img.affine, header=img.header, extra=img.extra
+        )
     else:
         if len(y) == 2:
-            return nib.spatialimages.SpatialImage(
-                dataobj=y[0], affine=img.affine, header=img.header, extra=img.extra),\
+            return (
                 nib.spatialimages.SpatialImage(
-                dataobj=y[1], affine=img.affine, header=img.header, extra=img.extra)
+                    dataobj=y[0], affine=img.affine, header=img.header, extra=img.extra
+                ),
+                nib.spatialimages.SpatialImage(
+                    dataobj=y[1], affine=img.affine, header=img.header, extra=img.extra
+                ),
+            )
         elif len(y) == 3:
-            return nib.spatialimages.SpatialImage(
-                dataobj=y[0], affine=img.affine, header=img.header, extra=img.extra),\
+            return (
                 nib.spatialimages.SpatialImage(
-                dataobj=y[1], affine=img.affine, header=img.header, extra=img.extra),\
+                    dataobj=y[0], affine=img.affine, header=img.header, extra=img.extra
+                ),
                 nib.spatialimages.SpatialImage(
-                dataobj=y[2], affine=img.affine, header=img.header, extra=img.extra)
+                    dataobj=y[1], affine=img.affine, header=img.header, extra=img.extra
+                ),
+                nib.spatialimages.SpatialImage(
+                    dataobj=y[2], affine=img.affine, header=img.header, extra=img.extra
+                ),
+            )
 
 
-def predict_from_filepath(filepath,
-                           model,
-                           block_shape,
-                           batch_size=1,
-                           normalizer=None,
-                           n_samples=1,
-                           return_variance=False,
-                           return_entropy=False):
+def predict_from_filepath(
+    filepath,
+    model,
+    block_shape,
+    batch_size=1,
+    normalizer=None,
+    n_samples=1,
+    return_variance=False,
+    return_entropy=False,
+):
     """Predict on a volume given a filepath and a trained model.
 
     Parameters
@@ -334,17 +363,20 @@ def predict_from_filepath(filepath,
         normalizer=normalizer,
         n_samples=n_samples,
         return_variance=return_variance,
-        return_entropy=return_entropy)
+        return_entropy=return_entropy,
+    )
 
 
-def predict_from_filepaths(filepaths,
-                            model,
-                            block_shape,
-                            batch_size=1,
-                            normalizer=None,
-                            n_samples=1,
-                            return_variance=False,
-                            return_entropy=False):
+def predict_from_filepaths(
+    filepaths,
+    model,
+    block_shape,
+    batch_size=1,
+    normalizer=None,
+    n_samples=1,
+    return_variance=False,
+    return_entropy=False,
+):
     """Yield a model's predictions on a list of filepaths.
 
     Parameters
@@ -378,7 +410,8 @@ def predict_from_filepaths(filepaths,
             normalizer=normalizer,
             n_samples=n_samples,
             return_variance=return_variance,
-            return_entropy=return_entropy)
+            return_entropy=return_entropy,
+        )
 
 
 def _get_model(path):
@@ -406,18 +439,20 @@ def _get_model(path):
 
     try:
         path = Path(path)
-        if path.suffix == '.json':
+        if path.suffix == ".json":
             path = path.parent.parent
         return tf.keras.experimental.load_from_saved_model(str(path))
     except Exception:
         pass
 
     raise ValueError(
-        "Failed to load model. Is the model in HDF5 format or SavedModel"
-        " format?")
+        "Failed to load model. Is the model in HDF5 format or SavedModel" " format?"
+    )
 
 
-def _transform_and_predict(model, x, block_shape, rotation, translation=[0, 0, 0], verbose=False):
+def _transform_and_predict(
+    model, x, block_shape, rotation, translation=[0, 0, 0], verbose=False
+):
     """Predict on rigidly transformed features.
 
     The rigid transformation is applied to the volumes prior to prediction, and
@@ -459,7 +494,8 @@ def _transform_and_predict(model, x, block_shape, rotation, translation=[0, 0, 0
         # each voxel, but if we get hard values, then we cannot average
         # multiple predictions.
         raise ValueError(
-            "This function is not compatible with multi-class predictions.")
+            "This function is not compatible with multi-class predictions."
+        )
 
     y = from_blocks_numpy(y, x.shape)
     y = warp(y, inverse_affine, order=0).numpy()

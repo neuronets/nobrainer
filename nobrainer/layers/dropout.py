@@ -35,7 +35,9 @@ class BernoulliDropout(tfkl.Layer):
     [https://www.cs.toronto.edu/~hinton/absps/JMLRdropout.pdf](https://www.cs.toronto.edu/~hinton/absps/JMLRdropout.pdf)
     """
 
-    def __init__(self, rate, is_monte_carlo, scale_during_training=True, seed=None, **kwargs):
+    def __init__(
+        self, rate, is_monte_carlo, scale_during_training=True, seed=None, **kwargs
+    ):
         super().__init__(**kwargs)
         self.rate = rate
         self.is_monte_carlo = is_monte_carlo
@@ -51,12 +53,14 @@ class BernoulliDropout(tfkl.Layer):
 
     def get_config(self):
         config = super().get_config()
-        config.update({
-            'rate': self.rate,
-            'is_monte_carlo': self.is_monte_carlo,
-            'scale_during_training': self.scale_during_training,
-            'seed': self.seed
-        })
+        config.update(
+            {
+                "rate": self.rate,
+                "is_monte_carlo": self.is_monte_carlo,
+                "scale_during_training": self.scale_during_training,
+                "seed": self.seed,
+            }
+        )
         return config
 
 
@@ -81,7 +85,14 @@ class ConcreteDropout(tfkl.Layer):
     [http://papers.nips.cc/paper/6949-concrete-dropout.pdf](http://papers.nips.cc/paper/6949-concrete-dropout.pdf)
     """
 
-    def __init__(self, is_monte_carlo, temperature=0.02, use_expectation=True, seed=None, **kwargs):
+    def __init__(
+        self,
+        is_monte_carlo,
+        temperature=0.02,
+        use_expectation=True,
+        seed=None,
+        **kwargs
+    ):
         super().__init__(**kwargs)
         self.is_monte_carlo = is_monte_carlo
         self.temperature = temperature
@@ -90,7 +101,9 @@ class ConcreteDropout(tfkl.Layer):
 
     def build(self, input_shape):
         initial_p = tfk.initializers.Constant(0.9)
-        self.p = self.add_weight(name="p", shape=input_shape[-1:], initializer=initial_p, trainable=True)
+        self.p = self.add_weight(
+            name="p", shape=input_shape[-1:], initializer=initial_p, trainable=True
+        )
         # TODO: where should this go? Or should it be removed?
         # self.p = tf.clip_by_value(self.p, 0.05, 0.95)
 
@@ -99,13 +112,19 @@ class ConcreteDropout(tfkl.Layer):
         eps = tfk.backend.epsilon()
         if self.is_monte_carlo:
             noise = tf.random.uniform(
-                tf.shape(inference), minval=0, maxval=1, seed=self.seed, dtype=self.dtype)
+                tf.shape(inference),
+                minval=0,
+                maxval=1,
+                seed=self.seed,
+                dtype=self.dtype,
+            )
             z = tf.nn.sigmoid(
                 (
                     tf.math.log(self.p + eps)
                     - tf.math.log(1.0 - self.p + eps)
                     + tf.math.log(noise + eps)
-                    - tf.math.log(1.0 - noise + eps))
+                    - tf.math.log(1.0 - noise + eps)
+                )
                 / self.temperature
             )
             return x * z
@@ -114,12 +133,14 @@ class ConcreteDropout(tfkl.Layer):
 
     def get_config(self):
         config = super().get_config()
-        config.update({
-            'is_monte_carlo': self.is_monte_carlo,
-            'temperature': self.temperature,
-            'use_expectation': self.use_expectation,
-            'seed': self.seed
-        })
+        config.update(
+            {
+                "is_monte_carlo": self.is_monte_carlo,
+                "temperature": self.temperature,
+                "use_expectation": self.use_expectation,
+                "seed": self.seed,
+            }
+        )
         return config
 
 
@@ -140,7 +161,9 @@ class GaussianDropout(tfkl.Layer):
     [https://www.cs.toronto.edu/~hinton/absps/JMLRdropout.pdf](https://www.cs.toronto.edu/~hinton/absps/JMLRdropout.pdf)
     """
 
-    def __init__(self, rate, is_monte_carlo, scale_during_training=True, seed=None, **kwargs):
+    def __init__(
+        self, rate, is_monte_carlo, scale_during_training=True, seed=None, **kwargs
+    ):
         super().__init__(**kwargs)
         self.rate = rate
         self.is_monte_carlo = is_monte_carlo
@@ -153,17 +176,21 @@ class GaussianDropout(tfkl.Layer):
                 stddev = math.sqrt(self.rate / (1.0 - self.rate))
             else:
                 stddev = math.sqrt(self.rate * (1.0 - self.rate))
-            noise = tf.random.normal(tf.shape(x), mean=1.0, stddev=stddev, seed=self.seed)
+            noise = tf.random.normal(
+                tf.shape(x), mean=1.0, stddev=stddev, seed=self.seed
+            )
             return x * noise
         else:
             return x
 
     def get_config(self):
         config = super().get_config()
-        config.update({
-            'rate': self.rate,
-            'is_monte_carlo': self.is_monte_carlo,
-            'scale_during_training': self.scale_during_training,
-            'seed': self.seed
-        })
+        config.update(
+            {
+                "rate": self.rate,
+                "is_monte_carlo": self.is_monte_carlo,
+                "scale_during_training": self.scale_during_training,
+                "seed": self.seed,
+            }
+        )
         return config

@@ -3,6 +3,7 @@ from nobrainer.models.meshnet import meshnet
 from nobrainer.models.unet import unet
 from nobrainer.models.autoencoder import autoencoder
 
+
 def get(name):
     """Return callable that creates a particular `tf.keras.Model`.
 
@@ -18,15 +19,16 @@ def get(name):
         raise ValueError("Model name must be a string.")
 
     models = {
-        'highresnet': highresnet,
-        'meshnet': meshnet,
-        'unet': unet,
-        'autoencoder': autoencoder
+        "highresnet": highresnet,
+        "meshnet": meshnet,
+        "unet": unet,
+        "autoencoder": autoencoder,
     }
 
     try:
         return models[name.lower()]
     except KeyError:
-        avail = ', '.join(models.keys())
+        avail = ", ".join(models.keys())
         raise ValueError(
-            "Uknown model: '{}'. Available models are {}.".format(name, avail))
+            "Uknown model: '{}'. Available models are {}.".format(name, avail)
+        )
