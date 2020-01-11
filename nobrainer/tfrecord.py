@@ -192,12 +192,7 @@ class _ProtoIterator:
         # files, though it is possible to have existing filenames that
         # are integers or floats.
         labels = [y for _, y in features_labels]
-        scalars = list(map(_is_int_or_float, labels))
-        if any(scalars) and not all(scalars):
-            raise ValueError(
-                "Some labels were detected as scalars, while others were not."
-                " Labels must be all scalars or all filenames of volumes.")
-        self.scalar_label = all(scalars)
+        self.scalar_label = _labels_all_scalar(labels)
         self._j = 0
 
         no_exist = []
@@ -268,3 +263,12 @@ def _is_int_or_float(value):
     except (TypeError, ValueError):
         pass
     return False
+
+
+def _labels_all_scalar(labels):
+    scalars = list(map(_is_int_or_float, labels))
+    if any(scalars) and not all(scalars):
+        raise ValueError(
+            "Some labels were detected as scalars, while others were not."
+            " Labels must be all scalars or all filenames of volumes.")
+    return all(scalars)
