@@ -98,18 +98,6 @@ def get_data(cache_dir=_cache_dir):
     return csvpath
 
 
-def _get_all_cpus():
-    """SLURM-aware function that returns number of CPUs or None if not using
-    SLURM.
-    """
-    nproc = os.environ.get('SLURM_CPUS_ON_NODE', None)
-    if nproc is not None:
-        nproc = int(nproc)
-    else:
-        nproc = multiprocessing.cpu_count()
-    return nproc
-
-
 class StreamingStats:
     """Object to calculate statistics on streaming data.
 

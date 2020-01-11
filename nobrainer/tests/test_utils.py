@@ -22,12 +22,6 @@ def test_get_data():
         assert Path(y).is_file()
 
 
-def test_get_all_cpus():
-    assert nbutils._get_all_cpus() == multiprocessing.cpu_count()
-    os.environ['SLURM_CPUS_ON_NODE'] = "128"
-    assert nbutils._get_all_cpus() == 128
-
-
 def test_streaming_stats():
     # TODO: add entropy
     ss = nbutils.StreamingStats()
