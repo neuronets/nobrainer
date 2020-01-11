@@ -21,14 +21,14 @@ def test_dice():
     out = losses.dice(x, y, axis=None).numpy()
     assert_allclose(out, 0)
 
-    x = [0., 0., 1., 1.]
-    y = [1., 1., 1., 1.]
+    x = [0.0, 0.0, 1.0, 1.0]
+    y = [1.0, 1.0, 1.0, 1.0]
     out = losses.dice(x, y, axis=None).numpy()
     ref = scipy.spatial.distance.dice(x, y)
     assert_allclose(out, ref)
 
-    x = [0., 0., 1., 1.]
-    y = [1., 1., 0., 0.]
+    x = [0.0, 0.0, 1.0, 1.0]
+    y = [1.0, 1.0, 0.0, 0.0]
     out = losses.dice(x, y, axis=None).numpy()
     ref = scipy.spatial.distance.dice(x, y)
     assert_allclose(out, ref)
@@ -64,7 +64,9 @@ def test_generalized_dice():
     # Why aren't the losses exactly one? Could it be the propogation of floating
     # point inaccuracies when summing?
     assert_allclose(losses.generalized_dice(x, y), np.ones(shape[0]), atol=1e-03)
-    assert_allclose(losses.GeneralizedDice(axis=(1, 2, 3))(x, y), losses.generalized_dice(x, y))
+    assert_allclose(
+        losses.GeneralizedDice(axis=(1, 2, 3))(x, y), losses.generalized_dice(x, y)
+    )
 
     x = np.ones((4, 32, 32, 32, 1), dtype=np.float64)
     y = x.copy()
@@ -89,14 +91,14 @@ def test_jaccard():
     out = losses.jaccard(x, y, axis=None).numpy()
     assert_allclose(out, 0)
 
-    x = [0., 0., 1., 1.]
-    y = [1., 1., 1., 1.]
+    x = [0.0, 0.0, 1.0, 1.0]
+    y = [1.0, 1.0, 1.0, 1.0]
     out = losses.jaccard(x, y, axis=None).numpy()
     ref = scipy.spatial.distance.jaccard(x, y)
     assert_allclose(out, ref)
 
-    x = [0., 0., 1., 1.]
-    y = [1., 1., 0., 0.]
+    x = [0.0, 0.0, 1.0, 1.0]
+    y = [1.0, 1.0, 0.0, 0.0]
     out = losses.jaccard(x, y, axis=None).numpy()
     ref = scipy.spatial.distance.jaccard(x, y)
     assert_allclose(out, ref)
@@ -129,18 +131,18 @@ def test_elbo():
 
 def test_get():
     if LooseVersion(tf.__version__) < LooseVersion("1.14.1-dev20190408"):
-        assert losses.get('dice') is losses.dice
-        assert losses.get('Dice') is losses.Dice
-        assert losses.get('jaccard') is losses.jaccard
-        assert losses.get('Jaccard') is losses.Jaccard
-        assert losses.get('tversky') is losses.tversky
-        assert losses.get('Tversky') is losses.Tversky
-        assert losses.get('binary_crossentropy')
+        assert losses.get("dice") is losses.dice
+        assert losses.get("Dice") is losses.Dice
+        assert losses.get("jaccard") is losses.jaccard
+        assert losses.get("Jaccard") is losses.Jaccard
+        assert losses.get("tversky") is losses.tversky
+        assert losses.get("Tversky") is losses.Tversky
+        assert losses.get("binary_crossentropy")
     else:
-        assert losses.get('dice') is losses.dice
-        assert isinstance(losses.get('Dice'), losses.Dice)
-        assert losses.get('jaccard') is losses.jaccard
-        assert isinstance(losses.get('Jaccard'), losses.Jaccard)
-        assert losses.get('tversky') is losses.tversky
-        assert isinstance(losses.get('Tversky'), losses.Tversky)
-        assert losses.get('binary_crossentropy')
+        assert losses.get("dice") is losses.dice
+        assert isinstance(losses.get("Dice"), losses.Dice)
+        assert losses.get("jaccard") is losses.jaccard
+        assert isinstance(losses.get("Jaccard"), losses.Jaccard)
+        assert losses.get("tversky") is losses.tversky
+        assert isinstance(losses.get("Tversky"), losses.Tversky)
+        assert losses.get("binary_crossentropy")

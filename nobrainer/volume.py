@@ -13,9 +13,18 @@ from nobrainer.transform import get_affine
 from nobrainer.transform import warp_features_labels
 
 
-def get_dataset(file_pattern, n_classes, batch_size, volume_shape,
-                block_shape=None, n_epochs=None, mapping=None, augment=False,
-                shuffle_buffer_size=None, num_parallel_calls=None):
+def get_dataset(
+    file_pattern,
+    n_classes,
+    batch_size,
+    volume_shape,
+    block_shape=None,
+    n_epochs=None,
+    mapping=None,
+    augment=False,
+    shuffle_buffer_size=None,
+    num_parallel_calls=None,
+):
     """Return `tf.data.Dataset` that preprocesses data for training or prediction.
 
     Labels are preprocessed for binary or multiclass segmentation according to
@@ -69,12 +78,15 @@ def get_dataset(file_pattern, n_classes, batch_size, volume_shape,
 
     # Read each of these files as a TFRecordDataset.
     # Assume all files have same compression type as the first file.
-    compression_type = 'GZIP' if _is_gzipped(files[0]) else None
+    compression_type = "GZIP" if _is_gzipped(files[0]) else None
     cycle_length = 1 if num_parallel_calls is None else num_parallel_calls
     dataset = dataset.interleave(
-        map_func=lambda x: tf.data.TFRecordDataset(x, compression_type=compression_type),
+        map_func=lambda x: tf.data.TFRecordDataset(
+            x, compression_type=compression_type
+        ),
         cycle_length=cycle_length,
-        num_parallel_calls=num_parallel_calls)
+        num_parallel_calls=num_parallel_calls,
+    )
 
     # Parse each example in each TFRecords file as a tensor of features and a
     # tensor of labels.
@@ -85,7 +97,9 @@ def get_dataset(file_pattern, n_classes, batch_size, volume_shape,
     # `volume_shape`. In the next steps, we process these tensors, i.e.,
     # separating them into non-overlapping blocks, binarizing or replacing
     # values in labels, standard-scoring the features, and augmenting.
-    preprocess_fn = _get_preprocess_fn(n_classes=n_classes, block_shape=block_shape, mapping=mapping, augment=augment)
+    preprocess_fn = _get_preprocess_fn(
+        n_classes=n_classes, block_shape=block_shape, mapping=mapping, augment=augment
+    )
     dataset = dataset.map(preprocess_fn, num_parallel_calls=num_parallel_calls)
 
     # Flatten the dataset from (n_blocks, *block_shape, 1) to (*block_shape, 1).
@@ -130,16 +144,20 @@ def apply_random_transform(features, labels):
         raise ValueError("shape of features and labels must be the same.")
     # Rotate -180 degrees to 180 degrees in three dimensions.
     rotation = tf.random.uniform(
-        shape=[3], minval=-np.pi, maxval=np.pi, dtype=tf.float32)
+        shape=[3], minval=-np.pi, maxval=np.pi, dtype=tf.float32
+    )
 
     # Translate at most 5% in any direction, so there's less chance of
     # important data going out of view.
     maxval = 0.05 * features.shape[0]
     translation = tf.random.uniform(
-        shape=[3], minval=-maxval, maxval=maxval, dtype=tf.float32)
+        shape=[3], minval=-maxval, maxval=maxval, dtype=tf.float32
+    )
 
     volume_shape = np.asarray(features.shape)
-    matrix = get_affine(volume_shape=volume_shape, rotation=rotation, translation=translation)
+    matrix = get_affine(
+        volume_shape=volume_shape, rotation=rotation, translation=translation
+    )
     return warp_features_labels(features=features, labels=labels, matrix=matrix)
 
 
@@ -193,7 +211,9 @@ def replace(x, mapping, zero=True):
 
     if zero:
         # Zero values in the data array that are not in the mapping values.
-        mask = tf.reduce_any(tf.equal(tf.expand_dims(out, -1), tf.expand_dims(vals, 0)), -1)
+        mask = tf.reduce_any(
+            tf.equal(tf.expand_dims(out, -1), tf.expand_dims(vals, 0)), -1
+        )
         out = tf.multiply(out, tf.cast(mask, tf.int32))
 
     return out
@@ -240,7 +260,7 @@ def to_blocks(x, block_shape):
     if isinstance(block_shape, int) == 1:
         block_shape = list(block_shape) * 3
     elif len(block_shape) != 3:
-        raise ValueError('expected block_shape to be 1 or 3 values.')
+        raise ValueError("expected block_shape to be 1 or 3 values.")
 
     block_shape = np.asarray(block_shape)
     blocks = volume_shape // block_shape
@@ -249,10 +269,8 @@ def to_blocks(x, block_shape):
     new_shape = (-1, *block_shape)
     perm = (0, 2, 4, 1, 3, 5)  # 3D only
     return tf.reshape(
-        tf.transpose(
-            tf.reshape(x, shape=inter_shape),
-            perm=perm),
-        shape=new_shape)
+        tf.transpose(tf.reshape(x, shape=inter_shape), perm=perm), shape=new_shape
+    )
 
 
 def from_blocks(x, output_shape):
@@ -282,10 +300,8 @@ def from_blocks(x, output_shape):
     perm = (0, 3, 1, 4, 2, 5)  # 3D only
 
     return tf.reshape(
-        tf.transpose(
-            tf.reshape(x, shape=intershape),
-            perm=perm),
-        shape=output_shape)
+        tf.transpose(tf.reshape(x, shape=intershape), perm=perm), shape=output_shape
+    )
 
 
 def _get_preprocess_fn(n_classes, block_shape=None, mapping=None, augment=False):
@@ -315,27 +331,41 @@ def _get_preprocess_fn(n_classes, block_shape=None, mapping=None, augment=False)
         raise ValueError("`n_classes` must be at least 1.")
 
     if n_classes <= 2:
+
         def preprocess(features, labels):
             if augment:
                 # Only apply random augmentation to ~50% of the data.
                 features, labels = tf.cond(
                     tf.random.uniform((1,)) > 0.5,
                     true_fn=lambda: apply_random_transform(features, labels),
-                    false_fn=lambda: (features, labels))
+                    false_fn=lambda: (features, labels),
+                )
                 # features, labels = apply_random_transform(features, labels)
             features, labels = _preprocess_binary(
-                features=features, labels=labels, n_classes=n_classes, block_shape=block_shape)
+                features=features,
+                labels=labels,
+                n_classes=n_classes,
+                block_shape=block_shape,
+            )
             return features, labels
+
     else:
+
         def preprocess(features, labels):
             if augment:
                 # Only apply random augmentation to ~50% of the data.
                 features, labels = tf.cond(
                     tf.random.uniform((1,)) > 0.5,
                     true_fn=lambda: apply_random_transform(features, labels),
-                    false_fn=lambda: (features, labels))
+                    false_fn=lambda: (features, labels),
+                )
             features, labels = _preprocess_multiclass(
-                features=features, labels=labels, n_classes=n_classes, block_shape=block_shape, mapping=mapping)
+                features=features,
+                labels=labels,
+                n_classes=n_classes,
+                block_shape=block_shape,
+                mapping=mapping,
+            )
             return features, labels
 
     return preprocess
@@ -423,7 +453,9 @@ def _preprocess_multiclass(features, labels, n_classes, block_shape=None, mappin
     x, y = features, labels
 
     if n_classes <= 2:
-        raise ValueError("`n_classes` must be greater than 2 for multi-class segmentation.")
+        raise ValueError(
+            "`n_classes` must be greater than 2 for multi-class segmentation."
+        )
 
     x = tf.convert_to_tensor(x)
     x = standardize(x)
@@ -449,13 +481,13 @@ def get_steps_per_epoch(n_volumes, volume_shape, block_shape, batch_size):
     def get_n(a, k):
         return (a - k) / k + 1
 
-    n_blocks = tuple(
-        get_n(aa, kk) for aa, kk
-        in zip(volume_shape, block_shape))
+    n_blocks = tuple(get_n(aa, kk) for aa, kk in zip(volume_shape, block_shape))
 
     for n in n_blocks:
         if not n.is_integer() or n < 1:
-            raise ValueError("cannot create non-overlapping blocks with the given parameters.")
+            raise ValueError(
+                "cannot create non-overlapping blocks with the given parameters."
+            )
     n_blocks_per_volume = np.prod(n_blocks).astype(int)
 
     steps = n_blocks_per_volume * n_volumes / batch_size
@@ -516,10 +548,7 @@ def from_blocks_numpy(a, output_shape):
     ncbrt = int(ncbrt)
     intershape = (ncbrt, ncbrt, ncbrt, *block_shape)
 
-    return (
-        a.reshape(intershape)
-        .transpose((0, 3, 1, 4, 2, 5))
-        .reshape(output_shape))
+    return a.reshape(intershape).transpose((0, 3, 1, 4, 2, 5)).reshape(output_shape)
 
 
 def to_blocks_numpy(a, block_shape):

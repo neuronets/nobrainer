@@ -15,7 +15,17 @@ tfkl = tfk.layers
 tfpl = tfp.layers
 
 
-def variational_meshnet(n_classes, input_shape, receptive_field=67, filters=71, is_monte_carlo=False, dropout=None, activation=tf.nn.relu, batch_size=None, name='variational_meshnet'):
+def variational_meshnet(
+    n_classes,
+    input_shape,
+    receptive_field=67,
+    filters=71,
+    is_monte_carlo=False,
+    dropout=None,
+    activation=tf.nn.relu,
+    batch_size=None,
+    name="variational_meshnet",
+):
     """Instantiate variational MeshNet model.
 
     Please see https://arxiv.org/abs/1805.10863 for more information.
@@ -55,22 +65,37 @@ def variational_meshnet(n_classes, input_shape, receptive_field=67, filters=71, 
         raise ValueError("unknown receptive field. Legal values are 37, 67, and 129.")
 
     def one_layer(x, layer_num, dilation_rate=(1, 1, 1)):
-		# TODO: implement correct behavior for is_mc.
+        # TODO: implement correct behavior for is_mc.
         x = tfpl.Convolution3DReparameterization(
-        	filters, kernel_size=3, padding='same', dilation_rate=dilation_rate, activation=activation,
-			name='layer{}/vwnconv3d'.format(layer_num))(x)
+            filters,
+            kernel_size=3,
+            padding="same",
+            dilation_rate=dilation_rate,
+            activation=activation,
+            name="layer{}/vwnconv3d".format(layer_num),
+        )(x)
         if dropout is None:
             pass
         elif dropout == "bernoulli":
-            x = BernoulliDropout(rate=0.5, is_monte_carlo=is_monte_carlo, scale_during_training=False, name='layer{}/bernoulli_dropout'.format(layer_num))(x)
+            x = BernoulliDropout(
+                rate=0.5,
+                is_monte_carlo=is_monte_carlo,
+                scale_during_training=False,
+                name="layer{}/bernoulli_dropout".format(layer_num),
+            )(x)
         elif dropout == "concrete":
-            x = ConcreteDropout(is_monte_carlo=is_monte_carlo, temperature=0.02, use_expectation=is_monte_carlo, name='layer{}/concrete_dropout'.format(layer_num))(x)
+            x = ConcreteDropout(
+                is_monte_carlo=is_monte_carlo,
+                temperature=0.02,
+                use_expectation=is_monte_carlo,
+                name="layer{}/concrete_dropout".format(layer_num),
+            )(x)
         else:
             raise ValueError("unknown dropout layer, {}".format(dropout))
-        x = tfkl.Activation(activation, name='layer{}/activation'.format(layer_num))(x)
+        x = tfkl.Activation(activation, name="layer{}/activation".format(layer_num))(x)
         return x
 
-    inputs = tfkl.Input(shape=input_shape, batch_size=batch_size, name='inputs')
+    inputs = tfkl.Input(shape=input_shape, batch_size=batch_size, name="inputs")
 
     if receptive_field == 37:
         x = one_layer(inputs, 1)
@@ -97,11 +122,15 @@ def variational_meshnet(n_classes, input_shape, receptive_field=67, filters=71, 
         x = one_layer(x, 6, dilation_rate=(32, 32, 32))
         x = one_layer(x, 7)
 
-	# TODO: implement is_mc behavior.
+    # TODO: implement is_mc behavior.
     x = tfpl.Convolution3DReparameterization(
-		filters=n_classes, kernel_size=1, padding='same', name='classification/vwnconv3d')(x)
+        filters=n_classes,
+        kernel_size=1,
+        padding="same",
+        name="classification/vwnconv3d",
+    )(x)
 
-    final_activation = 'sigmoid' if n_classes == 1 else 'softmax'
-    x = tfkl.Activation(final_activation, name='classification/activation')(x)
+    final_activation = "sigmoid" if n_classes == 1 else "softmax"
+    x = tfkl.Activation(final_activation, name="classification/activation")(x)
 
     return tf.keras.Model(inputs=inputs, outputs=x, name=name)

@@ -17,4 +17,4 @@ class ZeroPadding3DChannels(layers.Layer):
         super(ZeroPadding3DChannels, self).__init__(**kwds)
 
     def call(self, x):
-        return tf.pad(x, paddings=self._paddings, mode='CONSTANT', constant_values=0)
+        return tf.pad(x, paddings=self._paddings, mode="CONSTANT", constant_values=0)

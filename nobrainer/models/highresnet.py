@@ -9,13 +9,12 @@ from tensorflow.keras import layers
 from nobrainer.layers.padding import ZeroPadding3DChannels
 
 
-def highresnet(n_classes, input_shape, activation='relu', dropout_rate=0, name='highresnet'):
+def highresnet(
+    n_classes, input_shape, activation="relu", dropout_rate=0, name="highresnet"
+):
     """Instantiate HighResNet model."""
 
-    conv_kwds = {
-        'kernel_size': (3, 3, 3),
-        'padding': 'same',
-    }
+    conv_kwds = {"kernel_size": (3, 3, 3), "padding": "same"}
 
     n_base_filters = 16
 
@@ -37,10 +36,10 @@ def highresnet(n_classes, input_shape, activation='relu', dropout_rate=0, name='
         skip = x
         x = layers.BatchNormalization()(x)
         x = layers.Activation(activation)(x)
-        x = layers.Conv3D(n_base_filters*2, dilation_rate=2, **conv_kwds)(x)
+        x = layers.Conv3D(n_base_filters * 2, dilation_rate=2, **conv_kwds)(x)
         x = layers.BatchNormalization()(x)
         x = layers.Activation(activation)(x)
-        x = layers.Conv3D(n_base_filters*2, dilation_rate=2, **conv_kwds)(x)
+        x = layers.Conv3D(n_base_filters * 2, dilation_rate=2, **conv_kwds)(x)
         x = layers.Add()([x, skip])
 
     x = ZeroPadding3DChannels(16)(x)
@@ -48,15 +47,15 @@ def highresnet(n_classes, input_shape, activation='relu', dropout_rate=0, name='
         skip = x
         x = layers.BatchNormalization()(x)
         x = layers.Activation(activation)(x)
-        x = layers.Conv3D(n_base_filters*4, dilation_rate=4, **conv_kwds)(x)
+        x = layers.Conv3D(n_base_filters * 4, dilation_rate=4, **conv_kwds)(x)
         x = layers.BatchNormalization()(x)
         x = layers.Activation(activation)(x)
-        x = layers.Conv3D(n_base_filters*4, dilation_rate=4, **conv_kwds)(x)
+        x = layers.Conv3D(n_base_filters * 4, dilation_rate=4, **conv_kwds)(x)
         x = layers.Add()([x, skip])
 
-    x = layers.Conv3D(filters=n_classes, kernel_size=(1, 1, 1), padding='same')(x)
+    x = layers.Conv3D(filters=n_classes, kernel_size=(1, 1, 1), padding="same")(x)
 
-    final_activation = 'sigmoid' if n_classes == 1 else 'softmax'
+    final_activation = "sigmoid" if n_classes == 1 else "softmax"
     x = layers.Activation(final_activation)(x)
 
     # QUESTION: where should dropout go?

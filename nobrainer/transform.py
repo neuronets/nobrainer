@@ -71,7 +71,8 @@ def _warp_coords(matrix, volume_shape):
     coords = _get_coordinates(volume_shape=volume_shape)
     # Append ones to play nicely with 4x4 affine.
     coords_homogeneous = tf.concat(
-        [coords, tf.ones((coords.shape[0], 1), dtype=coords.dtype)], axis=1)
+        [coords, tf.ones((coords.shape[0], 1), dtype=coords.dtype)], axis=1
+    )
     return (coords_homogeneous @ tf.transpose(matrix))[..., :3]
 
 
@@ -101,59 +102,76 @@ def get_affine(volume_shape, rotation=[0, 0, 0], translation=[0, 0, 0]):
 
     # ROTATION
     # yaw
-    rx = tf.convert_to_tensor([
-        [1, 0, 0, 0],
-        [0, tf.math.cos(rotation[0]), -tf.math.sin(rotation[0]), 0],
-        [0, tf.math.sin(rotation[0]), tf.math.cos(rotation[0]), 0],
-        [0, 0, 0, 1]
-    ], dtype=tf.float32)
+    rx = tf.convert_to_tensor(
+        [
+            [1, 0, 0, 0],
+            [0, tf.math.cos(rotation[0]), -tf.math.sin(rotation[0]), 0],
+            [0, tf.math.sin(rotation[0]), tf.math.cos(rotation[0]), 0],
+            [0, 0, 0, 1],
+        ],
+        dtype=tf.float32,
+    )
 
     # pitch
-    ry = tf.convert_to_tensor([
-        [tf.math.cos(rotation[1]), 0, tf.math.sin(rotation[1]), 0],
-        [0, 1, 0, 0],
-        [-tf.math.sin(rotation[1]), 0, tf.math.cos(rotation[1]), 0],
-        [0, 0, 0, 1]
-    ], dtype=tf.float32)
+    ry = tf.convert_to_tensor(
+        [
+            [tf.math.cos(rotation[1]), 0, tf.math.sin(rotation[1]), 0],
+            [0, 1, 0, 0],
+            [-tf.math.sin(rotation[1]), 0, tf.math.cos(rotation[1]), 0],
+            [0, 0, 0, 1],
+        ],
+        dtype=tf.float32,
+    )
 
     # roll
-    rz = tf.convert_to_tensor([
-        [tf.math.cos(rotation[2]), -tf.math.sin(rotation[2]), 0, 0],
-        [tf.math.sin(rotation[2]), tf.math.cos(rotation[2]), 0, 0],
-        [0, 0, 1, 0],
-        [0, 0, 0, 1]
-    ], dtype=tf.float32)
+    rz = tf.convert_to_tensor(
+        [
+            [tf.math.cos(rotation[2]), -tf.math.sin(rotation[2]), 0, 0],
+            [tf.math.sin(rotation[2]), tf.math.cos(rotation[2]), 0, 0],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1],
+        ],
+        dtype=tf.float32,
+    )
 
     # Rotation around origin.
     transform = rz @ ry @ rx
 
     center = tf.convert_to_tensor(volume_shape / 2 - 0.5, dtype=tf.float32)
     neg_center = tf.math.negative(center)
-    center_to_origin = tf.convert_to_tensor([
-        [1, 0, 0, neg_center[0]],
-        [0, 1, 0, neg_center[1]],
-        [0, 0, 1, neg_center[2]],
-        [0, 0, 0, 1]
-    ], dtype=tf.float32)
+    center_to_origin = tf.convert_to_tensor(
+        [
+            [1, 0, 0, neg_center[0]],
+            [0, 1, 0, neg_center[1]],
+            [0, 0, 1, neg_center[2]],
+            [0, 0, 0, 1],
+        ],
+        dtype=tf.float32,
+    )
 
-    origin_to_center = tf.convert_to_tensor([
-        [1, 0, 0, center[0]],
-        [0, 1, 0, center[1]],
-        [0, 0, 1, center[2]],
-        [0, 0, 0, 1]
-    ], dtype=tf.float32)
+    origin_to_center = tf.convert_to_tensor(
+        [
+            [1, 0, 0, center[0]],
+            [0, 1, 0, center[1]],
+            [0, 0, 1, center[2]],
+            [0, 0, 0, 1],
+        ],
+        dtype=tf.float32,
+    )
 
     # Rotation around center of volume.
     transform = origin_to_center @ transform @ center_to_origin
 
-
     # TRANSLATION
-    translation = tf.convert_to_tensor([
-        [1, 0, 0, translation[0]],
-        [0, 1, 0, translation[1]],
-        [0, 0, 1, translation[2]],
-        [0, 0, 0, 1]
-    ], dtype=tf.float32)
+    translation = tf.convert_to_tensor(
+        [
+            [1, 0, 0, translation[0]],
+            [0, 1, 0, translation[1]],
+            [0, 0, 1, translation[2]],
+            [0, 0, 0, 1],
+        ],
+        dtype=tf.float32,
+    )
 
     transform = translation @ transform
 
@@ -187,7 +205,8 @@ def _get_coordinates(volume_shape):
         tf.range(rows, dtype=dtype),
         tf.range(cols, dtype=dtype),
         tf.range(depth, dtype=dtype),
-        indexing='ij')
+        indexing="ij",
+    )
     return tf.reshape(tf.stack(out, axis=3), shape=(-1, 3))
 
 
@@ -300,7 +319,12 @@ def _get_voxels(volume, coords):
     xflat = tf.gather(params=xflat, indices=tf.cast(fcoords, tf.int32))
 
     # Zero image data that was out of frame.
-    outofframe = tf.reduce_any(coords < 0, -1) | (coords[:, 0] > rows) | (coords[:, 1] > cols) | (coords[:, 2] > depth)
+    outofframe = (
+        tf.reduce_any(coords < 0, -1)
+        | (coords[:, 0] > rows)
+        | (coords[:, 1] > cols)
+        | (coords[:, 2] > depth)
+    )
     xflat = tf.multiply(xflat, tf.cast(tf.logical_not(outofframe), xflat.dtype))
 
     return xflat

@@ -19,18 +19,18 @@ def test_dice():
     out = metrics.dice(x, y, axis=None).numpy()
     assert_allclose(out, 1)
 
-    x = [0., 0., 1., 1.]
-    y = [1., 1., 1., 1.]
+    x = [0.0, 0.0, 1.0, 1.0]
+    y = [1.0, 1.0, 1.0, 1.0]
     out = metrics.dice(x, y, axis=None).numpy()
-    ref = 1. - scipy.spatial.distance.dice(x, y)
+    ref = 1.0 - scipy.spatial.distance.dice(x, y)
     assert_allclose(out, ref)
     jac_out = metrics.jaccard(x, y, axis=None).numpy()
-    assert_allclose(out, 2. * jac_out / (1. + jac_out))
+    assert_allclose(out, 2.0 * jac_out / (1.0 + jac_out))
 
-    x = [0., 0., 1., 1.]
-    y = [1., 1., 0., 0.]
+    x = [0.0, 0.0, 1.0, 1.0]
+    y = [1.0, 1.0, 0.0, 0.0]
     out = metrics.dice(x, y, axis=None).numpy()
-    ref = 1. - scipy.spatial.distance.dice(x, y)
+    ref = 1.0 - scipy.spatial.distance.dice(x, y)
     assert_allclose(out, ref, atol=1e-07)
     assert_allclose(out, 0, atol=1e-07)
 
@@ -41,7 +41,7 @@ def test_dice():
     y[3:, 10:] = 0
     dices = np.empty(x.shape[0])
     for i in range(x.shape[0]):
-        dices[i] = 1. - scipy.spatial.distance.dice(x[i].flatten(), y[i].flatten())
+        dices[i] = 1.0 - scipy.spatial.distance.dice(x[i].flatten(), y[i].flatten())
     assert_allclose(metrics.dice(x, y, axis=(1, 2, 3, 4)), dices)
 
 
@@ -86,18 +86,18 @@ def test_jaccard():
     out = metrics.jaccard(x, y, axis=None).numpy()
     assert_allclose(out, 1)
 
-    x = [0., 0., 1., 1.]
-    y = [1., 1., 1., 1.]
+    x = [0.0, 0.0, 1.0, 1.0]
+    y = [1.0, 1.0, 1.0, 1.0]
     out = metrics.jaccard(x, y, axis=None).numpy()
-    ref = 1. - scipy.spatial.distance.jaccard(x, y)
+    ref = 1.0 - scipy.spatial.distance.jaccard(x, y)
     assert_allclose(out, ref)
     dice_out = metrics.dice(x, y, axis=None).numpy()
-    assert_allclose(out, dice_out / (2. - dice_out))
+    assert_allclose(out, dice_out / (2.0 - dice_out))
 
-    x = [0., 0., 1., 1.]
-    y = [1., 1., 0., 0.]
+    x = [0.0, 0.0, 1.0, 1.0]
+    y = [1.0, 1.0, 0.0, 0.0]
     out = metrics.jaccard(x, y, axis=None).numpy()
-    ref = 1. - scipy.spatial.distance.jaccard(x, y)
+    ref = 1.0 - scipy.spatial.distance.jaccard(x, y)
     assert_allclose(out, ref, atol=1e-07)
     assert_allclose(out, 0, atol=1e-07)
 
@@ -108,7 +108,9 @@ def test_jaccard():
     y[3:, 10:] = 0
     jaccards = np.empty(x.shape[0])
     for i in range(x.shape[0]):
-        jaccards[i] = 1. - scipy.spatial.distance.jaccard(x[i].flatten(), y[i].flatten())
+        jaccards[i] = 1.0 - scipy.spatial.distance.jaccard(
+            x[i].flatten(), y[i].flatten()
+        )
     assert_allclose(metrics.jaccard(x, y, axis=(1, 2, 3, 4)), jaccards)
 
 
@@ -119,13 +121,17 @@ def test_tversky():
 
     # Test that tversky and dice are same when alpha = beta = 0.5
     dice = metrics.dice(y_true, y_pred).numpy()
-    tversky = metrics.tversky(y_true, y_pred, axis=(1, 2, 3), alpha=0.5, beta=0.5).numpy()
+    tversky = metrics.tversky(
+        y_true, y_pred, axis=(1, 2, 3), alpha=0.5, beta=0.5
+    ).numpy()
     assert_allclose(dice, tversky)
 
     # Test that tversky and jaccard are same when alpha = beta = 1.0
     jaccard = metrics.jaccard(y_true, y_pred).numpy()
-    tversky = metrics.tversky(y_true, y_pred, axis=(1, 2, 3), alpha=1., beta=1.).numpy()
+    tversky = metrics.tversky(
+        y_true, y_pred, axis=(1, 2, 3), alpha=1.0, beta=1.0
+    ).numpy()
     assert_allclose(jaccard, tversky)
 
     with pytest.raises(ValueError):
-        metrics.tversky([0., 0., 1.], [1., 0., 1.], axis=0)
+        metrics.tversky([0.0, 0.0, 1.0], [1.0, 0.0, 1.0], axis=0)

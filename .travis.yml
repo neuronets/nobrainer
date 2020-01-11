@@ -8,5 +8,5 @@ branches:
 install:
   - pip install --no-cache-dir --editable=".[cpu,dev]"
 script:
-  - travis_wait pytest --verbose --cov nobrainer
-  - cd guide && bash .run_tests.sh
+  - travis_wait pytest
+  - cd guide && bash .run_notebooks.sh

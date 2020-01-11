@@ -128,6 +128,7 @@ def tversky(y_true, y_pred, axis=(1, 2, 3), alpha=0.3, beta=0.7):
     den = (
         num
         + alpha * tf.reduce_sum(y_pred * (1 - y_true), axis=axis)
-        + beta * tf.reduce_sum((1 - y_pred) * y_true, axis=axis))
+        + beta * tf.reduce_sum((1 - y_pred) * y_true, axis=axis)
+    )
     # Sum over classes.
     return tf.reduce_sum((num + eps) / (den + eps), axis=-1)

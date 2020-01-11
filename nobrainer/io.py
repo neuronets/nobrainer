@@ -9,21 +9,21 @@ import nibabel as nib
 import numpy as np
 import tensorflow as tf
 
-_TFRECORDS_FEATURES_DTYPE = 'float32'
+_TFRECORDS_FEATURES_DTYPE = "float32"
 
 
-def read_csv(filepath, skip_header=True, delimiter=','):
+def read_csv(filepath, skip_header=True, delimiter=","):
     """Return list of tuples from a CSV, where each tuple contains the items
     in a row.
     """
-    with open(filepath, newline='') as csvfile:
+    with open(filepath, newline="") as csvfile:
         reader = csv.reader(csvfile, delimiter=delimiter)
         if skip_header:
             next(reader)
         return [tuple(row) for row in reader]
 
 
-def read_mapping(filepath, skip_header=True, delimiter=','):
+def read_mapping(filepath, skip_header=True, delimiter=","):
     """Read CSV to dictionary, where first column becomes keys and second
     columns becomes values. Other columns are ignored. Keys and values are
     coerced to integers.
@@ -34,8 +34,7 @@ def read_mapping(filepath, skip_header=True, delimiter=','):
     try:
         return {int(row[0]): int(row[1]) for row in mapping}
     except ValueError:
-        raise ValueError(
-            "mapping values must be integers but non-integer encountered")
+        raise ValueError("mapping values must be integers but non-integer encountered")
 
 
 def read_volume(filepath, dtype=None, return_affine=False, to_ras=False):
@@ -43,13 +42,21 @@ def read_volume(filepath, dtype=None, return_affine=False, to_ras=False):
     img = nib.load(filepath)
     if to_ras:
         img = nib.as_closest_canonical(img)
-    data = img.get_fdata(caching='unchanged')
+    data = img.get_fdata(caching="unchanged")
     if dtype is not None:
         data = data.astype(dtype)
     return data if not return_affine else (data, img.affine)
 
 
-def verify_features_labels(volume_filepaths, volume_shape=(256, 256, 256), check_shape=True, check_labels_int=True, check_labels_gte_zero=True, num_parallel_calls=None, verbose=1):
+def verify_features_labels(
+    volume_filepaths,
+    volume_shape=(256, 256, 256),
+    check_shape=True,
+    check_labels_int=True,
+    check_labels_gte_zero=True,
+    num_parallel_calls=None,
+    verbose=1,
+):
     """Verify a list of files. This function is meant to be run before
     converting volumes to TFRecords.
 
@@ -80,7 +87,8 @@ def verify_features_labels(volume_filepaths, volume_shape=(256, 256, 256), check
         if len(pair) != 2:
             raise ValueError(
                 "all items in 'volume_filepaths' must have length of 2, but"
-                " found at least one item with lenght != 2.")
+                " found at least one item with lenght != 2."
+            )
 
     labels = (y for _, y in volume_filepaths)
     scalar_labels = _labels_all_scalar(labels)
@@ -93,9 +101,17 @@ def verify_features_labels(volume_filepaths, volume_shape=(256, 256, 256), check
                 raise ValueError("file does not exist: {}".format(pair[1]))
 
     if scalar_labels:
-        map_fn = functools.partial(_verify_features_scalar_labels, volume_shape=volume_shape)
+        map_fn = functools.partial(
+            _verify_features_scalar_labels, volume_shape=volume_shape
+        )
     else:
-        map_fn = functools.partial(_verify_features_nonscalar_labels, volume_shape=volume_shape, check_shape=check_shape, check_labels_int=check_labels_int, check_labels_gte_zero=check_labels_gte_zero)
+        map_fn = functools.partial(
+            _verify_features_nonscalar_labels,
+            volume_shape=volume_shape,
+            check_shape=check_shape,
+            check_labels_int=check_labels_int,
+            check_labels_gte_zero=check_labels_gte_zero,
+        )
     if num_parallel_calls is None:
         # Get number of processes allocated to the current process.
         # Note the difference from `os.cpu_count()`.
@@ -116,17 +132,23 @@ def verify_features_labels(volume_filepaths, volume_shape=(256, 256, 256), check
             for valid in p.imap(map_fn, volume_filepaths, chunksize=2):
                 outputs.append(valid)
                 progbar.add(1)
-    invalid_files = [pair for valid, pair in zip(outputs, volume_filepaths) if not valid]
+    invalid_files = [
+        pair for valid, pair in zip(outputs, volume_filepaths) if not valid
+    ]
     return invalid_files
 
 
-def _verify_features_nonscalar_labels(pair_of_paths, *, volume_shape, check_shape, check_labels_int, check_labels_gte_zero):
+def _verify_features_nonscalar_labels(
+    pair_of_paths, *, volume_shape, check_shape, check_labels_int, check_labels_gte_zero
+):
     """Verify a pair of features and labels volumes."""
     x = nib.load(pair_of_paths[0])
     y = nib.load(pair_of_paths[1])
     if check_shape:
         if not volume_shape:
-            raise ValueError("`volume_shape` must be specified if `check_shape` is true.")
+            raise ValueError(
+                "`volume_shape` must be specified if `check_shape` is true."
+            )
         if x.shape != volume_shape:
             return False
         if x.shape != y.shape:
@@ -135,7 +157,7 @@ def _verify_features_nonscalar_labels(pair_of_paths, *, volume_shape, check_shap
         # Quick check of integer type.
         if not np.issubdtype(y.dataobj.dtype, np.integer):
             return False
-        y = y.get_fdata(caching='unchanged', dtype=np.float32)
+        y = y.get_fdata(caching="unchanged", dtype=np.float32)
         # Longer check that all values in labels can be cast to int.
         if not np.all(np.mod(y, 1) == 0):
             return False
@@ -160,5 +182,5 @@ def _verify_features_scalar_labels(path_scalar, *, volume_shape):
 
 def _is_gzipped(filepath):
     """Return True if the file is gzip-compressed, False otherwise."""
-    with open(filepath, 'rb') as f:
-        return f.read(2) == b'\x1f\x8b'
+    with open(filepath, "rb") as f:
+        return f.read(2) == b"\x1f\x8b"

@@ -5,7 +5,15 @@ import math
 import tensorflow as tf
 from tensorflow.keras import layers, models
 
-def autoencoder(input_shape, encoding_dim=512, n_base_filters=16, batchnorm=True, batch_size=None, name='autoencoder'):
+
+def autoencoder(
+    input_shape,
+    encoding_dim=512,
+    n_base_filters=16,
+    batchnorm=True,
+    batch_size=None,
+    name="autoencoder",
+):
     """Instantiate Autoencoder Architecture.
 
     Parameters
@@ -26,36 +34,31 @@ def autoencoder(input_shape, encoding_dim=512, n_base_filters=16, batchnorm=True
     Model object.
     """
 
-    conv_kwds = {
-       'kernel_size': 4,
-       'activation': None,
-        'padding': 'same',
-        'strides': 2
-    }
+    conv_kwds = {"kernel_size": 4, "activation": None, "padding": "same", "strides": 2}
 
     conv_transpose_kwds = {
-       'kernel_size': 4,
-       'strides': 2,
-       'activation': None,
-       'padding': 'same',
+        "kernel_size": 4,
+        "strides": 2,
+        "activation": None,
+        "padding": "same",
     }
 
     dimensions = input_shape[:-1]
     n_dims = len(dimensions)
 
-    if not (n_dims in [2,3] and dimensions[1:]==dimensions[:-1]):
-        raise ValueError('Dimensions should be of square or cube!')
+    if not (n_dims in [2, 3] and dimensions[1:] == dimensions[:-1]):
+        raise ValueError("Dimensions should be of square or cube!")
 
-    Conv = getattr(layers, 'Conv{}D'.format(n_dims))
-    ConvTranspose = getattr(layers, 'Conv{}DTranspose'.format(n_dims))
+    Conv = getattr(layers, "Conv{}D".format(n_dims))
+    ConvTranspose = getattr(layers, "Conv{}DTranspose".format(n_dims))
     n_layers = int(math.log(dimensions[0], 2))
 
     # Input layer
-    inputs = x = layers.Input(shape=input_shape, batch_size=batch_size, name='inputs')
+    inputs = x = layers.Input(shape=input_shape, batch_size=batch_size, name="inputs")
 
     # Encoder
     for i in range(n_layers):
-        n_filters = min(n_base_filters*(2**(i)), encoding_dim)
+        n_filters = min(n_base_filters * (2 ** (i)), encoding_dim)
 
         x = Conv(n_filters, **conv_kwds)(x)
         if batchnorm:
@@ -63,12 +66,12 @@ def autoencoder(input_shape, encoding_dim=512, n_base_filters=16, batchnorm=True
             x = layers.ReLU()(x)
 
     # Encoding of the input image
-    encoding = x = layers.Flatten(name='Encoding')(x)
-    
+    encoding = x = layers.Flatten(name="Encoding")(x)
+
     # Decoder
-    x = layers.Reshape((1,)*n_dims+(encoding_dim,))(x)
+    x = layers.Reshape((1,) * n_dims + (encoding_dim,))(x)
     for i in range(n_layers)[::-1]:
-        n_filters = min(n_base_filters*(2**(i)), encoding_dim)
+        n_filters = min(n_base_filters * (2 ** (i)), encoding_dim)
 
         x = ConvTranspose(n_filters, **conv_transpose_kwds)(x)
         if batchnorm:
@@ -76,6 +79,6 @@ def autoencoder(input_shape, encoding_dim=512, n_base_filters=16, batchnorm=True
             x = layers.LeakyReLU()(x)
 
     # Output layer
-    outputs = Conv(1, 3, activation='sigmoid', padding='same')(x)
+    outputs = Conv(1, 3, activation="sigmoid", padding="same")(x)
 
     return models.Model(inputs=inputs, outputs=outputs)
