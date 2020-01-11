@@ -1,11 +1,12 @@
 dist: xenial
 language: python
 python:
-  - "3.6"
+  - "3.7"
 branches:
   only:
     - master
 install:
   - pip install --no-cache-dir --editable=".[cpu,dev]"
 script:
-  - travis_wait pytest --verbose --cov=nobrainer nobrainer
+  - travis_wait pytest --verbose --cov nobrainer
+  - cd guide && bash _run_tests.sh
