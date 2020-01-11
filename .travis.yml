@@ -12,7 +12,7 @@ script:
   - |
     set -e
     cd guide
-    nbconvert --to script *.ipynb
+    jupyter-nbconvert --to script *.ipynb
     # Remove anything from `model.fit` and below in scripts.
     # Model fitting may crash travis.
     sed -i -e '/model.fit/,$d; /get_ipython/d' *.py
