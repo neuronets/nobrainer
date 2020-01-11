@@ -71,11 +71,39 @@ def test_read_volume(tmp_path):
     assert np.array_equal(data, data_loaded)
     assert np.array_equal(affine, affine_loaded)
 
+    data = np.random.rand(8, 8, 8).astype(np.float32)
+    affine = np.array([
+        [1.5, 0, 1.2, 0],
+        [0.8, 0.8, 0, 0],
+        [0, 1, 0, 0],
+        [0, 0, 0, 1]
+    ])
+    filename = str(tmp_path / 'foo_asr.nii.gz')
+    nib.save(nib.Nifti1Image(data, affine), filename)
+    data_loaded = io.read_volume(filename, to_ras=True)
+    assert not np.array_equal(data, data_loaded)
+    data_loaded = io.read_volume(filename, to_ras=False)
+    assert np.array_equal(data, data_loaded)
 
-def test_verify_features_labels(csv_of_volumes):
+
+def test_verify_features_nonscalar_labels(csv_of_volumes):
     files = io.read_csv(csv_of_volumes, skip_header=False)
-    io.verify_features_labels(
+    invalid = io.verify_features_labels(
         files, volume_shape=(8, 8, 8), num_parallel_calls=1)
+    assert not invalid
+    # TODO: add more cases.
+
+
+def test_verify_features_scalar_labels(csv_of_volumes):
+    files = io.read_csv(csv_of_volumes, skip_header=False)
+    files = [(x, 0) for (x, _) in files]
+    invalid = io.verify_features_labels(
+        files, volume_shape=(8, 8, 8), num_parallel_calls=1)
+    assert not invalid
+    invalid = io.verify_features_labels(
+        files, volume_shape=(12, 12, 8), num_parallel_calls=1)
+    assert all(invalid)
+
 
 
 def test_is_gzipped(tmp_path):

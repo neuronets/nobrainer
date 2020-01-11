@@ -54,16 +54,18 @@ def cli():
 @click.option('-c', '--csv', type=click.Path(exists=True), required=True, **_option_kwds)
 @click.option('-t', '--tfrecords-template', default='tfrecords/data_shard-{shard:03d}.tfrecords', required=True, **_option_kwds)
 @click.option('-s', '--volume-shape', nargs=3, type=int, required=True, **_option_kwds)
-@click.option('-n', '--volumes-per-shard', type=int, default=100, help='Number of volume pairs per TFRecords file.', **_option_kwds)
+@click.option('-n', '--examples-per-shard', type=int, default=100, help='Number of (feature, label) pairs per TFRecord file.', **_option_kwds)
 @click.option('--to-ras/--no-to-ras', default=True, help='Reorient volumes to RAS before saving to TFRecords.', **_option_kwds)
 @click.option('--gzip/--no-gzip', default=True, help='Compress TFRecords with gzip (highly recommended).', **_option_kwds)
 @click.option('--verify-volumes/--no-verify-volumes', default=True, help='Verify volume pairs before converting. This option is highly recommended, as it checks that shapes of features and labels are equal to "volume-shape", that labels are (or can safely be coerced to) an integer type, and that labels are all >= 0.', **_option_kwds)
 @click.option('-j', '--num-parallel-calls', default=-1, type=int, help='Number of processes to use. If -1, uses all available processes.', **_option_kwds)
 @click.option('-v', '--verbose', is_flag=True, help='Print progress bar.', **_option_kwds)
-def convert(*, csv, tfrecords_template, volume_shape, volumes_per_shard, to_ras, gzip, verify_volumes, num_parallel_calls, verbose):
+def convert(*, csv, tfrecords_template, volume_shape, examples_per_shard, to_ras, gzip, verify_volumes, num_parallel_calls, verbose):
     """Convert medical imaging volumes to TFRecords.
 
-    Volumes must all be the same shape. This will overwrite existing TFRecords files.
+    Volumes must all be the same shape. This will overwrite existing TFRecord files.
+
+    Labels can be volumetric or scalar.
     """
     # TODO: improve docs.
     volume_filepaths = _read_csv(csv)
@@ -100,8 +102,8 @@ def convert(*, csv, tfrecords_template, volume_shape, volumes_per_shard, to_ras,
     _write_tfrecord(
         features_labels=volume_filepaths,
         filename_template=tfrecords_template,
-        examples_per_shard=volumes_per_shard,
-        # to_ras=to_ras,
+        examples_per_shard=examples_per_shard,
+        to_ras=to_ras,
         compressed=gzip,
         processes=num_parallel_calls,
         verbose=verbose)

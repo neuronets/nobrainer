@@ -49,19 +49,15 @@ def read_volume(filepath, dtype=None, return_affine=False, to_ras=False):
     return data if not return_affine else (data, img.affine)
 
 
-def verify_features_labels(volume_filepaths, volume_shape=(256, 256, 256), scalar_labels=False, check_shape=True, check_labels_int=True, check_labels_gte_zero=True, num_parallel_calls=None, verbose=1):
+def verify_features_labels(volume_filepaths, volume_shape=(256, 256, 256), check_shape=True, check_labels_int=True, check_labels_gte_zero=True, num_parallel_calls=None, verbose=1):
     """Verify a list of files. This function is meant to be run before
     converting volumes to TFRecords.
 
     Parameters
     ----------
     volume_filepaths: nested list. Every sublist in the list should contain two
-        items: path to feature volume and path to label volume, in that order.
-        If `scalar_labels` is `True`, the second item in every sublist should
-        be a scalar and not a path.
+        items: (1) path to feature volume and (2) path to label volume or a scalar.
     volume_shape: tuple of three ints. Shape that both volumes should be.
-    scalar_labels: boolean, if true, check that all features have the desired
-        shape and that all labels are scalars.
     check_shape: boolean, if true, validate that the shape of both volumes is
         equal to 'volume_shape'.
     check_labels_int: boolean, if true, validate that every labels volume is an
@@ -78,12 +74,18 @@ def verify_features_labels(volume_filepaths, volume_shape=(256, 256, 256), scala
     List of invalid pairs of filepaths. If the list is empty, all filepaths are
     valid.
     """
+    from nobrainer.tfrecord import _labels_all_scalar
 
     for pair in volume_filepaths:
         if len(pair) != 2:
             raise ValueError(
                 "all items in 'volume_filepaths' must have length of 2, but"
                 " found at least one item with lenght != 2.")
+
+    labels = (y for _, y in volume_filepaths)
+    scalar_labels = _labels_all_scalar(labels)
+
+    for pair in volume_filepaths:
         if not os.path.exists(pair[0]):
             raise ValueError("file does not exist: {}".format(pair[0]))
         if not scalar_labels:
