@@ -2,9 +2,9 @@ from distutils.version import LooseVersion
 
 import tensorflow as tf
 
-if LooseVersion(tf.__version__) < LooseVersion("1.13.1"):
+if LooseVersion(tf.__version__) < LooseVersion("2.0.0"):
     raise ValueError(
-        "tensorflow>=1.13.1 must be installed but found version {}".format(
+        "tensorflow>=2.0.0 must be installed but found version {}".format(
             tf.__version__
         )
     )
