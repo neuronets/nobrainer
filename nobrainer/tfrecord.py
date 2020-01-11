@@ -73,6 +73,8 @@ def parse_example_fn(volume_shape, scalar_label=False):
         x = tf.reshape(x, shape=volume_shape)
         if not scalar_label:
             y = tf.reshape(y, shape=volume_shape)
+        else:
+            y = tf.reshape(y, shape=[1])
         return x, y
     return parse_example
 
