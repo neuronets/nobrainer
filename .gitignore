@@ -10,4 +10,6 @@ __pycache__
 *.pytest_cache
 *.sif
 *.simg
+*.tfrec
 *.tfrecords
+scratch

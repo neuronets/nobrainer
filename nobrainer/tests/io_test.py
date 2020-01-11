@@ -71,42 +71,47 @@ def test_read_volume(tmp_path):
     assert np.array_equal(data, data_loaded)
     assert np.array_equal(affine, affine_loaded)
 
+    data = np.random.rand(8, 8, 8).astype(np.float32)
+    affine = np.array([
+        [1.5, 0, 1.2, 0],
+        [0.8, 0.8, 0, 0],
+        [0, 1, 0, 0],
+        [0, 0, 0, 1]
+    ])
+    filename = str(tmp_path / 'foo_asr.nii.gz')
+    nib.save(nib.Nifti1Image(data, affine), filename)
+    data_loaded = io.read_volume(filename, to_ras=True)
+    assert not np.array_equal(data, data_loaded)
+    data_loaded = io.read_volume(filename, to_ras=False)
+    assert np.array_equal(data, data_loaded)
 
-def test_convert(csv_of_volumes, tmp_path):
+
+def test_verify_features_nonscalar_labels(csv_of_volumes):
     files = io.read_csv(csv_of_volumes, skip_header=False)
-    tfrecords_template = str(tmp_path / 'data-{shard:03d}.tfrecords')
-    volumes_per_shard = 12
-    io.convert(
-        files,
-        tfrecords_template=tfrecords_template,
-        volumes_per_shard=volumes_per_shard,
-        num_parallel_calls=1)
-
-    paths = list(tmp_path.glob('data-*.tfrecords'))
-    paths = sorted(paths)
-    assert len(paths) == 9
-    assert (tmp_path / 'data-008.tfrecords').is_file()
-
-    dset = tf.data.TFRecordDataset(list(map(str, paths)), compression_type='GZIP')
-    dset = dset.map(io.get_parse_fn(volume_shape=(8, 8, 8), include_affines=True))
-
-    for ref, test in zip(files, dset):
-        x, y = ref
-        x, x_aff = io.read_volume(x, return_affine=True)
-        y, y_aff = io.read_volume(y, return_affine=True)
-        assert np.array_equal(x, test[0])
-        assert np.array_equal(y, test[1])
-        assert np.array_equal(x_aff, test[2])
-        assert np.array_equal(y_aff, test[3])
-
-    with pytest.raises(ValueError):
-        io.convert(files, tfrecords_template="data/foobar-{}.tfrecords")
-
-
-def test_verify_features_labels(csv_of_volumes):
-    files = io.read_csv(csv_of_volumes, skip_header=False)
-    io.verify_features_labels(
+    invalid = io.verify_features_labels(
         files, volume_shape=(8, 8, 8), num_parallel_calls=1)
+    assert not invalid
+    # TODO: add more cases.
+
+
+def test_verify_features_scalar_labels(csv_of_volumes):
+    files = io.read_csv(csv_of_volumes, skip_header=False)
+    # Int labels.
+    files = [(x, 0) for (x, _) in files]
+    invalid = io.verify_features_labels(
+        files, volume_shape=(8, 8, 8), num_parallel_calls=1)
+    assert not invalid
+    invalid = io.verify_features_labels(
+        files, volume_shape=(12, 12, 8), num_parallel_calls=1)
+    assert all(invalid)
+    # Float labels.
+    files = [(x, 1.0) for (x, _) in files]
+    invalid = io.verify_features_labels(
+        files, volume_shape=(8, 8, 8), num_parallel_calls=1)
+    assert not invalid
+    invalid = io.verify_features_labels(
+        files, volume_shape=(12, 12, 8), num_parallel_calls=1)
+    assert all(invalid)
 
 
 def test_is_gzipped(tmp_path):

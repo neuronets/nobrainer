@@ -8,7 +8,7 @@ import numpy as np
 import tensorflow as tf
 
 from nobrainer.io import _is_gzipped
-from nobrainer.io import get_parse_fn
+from nobrainer.tfrecord import parse_example_fn
 from nobrainer.transform import get_affine
 from nobrainer.transform import warp_features_labels
 
@@ -78,7 +78,7 @@ def get_dataset(file_pattern, n_classes, batch_size, volume_shape,
 
     # Parse each example in each TFRecords file as a tensor of features and a
     # tensor of labels.
-    parse_fn = get_parse_fn(volume_shape=volume_shape)
+    parse_fn = parse_example_fn(volume_shape=volume_shape, scalar_label=False)
     dataset = dataset.map(map_func=parse_fn)
 
     # At this point, dataset output will be two tensors, both with shape
