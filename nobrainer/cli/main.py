@@ -268,20 +268,24 @@ def info():
     uname = platform.uname()
     s = f"""\
 Python:
-  Version: {platform.python_version()}
-  Implementation: {platform.python_implementation()}
-  64-bit: {sys.maxsize > 2**32}
-  Packages:
-    Nobrainer: {__version__}
-    Nibabel: {nib.__version__}
-    Numpy: {np.__version__}
-    TensorFlow: {tf.__version__}
-    TensorFlow-Probability: {tfp.__version__}
+ Version: {platform.python_version()}
+ Implementation: {platform.python_implementation()}
+ 64-bit: {sys.maxsize > 2**32}
+ Packages:
+  Nobrainer: {__version__}
+  Nibabel: {nib.__version__}
+  Numpy: {np.__version__}
+  TensorFlow: {tf.__version__}
+   GPU support: {tf.test.is_built_with_gpu_support()}
+   GPU available: {bool(tf.config.list_physical_devices('GPU'))}
+  TensorFlow-Probability: {tfp.__version__}
+
 System:
-  OSType: {uname.system}
-  Release: {uname.release}
-  Version: {uname.version}
-  Architecture: {uname.machine}
+ OSType: {uname.system}
+ Release: {uname.release}
+ Version: {uname.version}
+ Architecture: {uname.machine}
+
 Timestamp: {datetime.datetime.utcnow().strftime('%Y/%m/%d %T')}"""
     click.echo(s)
 
