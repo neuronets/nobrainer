@@ -49,15 +49,19 @@ def read_volume(filepath, dtype=None, return_affine=False, to_ras=False):
     return data if not return_affine else (data, img.affine)
 
 
-def verify_features_labels(volume_filepaths, volume_shape=(256, 256, 256), check_shape=True, check_labels_int=True, check_labels_gte_zero=True, num_parallel_calls=None, verbose=1):
+def verify_features_labels(volume_filepaths, volume_shape=(256, 256, 256), scalar_labels=False, check_shape=True, check_labels_int=True, check_labels_gte_zero=True, num_parallel_calls=None, verbose=1):
     """Verify a list of files. This function is meant to be run before
     converting volumes to TFRecords.
 
     Parameters
     ----------
     volume_filepaths: nested list. Every sublist in the list should contain two
-        items: path to features volume and path to labels volume, in that order.
+        items: path to feature volume and path to label volume, in that order.
+        If `scalar_labels` is `True`, the second item in every sublist should
+        be a scalar and not a path.
     volume_shape: tuple of three ints. Shape that both volumes should be.
+    scalar_labels: boolean, if true, check that all features have the desired
+        shape and that all labels are scalars.
     check_shape: boolean, if true, validate that the shape of both volumes is
         equal to 'volume_shape'.
     check_labels_int: boolean, if true, validate that every labels volume is an
@@ -82,17 +86,22 @@ def verify_features_labels(volume_filepaths, volume_shape=(256, 256, 256), check
                 " found at least one item with lenght != 2.")
         if not os.path.exists(pair[0]):
             raise ValueError("file does not exist: {}".format(pair[0]))
-        if not os.path.exists(pair[1]):
-            raise ValueError("file does not exist: {}".format(pair[1]))
+        if not scalar_labels:
+            if not os.path.exists(pair[1]):
+                raise ValueError("file does not exist: {}".format(pair[1]))
 
-    print("Verifying {} pairs of volumes".format(len(volume_filepaths)))
-    progbar = tf.keras.utils.Progbar(len(volume_filepaths), verbose=verbose)
-    progbar.update(0)
-    map_fn = functools.partial(_verify_features_labels_pair, volume_shape=volume_shape, check_shape=check_shape, check_labels_int=check_labels_int, check_labels_gte_zero=check_labels_gte_zero)
+    if scalar_labels:
+        map_fn = functools.partial(_verify_features_scalar_labels, volume_shape=volume_shape)
+    else:
+        map_fn = functools.partial(_verify_features_nonscalar_labels, volume_shape=volume_shape, check_shape=check_shape, check_labels_int=check_labels_int, check_labels_gte_zero=check_labels_gte_zero)
     if num_parallel_calls is None:
         # Get number of processes allocated to the current process.
         # Note the difference from `os.cpu_count()`.
         num_parallel_calls = len(os.sched_getaffinity(0))
+
+    print("Verifying {} examples".format(len(volume_filepaths)))
+    progbar = tf.keras.utils.Progbar(len(volume_filepaths), verbose=verbose)
+    progbar.update(0)
 
     outputs = []
     if num_parallel_calls == 1:
@@ -109,7 +118,7 @@ def verify_features_labels(volume_filepaths, volume_shape=(256, 256, 256), check
     return invalid_files
 
 
-def _verify_features_labels_pair(pair_of_paths, *, volume_shape, check_shape, check_labels_int, check_labels_gte_zero):
+def _verify_features_nonscalar_labels(pair_of_paths, *, volume_shape, check_shape, check_labels_int, check_labels_gte_zero):
     """Verify a pair of features and labels volumes."""
     x = nib.load(pair_of_paths[0])
     y = nib.load(pair_of_paths[1])
@@ -131,6 +140,19 @@ def _verify_features_labels_pair(pair_of_paths, *, volume_shape, check_shape, ch
     if check_labels_gte_zero:
         if not np.all(y >= 0):
             return False
+    return True
+
+
+def _verify_features_scalar_labels(path_scalar, *, volume_shape):
+    """Check that feature has the desired shape and that label is scalar."""
+    from nobrainer.tfrecord import _is_int_or_float
+
+    feature, label = path_scalar
+    x = nib.load(feature)
+    if x.shape != volume_shape:
+        return False
+    if not _is_int_or_float(label):
+        return False
     return True
 
 
