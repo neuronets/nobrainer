@@ -96,6 +96,7 @@ def test_verify_features_nonscalar_labels(csv_of_volumes):
 
 def test_verify_features_scalar_labels(csv_of_volumes):
     files = io.read_csv(csv_of_volumes, skip_header=False)
+    # Int labels.
     files = [(x, 0) for (x, _) in files]
     invalid = io.verify_features_labels(
         files, volume_shape=(8, 8, 8), num_parallel_calls=1)
@@ -103,7 +104,14 @@ def test_verify_features_scalar_labels(csv_of_volumes):
     invalid = io.verify_features_labels(
         files, volume_shape=(12, 12, 8), num_parallel_calls=1)
     assert all(invalid)
-
+    # Float labels.
+    files = [(x, 1.0) for (x, _) in files]
+    invalid = io.verify_features_labels(
+        files, volume_shape=(8, 8, 8), num_parallel_calls=1)
+    assert not invalid
+    invalid = io.verify_features_labels(
+        files, volume_shape=(12, 12, 8), num_parallel_calls=1)
+    assert all(invalid)
 
 
 def test_is_gzipped(tmp_path):
