@@ -245,7 +245,7 @@ def test_concrete_dropout():
     )
 
     seed = 42
-    kwds = dict(rtol=1e-05, atol=1e-08)
+    kwds = dict(rtol=1e-05, atol=1e-07)
 
     tf.random.set_seed(seed)
     y_ = dpl.ConcreteDropout(is_monte_carlo=False, use_expectation=False, seed=seed)(a)
