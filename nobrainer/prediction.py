@@ -3,17 +3,14 @@
 import math
 from pathlib import Path
 
-import h5py
 import nibabel as nib
 import numpy as np
 import tensorflow as tf
 
 from nobrainer.transform import get_affine
 from nobrainer.transform import warp
-from nobrainer.volume import from_blocks
 from nobrainer.volume import from_blocks_numpy
 from nobrainer.volume import standardize_numpy
-from nobrainer.volume import to_blocks
 from nobrainer.volume import to_blocks_numpy
 
 
@@ -54,8 +51,8 @@ def predict(
     If `inputs` is a:
         - 3D numpy array, return an iterable of maximum 3 elements;
             3D array of mean, variance(optional),and entropy(optional) of prediction.
-            if the flags for variance or entropy is set False, it won't be returned at all
-            The specific order of the elements are:
+            if the flags for variance or entropy is set False, it won't be returned at
+            all The specific order of the elements are:
             mean, variance(default=None) , entropy(default=None)
             Note, variance is only defined when n_sample  > 1
         - Nibabel image or filepath, return a set of Nibabel images of mean, variance,
@@ -221,9 +218,6 @@ def predict_from_array(
     total_means = from_blocks_numpy(means, output_shape=inputs.shape)
     total_variance = from_blocks_numpy(variances, output_shape=inputs.shape)
     total_entropy = from_blocks_numpy(entropies, output_shape=inputs.shape)
-
-    mean_var_voxels = np.mean(total_variance)
-    std_var_voxels = np.std(total_variance)
 
     include_variance = (n_samples > 1) and (return_variance)
     if include_variance:

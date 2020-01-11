@@ -1,12 +1,10 @@
 """Main command-line interface for nobrainer."""
 
 import datetime
-import inspect
 import json
 import logging
 import os
 import platform
-import pprint
 import sys
 
 import click
@@ -21,12 +19,9 @@ from nobrainer import __version__
 from nobrainer.io import verify_features_labels as _verify_features_labels
 from nobrainer.io import read_csv as _read_csv
 from nobrainer.io import read_volume as _read_volume
-from nobrainer.losses import get as _get_loss
 from nobrainer.prediction import _transform_and_predict
 from nobrainer.tfrecord import write as _write_tfrecord
 from nobrainer.volume import from_blocks_numpy as _from_blocks_numpy
-from nobrainer.volume import get_dataset as _get_dataset
-from nobrainer.volume import get_steps_per_epoch as _get_steps_per_epoch
 from nobrainer.volume import standardize_numpy as _standardize_numpy
 from nobrainer.volume import to_blocks_numpy as _to_blocks_numpy
 
@@ -86,7 +81,12 @@ def cli():
 @click.option(
     "--verify-volumes/--no-verify-volumes",
     default=True,
-    help='Verify volume pairs before converting. This option is highly recommended, as it checks that shapes of features and labels are equal to "volume-shape", that labels are (or can safely be coerced to) an integer type, and that labels are all >= 0.',
+    help=(
+        "Verify volume pairs before converting. This option is highly recommended, as"
+        ' it checks that shapes of features and labels are equal to "volume-shape",'
+        " that labels are (or can safely be coerced to) an integer type, and that"
+        " labels are all >= 0."
+    ),
     **_option_kwds,
 )
 @click.option(
@@ -146,9 +146,10 @@ def convert(
         else:
             click.echo(click.style("Failed verification.", fg="red"))
             click.echo(
-                "Found {} invalid pairs of volumes. These files might not all have shape {}, the labels might not be an integer type or coercible to integer type, or the labels might not be >= 0.".format(
-                    len(invalid_pairs), volume_shape
-                )
+                f"Found {len(invalid_pairs)} invalid pairs of volumes. These files"
+                " might not all have shape {volume_shape}, the labels might not be an"
+                " integer type or coercible to integer type, or the labels might not"
+                " be >= 0."
             )
             for pair in invalid_pairs:
                 click.echo(pair[0])
@@ -176,7 +177,8 @@ def merge():
     from the same initial model.
     """
     click.echo(
-        "Not implemented yet. In the future, this command will be used for merging models."
+        "Not implemented yet. In the future, this command will be used for merging"
+        " models."
     )
     sys.exit(-2)
 
@@ -215,20 +217,29 @@ def merge():
     "--threshold",
     type=float,
     default=0.3,
-    help="Threshold used to binarize model output. Only used in binary prediction and must be in (0, 1).",
+    help=(
+        "Threshold used to binarize model output. Only used in binary prediction and"
+        " must be in (0, 1)."
+    ),
     **_option_kwds,
 )
 @click.option(
     "-l",
     "--largest-label",
     is_flag=True,
-    help="Zero out all values not connected to the largest contiguous label (not including 0 values). This remove false positives in binary prediction.",
+    help=(
+        "Zero out all values not connected to the largest contiguous label (not"
+        " including 0 values). This remove false positives in binary prediction."
+    ),
     **_option_kwds,
 )
 @click.option(
     "--rotate-and-predict",
     is_flag=True,
-    help="Average the prediction with a prediction on a rotated (and subsequently un-rotated) volume. This can produce a better overall prediction.",
+    help=(
+        "Average the prediction with a prediction on a rotated (and subsequently"
+        " un-rotated) volume. This can produce a better overall prediction."
+    ),
     **_option_kwds,
 )
 @click.option(
@@ -349,7 +360,8 @@ def predict(
     if largest_label:
         if not is_binary_prediction:
             raise ValueError(
-                "Removing all labels except the largest is only allowed with binary prediction."
+                "Removing all labels except the largest is only allowed with binary"
+                " prediction."
             )
         if verbose:
             click.echo("Removing all labels except largest ...")

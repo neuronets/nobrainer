@@ -1,6 +1,5 @@
 """Volumetric affine transformations implemented in TensorFlow."""
 
-import numpy as np
 import tensorflow as tf
 
 
@@ -24,9 +23,9 @@ def warp_features_labels(features, labels, matrix):
     labels = tf.convert_to_tensor(labels)
 
     warped_coords = _warp_coords(matrix=matrix, volume_shape=features.shape)
-    f = _trilinear_interpolation(volume=features, coords=warped_coords)
-    l = _nearest_neighbor_interpolation(volume=labels, coords=warped_coords)
-    return (f, l)
+    feature = _trilinear_interpolation(volume=features, coords=warped_coords)
+    label = _nearest_neighbor_interpolation(volume=labels, coords=warped_coords)
+    return (feature, label)
 
 
 def warp(volume, matrix, order=1):
@@ -219,9 +218,9 @@ def _nearest_neighbor_interpolation(volume, coords):
 def _trilinear_interpolation(volume, coords):
     """Trilinear interpolation.
 
-    Implemented according to:
-    - https://en.wikipedia.org/wiki/Trilinear_interpolation#Method
-    - https://github.com/Ryo-Ito/spatial_transformer_network/blob/2555e846b328e648a456f92d4c80fce2b111599e/warp.py#L137-L222
+    Implemented according to
+    https://en.wikipedia.org/wiki/Trilinear_interpolation#Method
+    https://github.com/Ryo-Ito/spatial_transformer_network/blob/2555e846b328e648a456f92d4c80fce2b111599e/warp.py#L137-L222
     """
     volume = tf.cast(volume, tf.float32)
     coords = tf.cast(coords, tf.float32)
@@ -231,13 +230,9 @@ def _trilinear_interpolation(volume, coords):
     xlen = shape[0]
     ylen = shape[1]
     zlen = shape[2]
-    # xlen, ylen, zlen = tf.shape(volume)
 
-    max_x = xlen - 1
-    max_y = ylen - 1
-    max_z = zlen - 1
-
-    # Get lattice points. x0 is point below x, and x1 is point above x. Same for y and z.
+    # Get lattice points. x0 is point below x, and x1 is point above x. Same for y and
+    # z.
     x0 = tf.cast(coords_floor[:, 0], tf.int32)
     x1 = x0 + 1
     y0 = tf.cast(coords_floor[:, 1], tf.int32)

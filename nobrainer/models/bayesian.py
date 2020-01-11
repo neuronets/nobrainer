@@ -5,7 +5,6 @@ import tensorflow_probability as tfp
 
 from nobrainer.layers.dropout import BernoulliDropout
 from nobrainer.layers.dropout import ConcreteDropout
-from nobrainer.layers.dropout import GaussianDropout
 
 # TODO: add WeightNorm wrapper from tensorflow-probability once next
 # version of tfp is released.

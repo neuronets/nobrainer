@@ -7,7 +7,6 @@ import tensorflow as tf
 
 from nobrainer import io
 from nobrainer import tfrecord
-from nobrainer.tests.utils import csv_of_volumes
 
 
 def test_write_read_volume_labels(csv_of_volumes, tmp_path):

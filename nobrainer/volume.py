@@ -109,7 +109,7 @@ def get_dataset(
 
     # Prefetch data to overlap data production with data consumption. The
     # TensorFlow documentation suggests prefetching `batch_size` elements.
-    datset = dataset.prefetch(buffer_size=batch_size)
+    dataset = dataset.prefetch(buffer_size=batch_size)
 
     # Batch the dataset, so each iteration gives `batch_size` elements. We drop
     # the remainder so that when training on multiple GPUs, the batch will

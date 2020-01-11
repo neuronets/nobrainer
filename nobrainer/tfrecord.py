@@ -3,7 +3,6 @@ import math
 import multiprocessing as mp
 import os
 from pathlib import Path
-import warnings
 
 import numpy as np
 import tensorflow as tf
@@ -33,11 +32,12 @@ def write(
         filename_template.format(shard=0)
     except Exception:
         raise ValueError(
-            "`filename_template` must include a string formatting key 'shard' that accepts an integer."
+            "`filename_template` must include a string formatting key 'shard' that"
+            " accepts an integer."
         )
 
-    # This is the object that returns a protocol buffer string of the feature and label on each iteration.
-    # It is pickle-able, unlike a generator.
+    # This is the object that returns a protocol buffer string of the feature and label
+    # on each iteration. It is pickle-able, unlike a generator.
     proto_iterators = [_ProtoIterator(s) for s in shards]
     # Set up positional arguments for the core writer function.
     iterable = [
@@ -84,7 +84,8 @@ def parse_example_fn(volume_shape, scalar_label=False):
         y = tf.io.decode_raw(e["label/value"], _TFRECORDS_DTYPE)
         # TODO: this line does not work. The shape cannot be determined
         # dynamically... for now.
-        # xshape = tf.cast(tf.io.decode_raw(e["feature/shape"], _TFRECORDS_DTYPE), tf.int32)
+        # xshape = tf.cast(
+        #     tf.io.decode_raw(e["feature/shape"], _TFRECORDS_DTYPE), tf.int32)
         x = tf.reshape(x, shape=volume_shape)
         if not scalar_label:
             y = tf.reshape(y, shape=volume_shape)
@@ -277,7 +278,8 @@ class _ProtoIterator:
 
 def _write_tfrecords(protobuf_iterator, filename, compressed=True):
     """
-    protobuf_iterator: iterator, iterator which yields protocol-buffer serialized strings.
+    protobuf_iterator: iterator, iterator which yields protocol-buffer serialized
+        strings.
     """
     if compressed:
         options = tf.io.TFRecordOptions(compression_type="GZIP")

@@ -1,14 +1,11 @@
 import gzip
-from pathlib import Path
 import tempfile
 
 import nibabel as nib
 import numpy as np
 import pytest
-import tensorflow as tf
 
 from nobrainer import io
-from nobrainer.tests.utils import csv_of_volumes
 
 
 def test_read_csv():

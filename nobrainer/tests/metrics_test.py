@@ -3,7 +3,6 @@ from numpy.testing import assert_allclose
 from numpy.testing import assert_array_equal
 import pytest
 import scipy.spatial.distance
-import tensorflow as tf
 
 from nobrainer import metrics
 

@@ -20,8 +20,10 @@ class BernoulliDropout(tfkl.Layer):
     Parameters
     ----------
     rate : float between 0 and 1, drop probability.
-    is_monte_carlo : A boolean Tensor correponding to whether or not Monte-Carlo sampling will be used to calculate the networks output
-    scale_during_training : A boolean value determining whether scaling is performed during training or testing
+    is_monte_carlo : A boolean Tensor correponding to whether or not Monte-Carlo
+        sampling will be used to calculate the networks output
+    scale_during_training : A boolean value determining whether scaling is performed
+        during training or testing
     name : A name for this layer (optional).
 
     References
@@ -67,18 +69,20 @@ class BernoulliDropout(tfkl.Layer):
 class ConcreteDropout(tfkl.Layer):
     """Concrete Dropout.
 
-    Outputs the input element multiplied by a random variable sampled from a concrete distribution
+    Outputs the input element multiplied by a random variable sampled from a concrete
+    distribution
 
     Parameters
     ----------
-    is_monte_carlo : A boolean Tensor correponding to whether or not Monte-Carlo sampling will be used to calculate the networks output
-    temperature
-    use_expectation
+    is_monte_carlo : A boolean Tensor correponding to whether or not Monte-Carlo
+        sampling will be used to calculate the networks output temperature.
+    use_expectation : boolean
     name : A name for this layer (optional).
 
     References
     ----------
-    Concrete Dropout. Y. Gal, J. Hron & A. Kendall, Advances in Neural Information Processing Systems. 2017.
+    Concrete Dropout. Y. Gal, J. Hron & A. Kendall, Advances in Neural Information
+    Processing Systems. 2017.
 
     Links
     -----
