@@ -206,7 +206,7 @@ class ELBO(LossFunctionWrapper):
                     model,
                     num_examples,
                      from_logits=False,
-                    reduction=ReductionV2ReductionV2.AUTO,
+                    reduction=ReductionV2.AUTO,
                     name='ELBO'):
         super().__init__(
             elbo,
