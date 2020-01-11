@@ -2,11 +2,8 @@
 
 import tensorflow as tf
 from tensorflow.python.keras.losses import Loss
-try:
-    from tensorflow.python.keras.utils.losses_utils import ReductionV2
-except ImportError:
-    # for tensorflow 1.13.1
-    from tensorflow.python.ops.losses.losses_impl import ReductionV2
+from tensorflow.python.keras.losses import LossFunctionWrapper
+from tensorflow.python.keras.utils.losses_utils import ReductionV2
 
 from nobrainer import metrics
 
@@ -190,102 +187,34 @@ class Tversky(Loss):
         return tversky(y_true=y_true, y_pred=y_pred, axis=self.axis, alpha=self.alpha, beta=self.beta)
 
 
-def variational(y_true, y_pred, model, n_examples=1, prior_model=None):
-    """"""
-
-    def _maybe_get_layer_attr(model, layer_attribute):
-        """Get the value for a particular attribute for each layer in a model.
-        """
-        attr_values = []
-        for layer in model.layers:
-            try:
-                this_val = getattr(layer, layer_attribute)
-                attr_values.append(this_val)
-            except AttributeError:
-                pass
-        return attr_values
-
-    # fuzz factor for numerical stability
-    eps = tf.keras.backend.epsilon()
-
-    # The objects ms and sigmas are lists of tensors.
-    ms = _maybe_get_layer_attr(model, 'kernel_m') \
-            + _maybe_get_layer_attr(model, 'bias_m')
-    sigmas = _maybe_get_layer_attr(model, 'kernel_sigma') \
-            + _maybe_get_layer_attr(model, 'bias_sigma')
-
-    if not ms:
-        raise ValueError(
-            "Could not find any layers with name kernel_m or bias_m. Check if"
-            " you are using a variational network.")
-    if not sigmas:
-        raise ValueError(
-            "Could not find any layers with name kernel_sigma or bias_sigma."
-            " Check if you are using a variational network.")
-
-    # If no priors, initialize mean 0 and sigmas 1.
-    if prior_model is None:
-        ms_prior = [
-            tf.constant(0, dtype=v.dtype, shape=v.shape)
-            for v in ms]
-        # QUESTION: should iterate over sigmas instead of ms? The original
-        # implementation iterates over ms.
-        sigmas_prior = [
-            tf.constant(1, dtype=v.dtype, shape=v.shape)
-            for v in ms]
-    else:
-        # TODO: add priors from existing Keras model.
-        raise NotImplementedError("loss with model priors not implemented yet.")
-
-    # negative log-likelihood
-    nll_loss = tf.reduce_mean(
-        tf.keras.backend.categorical_crossentropy(
-            target=y_true, output=y_pred, from_logits=False))
-
-    l2_loss = tf.add_n(
-        [
-            tf.reduce_sum((tf.square(ms[i] - ms_prior[i])) / ((tf.square(sigmas_prior[i]) + eps) * 2.0))
-            for i, _ in enumerate(ms)],
-        name='l2_loss')
-
-    sigma_squared_loss = tf.add_n(
-        [
-            tf.reduce_sum(tf.square(sigmas[i]) / ((tf.square(sigmas_prior[i]) + eps) * 2.0))
-            for i in range(len(sigmas))],
-        name='sigma_squared_loss')
-
-    log_sigma_loss = tf.add_n(
-        [
-            tf.reduce_sum(tf.log(v + eps)) for v in sigmas],
-        name='log_sigmas_loss')
-
-    loss = nll_loss + (l2_loss + sigma_squared_loss - log_sigma_loss) / float(n_examples)
-
-    return loss
+def elbo(y_true, y_pred, model, num_examples, from_logits=False):
+    """Labels should be integers in `[0, n)`."""
+    scc_fn = tf.losses.SparseCategoricalCrossentropy(from_logits=from_logits)
+    neg_log_likelihood = scc_fn(y_true, y_pred)
+    kl = sum(model.losses) / num_examples
+    elbo_loss = neg_log_likelihood + kl
+    return elbo_loss
 
 
-class Variational(Loss):
-    """Computes the loss for a variational model.
+class ELBO(LossFunctionWrapper):
+    """Loss to minimize Evidence Lower Bound (ELBO).
 
-    Use this loss for binary of multi-class segmentation.
+    Use this loss for multiclass variational segmentation.
+    Labels should not be one-hot encoded.
     """
-
     def __init__(self,
-                 model,
-                 n_examples=1,
-                 prior_model=None,
-                 reduction=ReductionV2.SUM_OVER_BATCH_SIZE,
-                 name='variational'):
-        super().__init__(reduction=reduction, name=name)
-        self.model = model
-        self.n_examples = n_examples
-        self.prior_model = prior_model
-
-    def call(self, y_true, y_pred):
-        """Calculates the variational loss."""
-        y_pred = tf.convert_to_tensor(y_pred)
-        y_true = tf.cast(y_true, y_pred.dtype)
-        return variational(y_true=y_true, y_pred=y_pred, model=model, n_examples=n_examples, prior_model=prior_model)
+                    model,
+                    num_examples,
+                     from_logits=False,
+                    reduction=ReductionV2.AUTO,
+                    name='ELBO'):
+        super().__init__(
+            elbo,
+            model=model,
+            num_examples=num_examples,
+            from_logits=from_logits,
+            name=name,
+            reduction=reduction)
 
 
 def get(loss):
@@ -298,8 +227,8 @@ def get(loss):
         'Jaccard': Jaccard,
         'tversky': tversky,
         'Tversky': Tversky,
-        'variational': variational,
-        'Variational': Variational,
+        'elbo': elbo,
+        'ELBO': ELBO,
     }
     with tf.keras.utils.CustomObjectScope(objects):
         return tf.keras.losses.get(loss)

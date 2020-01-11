@@ -55,6 +55,8 @@ def test_apply_random_transform():
     assert_array_equal(x0, x1)
     assert_array_equal(y[0], y0)
     assert_array_equal(y0, y1)
+    # Need to reset the seed, because it is set in other tests.
+    tf.random.set_seed(None)
     dataset = dataset.map(volume.apply_random_transform)
     x0, y0 = next(iter(dataset))
     x1, y1 = next(iter(dataset))
