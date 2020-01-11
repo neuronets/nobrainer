@@ -10,8 +10,9 @@ install:
 script:
   - travis_wait pytest --verbose --cov=nobrainer nobrainer
   - |
+    set -e
     cd guide
-    jupyter-nbconvert --to script *.ipynb
+    nbconvert --to script *.ipynb
     # Remove anything from `model.fit` and below in scripts.
     # Model fitting may crash travis.
     sed -i -e '/model.fit/,$d; /get_ipython/d' *.py
