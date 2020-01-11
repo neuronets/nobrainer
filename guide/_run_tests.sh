@@ -16,4 +16,4 @@ sed -i -e '/model.fit/,$d; /pip install/d;' *.py
 for f in *.py; do echo print\(\"++ FINISHED $f ++\"\) >> $f; done
 
 # Run!
-for f in *.py; do jupyter-run $f || exit 1; done
+for f in *.py; do ipython $f || exit 1; done
