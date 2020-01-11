@@ -55,7 +55,7 @@ def cli():
 
 @cli.command()
 @click.option('-c', '--csv', type=click.Path(exists=True), required=True, **_option_kwds)
-@click.option('-t', '--tfrecords-template', default='tfrecords/data_shard-{shard:03d}.tfrecords', required=True, **_option_kwds)
+@click.option('-t', '--tfrecords-template', default='tfrecords/data_shard-{shard:03d}.tfrec', required=True, **_option_kwds)
 @click.option('-s', '--volume-shape', nargs=3, type=int, required=True, **_option_kwds)
 @click.option('-n', '--examples-per-shard', type=int, default=100, help='Number of (feature, label) pairs per TFRecord file.', **_option_kwds)
 @click.option('--to-ras/--no-to-ras', default=True, help='Reorient volumes to RAS before saving to TFRecords.', **_option_kwds)

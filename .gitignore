@@ -13,3 +13,4 @@ __pycache__
 *.tfrec
 *.tfrecords
 scratch
+/guide/*.py

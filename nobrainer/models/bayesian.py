@@ -1,14 +1,24 @@
-"""Model definition for MeshNet.
-
-Implemented according to the [MeshNet manuscript](https://arxiv.org/abs/1612.00940)
-"""
+"""Implementations of Bayesian neural networks."""
 
 import tensorflow as tf
-from tensorflow.keras import layers
+import tensorflow_probability as tfp
+
+from nobrainer.layers.dropout import BernoulliDropout
+from nobrainer.layers.dropout import ConcreteDropout
+from nobrainer.layers.dropout import GaussianDropout
+
+# TODO: add WeightNorm wrapper from tensorflow-probability once next
+# version of tfp is released.
+
+tfk = tf.keras
+tfkl = tfk.layers
+tfpl = tfp.layers
 
 
-def meshnet(n_classes, input_shape, receptive_field=67, filters=71, activation='relu', dropout_rate=0.25, batch_size=None, name='meshnet'):
-    """Instantiate MeshNet model.
+def variational_meshnet(n_classes, input_shape, receptive_field=67, filters=71, is_monte_carlo=False, dropout=None, activation=tf.nn.relu, batch_size=None, name='variational_meshnet'):
+    """Instantiate variational MeshNet model.
+
+    Please see https://arxiv.org/abs/1805.10863 for more information.
 
     Parameters
     ----------
@@ -23,7 +33,11 @@ def meshnet(n_classes, input_shape, receptive_field=67, filters=71, activation='
         MeshNet manuscript uses 21 filters for a binary segmentation task
         (i.e., brain extraction) and 71 filters for a multi-class segmentation task.
     activation: str or optimizer object, the non-linearity to use.
-    dropout_rate: float between 0 and 1, the fraction of input units to drop.
+    is_monte_carlo: bool, if true, apply variational approximation in the variational
+        convolution layers. If false, will use the most likely weight (i.e.,
+        the mean of the weight gaussian) instead of sampling a weight from the
+        gaussian distribution.
+    dropout: string, type of dropout layer.
     batch_size: int, number of samples in each batch. This must be set when
         training on TPUs.
     name: str, name to give to the resulting model object.
@@ -41,13 +55,22 @@ def meshnet(n_classes, input_shape, receptive_field=67, filters=71, activation='
         raise ValueError("unknown receptive field. Legal values are 37, 67, and 129.")
 
     def one_layer(x, layer_num, dilation_rate=(1, 1, 1)):
-        x = layers.Conv3D(filters, kernel_size=(3, 3, 3), padding='same', dilation_rate=dilation_rate, name='layer{}/conv3d'.format(layer_num))(x)
-        x = layers.BatchNormalization(name='layer{}/batchnorm'.format(layer_num))(x)
-        x = layers.Activation(activation, name='layer{}/activation'.format(layer_num))(x)
-        x = layers.Dropout(dropout_rate, name='layer{}/dropout'.format(layer_num))(x)
+		# TODO: implement correct behavior for is_mc.
+        x = tfpl.Convolution3DReparameterization(
+        	filters, kernel_size=3, padding='same', dilation_rate=dilation_rate, activation=activation,
+			name='layer{}/vwnconv3d'.format(layer_num))(x)
+        if dropout is None:
+            pass
+        elif dropout == "bernoulli":
+            x = BernoulliDropout(rate=0.5, is_monte_carlo=is_monte_carlo, scale_during_training=False, name='layer{}/bernoulli_dropout'.format(layer_num))(x)
+        elif dropout == "concrete":
+            x = ConcreteDropout(is_monte_carlo=is_monte_carlo, temperature=0.02, use_expectation=is_monte_carlo, name='layer{}/concrete_dropout'.format(layer_num))(x)
+        else:
+            raise ValueError("unknown dropout layer, {}".format(dropout))
+        x = tfkl.Activation(activation, name='layer{}/activation'.format(layer_num))(x)
         return x
 
-    inputs = layers.Input(shape=input_shape, batch_size=batch_size, name='inputs')
+    inputs = tfkl.Input(shape=input_shape, batch_size=batch_size, name='inputs')
 
     if receptive_field == 37:
         x = one_layer(inputs, 1)
@@ -74,9 +97,11 @@ def meshnet(n_classes, input_shape, receptive_field=67, filters=71, activation='
         x = one_layer(x, 6, dilation_rate=(32, 32, 32))
         x = one_layer(x, 7)
 
-    x = layers.Conv3D(filters=n_classes, kernel_size=(1, 1, 1), padding='same', name='classification/conv3d')(x)
+	# TODO: implement is_mc behavior.
+    x = tfpl.Convolution3DReparameterization(
+		filters=n_classes, kernel_size=1, padding='same', name='classification/vwnconv3d')(x)
 
     final_activation = 'sigmoid' if n_classes == 1 else 'softmax'
-    x = layers.Activation(final_activation, name='classification/activation')(x)
+    x = tfkl.Activation(final_activation, name='classification/activation')(x)
 
     return tf.keras.Model(inputs=inputs, outputs=x, name=name)

@@ -122,7 +122,7 @@ def test_tversky():
 
 
 @pytest.mark.xfail
-def test_variational():
+def test_elbo():
     # TODO: write the test
     assert False
 
