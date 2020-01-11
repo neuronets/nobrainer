@@ -18,7 +18,6 @@ import nobrainer.losses
 import nobrainer.metrics
 import nobrainer.models
 import nobrainer.prediction
-import nobrainer.training
 import nobrainer.transform
 import nobrainer.utils
 import nobrainer.volume

@@ -8,4 +8,4 @@ branches:
 install:
   - pip install --no-cache-dir --editable=".[cpu,dev]"
 script:
-  - pytest --verbose --cov=nobrainer nobrainer
+  - travis_wait pytest --verbose --cov=nobrainer nobrainer
