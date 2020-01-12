@@ -233,7 +233,7 @@ def standardize(x):
     Tensor of standardized values. Output has mean 0 and standard deviation 1.
     """
     x = tf.convert_to_tensor(x)
-    if x.dtype != tf.float64:
+    if x.dtype != tf.float32:
         x = tf.cast(x, tf.float32)
     mean, var = tf.nn.moments(x, axes=None)
     std = tf.sqrt(var)
