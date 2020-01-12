@@ -24,7 +24,7 @@ class BernoulliDropout(tfkl.Layer):
         sampling will be used to calculate the networks output
     scale_during_training : A boolean value determining whether scaling is performed
         during training or testing
-    name : A name for this layer (optional).
+    seed : int, value to seed random number generator.
 
     References
     ----------
@@ -77,6 +77,7 @@ class ConcreteDropout(tfkl.Layer):
     is_monte_carlo : A boolean Tensor correponding to whether or not Monte-Carlo
         sampling will be used to calculate the networks output temperature.
     use_expectation : boolean
+    seed : int, value to seed random number generator.
     name : A name for this layer (optional).
 
     References
@@ -153,6 +154,12 @@ class GaussianDropout(tfkl.Layer):
 
     Parameters
     ----------
+    rate : float between 0 and 1, drop probability.
+    is_monte_carlo : A boolean Tensor correponding to whether or not Monte-Carlo
+        sampling will be used to calculate the networks output
+    scale_during_training : A boolean value determining whether scaling is performed
+        during training or testing
+    seed : int, value to seed random number generator.
 
     References
     ----------
