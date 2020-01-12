@@ -2,7 +2,6 @@
 
 from collections import namedtuple
 import csv
-import multiprocessing
 import os
 import tempfile
 
@@ -17,7 +16,8 @@ def get_data(cache_dir=_cache_dir):
     files, and the labels are the corresponding aparc+aseg MGZ files, created
     with FreeSurfer. This will download 46 megabytes of data.
 
-    These data can be found at https://datasets.datalad.org/workshops/nih-2017/ds000114/.
+    These data can be found at
+    https://datasets.datalad.org/workshops/nih-2017/ds000114/.
 
     Parameters
     ----------

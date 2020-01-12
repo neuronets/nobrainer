@@ -8,5 +8,6 @@ branches:
 install:
   - pip install --no-cache-dir --editable=".[cpu,dev]"
 script:
+  - flake8
   - travis_wait pytest
   - cd guide && bash .run_notebooks.sh

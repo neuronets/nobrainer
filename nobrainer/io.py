@@ -1,7 +1,6 @@
 """Input/output methods."""
 import csv
 import functools
-import math
 import multiprocessing
 import os
 

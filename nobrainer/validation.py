@@ -9,7 +9,6 @@ from nobrainer.io import read_mapping
 from nobrainer.io import read_volume
 from nobrainer.metrics import dice_numpy
 from nobrainer.predict import predict as _predict
-import nobrainer
 
 DT_X = "float32"
 
@@ -43,9 +42,9 @@ def validate_from_filepath(
             the variance will not be returned; instead it will return None
         return_entropy: Boolean. If set True, it returns the running entropy.
             along with mean.
-        return_array_from_images: Boolean. If set True and the given input is either image,
-            filepath, or filepaths, it will return arrays of [mean, variance, entropy]
-            instead of images of them. Also, if the input is array, it will
+        return_array_from_images: Boolean. If set True and the given input is either
+            image, filepath, or filepaths, it will return arrays of [mean, variance,
+            entropy] instead of images of them. Also, if the input is array, it will
             simply return array, whether or not this flag is True or False.
         n_samples: The number of sampling. If set as 1, it will just return the
             single prediction value.
@@ -176,6 +175,3 @@ def validate_from_filepaths(
         print(filepath[0])
         print("Dice: " + str(np.mean(dice)))
         np.save(dice_path, dice)
-
-
-# CUDA_VISIBLE_DEVICES=0 nobrainer validate --model=nobrainer/data/1528485348   --batch-size=4 --block-shape 32 32 32  --csv=nobrainer/data/test_validate.csv    --n-classes=50 --label-mapping=examples/brain-labelling-cli/50-class-mapping.csv

@@ -7,10 +7,10 @@ import tensorflow as tf
 
 from nobrainer import io
 from nobrainer import tfrecord
-from nobrainer.tests.utils import csv_of_volumes
+from nobrainer.tests.utils import csv_of_volumes  # noqa: F401
 
 
-def test_write_read_volume_labels(csv_of_volumes, tmp_path):
+def test_write_read_volume_labels(csv_of_volumes, tmp_path):  # noqa: F811
     files = io.read_csv(csv_of_volumes, skip_header=False)
     filename_template = str(tmp_path / "data-{shard:03d}.tfrecords")
     examples_per_shard = 12
@@ -43,7 +43,7 @@ def test_write_read_volume_labels(csv_of_volumes, tmp_path):
         )
 
 
-def test_write_read_volume_labels_all_processes(csv_of_volumes, tmp_path):
+def test_write_read_volume_labels_all_processes(csv_of_volumes, tmp_path):  # noqa: F811
     files = io.read_csv(csv_of_volumes, skip_header=False)
     filename_template = str(tmp_path / "data-{shard:03d}.tfrecords")
     examples_per_shard = 12
@@ -76,7 +76,7 @@ def test_write_read_volume_labels_all_processes(csv_of_volumes, tmp_path):
         )
 
 
-def test_write_read_float_labels(csv_of_volumes, tmp_path):
+def test_write_read_float_labels(csv_of_volumes, tmp_path):  # noqa: F811
     files = io.read_csv(csv_of_volumes, skip_header=False)
     files = [(x, random.random()) for x, _ in files]
     filename_template = str(tmp_path / "data-{shard:03d}.tfrecords")
@@ -105,7 +105,7 @@ def test_write_read_float_labels(csv_of_volumes, tmp_path):
         assert_array_equal(y, test[1])
 
 
-def test_write_read_int_labels(csv_of_volumes, tmp_path):
+def test_write_read_int_labels(csv_of_volumes, tmp_path):  # noqa: F811
     files = io.read_csv(csv_of_volumes, skip_header=False)
     files = [(x, random.randint(0, 9)) for x, _ in files]
     filename_template = str(tmp_path / "data-{shard:03d}.tfrecords")

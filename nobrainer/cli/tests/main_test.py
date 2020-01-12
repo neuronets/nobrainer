@@ -3,7 +3,6 @@
 import csv
 from pathlib import Path
 
-import click
 from click.testing import CliRunner
 import nibabel as nib
 import numpy as np
@@ -11,9 +10,7 @@ import pytest
 
 from nobrainer.cli import main as climain
 from nobrainer.io import read_csv
-from nobrainer.io import read_volume
 from nobrainer.models.meshnet import meshnet
-from nobrainer.tfrecord import write
 from nobrainer.utils import get_data
 
 
@@ -67,7 +64,7 @@ def test_convert_scalar_int_labels(tmp_path):
         assert not Path("data/shard-005.tfrecords").is_file()
 
 
-def test_convert_scalar_int_labels(tmp_path):
+def test_convert_scalar_float_labels(tmp_path):
     runner = CliRunner()
     with runner.isolated_filesystem():
         csvpath = get_data(str(tmp_path))
