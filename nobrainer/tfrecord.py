@@ -22,7 +22,31 @@ def write(
     chunksize=1,
     verbose=1,
 ):
-    """Write to TFRecords files."""
+    """Write features and labels to TFRecord files.
+
+    This method supports the use of scalar or nD labels. All labels, however, must be
+    scalar, or all labels must be nD. If labels are nD, their shape must be the same
+    as the shape of features.
+
+    Parameters
+    ----------
+    features_labels: nested sequence, pairs of features and labels. If the labels are
+        nD, each pair should be `(path_to_feature, path_to_label)`. If labels are
+        scalar, each pair should be `(path_to_feature, scalar_label)`.
+    filename_template: str, the path to which TFRecord files should be written. A string
+        formatting key `shard` should be included to indicate the unique TFRecord file
+        when writing to multiple TFRecord files. For example,
+        `data_shard-{shard:03d}.tfrec`.
+    examples_per_shard: int, number of pairs of `(feature, label)` per TFRecord file.
+    to_ras: boolean, reorient volumes to RAS before writing to TFRecord file.
+    compressed: boolean, if `True`, gzip compress TFRecord file. Highly recommended.
+    processes: int, number of processes for multiprocessing. This is useful when
+        writing to multiple TFRecord files (i.e.,
+        `examples_per_shard` < `len(features_labels)`). If `None`, uses all available
+        cores.
+    chunksize: int, multiprocessing chunksize.
+    verbose: int, if 1, print progress bar. If 0, print nothing.
+    """
     n_examples = len(features_labels)
     n_shards = math.ceil(n_examples / examples_per_shard)
     shards = np.array_split(features_labels, n_shards)
@@ -68,11 +92,34 @@ def write(
 
 
 def parse_example_fn(volume_shape, scalar_label=False):
-    """"""
+    """Return function that can be used to read TFRecord file into tensors.
+
+    Parameters
+    ----------
+    volume_shape: sequence, the shape of the feature data. If `scalar_label` is `False`,
+        this also corresponds to the shape of the label data.
+    scalar_label: boolean, if `True`, label is a scalar. If `False`, label must be the
+        same shape as feature data.
+
+    Returns
+    -------
+    Function with which a TFRecord file can be parsed.
+    """
 
     @tf.function
     def parse_example(serialized):
-        """"""
+        """Parse one example from a TFRecord file made with Nobrainer.
+
+        Parameters
+        ----------
+        serialized: str, serialized proto message.
+
+        Returns
+        -------
+        Tuple of two tensors. If `scalar_label` is `False`, both tensors have shape
+        `volume_shape`. Otherwise, the first tensor has shape `volume_shape`, and the
+        second is a scalar tensor.
+        """
         features = {
             "feature/shape": tf.io.FixedLenFeature(shape=[], dtype=tf.string),
             "feature/value": tf.io.FixedLenFeature(shape=[], dtype=tf.string),
