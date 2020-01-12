@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from nobrainer import io
+from nobrainer.tests.utils import csv_of_volumes  # noqa: F401
 
 
 def test_read_csv():
@@ -82,7 +83,7 @@ def test_read_volume(tmp_path):
     assert np.array_equal(data, data_loaded)
 
 
-def test_verify_features_nonscalar_labels(csv_of_volumes):
+def test_verify_features_nonscalar_labels(csv_of_volumes):  # noqa: F811
     files = io.read_csv(csv_of_volumes, skip_header=False)
     invalid = io.verify_features_labels(
         files, volume_shape=(8, 8, 8), num_parallel_calls=1
@@ -91,7 +92,7 @@ def test_verify_features_nonscalar_labels(csv_of_volumes):
     # TODO: add more cases.
 
 
-def test_verify_features_scalar_labels(csv_of_volumes):
+def test_verify_features_scalar_labels(csv_of_volumes):  # noqa: F811
     files = io.read_csv(csv_of_volumes, skip_header=False)
     # Int labels.
     files = [(x, 0) for (x, _) in files]

@@ -3,7 +3,7 @@
 import tensorflow as tf
 
 
-def warp_features_labels(features, labels, matrix):
+def warp_features_labels(features, labels, matrix, scalar_label=False):
     """Warp features and labels tensors according to affine matrix.
 
     Trilinear interpolation is used for features, and nearest neighbor
@@ -12,7 +12,7 @@ def warp_features_labels(features, labels, matrix):
     Parameters
     ----------
     features: Rank 3 tensor, volumetric feature data.
-    labels: Rank 3 tensor, volumetric label data.
+    labels: Rank 3 tensor or N
     matrix: Tensor with shape `(4, 4)`, affine matrix.
 
     Returns
@@ -23,9 +23,10 @@ def warp_features_labels(features, labels, matrix):
     labels = tf.convert_to_tensor(labels)
 
     warped_coords = _warp_coords(matrix=matrix, volume_shape=features.shape)
-    feature = _trilinear_interpolation(volume=features, coords=warped_coords)
-    label = _nearest_neighbor_interpolation(volume=labels, coords=warped_coords)
-    return (feature, label)
+    features = _trilinear_interpolation(volume=features, coords=warped_coords)
+    if not scalar_label:
+        labels = _nearest_neighbor_interpolation(volume=labels, coords=warped_coords)
+    return (features, labels)
 
 
 def warp(volume, matrix, order=1):

@@ -12,18 +12,47 @@ from nobrainer.tfrecord import parse_example_fn
 from nobrainer.transform import get_affine
 from nobrainer.transform import warp_features_labels
 
+AUTOTUNE = tf.data.experimental.AUTOTUNE
+
+
+def tfrecord_dataset(
+    file_pattern,
+    volume_shape,
+    shuffle,
+    scalar_label,
+    compressed=True,
+    num_parallel_calls=AUTOTUNE,
+):
+    """Return `tf.data.Dataset` from TFRecord files."""
+    dataset = tf.data.Dataset.list_files(file_pattern, shuffle=shuffle)
+    # Read each of these files as a TFRecordDataset.
+    # Assume all files have same compression type as the first file.
+    compression_type = "GZIP" if compressed else None
+    cycle_length = 1 if num_parallel_calls is None else num_parallel_calls
+    dataset = dataset.interleave(
+        map_func=lambda x: tf.data.TFRecordDataset(
+            x, compression_type=compression_type
+        ),
+        cycle_length=cycle_length,
+        num_parallel_calls=num_parallel_calls,
+    )
+    parse_fn = parse_example_fn(volume_shape=volume_shape, scalar_label=scalar_label)
+    dataset = dataset.map(map_func=parse_fn, num_parallel_calls=num_parallel_calls)
+    return dataset
+
 
 def get_dataset(
     file_pattern,
     n_classes,
     batch_size,
     volume_shape,
+    scalar_label=False,
     block_shape=None,
     n_epochs=None,
     mapping=None,
     augment=False,
     shuffle_buffer_size=None,
-    num_parallel_calls=None,
+    num_parallel_calls=AUTOTUNE,
 ):
     """Return `tf.data.Dataset` that preprocesses data for training or prediction.
 
@@ -40,6 +69,7 @@ def get_dataset(
     batch_size: int, number of elements per batch.
     volume_shape: tuple of length 3, the shape of every volume in the TFRecords
         files. Every volume must have the same shape.
+    scalar_label: boolean, if `True`, labels are scalars.
     block_shape: tuple of length 3, the shape of the non-overlapping sub-volumes
         to take from the full volumes. If None, do not separate the full volumes
         into sub-volumes. Separating into non-overlapping sub-volumes is useful
@@ -65,47 +95,87 @@ def get_dataset(
     shape of features is `(batch_size, *block_shape, 1)` and the shape of labels
     is `(batch_size, *block_shape, n_classes)`. If block_shape is None, then
     the shape of features is `(batch_size, *volume_shape, 1)` and the shape of
-    labels is `(batch_size, *volume_shape, n_classes)`.
+    labels is `(batch_size, *volume_shape, n_classes)`. If `scalar_label` is `True,
+    the shape of labels is always `(batch_size,)`.
     """
 
     files = glob.glob(file_pattern)
     if not files:
         raise ValueError("no files found for pattern '{}'".format(file_pattern))
 
-    # Create dataset of all files.
+    # Create dataset of all TFRecord files. After this point, the dataset will have
+    # two value per iteration: (feature, label).
     shuffle = bool(shuffle_buffer_size)
-    dataset = tf.data.Dataset.list_files(file_pattern, shuffle=shuffle)
-
-    # Read each of these files as a TFRecordDataset.
-    # Assume all files have same compression type as the first file.
-    compression_type = "GZIP" if _is_gzipped(files[0]) else None
-    cycle_length = 1 if num_parallel_calls is None else num_parallel_calls
-    dataset = dataset.interleave(
-        map_func=lambda x: tf.data.TFRecordDataset(
-            x, compression_type=compression_type
-        ),
-        cycle_length=cycle_length,
+    compressed = _is_gzipped(files[0])
+    dataset = tfrecord_dataset(
+        file_pattern=file_pattern,
+        volume_shape=volume_shape,
+        shuffle=shuffle,
+        scalar_label=scalar_label,
+        compressed=compressed,
         num_parallel_calls=num_parallel_calls,
     )
 
-    # Parse each example in each TFRecords file as a tensor of features and a
-    # tensor of labels.
-    parse_fn = parse_example_fn(volume_shape=volume_shape, scalar_label=False)
-    dataset = dataset.map(map_func=parse_fn)
+    # Standard-score the features.
+    dataset = dataset.map(lambda x, y: (standardize(x), y))
 
-    # At this point, dataset output will be two tensors, both with shape
-    # `volume_shape`. In the next steps, we process these tensors, i.e.,
-    # separating them into non-overlapping blocks, binarizing or replacing
-    # values in labels, standard-scoring the features, and augmenting.
-    preprocess_fn = _get_preprocess_fn(
-        n_classes=n_classes, block_shape=block_shape, mapping=mapping, augment=augment
-    )
-    dataset = dataset.map(preprocess_fn, num_parallel_calls=num_parallel_calls)
+    # Separate into blocks, if requested.
+    if block_shape is not None:
+        if not scalar_label:
+            dataset = dataset.map(
+                lambda x, y: (to_blocks(x, block_shape), to_blocks(y, block_shape)),
+                num_parallel_calls=num_parallel_calls,
+            )
+            # This step is necessary because separating into blocks adds a dimension.
+            dataset = dataset.unbatch()
+        if scalar_label:
 
-    # Flatten the dataset from (n_blocks, *block_shape, 1) to (*block_shape, 1).
-    # We do this so that when we batch, we get batches of (batch_size, *block_shape, 1)
-    # instead of (batch_size, n_blocks, *block_shape, 1).
-    dataset = dataset.flat_map(lambda x, y: tf.data.Dataset.from_tensor_slices((x, y)))
+            def _f(x, y):
+                x = to_blocks(x, block_shape)
+                n_blocks = x.shape[0]
+                y = tf.repeat(y, n_blocks)
+
+            dataset = dataset.map(_f, num_parallel_calls=num_parallel_calls)
+            # This step is necessary because separating into blocks adds a dimension.
+            dataset = dataset.unbatch()
+
+    # Augment examples if requested.
+    if augment:
+        if not scalar_label:
+            dataset = dataset.map(
+                lambda x, y: tf.cond(
+                    tf.random.uniform((1,)) > 0.5,
+                    true_fn=lambda: apply_random_transform(x, y),
+                    false_fn=lambda: (x, y),
+                ),
+                num_parallel_calls=num_parallel_calls,
+            )
+        else:
+            dataset = dataset.map(
+                lambda x, y: tf.cond(
+                    tf.random.uniform((1,)) > 0.5,
+                    true_fn=lambda: apply_random_transform_scalar_labels(x, y),
+                    false_fn=lambda: (x, y),
+                ),
+                num_parallel_calls=num_parallel_calls,
+            )
+
+    # Binarize or replace labels according to mapping.
+    if not scalar_label:
+        if n_classes < 1:
+            raise ValueError("n_classes must be > 0.")
+        elif n_classes == 1:
+            dataset = dataset.map(lambda x, y: (x, tf.expand_dims(binarize(y), -1)))
+        elif n_classes == 2:
+            dataset = dataset.map(lambda x, y: (x, tf.one_hot(binarize(y), n_classes)))
+        elif n_classes > 2:
+            if mapping is not None:
+                dataset = dataset.map(lambda x, y: (x, replace(y, mapping=mapping)))
+            dataset = dataset.map(lambda x, y: (x, tf.one_hot(y, n_classes)))
+
+    # Add grayscale channel to features.
+    # TODO: in the future, multi-channel features should be supported.
+    dataset = dataset.map(lambda x, y: (tf.expand_dims(x, -1), y))
 
     # Prefetch data to overlap data production with data consumption. The
     # TensorFlow documentation suggests prefetching `batch_size` elements.
@@ -161,6 +231,37 @@ def apply_random_transform(features, labels):
     return warp_features_labels(features=features, labels=labels, matrix=matrix)
 
 
+def apply_random_transform_scalar_labels(features, labels):
+    """Apply a random rigid transformation to `features`.
+
+    Features are interpolated trilinearly, and labels are unchanged because they are
+    scalars.
+    """
+    if len(features.shape) != 3:
+        raise ValueError("features must be rank 3")
+    if len(features.shape) != 1:
+        raise ValueError("labels must be rank 1")
+    # Rotate -180 degrees to 180 degrees in three dimensions.
+    rotation = tf.random.uniform(
+        shape=[3], minval=-np.pi, maxval=np.pi, dtype=tf.float32
+    )
+
+    # Translate at most 5% in any direction, so there's less chance of
+    # important data going out of view.
+    maxval = 0.05 * features.shape[0]
+    translation = tf.random.uniform(
+        shape=[3], minval=-maxval, maxval=maxval, dtype=tf.float32
+    )
+
+    volume_shape = np.asarray(features.shape)
+    matrix = get_affine(
+        volume_shape=volume_shape, rotation=rotation, translation=translation
+    )
+    return warp_features_labels(
+        features=features, labels=labels, matrix=matrix, scalar_label=True
+    )
+
+
 def binarize(x):
     """Converts all values greater than 0 to 1 and all others to 0.
 
@@ -196,7 +297,6 @@ def replace(x, mapping, zero=True):
     keys = tf.convert_to_tensor(list(mapping.keys()))
     vals = tf.convert_to_tensor(list(mapping.values()))
 
-    # 'tensorflow>=1.13'
     sidx = tf.argsort(keys)
     ks = tf.gather(keys, sidx)
     vs = tf.gather(vals, sidx)
@@ -302,179 +402,6 @@ def from_blocks(x, output_shape):
     return tf.reshape(
         tf.transpose(tf.reshape(x, shape=intershape), perm=perm), shape=output_shape
     )
-
-
-def _get_preprocess_fn(n_classes, block_shape=None, mapping=None, augment=False):
-    """Creates a `Dataset` of `features` and `labels` preprocessed for binary
-    or multiclass segmentation.
-
-    Parameters
-    ----------
-    n_classes: int, number of classes in output of model, must be greater than 0.
-    block_shape: tuple of len 3, if not `None`, the shape of non-overlapping
-        sub-volumes to take from the full volumes.
-    mapping: dict, dictionary mapping original values in labels to new values.
-        Values in x equal to a key in the mapping are replaced with the
-        corresponding value. Keys and values may overlap. Only used when
-        `n_classes` > 2 (i.e., multiclass segmentation).
-    augment: boolean, if true, apply random rigid transformations to the features
-        and labels. Features are interpolated trilinearly, and labels are
-        interpolated with nearest neighbors. See `apply_random_transform` for
-        more information.
-
-    Returns
-    -------
-    Function that takes float tensors `features` and `labels` and preprocessed
-    `features` and `labels`.
-    """
-    if n_classes < 1:
-        raise ValueError("`n_classes` must be at least 1.")
-
-    if n_classes <= 2:
-
-        def preprocess(features, labels):
-            if augment:
-                # Only apply random augmentation to ~50% of the data.
-                features, labels = tf.cond(
-                    tf.random.uniform((1,)) > 0.5,
-                    true_fn=lambda: apply_random_transform(features, labels),
-                    false_fn=lambda: (features, labels),
-                )
-                # features, labels = apply_random_transform(features, labels)
-            features, labels = _preprocess_binary(
-                features=features,
-                labels=labels,
-                n_classes=n_classes,
-                block_shape=block_shape,
-            )
-            return features, labels
-
-    else:
-
-        def preprocess(features, labels):
-            if augment:
-                # Only apply random augmentation to ~50% of the data.
-                features, labels = tf.cond(
-                    tf.random.uniform((1,)) > 0.5,
-                    true_fn=lambda: apply_random_transform(features, labels),
-                    false_fn=lambda: (features, labels),
-                )
-            features, labels = _preprocess_multiclass(
-                features=features,
-                labels=labels,
-                n_classes=n_classes,
-                block_shape=block_shape,
-                mapping=mapping,
-            )
-            return features, labels
-
-    return preprocess
-
-
-def _preprocess_binary(features, labels, n_classes=1, block_shape=None):
-    """Preprocesses `features` and `labels` for binary segmentation.
-
-    Features are standard-scored (mean 0 and standard deviation of 1). Labels
-    are binarized (i.e., values above 0 are set to 1). Then, non-overlapping
-    blocks of shape `block_shape` are taken from the features and labels. See
-    `to_blocks` for more information. Finally, one dimension is added to the
-    end of the features tensor as the grascale channel. If `n_classes` is 1,
-    then a dimension is added to the labels tensor. If `n_classes` is 2, then
-    the labels tensor is transformed into its one-hot encoding.
-
-    Parameters
-    ----------
-    features: float32 tensor, features volume, must have rank 3.
-    labels: float32 tensor, labels volume, must have rank 3.
-    n_classes: {1, 2}, number of classes in the output of the target model.
-    block_shape: tuple of length 3, shape of sub-blocks to be taken from the
-        volumes of features and labels.
-
-    Returns
-    -------
-    Tuple of preprocessed `features` and `labels`, where `features`
-    and `labels` have rank 5: `(n_blocks, x, y, z, c)`.
-    """
-    x, y = features, labels
-
-    x = tf.convert_to_tensor(x)
-    x = standardize(x)
-    if block_shape is not None:
-        x = to_blocks(x, block_shape=block_shape)
-    else:
-        x = tf.expand_dims(x, axis=0)
-    x = tf.expand_dims(x, axis=-1)  # Add grayscale channel.
-
-    y = tf.convert_to_tensor(y)
-    y = binarize(y)
-    if block_shape is not None:
-        y = to_blocks(y, block_shape=block_shape)
-    else:
-        y = tf.expand_dims(y, axis=0)
-    if n_classes == 1:
-        y = tf.expand_dims(y, axis=-1)
-    elif n_classes == 2:
-        y = tf.one_hot(tf.cast(y, tf.int32), n_classes, dtype=tf.float32)
-    else:
-        raise ValueError("`n_classes` must be 1 or 2 for binary segmentation.")
-
-    return x, y
-
-
-def _preprocess_multiclass(features, labels, n_classes, block_shape=None, mapping=None):
-    """Preprocesses `features` and `labels` for multiclass segmentation.
-
-    Features are standard-scored (mean 0 and standard deviation of 1). If a
-    mapping is provided, values in labels are replaced according to the mapping.
-    Values in labels that are not in the keys of the mapping are zeroed. Then,
-    non-overlapping blocks of shape `block_shape` are taken from the features
-    and labels. See `to_blocks` for more information. Finally, one dimension is
-    added to the end of the features tensor as the grascale channel, and the
-    labels tensor is transformed into its one-hot encoding.
-
-    Parameters
-    ----------
-    features: float32 tensor, features volume, must have rank 3.
-    labels: float32 tensor, labels volume, must have rank 3.
-    n_classes: int, number of classes in the output of the target model, must be
-        greater than 2.
-    block_shape: tuple of length 3, shape of sub-blocks to be taken from the
-        volumes of features and labels.
-    mapping: dict, dictionary mapping original values in labels to new values.
-        Values in x equal to a key in the mapping are replaced with the
-        corresponding value. Keys and values may overlap.
-
-    Returns
-    -------
-    Tuple of preprocessed `features` and `labels`, where `features`
-    have shape ``(n_blocks, x, y, z, 1)` and `labels` have shape
-    `(n_blocks, x, y, z, n_classes)`.
-    """
-    x, y = features, labels
-
-    if n_classes <= 2:
-        raise ValueError(
-            "`n_classes` must be greater than 2 for multi-class segmentation."
-        )
-
-    x = tf.convert_to_tensor(x)
-    x = standardize(x)
-    if block_shape is not None:
-        x = to_blocks(x, block_shape=block_shape)
-    else:
-        x = tf.expand_dims(x, axis=0)
-    x = tf.expand_dims(x, axis=-1)  # Add grayscale channel.
-
-    y = tf.convert_to_tensor(y)
-    if mapping is not None:
-        y = replace(y, mapping=mapping)
-    if block_shape is not None:
-        y = to_blocks(y, block_shape=block_shape)
-    else:
-        y = tf.expand_dims(y, axis=0)
-
-    y = tf.one_hot(tf.cast(y, tf.int32), n_classes, dtype=tf.float32)
-    return x, y
 
 
 def get_steps_per_epoch(n_volumes, volume_shape, block_shape, batch_size):

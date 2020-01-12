@@ -113,14 +113,8 @@ class Jaccard(LossFunctionWrapper):
     ```
     """
 
-    def __init__(
-        self,
-        axis=(1, 2, 3, 4),
-        reduction=ReductionV2.SUM_OVER_BATCH_SIZE,
-        name="jaccard",
-    ):
-        super(Jaccard, self).__init__(reduction=reduction, name=name)
-        self.axis = axis
+    def __init__(self, axis=(1, 2, 3, 4), reduction=ReductionV2.AUTO, name="jaccard"):
+        super().__init__(jaccard, axis=axis, reduction=reduction, name=name)
 
 
 def tversky(y_true, y_pred, axis=(1, 2, 3), alpha=0.3, beta=0.7):
