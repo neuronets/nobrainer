@@ -3,6 +3,7 @@ from distutils.version import LooseVersion
 import tensorflow as tf
 
 from nobrainer._version import get_versions
+import nobrainer.dataset
 import nobrainer.io
 import nobrainer.layers
 import nobrainer.losses
