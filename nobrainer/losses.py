@@ -1,7 +1,6 @@
 """Implementations of loss functions for 3D semantic segmentation."""
 
 import tensorflow as tf
-from tensorflow.python.keras.losses import Loss
 from tensorflow.python.keras.losses import LossFunctionWrapper
 from tensorflow.python.keras.utils.losses_utils import ReductionV2
 
@@ -12,7 +11,7 @@ def dice(y_true, y_pred, axis=(1, 2, 3, 4)):
     return 1.0 - metrics.dice(y_true=y_true, y_pred=y_pred, axis=axis)
 
 
-class Dice(Loss):
+class Dice(LossFunctionWrapper):
     """Computes one minus the Dice similarity between labels and predictions.
     For example, if `y_true` is [0., 0., 1., 1.] and `y_pred` is [1., 1., 1., 0.]
     then the Dice loss is 0.6. The Dice similarity between these tensors is 0.4.
@@ -37,17 +36,8 @@ class Dice(Loss):
     ```
     """
 
-    def __init__(
-        self, axis=(1, 2, 3, 4), reduction=ReductionV2.SUM_OVER_BATCH_SIZE, name="dice"
-    ):
-        super(Dice, self).__init__(reduction=reduction, name=name)
-        self.axis = axis
-
-    def call(self, y_true, y_pred):
-        """Calculates the Dice loss."""
-        y_pred = tf.convert_to_tensor(y_pred)
-        y_true = tf.cast(y_true, y_pred.dtype)
-        return dice(y_true=y_true, y_pred=y_pred, axis=self.axis)
+    def __init__(self, axis=(1, 2, 3, 4), reduction=ReductionV2.AUTO, name="dice"):
+        super().__init__(dice, axis=axis, reduction=reduction, name=name)
 
 
 def focal_tversky(y_true, y_pred):
@@ -61,7 +51,7 @@ def generalized_dice(y_true, y_pred, axis=(1, 2, 3)):
     return 1.0 - metrics.generalized_dice(y_true=y_true, y_pred=y_pred, axis=axis)
 
 
-class GeneralizedDice(Loss):
+class GeneralizedDice(LossFunctionWrapper):
     """Computes one minus the generalized Dice similarity between labels and
     predictions. For example, if `y_true` is [[0., 0., 1., 1.]] and `y_pred` is
     [[1., 1., 1., 0.]] then the generalized Dice loss is 0.60. The generalized
@@ -88,26 +78,16 @@ class GeneralizedDice(Loss):
     """
 
     def __init__(
-        self,
-        axis=(1, 2, 3),
-        reduction=ReductionV2.SUM_OVER_BATCH_SIZE,
-        name="generalized_dice",
+        self, axis=(1, 2, 3), reduction=ReductionV2.AUTO, name="generalized_dice"
     ):
-        super(GeneralizedDice, self).__init__(reduction=reduction, name=name)
-        self.axis = axis
-
-    def call(self, y_true, y_pred):
-        """Calculates the generalized Dice loss."""
-        y_pred = tf.convert_to_tensor(y_pred)
-        y_true = tf.cast(y_true, y_pred.dtype)
-        return generalized_dice(y_true=y_true, y_pred=y_pred, axis=self.axis)
+        super().__init__(generalized_dice, axis=axis, reduction=reduction, name=name)
 
 
 def jaccard(y_true, y_pred, axis=(1, 2, 3, 4)):
     return 1.0 - metrics.jaccard(y_true=y_true, y_pred=y_pred, axis=axis)
 
 
-class Jaccard(Loss):
+class Jaccard(LossFunctionWrapper):
     """Computes one minus the Jaccard similarity between labels and predictions.
     For example, if `y_true` is [0., 0., 1., 1.] and `y_pred` is [1., 1., 1., 0.]
     then the Jaccard loss is 0.75. The Jaccard similarity between these tensors
@@ -142,12 +122,6 @@ class Jaccard(Loss):
         super(Jaccard, self).__init__(reduction=reduction, name=name)
         self.axis = axis
 
-    def call(self, y_true, y_pred):
-        """Calculates the Jaccard loss."""
-        y_pred = tf.convert_to_tensor(y_pred)
-        y_true = tf.cast(y_true, y_pred.dtype)
-        return jaccard(y_true=y_true, y_pred=y_pred, axis=self.axis)
-
 
 def tversky(y_true, y_pred, axis=(1, 2, 3), alpha=0.3, beta=0.7):
     n_classes = tf.cast(tf.shape(y_pred)[-1], tf.float32)
@@ -158,7 +132,7 @@ def tversky(y_true, y_pred, axis=(1, 2, 3), alpha=0.3, beta=0.7):
     return 1.0 - (scores / n_classes)
 
 
-class Tversky(Loss):
+class Tversky(LossFunctionWrapper):
     """Computes Tversky loss between labels and predictions.
 
     Use this loss for binary or multi-class semantic segmentation tasks. The
@@ -179,24 +153,11 @@ class Tversky(Loss):
         axis=(1, 2, 3),
         alpha=0.3,
         beta=0.7,
-        reduction=ReductionV2.SUM_OVER_BATCH_SIZE,
+        reduction=ReductionV2.AUTO,
         name="tversky",
     ):
-        super(Tversky, self).__init__(reduction=reduction, name=name)
-        self.axis = axis
-        self.alpha = alpha
-        self.beta = beta
-
-    def call(self, y_true, y_pred):
-        """Calculates the Jaccard loss."""
-        y_pred = tf.convert_to_tensor(y_pred)
-        y_true = tf.cast(y_true, y_pred.dtype)
-        return tversky(
-            y_true=y_true,
-            y_pred=y_pred,
-            axis=self.axis,
-            alpha=self.alpha,
-            beta=self.beta,
+        super().__init__(
+            tversky, axis=axis, alpha=alpha, beta=beta, reduction=reduction, name=name
         )
 
 
