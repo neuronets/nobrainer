@@ -26,7 +26,11 @@ def tfrecord_dataset(
     compressed=True,
     num_parallel_calls=AUTOTUNE,
 ):
-    """Return `tf.data.Dataset` from TFRecord files."""
+    """Return `tf.data.Dataset` from TFRecord files.
+
+    Order of outputs is not guaranteed when using default value for
+    `num_parallel_calls`.
+    """
     dataset = tf.data.Dataset.list_files(file_pattern, shuffle=shuffle)
     # Read each of these files as a TFRecordDataset.
     # Assume all files have same compression type as the first file.
@@ -36,6 +40,8 @@ def tfrecord_dataset(
         map_func=lambda x: tf.data.TFRecordDataset(
             x, compression_type=compression_type
         ),
+        # cycle_length != num_parallel_calls will cause output order to be
+        # non-deterministic.
         cycle_length=cycle_length,
         num_parallel_calls=num_parallel_calls,
     )
@@ -51,13 +57,18 @@ def get_dataset(
     volume_shape,
     scalar_label=False,
     block_shape=None,
-    n_epochs=None,
+    n_epochs=1,
     mapping=None,
     augment=False,
     shuffle_buffer_size=None,
     num_parallel_calls=AUTOTUNE,
 ):
     """Return `tf.data.Dataset` that preprocesses data for training or prediction.
+
+    This function is mainly intended to be a reference for good practices. It is
+    recommended, however, to use `tfrecord_dataset` to parse a dataset and then to
+    create a processing pipeline manually. This will allow the user to create an optimal
+    processing workflow for their data.
 
     Labels are preprocessed for binary or multiclass segmentation according to
     `n_classes`.
@@ -109,6 +120,7 @@ def get_dataset(
     # Create dataset of all TFRecord files. After this point, the dataset will have
     # two value per iteration: (feature, label).
     shuffle = bool(shuffle_buffer_size)
+    print("SHUFFLE", shuffle)
     compressed = _is_gzipped(files[0])
     dataset = tfrecord_dataset(
         file_pattern=file_pattern,
@@ -194,7 +206,7 @@ def get_dataset(
 
     # Optionally shuffle. We also optionally shuffle the list of files.
     # The TensorFlow recommend shuffling and then repeating.
-    if shuffle_buffer_size:
+    if shuffle:
         dataset = dataset.shuffle(buffer_size=shuffle_buffer_size)
 
     # Repeat the dataset for n_epochs. If n_epochs is None, then repeat
@@ -206,6 +218,8 @@ def get_dataset(
 
 
 def get_steps_per_epoch(n_volumes, volume_shape, block_shape, batch_size):
+    """Return the number of steps in an epoch."""
+
     def get_n(a, k):
         return (a - k) / k + 1
 
