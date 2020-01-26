@@ -47,7 +47,7 @@ def apply_random_transform_scalar_labels(features, labels):
     """
     if len(features.shape) != 3:
         raise ValueError("features must be rank 3")
-    if len(features.shape) != 1:
+    if len(labels.shape) != 1:
         raise ValueError("labels must be rank 1")
     # Rotate -180 degrees to 180 degrees in three dimensions.
     rotation = tf.random.uniform(
