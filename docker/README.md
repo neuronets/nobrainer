@@ -16,7 +16,7 @@ Using Singularity version 3.x, Docker images can be converted to Singularity con
 
 ## Pulling from DockerHub
 
-In most cases (e.g., working on a HPC cluster), the __Nobrainer__ singularity container can be created with:
+In most cases (e.g., working on a HPC cluster), the _Nobrainer_ singularity container can be created with:
 
 ```bash
 singularity pull docker://neuronets/nobrainer:master-gpu
@@ -24,7 +24,7 @@ singularity pull docker://neuronets/nobrainer:master-gpu
 
 ## Building from local Docker cache
 
-If you built a __Nobrainer__ Docker images locally and would like to convert it to a Singularity container, you can do so with:
+If you built a _Nobrainer_ Docker images locally and would like to convert it to a Singularity container, you can do so with:
 
 ```bash
 sudo singularity pull docker-daemon://neuronets/nobrainer:master-gpu
