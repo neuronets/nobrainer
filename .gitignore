@@ -1,6 +1,6 @@
-build
+build/
 .coverage
-dist
+dist/
 *.egg-info
 *.ipynb_checkpoints
 /*.ipynb

@@ -1,0 +1,28 @@
+#!/bin/bash
+
+case "$(basename $DOCKERFILE_PATH)" in
+    cpu.Dockerfile)
+        docker build \
+            --file="$DOCKERFILE_PATH" \
+            --tag $IMAGE_NAME .
+        ;;
+
+    gpu.Dockerfile)
+        echo "+++ Building x86-64 GPU image +++"
+        docker build \
+            --file="$DOCKERFILE_PATH" \
+            --tag $IMAGE_NAME .
+
+        echo "+++ Building powerpc GPU image +++"
+        docker build \
+            --platform linux/ppc64le \
+            --build-arg BASE_IMAGE="ibmcom/tensorflow-ppc64le:2.1.0-gpu-py3-jupyter" \
+            --file="$DOCKERFILE_PATH" \
+            --tag $IMAGE_NAME .
+        ;;
+
+    *)
+        echo "+++ Unknown Dockerfile $DOCKERFILE_PATH +++"
+        exit 1
+
+esac

@@ -1,0 +1,5 @@
+#!/bin/bash
+#
+# Register multiple platforms, to enable building for powerpc on non-powerpc host.
+# See https://github.com/multiarch/qemu-user-static
+docker run --rm --privileged multiarch/qemu-user-static:x86_64-ppc64le --reset -p yes
