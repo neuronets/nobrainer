@@ -1,7 +1,13 @@
 #!/bin/bash
 
+echo "+++ ENVIRONMENT +++"
+env
+echo "--------------------------"
+docker version
+
 case "$(basename $DOCKERFILE_PATH)" in
     cpu.Dockerfile)
+        echo "+++ Building x86-64 CPU image +++"
         docker build \
             --file="$DOCKERFILE_PATH" \
             --tag $IMAGE_NAME ..
