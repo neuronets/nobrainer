@@ -1,6 +1,7 @@
 #!/bin/bash
 
 echo "+++ ENVIRONMENT +++"
+. /etc/os-release
 env
 echo "--------------------------"
 docker version
