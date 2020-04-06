@@ -5,6 +5,10 @@ env
 echo "--------------------------"
 docker version
 
+echo "--------------------------"
+echo "+++ ls output +++"
+ls
+
 case "$(basename $DOCKERFILE_PATH)" in
     cpu.Dockerfile)
         echo "+++ Building x86-64 CPU image +++"
