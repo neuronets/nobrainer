@@ -1,7 +1,8 @@
 #!/bin/bash
 
 echo "+++ ENVIRONMENT +++"
-. /etc/os-release
+cat  /etc/os-release
+cat  /etc/lsb-release
 env
 echo "--------------------------"
 docker version
@@ -10,26 +11,29 @@ echo "--------------------------"
 echo "+++ ls output +++"
 ls
 
+# get into top-level nobrainer directory
+cd ..
+
 case "$(basename $DOCKERFILE_PATH)" in
     cpu.Dockerfile)
         echo "+++ Building x86-64 CPU image +++"
         docker build \
             --file="$DOCKERFILE_PATH" \
-            --tag $IMAGE_NAME ..
+            --tag $IMAGE_NAME .
         ;;
 
     gpu.Dockerfile)
         echo "+++ Building x86-64 GPU image +++"
         docker build \
             --file="$DOCKERFILE_PATH" \
-            --tag $IMAGE_NAME ..
+            --tag $IMAGE_NAME .
 
         echo "+++ Building powerpc GPU image +++"
         docker build \
             --platform linux/ppc64le \
             --build-arg BASE_IMAGE="ibmcom/tensorflow-ppc64le:2.1.0-gpu-py3-jupyter" \
             --file="$DOCKERFILE_PATH" \
-            --tag $IMAGE_NAME ..
+            --tag $IMAGE_NAME .
         ;;
 
     *)
