@@ -1,5 +1,21 @@
 #!/bin/bash
-#
+
+# Upgrade Docker CE.
+# See https://docs.docker.com/install/linux/docker-ce/ubuntu/
+apt-get update -qq
+apt-get install -qq --yes \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    gnupg-agent
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+apt-key fingerprint 0EBFCD88
+echo "deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable" >> /etc/apt/sources.list
+apt-get update -qq
+apt-get install -qq --yes docker-ce docker-ce-cli containerd.io
+
+systemctl restart docker
+
 # Register multiple platforms, to enable building for powerpc on non-powerpc host.
 # See https://github.com/multiarch/qemu-user-static
 docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
