@@ -14,6 +14,9 @@ echo "deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable" >
 apt-get update -qq
 apt-get install -qq --yes docker-ce docker-ce-cli containerd.io
 
+# Enable experimental features in daemon. This is to allow for --platform in
+# `docker build`.
+echo '{"experimental": true}' > /etc/docker/daemon.json
 systemctl restart docker
 
 # Register multiple platforms, to enable building for powerpc on non-powerpc host.
