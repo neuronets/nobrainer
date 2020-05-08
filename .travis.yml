@@ -6,7 +6,7 @@ branches:
   only:
     - master
 install:
-  - pip install --no-cache-dir --editable=".[cpu,dev]"
+  - python3 -m pip install --upgrade --force-reinstall --no-cache-dir --editable=".[cpu,dev]"
 script:
   - flake8
   - travis_wait pytest
