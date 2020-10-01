@@ -189,6 +189,94 @@ class ELBO(LossFunctionWrapper):
         )
 
 
+def wasserstein(y_true, y_pred):
+    return y_true * y_pred
+
+
+class Wasserstein(LossFunctionWrapper):
+    """Computes Tversky loss between labels and predictions.
+
+    Use this loss for binary or multi-class semantic segmentation tasks. The
+    default value for the axis parameter is meant for binary or multi-class
+    predictions. Values in `y_true` and `y_pred` should be in the range [0, 1].
+    The default values for alpha and beta are set according to recommendations
+    in the Tverky loss manuscript.
+
+    Usage with tf.keras API:
+    ```python
+    model = tf.keras.Model(inputs, outputs)
+    model.compile('sgd', loss=nobrainer.losses.Tversky())
+    ```
+    """
+
+    def __init__(
+        self,
+        reduction=ReductionV2.AUTO,
+        name="wasserstein",
+    ):
+        super().__init__(
+            wasserstein, reduction=reduction, name=name
+        )
+
+
+def wasserstein_gp(reals, fakes, discriminator=None, alpha=0, gp_weight=10, epsilon_weight=0.001):
+
+    weight_shape = (tf.shape(reals)[0],) + (1,1,1,1)
+    weight = tf.random.uniform(weight_shape, minval=0, maxval=1)
+    average_samples = (weight * reals) + ((1 - weight) * fakes)
+
+    average_pred = discriminator(([average_samples, alpha]))
+
+    gradients = tf.gradients(average_pred, average_samples)[0]
+
+    gradients_squared = tf.square(gradients)
+    gradients_sqr_sum = tf.reduce_sum(gradients_squared, axis=tf.range(1, tf.rank(gradients_squared)))
+    gradient_l2_norm = tf.sqrt(gradients_sqr_sum)
+
+    gradient_penalty =  gp_weight * tf.square(1 - gradient_l2_norm)
+
+    real_pred, _ = discriminator(([reals, alpha]))
+    epsilon_loss = epsilon_weight * tf.square(real_pred)
+
+    return  gradient_penalty + epsilon_loss
+
+
+class WassersteinGP(LossFunctionWrapper):
+    """Computes Tversky loss between labels and predictions.
+
+    Use this loss for binary or multi-class semantic segmentation tasks. The
+    default value for the axis parameter is meant for binary or multi-class
+    predictions. Values in `y_true` and `y_pred` should be in the range [0, 1].
+    The default values for alpha and beta are set according to recommendations
+    in the Tverky loss manuscript.
+
+    Usage with tf.keras API:
+    ```python
+    model = tf.keras.Model(inputs, outputs)
+    model.compile('sgd', loss=nobrainer.losses.Tversky())
+    ```
+    """
+
+    def __init__(
+        self,
+        discriminator=None,
+        alpha=0,
+        gp_weight=10,
+        epsilon_weight=0.001,
+        reduction=ReductionV2.AUTO,
+        name="wasserstein_gp",
+    ):
+        super().__init__(
+            wasserstein_gp, 
+            discriminator=discriminator,
+            alpha=alpha,
+            gp_weight=gp_weight,
+            epsilon_weight=epsilon_weight,
+            reduction=reduction,
+            name=name
+        )
+
+
 def get(loss):
     """Wrapper for `tf.keras.losses.get` that includes Nobrainer's losses."""
     objects = {
@@ -201,6 +289,10 @@ def get(loss):
         "Tversky": Tversky,
         "elbo": elbo,
         "ELBO": ELBO,
+        "wasserstein": wasserstein,
+        "Wasserstein": Wasserstein,
+        "wasserstein_gp": wasserstein_gp,
+        "WassersteinGP": WassersteinGP
     }
     with tf.keras.utils.CustomObjectScope(objects):
         return tf.keras.losses.get(loss)
