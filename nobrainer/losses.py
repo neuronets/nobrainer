@@ -194,18 +194,22 @@ def wasserstein(y_true, y_pred):
 
 
 class Wasserstein(LossFunctionWrapper):
-    """Computes Tversky loss between labels and predictions.
+    """Computes Wasserstein loss between labels and predictions.
 
-    Use this loss for binary or multi-class semantic segmentation tasks. The
-    default value for the axis parameter is meant for binary or multi-class
-    predictions. Values in `y_true` and `y_pred` should be in the range [0, 1].
-    The default values for alpha and beta are set according to recommendations
-    in the Tverky loss manuscript.
+    Aims to score the realness or fakeness of a given image and measures the Earth Mover (EM) 
+    distance. Use this loss for training GANs. Values for `y_true` is 1 or -1 for real and fake,
+    and `y_pred` is from discriminator. Use in combination with gradient clipping or gradient
+    penalty (WassersteinGP defined below).
+    https://arxiv.org/abs/1701.07875
 
-    Usage with tf.keras API:
+    Usage:
     ```python
-    model = tf.keras.Model(inputs, outputs)
-    model.compile('sgd', loss=nobrainer.losses.Tversky())
+    real_pred = discriminator(real)
+    fake_pred = discriminator(fake)
+
+    wasserstein_loss = Wasserstein()
+    disciminator_loss = wasserstein_loss(1, real_pred) + wasserstein_loss(-1, fake_pred)
+    generator_loss = wasserstein_loss(1, fake_pred)
     ```
     """
 
@@ -220,7 +224,6 @@ class Wasserstein(LossFunctionWrapper):
 
 
 def wasserstein_gp(reals, fakes, discriminator=None, alpha=0, gp_weight=10, epsilon_weight=0.001):
-
     weight_shape = (tf.shape(reals)[0],) + (1,1,1,1)
     weight = tf.random.uniform(weight_shape, minval=0, maxval=1)
     average_samples = (weight * reals) + ((1 - weight) * fakes)
@@ -242,18 +245,17 @@ def wasserstein_gp(reals, fakes, discriminator=None, alpha=0, gp_weight=10, epsi
 
 
 class WassersteinGP(LossFunctionWrapper):
-    """Computes Tversky loss between labels and predictions.
+    """Computes Gradient Penalty for Wasserstein Loss.
+    Improvement to gradient clipping for Wasserstein-GAN to enforce the Lipschitz constraint.
+    Uses the points interpolated between real and fake to ensure a gradient norm of 1.
+    https://arxiv.org/pdf/1704.00028.pdf
 
-    Use this loss for binary or multi-class semantic segmentation tasks. The
-    default value for the axis parameter is meant for binary or multi-class
-    predictions. Values in `y_true` and `y_pred` should be in the range [0, 1].
-    The default values for alpha and beta are set according to recommendations
-    in the Tverky loss manuscript.
-
-    Usage with tf.keras API:
+    Usage:
     ```python
-    model = tf.keras.Model(inputs, outputs)
-    model.compile('sgd', loss=nobrainer.losses.Tversky())
+    fakes = generator(latents)
+
+    wasserstein_gp = WassersteinGP(discriminator=discriminator, alpha=alpha)
+    gradient_penalty = wasserstein_gp(reals, fakes)
     ```
     """
 
