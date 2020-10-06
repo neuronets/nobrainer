@@ -117,7 +117,7 @@ class Generator:
 
         return models.Model(inputs=[latents, alpha], outputs=[x], name='generator_base')
 
-    def _make_generator_block(self, nf, name=''):
+    def _make_generator_block(self, nf, kernel_size=4, name=''):
         '''
         Creates a generator block
         '''
@@ -126,12 +126,12 @@ class Generator:
 
         # block_layers.append(self.ConvTranspose(nf, kernel_size=3, strides=2, padding='same'))
         block_layers.append(self.Upsampling())
-        block_layers.append(self.Conv(nf, kernel_size=4, strides=1, padding='same'))
+        block_layers.append(self.Conv(nf, kernel_size=kernel_size, strides=1, padding='same'))
         block_layers.append(layers.Activation(tf.nn.leaky_relu))
         block_layers.append(self._pixel_norm())
 
         # block_layers.append(self.Conv(nf, kernel_size=3, strides=1, padding='same'))
-        block_layers.append(self.Conv(nf, kernel_size=4, strides=1, padding='same'))
+        block_layers.append(self.Conv(nf, kernel_size=kernel_size, strides=1, padding='same'))
         block_layers.append(layers.Activation(tf.nn.leaky_relu))
         block_layers.append(self._pixel_norm())
 
@@ -155,8 +155,8 @@ class Generator:
         g_block_output = g_block(self.growing_generator.output)
         to_rgb_2 = self.Conv(self.num_channels, kernel_size=1)(g_block_output)
 
-        lerp_output = self._weighted_sum()([to_rgb_1, to_rgb_2, self.growing_generator.input[1]])
-        output = layers.Activation('tanh')(lerp_output)
+        output = self._weighted_sum()([to_rgb_1, to_rgb_2, self.growing_generator.input[1]])
+        # output = layers.Activation('tanh')(lerp_output)
 
         self.growing_generator = models.Model(inputs=self.growing_generator.input, outputs=g_block_output)
         self.train_generator = models.Model(inputs=self.growing_generator.input, outputs=[output], name=self.name)
@@ -224,17 +224,17 @@ class Discriminator:
 
         return models.Model(inputs=[inputs], outputs=[output])
 
-    def _make_discriminator_block(self, nf, name=''):
+    def _make_discriminator_block(self, nf, kernel_size=4, name=''):
         '''
         Creates a discriminator block
         '''
 
         block_layers = []
 
-        block_layers.append(self.Conv(nf, kernel_size=3, strides=1, padding='same'))
+        block_layers.append(self.Conv(nf, kernel_size=kernel_size, strides=1, padding='same'))
         block_layers.append(layers.Activation(tf.nn.leaky_relu))
 
-        block_layers.append(self.Conv(nf, kernel_size=4, strides=2, padding='same'))
+        block_layers.append(self.Conv(nf, kernel_size=kernel_size, strides=2, padding='same'))
         block_layers.append(layers.Activation(tf.nn.leaky_relu))
 
         return models.Sequential(block_layers, name=name)
