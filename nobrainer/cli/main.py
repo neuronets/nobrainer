@@ -15,12 +15,16 @@ import skimage.transform
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+import sys
+sys.path.insert(0, '..')
+
 from nobrainer import __version__
 from nobrainer.io import verify_features_labels as _verify_features_labels
 from nobrainer.io import read_csv as _read_csv
 from nobrainer.io import read_volume as _read_volume
 from nobrainer.prediction import _transform_and_predict
-from nobrainer.tfrecord import write as _write_tfrecord
+# from nobrainer.tfrecord import write as _write_tfrecord
+from tfrecord import write as _write_tfrecord
 from nobrainer.volume import from_blocks_numpy as _from_blocks_numpy
 from nobrainer.volume import standardize_numpy as _standardize_numpy
 from nobrainer.volume import to_blocks_numpy as _to_blocks_numpy
@@ -98,6 +102,19 @@ def cli():
     **_option_kwds,
 )
 @click.option(
+    "--multi-resolution/--no-multi-resolution",
+    default=False,
+    help="Create tfrecords for multiple resolutions",
+    **_option_kwds,
+)
+@click.option(
+    "--start-resolution",
+    type=int,
+    default=4,
+    help="Set if --multi-resolution is true",
+    **_option_kwds,
+)
+@click.option(
     "-v", "--verbose", is_flag=True, help="Print progress bar.", **_option_kwds
 )
 def convert(
@@ -110,6 +127,8 @@ def convert(
     gzip,
     verify_volumes,
     num_parallel_calls,
+    multi_resolution,
+    start_resolution,
     verbose,
 ):
     """Convert medical imaging volumes to TFRecords.
@@ -163,6 +182,7 @@ def convert(
         to_ras=to_ras,
         compressed=gzip,
         processes=num_parallel_calls,
+        multi_resolution=multi_resolution,
         verbose=verbose,
     )
 
