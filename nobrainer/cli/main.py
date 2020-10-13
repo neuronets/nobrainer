@@ -98,6 +98,19 @@ def cli():
     **_option_kwds,
 )
 @click.option(
+    "--multi-resolution/--no-multi-resolution",
+    default=False,
+    help="Create tfrecords for multiple resolutions",
+    **_option_kwds,
+)
+@click.option(
+    "--start-resolution",
+    type=int,
+    default=4,
+    help="Set if --multi-resolution is true",
+    **_option_kwds,
+)
+@click.option(
     "-v", "--verbose", is_flag=True, help="Print progress bar.", **_option_kwds
 )
 def convert(
@@ -110,6 +123,8 @@ def convert(
     gzip,
     verify_volumes,
     num_parallel_calls,
+    multi_resolution,
+    start_resolution,
     verbose,
 ):
     """Convert medical imaging volumes to TFRecords.
@@ -163,6 +178,7 @@ def convert(
         to_ras=to_ras,
         compressed=gzip,
         processes=num_parallel_calls,
+        multi_resolution=multi_resolution,
         verbose=verbose,
     )
 
