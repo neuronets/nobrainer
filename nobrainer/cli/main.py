@@ -100,14 +100,17 @@ def cli():
 @click.option(
     "--multi-resolution/--no-multi-resolution",
     default=False,
-    help="Create tfrecords for multiple resolutions",
+    help="Create tfrecords for multiple resolutions. if set, labels in csv need to be scalar.",
     **_option_kwds,
 )
 @click.option(
     "--start-resolution",
     type=int,
     default=4,
-    help="Set if --multi-resolution is true",
+    help=(
+        "Set if `multi-resolution` is true. Indicates smallest resolution for tfrecords, all resolutions "
+        "in exponents of 2 from `start-resolution` to `volume-shape` are generated as tfrecords"
+    ),
     **_option_kwds,
 )
 @click.option(
@@ -171,6 +174,13 @@ def convert(
                 click.echo(pair[1])
             sys.exit(-1)
 
+    if multi_resolution:
+        start_resolution_log = np.log2(start_resolution).astype(np.int32)
+        target_resolution_log = np.log2(volume_shape[0]).astype(np.int32)
+        resolutions = [2**res for res in range(start_resolution_log, target_resolution_log+1)]
+    else:
+        resolutions = None
+
     _write_tfrecord(
         features_labels=volume_filepaths,
         filename_template=tfrecords_template,
@@ -179,6 +189,7 @@ def convert(
         compressed=gzip,
         processes=num_parallel_calls,
         multi_resolution=multi_resolution,
+        resolutions=resolutions,
         verbose=verbose,
     )
 

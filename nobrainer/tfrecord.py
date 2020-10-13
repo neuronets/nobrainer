@@ -22,7 +22,7 @@ def write(
     processes=None,
     chunksize=1,
     multi_resolution=False,
-    start_resolution=4,
+    resolutions=None,
     verbose=1,
 ):
     """Write features and labels to TFRecord files.
@@ -48,6 +48,9 @@ def write(
         `examples_per_shard` < `len(features_labels)`). If `None`, uses all available
         cores.
     chunksize: int, multiprocessing chunksize.
+    multi_resolution: boolean, if `True`, different tfrecords for each resolution in each shard
+    resolutions: list of ints, if multi_resolution is `True`, set resolutions for which tfrecords are created
+        For example, [4, 8, 16, 32, 64, 128, 256]
     verbose: int, if 1, print progress bar. If 0, print nothing.
     """
     n_examples = len(features_labels)
@@ -62,14 +65,11 @@ def write(
             "`filename_template` must include a string formatting key 'shard' that"
             " accepts an integer."
         )
-
-    if multi_resolution:
-        #TODO change from hardcode
-        start_resolution_log = 2
-        target_resolution_log = 8
-        resolutions = [2**res for res in range(start_resolution_log, target_resolution_log+1)]
-    else:
-        resolutions = None
+    # Test if resolutions is set
+    if multi_resolution and not isinstance(resolutions, list):
+        raise ValueError(
+            "`resolutions` must be set with a list of ints indicating resolutions for tfrecords"
+        )
 
     # This is the object that returns a protocol buffer string of the feature and label
     # on each iteration. It is pickle-able, unlike a generator.
@@ -339,12 +339,12 @@ class _ProtoIterator:
         else:
             # only scalar label
             proto_dict = {}
-            x, affine = read_volume(
+            original, affine = read_volume(
                     x, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras
             )
             for resolution in self.resolutions[::-1]:
                 x = skimage.transform.resize(
-                    x,
+                    original,
                     output_shape=(resolution, resolution, resolution),
                     order=1,  # linear
                     mode="constant",
@@ -357,6 +357,7 @@ class _ProtoIterator:
                 proto_dict[resolution] = proto.SerializeToString()
 
             return proto_dict
+
 
 def _write_tfrecords(protobuf_iterator, filename, compressed=True, multi_resolution=False, resolutions=None):
     """
