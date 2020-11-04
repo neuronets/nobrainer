@@ -350,7 +350,7 @@ class ComposeTransform(object):
                 continue
             else:
                 raise Exception('unexpected type')                
-        return img
+tmp_        return img
 
 class Merge(object):
     """Merge a group of 3D volumes
