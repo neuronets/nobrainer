@@ -1,14 +1,6 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Nov  4 10:42:17 2020
-
-@author: aakanksha
-"""
-
 import pytest
 import numpy as np
-import transformations
+import spatial_transforms as transformations
 import tensorflow as tf
 from numpy.testing import assert_array_equal
 
