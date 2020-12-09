@@ -1,13 +1,12 @@
-import os
-import random
 import numpy as np
 import tensorflow as tf
 
-def centercrop(x, y = None,  finesize= 64, trans_xy = False): 
+def centercrop(x, y=None, finesize=64, trans_xy=False): 
     """
     Provides centercrop for 3D Inputs and 3D Labels of size [p,q,r]
     """
-    if ~tf.is_tensor(x): x = tf.convert_to_tensor(x)
+    if ~tf.is_tensor(x):
+	x = tf.convert_to_tensor(x)
     x = tf.cast(x, tf.float32)
     if len(x.shape) != 3:
         raise ValueError("`volume` must be rank 3")
@@ -31,10 +30,13 @@ def centercrop(x, y = None,  finesize= 64, trans_xy = False):
         return x
 
 def spatialConstantPadding(x, y = None, trans_xy= False, padding_zyx= [1,1,1]):
-    if ~tf.is_tensor(x): x = tf.convert_to_tensor(x)
+    if ~tf.is_tensor(x):
+	x = tf.convert_to_tensor(x)
     x = tf.cast(x, tf.float32)
-    padz = padding_zyx[0]; pady= padding_zyx[1]; padx= padding_zyx[2]
-    padding = tf.constant([ [padz,padz], [pady,pady], [padx,padx]])
+    padz = padding_zyx[0] 
+    pady= padding_zyx[1]
+    padx= padding_zyx[2]
+    padding = tf.constant([[padz,padz], [pady,pady], [padx,padx]])
     x = tf.pad(x,padding, 'CONSTANT')
     if trans_xy: 
         if y is None:
@@ -72,7 +74,7 @@ def resize(x, y= None, trans_xy= False, size = [32,32], mode = 'bicubic'):
     """
     if ~tf.is_tensor(x): x = tf.convert_to_tensor(x)
     x = tf.cast(x, tf.float32)
-    x = tf.image.resize(x, size, method = mode)
+    x = tf.image.resize(x, size, method=mode)
     if trans_xy: 
         if y is None:
             raise ValueError("`LabelMap' should be assigned")
@@ -86,8 +88,9 @@ def resize(x, y= None, trans_xy= False, size = [32,32], mode = 'bicubic'):
     else:
         return x
     
-def randomflip_leftright(x, y= None, trans_xy= False):
-    if ~tf.is_tensor(x): x = tf.convert_to_tensor(x)
+def randomflip_leftright(x, y=None, trans_xy=False):
+    if ~tf.is_tensor(x): 
+	x = tf.convert_to_tensor(x)
     x = tf.cast(x, tf.float32)
     if trans_xy: 
         if y is None:

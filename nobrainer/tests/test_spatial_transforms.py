@@ -1,11 +1,11 @@
 import pytest
 import numpy as np
 from nobrainer import spatial_transforms as transformations
-import tensorflow as tf
+# import tensorflow as tf
 from numpy.testing import assert_array_equal
 
 def test_centercrop():  
-    #test for only inputs
+    # Test for inputs
     shape = (10, 10, 10)
     x = np.ones(shape).astype(np.float32)
     y = np.random.randint(0, 2, size=shape).astype(np.float32)
@@ -16,12 +16,12 @@ def test_centercrop():
     assert x.shape[1] == finesize & x.shape[0] == finesize &  x.shape[2] == shape[2] 
     assert y.shape[1] == finesize & y.shape[0] == finesize & y.shape[2] == shape[2]
 
-    #test for both x and y
+    # test for both x and y
     shape = (10, 10, 10)
     x = np.ones(shape).astype(np.float32)
     y = np.random.randint(0, 2, size=shape).astype(np.float32)
     finesize= int(x.shape[1])
-    x, y = transformations.centercrop(x, y, finesize, trans_xy= True)
+    x, y = transformations.centercrop(x, y, finesize, trans_xy=True)
     x = x.numpy()
     y = y.numpy()
     # Test for output shapes
@@ -35,8 +35,10 @@ def test_centercrop():
     finesize= [128,1]
     x1, y1 = transformations.centercrop(x, y,   finesize[0], trans_xy= True)
     x2, y2 = transformations.centercrop(x, y,  finesize[1], trans_xy= True)
-    x1 = x1.numpy();       x2 = x2.numpy()
-    y1 = y1.numpy();       y2 = y2.numpy()
+    x1 = x1.numpy()
+    x2 = x2.numpy()
+    y1 = y1.numpy()
+    y2 = y2.numpy()
     assert x1.shape[1] == min(shape[1],finesize[0]) & x1.shape[0] == min(shape[0],finesize[0]) & x1.shape[2] == shape[2] 
     assert y1.shape[1] == min(shape[1],finesize[0]) & y1.shape[0] == min(shape[0],finesize[0]) & y1.shape[2] == shape[2] 
     
@@ -76,7 +78,7 @@ def test_spatialConstantPadding():
         [0., 0., 0., 0., 0., 0., 0.],
         [0., 0., 0., 0., 0., 0., 0.],
         [0., 0., 0., 0., 0., 0., 0.]]])
-    resultx, resulty = transformations.spatialConstantPadding(x, y, trans_xy = True, padding_zyx = [0,2,2])
+    resultx, resulty = transformations.spatialConstantPadding(x, y, trans_xy=True, padding_zyx=[0,2,2])
     np.testing.assert_allclose(x_expected, resultx.numpy())
     np.testing.assert_allclose(y_expected, resulty.numpy())
 
@@ -84,7 +86,7 @@ def test_randomCrop():
     x = np.random.rand(10,10,10).astype(np.float32)
     y = np.random.randint(0, 2, size=(10,10,10)).astype(np.float32)
     expected_shape = (3,3,10)
-    results_x, results_y =transformations.randomCrop(x,y, trans_xy = True, cropsize = 3)
+    results_x, results_y =transformations.randomCrop(x,y, trans_xy=True, cropsize=3)
     assert np.shape(results_x.numpy()) == expected_shape
     assert np.shape(results_y.numpy()) == expected_shape
     assert np.all(np.in1d(np.ravel(results_x),np.ravel(x)))
@@ -94,14 +96,14 @@ def test_resize():
     x = np.random.rand(10,10,10).astype(np.float32)
     y = np.random.randint(0, 2, size=(10,10,10)).astype(np.float32)
     expected_shape = (5,5,10)
-    results_x, results_y= transformations.resize(x, y, trans_xy= True, size = [5,5], mode = 'bicubic')
+    results_x, results_y= transformations.resize(x, y, trans_xy=True, size=[5,5], mode='bicubic')
     assert np.shape(results_x.numpy()) == expected_shape
     assert np.shape(results_y.numpy()) == expected_shape  
     
 def test_randomflip_leftright():
     x = np.random.rand(3,3,3).astype(np.float32)
     y = np.random.randint(0, 2, size=(3,3,3)).astype(np.float32)
-    results_x, results_y = transformations.randomflip_leftright(x,y, trans_xy = True)
+    results_x, results_y = transformations.randomflip_leftright(x,y, trans_xy=True)
     expected_shape = (3,3,3)
     assert np.shape(results_x.numpy()) == expected_shape
     assert np.shape(results_y.numpy()) == expected_shape  
