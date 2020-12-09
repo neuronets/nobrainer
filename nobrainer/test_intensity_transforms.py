@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Oct 30 17:01:57 2020
-
-@author: aakanksha
-"""
-
 import pytest
 import numpy as np
 import intensity_transforms
