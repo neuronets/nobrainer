@@ -100,6 +100,6 @@ def randomflip_leftright(x, y=None, trans_xy=False):
         c = tf.concat([x, y], axis=0)
         c = tf.image.random_flip_left_right(c, seed = None)
         split_channel= int(c.shape[0]/2)
-        return c[0:split_channel,:,:],c[split_channel:c.shape[0],:,:]
+        return c[0:split_channel,:,:], c[split_channel:c.shape[0],:,:]
     else:
         return tf.image.random_flip_left_right(x, seed = None)

@@ -86,7 +86,7 @@ def test_randomCrop():
     x = np.random.rand(10,10,10).astype(np.float32)
     y = np.random.randint(0, 2, size=(10,10,10)).astype(np.float32)
     expected_shape = (3,3,10)
-    results_x, results_y =transformations.randomCrop(x,y, trans_xy=True, cropsize=3)
+    results_x, results_y = transformations.randomCrop(x,y, trans_xy=True, cropsize=3)
     assert np.shape(results_x.numpy()) == expected_shape
     assert np.shape(results_y.numpy()) == expected_shape
     assert np.all(np.in1d(np.ravel(results_x),np.ravel(x)))
