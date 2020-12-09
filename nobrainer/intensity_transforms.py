@@ -1,9 +1,3 @@
-
-"""
-Created 
-
-@author: aakanksha
-"""
 ##TO DO def DivisiblePad(x,y= None, trans_xy= False, k):  
 
 import os
