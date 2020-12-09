@@ -323,77 +323,7 @@ def _get_voxels(volume, coords):
         | (coords[:, 1] > cols)
         | (coords[:, 2] > depth)
     )
-
-
-    """
-Composes several transforms together for label and Target, by using Merge() and Split(), input and target volumes can be transformed along channel-dimension, can be split back.
-    """
-class ComposeTransform(object):
-
-    def __init__(self, transforms):
-        self.transforms = transforms
-
-    def __call__(self, img):
-        for t in self.transforms:
-            if isinstance(t, collections.Sequence):
-                assert isinstance(img, collections.Sequence) and len(img) == len(t), "size of image group and transform group does not fit"
-                tmp_ = []
-                for i, im_ in enumerate(img):
-                    if callable(t[i]):
-                        tmp_.append(t[i](im_))
-                    else:
-                        tmp_.append(im_)
-                img = tmp_
-            elif callable(t):
-                img = t(img)
-            elif t is None:
-                continue
-            else:
-                raise Exception('unexpected type')                
-tmp_        return img
-
-class Merge(object):
-    """Merge a group of 3D volumes
-    """
-    def __init__(self, axis=-1):
-        self.axis = axis
-    def __call__(self, images):
-        if isinstance(images, collections.Sequence) or isinstance(images, np.ndarray):
-            assert all([isinstance(i, np.ndarray) for i in images]), 'only numpy array is supported'
-            shapes = [list(i.shape) for i in images]
-            for s in shapes:
-                s[self.axis] = None
-            assert all([s==shapes[0] for s in shapes]), 'shapes must be the same except the merge axis'
-            return np.concatenate(images, axis=self.axis)
-        else:
-            raise Exception("obj is not a sequence (list, tuple, etc)")
-
-class Split(object):
-    """
-Split Volumes into individual Volumes
-    """
-    def __init__(self, *slices, **kwargs):
-        assert isinstance(slices, collections.Sequence)
-        slices_ = []
-        for s in slices:
-            if isinstance(s, collections.Sequence):
-                slices_.append(slice(*s))
-            else:
-                slices_.append(s)
-        assert all([isinstance(s, slice) for s in slices_]), 'slices must be consist of slice instances'
-        self.slices = slices_
-        self.axis = kwargs.get('axis', -1)
-
-    def __call__(self, image):
-        if isinstance(image, np.ndarray):
-            ret = []
-            for s in self.slices:
-                sl = [slice(None)]*image.ndim
-                sl[self.axis] = s
-                ret.append(image[sl])
-            return ret
-        else:
-            raise Exception("obj is not an numpy array")
+    
     xflat = tf.multiply(xflat, tf.cast(tf.logical_not(outofframe), xflat.dtype))
 
     return xflat
