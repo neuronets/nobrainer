@@ -6,8 +6,7 @@ def addGaussianNoise(x, y=None, trans_xy=False, noise_mean=0.0, noise_std=0.1):
     """
     Adds gaussian noise to 3D tensor and label
     """
-    if ~tf.is_tensor(x): 
-	x = tf.convert_to_tensor(x)
+    if ~tf.is_tensor(x): x = tf.convert_to_tensor(x)
     x = tf.cast(x, tf.float32)
     noise = tf.random.normal(x.shape, noise_mean, noise_std, dtype=x.dtype)
     if trans_xy:
@@ -24,8 +23,7 @@ def addGaussianNoise(x, y=None, trans_xy=False, noise_mean=0.0, noise_std=0.1):
         return tf.math.add(x,noise)
 
 def minmaxIntensityScaling(x, y= None, trans_xy = False):
-    if ~tf.is_tensor(x):
-	x = tf.convert_to_tensor(x)
+    if ~tf.is_tensor(x): x = tf.convert_to_tensor(x)
     x = tf.cast(x, tf.float32)
     ep = tf.cast(tf.convert_to_tensor(1e-8*np.ones(x.shape).astype(np.float32)), tf.float32)
     xmin= tf.cast(tf.reduce_min(x), tf.float32) 
@@ -35,7 +33,7 @@ def minmaxIntensityScaling(x, y= None, trans_xy = False):
         if y is None:
             raise ValueError("`LabelMap' should be assigned")
         if len(y.shape) != 3:
-            raise ValueError("`LabelMap` must be equal or higher than rank 2")
+	    raise ValueError("`LabelMap` must be equal or higher than rank 2")
         if ~tf.is_tensor(y): 
             y = tf.convert_to_tensor(y)  
         y = tf.cast(y, tf.float32)
@@ -66,11 +64,9 @@ def customIntensityScaling(x, y = None, trans_xy = False, scale_x=[0.0,1.0],  sc
         return x
 
 def intensityMasking(x, mask_x, y=None, trans_xy=False, mask_y=None):
-    if ~tf.is_tensor(x): 
-	x = tf.convert_to_tensor(x)
+    if ~tf.is_tensor(x): x = tf.convert_to_tensor(x)
     x = tf.cast(x, tf.float32)
-    if ~tf.is_tensor(mask_x): 
-	mask_x = tf.convert_to_tensor(mask_x)
+    if ~tf.is_tensor(mask_x): mask_x = tf.convert_to_tensor(mask_x)
     mask_x = tf.cast(mask_x, tf.float32)
     if mask_x.shape[0] != x.shape[0] and mask_x.shape[1] != x.shape[1]:
 	raise ValueError("Masks shape should be same as Input")
@@ -90,8 +86,7 @@ def intensityMasking(x, mask_x, y=None, trans_xy=False, mask_y=None):
         return x
 
 def contrastAdjust(x,y=None, trans_xy=False, gamma=1.0):
-    if ~tf.is_tensor(x):
-	x = tf.convert_to_tensor(x)
+    if ~tf.is_tensor(x): x = tf.convert_to_tensor(x)
     x = tf.cast(x, tf.float32)
     ep = tf.cast(tf.convert_to_tensor(1e-7*np.ones(x.shape).astype(np.float32)), tf.float32)
     gamma = tf.cast(tf.convert_to_tensor(gamma*np.ones(x.shape).astype(np.float32)), tf.float32)    
