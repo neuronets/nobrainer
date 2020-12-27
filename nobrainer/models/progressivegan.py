@@ -126,9 +126,9 @@ class Generator:
 
         # block_layers.append(self.ConvTranspose(nf, kernel_size=3, strides=2, padding='same'))
         block_layers.append(self.Upsampling())
-        block_layers.append(self.Conv(nf, kernel_size=kernel_size, strides=1, padding='same'))
-        block_layers.append(layers.Activation(tf.nn.leaky_relu))
-        block_layers.append(self._pixel_norm())
+        #block_layers.append(self.Conv(nf, kernel_size=kernel_size, strides=1, padding='same'))
+        #block_layers.append(layers.Activation(tf.nn.leaky_relu))
+        #block_layers.append(self._pixel_norm())
 
         # block_layers.append(self.Conv(nf, kernel_size=3, strides=1, padding='same'))
         block_layers.append(self.Conv(nf, kernel_size=kernel_size, strides=1, padding='same'))
@@ -156,7 +156,7 @@ class Generator:
         to_rgb_2 = self.Conv(self.num_channels, kernel_size=1)(g_block_output)
 
         output = self._weighted_sum()([to_rgb_1, to_rgb_2, self.growing_generator.input[1]])
-        # output = layers.Activation('tanh')(lerp_output)
+        output = layers.Activation('tanh')(output)
 
         self.growing_generator = models.Model(inputs=self.growing_generator.input, outputs=g_block_output)
         self.train_generator = models.Model(inputs=self.growing_generator.input, outputs=[output], name=self.name)
@@ -231,8 +231,8 @@ class Discriminator:
 
         block_layers = []
 
-        block_layers.append(self.Conv(nf, kernel_size=kernel_size, strides=1, padding='same'))
-        block_layers.append(layers.Activation(tf.nn.leaky_relu))
+        #block_layers.append(self.Conv(nf, kernel_size=kernel_size, strides=1, padding='same'))
+        #block_layers.append(layers.Activation(tf.nn.leaky_relu))
 
         block_layers.append(self.Conv(nf, kernel_size=kernel_size, strides=2, padding='same'))
         block_layers.append(layers.Activation(tf.nn.leaky_relu))
