@@ -297,3 +297,23 @@ def to_blocks_numpy(a, block_shape):
     new_shape = (-1,) + block_shape
     perm = (0, 2, 4, 1, 3, 5)
     return a.reshape(inter_shape).transpose(perm).reshape(new_shape)
+
+def adjust_dynamic_range_numpy(a, drange_in, drange_out):
+    """Scale and shift numpy array.
+
+    Implements `(a * scale) + bias`.
+
+    Parameters
+    ----------
+    a: array, values to scale and shift.
+    drange_in: tuple, input range of values
+    drange_out: tuple, output range of values
+
+    Returns
+    -------
+    Array of scaled and shifted values. Output values has range in drange_out.
+    """
+    a = np.asarray(a)
+    scale = (drange_out[1] - drange_out[0]) / (drange_in[1] - drange_in[0])
+    bias = drange_out[0] - drange_in[0] * scale
+    return a * scale + bias
