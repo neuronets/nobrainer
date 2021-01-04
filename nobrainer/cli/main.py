@@ -6,6 +6,7 @@ import logging
 import os
 import platform
 import sys
+import glob
 
 import click
 import nibabel as nib
@@ -457,6 +458,14 @@ def predict(
     **_option_kwds,
 )
 @click.option(
+    "--multi-resolution",
+    is_flag=True,
+    help=(
+        "Generate all resolutions available from the progressive generator using the same latents."
+    ),
+    **_option_kwds,
+)
+@click.option(
     "-v", "--verbose", is_flag=True, help="Print progress bar.", **_option_kwds
 )
 def generate(
@@ -467,6 +476,7 @@ def generate(
     drange_in,
     drange_out,
     output_shape,
+    multi_resolution,
     verbose,
 ):
     """Generate images from latents using a trained GAN model.
@@ -484,17 +494,29 @@ def generate(
             "Output file already exists. Will not overwrite {}".format(outfile)
         )
 
-    output_resolution = int(np.log2(output_shape[0]))
-    model = os.path.join(model, 'g_{}.h5'.format(output_resolution))
-    generator = tf.keras.models.load_model(model, custom_objects={'tf': tf, 'leaky_relu': tf.nn.leaky_relu})
     if verbose:
         click.echo("Generating ...")
     try:
         latents = tf.random.normal((1, latent_size))
-        # 1.0 is the alpha value which is the ratio between upsampling and generation from previous 
+        # 1.0 in the generator is the alpha value which is the ratio between upsampling and generation from previous 
         # resolutions. The values are between 0 to 1.0 for training and 1.0 for inference. This is done
         # for smooth transition. For more details see https://arxiv.org/abs/1710.10196.
-        img = generator([latents, 1.0]) 
+        if multi_resolution:
+            images = []
+            model_paths = glob.glob(os.path.join(model, "g_*.h5"))
+            resolutions = [os.path.splitext(m)[0].split('_')[-1] for m in model_paths]
+            for model_path in model_paths:
+                generator = tf.keras.models.load_model(model_path, custom_objects={'tf': tf, 'leaky_relu': tf.nn.leaky_relu})
+                img = generator([latents, 1.0])
+                img = np.squeeze(img)
+                images.append(img)
+        else:
+            output_resolution = int(np.log2(output_shape[0]))
+            model = os.path.join(model, 'g_{}.h5'.format(output_resolution))
+            generator = tf.keras.models.load_model(model, custom_objects={'tf': tf, 'leaky_relu': tf.nn.leaky_relu})
+            img = generator([latents, 1.0])
+            img = np.squeeze(img)            
+
     except Exception:
         click.echo(click.style("ERROR: generation failed. See error trace.", fg="red"))
         raise
@@ -506,13 +528,22 @@ def generate(
                 drange_in, drange_out
             )
         )
-    img = _adjust_dynamic_range_numpy(img, drange_in, drange_out)
-    img = np.squeeze(img).astype(np.uint8)
+    if multi_resolution:
+        images = _adjust_dynamic_range_numpy(images, drange_in, drange_out)
+    else:
+        img = _adjust_dynamic_range_numpy(img, drange_in, drange_out)
 
-    img = nib.Nifti1Image(img, np.eye(4))
+    if verbose:
+        click.echo("Saving ...")
+    if multi_resolution:
+        for img, resolution in zip(images, resolutions):
+            img = nib.Nifti1Image(img.astype(np.uint8), np.eye(4))
+            # Add resolution to the outfile as an id
+            nib.save(img, "{0}_res_{3}.{1}.{2}".format(*outfile.split('.') + [2**int(resolution)]))
+    else:
+        img = nib.Nifti1Image(img.astype(np.uint8), np.eye(4))
+        nib.save(img, outfile)
 
-    # img = nib.spatialimages.SpatialImage(y.astype(np.int32), affine=affine)
-    nib.save(img, outfile)
     if verbose:
         click.echo("Output saved to {}".format(outfile))
 
