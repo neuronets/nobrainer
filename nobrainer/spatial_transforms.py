@@ -50,7 +50,8 @@ def spatialConstantPadding(x, y = None, trans_xy= False, padding_zyx= [1,1,1]):
         return x
     
 def randomCrop(x, y= None, trans_xy= False, cropsize = 16):
-    if ~tf.is_tensor(x): x = tf.convert_to_tensor(x)
+    if ~tf.is_tensor(x):
+        x = tf.convert_to_tensor(x)
     x = tf.cast(x, tf.float32)
     if trans_xy: 
         if y is None:
