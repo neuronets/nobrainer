@@ -1,4 +1,3 @@
-import numpy as np
 import tensorflow as tf
 
 
@@ -67,15 +66,16 @@ def randomCrop(x, y=None, trans_xy=False, cropsize=16):
             y = tf.convert_to_tensor(y)
         y = tf.cast(y, tf.float32)
         stacked = tf.stack([x, y], axis=0)
-        cropped = tf.image.random_crop(stacked, [2, cropsize, cropsize, x.shape[2]])
+        cropped = tf.image.random_crop(stacked,
+                                       [2, cropsize, cropsize, x.shape[2]])
         return cropped[0], cropped[1]
     else:
         return tf.image.random_crop(x, [cropsize, cropsize, x.shape[2]])
 
 
 def resize(x, y=None, trans_xy=False, size=[32, 32], mode='bicubic'):
-    """check image.ResizeMethod enum, or the string equivalent. The options are:
-    bilinear, lanczos3, lanczos5, bicubic, gaussian , nearest, area , mitchellcubic
+    """check image.ResizeMethod enum, or the string equivalent. Options:
+    bilinear, lanczos3, lanczos5, bicubic, gaussian , nearest.
     """
     if ~tf.is_tensor(x):
         x = tf.convert_to_tensor(x)

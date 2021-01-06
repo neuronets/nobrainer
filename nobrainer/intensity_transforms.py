@@ -31,8 +31,7 @@ def minmaxIntensityScaling(x, y=None, trans_xy=False):
     x = tf.cast(x, tf.float32)
     ep = tf.cast(
         tf.convert_to_tensor(
-            1e-8 *
-            np.ones(
+            1e-8 * np.ones(
                 x.shape).astype(
                 np.float32)),
         tf.float32)
@@ -49,23 +48,23 @@ def minmaxIntensityScaling(x, y=None, trans_xy=False):
         y = tf.cast(y, tf.float32)
         ymin = tf.cast(tf.reduce_min(y), tf.float32)
         ymax = tf.cast(tf.reduce_max(y), tf.float32)
-        y = tf.divide(tf.subtract(y, ymin), tf.add(tf.subtract(ymax, ymin), ep))
+        y = tf.divide(tf.subtract(y, ymin),
+                      tf.add(tf.subtract(ymax, ymin), ep))
     return x, y
 
 
-def customIntensityScaling(x, y=None, trans_xy=False, scale_x=[0.0, 1.0], scale_y=None):
+def customIntensityScaling(x, y=None, trans_xy=False, scale_x=[0.0, 1.0],
+                           scale_y=None):
     x_norm, y_norm = minmaxIntensityScaling(x, y, trans_xy)
     minx = tf.cast(
         tf.convert_to_tensor(
-            scale_x[0] *
-            np.ones(
+            scale_x[0] * np.ones(
                 x_norm.shape).astype(
                 np.float32)),
         tf.float32)
     maxx = tf.cast(
         tf.convert_to_tensor(
-            scale_x[1] *
-            np.ones(
+            scale_x[1] * np.ones(
                 x_norm.shape).astype(
                 np.float32)),
         tf.float32)
@@ -76,19 +75,17 @@ def customIntensityScaling(x, y=None, trans_xy=False, scale_x=[0.0, 1.0], scale_
         if y is None:
             raise ValueError("`LabelMap' should be assigned")
         if scale_y is None:
-            raise ValueError("Provide Label Map scaling arguments as: scale_Y = [a,b]")
+            raise ValueError("LabelMap scaling arguments as: scale_Y=[a,b]")
         y = tf.cast(y, tf.float32)
         miny = tf.cast(
             tf.convert_to_tensor(
-                scale_y[0] *
-                np.ones(
+                scale_y[0] * np.ones(
                     y_norm.shape).astype(
                     np.float32)),
             tf.float32)
         maxy = tf.cast(
             tf.convert_to_tensor(
-                scale_y[1] *
-                np.ones(
+                scale_y[1] * np.ones(
                     y_norm.shape).astype(
                     np.float32)),
             tf.float32)
@@ -132,15 +129,13 @@ def contrastAdjust(x, y=None, trans_xy=False, gamma=1.0):
     x = tf.cast(x, tf.float32)
     ep = tf.cast(
         tf.convert_to_tensor(
-            1e-7 *
-            np.ones(
+            1e-7 * np.ones(
                 x.shape).astype(
                 np.float32)),
         tf.float32)
     gamma = tf.cast(
         tf.convert_to_tensor(
-            gamma *
-            np.ones(
+            gamma * np.ones(
                 x.shape).astype(
                 np.float32)),
         tf.float32)
@@ -165,25 +160,3 @@ def contrastAdjust(x, y=None, trans_xy=False, gamma=1.0):
         return x, y
     else:
         return x
-
-# def GaussianSmoothing(x,y=None, trans_xy = False, kernel_size = 3, sigma = 1.0):
-#    if ~tf.is_tensor(x): x = tf.convert_to_tensor(x)
-#    x = tf.cast(x, tf.float32)
-#    gaussian_kernel = gauss_kernel(tf.shape(x)[-1], kernel_size, sigma)
-#    gaussian_kernel = gaussian_kernel[..., tf.newaxis]
-#
-#    x= tf.nn.depthwise_conv2d(tf.expand_dims(x, axis=0),
-#	gaussian_kernel, [1, 1, 1, 1], padding='SAME', data_format='NHWC')
-#
-#    if trans_xy:
-#        if y is None:
-#            raise ValueError("`LabelMap' should be assigned")
-#        if len(y.shape) != 3:
-#            raise ValueError("`LabelMap` must be equal or higher than rank 2")
-#        if ~tf.is_tensor(y):
-#            y = tf.convert_to_tensor(y)
-#        y = tf.cast(y, tf.float32)
-#        y = tf.nn.depthwise_conv2d(tf.expand_dims(y, axis=0), gaussian_kernel, [1, 1, 1, 1], padding='SAME', data_format='NHWC')
-#        return x,y
-#    else:
-#        return x
