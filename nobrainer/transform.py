@@ -1,8 +1,6 @@
 """Volumetric affine transformations implemented in TensorFlow."""
 
 import tensorflow as tf
-import numpy as np
-import collections
 
 
 def warp_features_labels(features, labels, matrix, scalar_label=False):
