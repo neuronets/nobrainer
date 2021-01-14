@@ -54,6 +54,7 @@ def get_dataset(
     n_epochs=None,
     mapping=None,
     augment=False,
+    standardize=True,
     shuffle_buffer_size=None,
     num_parallel_calls=AUTOTUNE,
 ):
@@ -119,8 +120,9 @@ def get_dataset(
         num_parallel_calls=num_parallel_calls,
     )
 
-    # Standard-score the features.
-    dataset = dataset.map(lambda x, y: (standardize(x), y))
+    if standardize:
+        # Standard-score the features.
+        dataset = dataset.map(lambda x, y: (standardize(x), y))        
 
     # Augment examples if requested.
     if augment:

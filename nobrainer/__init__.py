@@ -13,6 +13,7 @@ import nobrainer.prediction
 import nobrainer.transform
 import nobrainer.utils
 import nobrainer.volume  # noqa
+import nobrainer.training
 
 __version__ = get_versions()["version"]
 del get_versions

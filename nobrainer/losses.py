@@ -223,14 +223,29 @@ class Wasserstein(LossFunctionWrapper):
         )
 
 
-def wasserstein_gp(reals, fakes, discriminator=None, alpha=0, gp_weight=10, epsilon_weight=0.001):
-    weight_shape = (tf.shape(reals)[0],) + (1,1,1,1)
-    weight = tf.random.uniform(weight_shape, minval=0, maxval=1)
-    average_samples = (weight * reals) + ((1 - weight) * fakes)
+# def wasserstein_gp(reals, fakes, alpha=1, discriminator=None, gp_weight=10, epsilon_weight=0.001):
 
-    average_pred = discriminator(([average_samples, alpha]))
+#     weight_shape = (tf.shape(reals)[0],) + (1,1,1,1)
+#     weight = tf.random.uniform(weight_shape, minval=0, maxval=1)
+#     average_samples = (weight * reals) + ((1 - weight) * fakes)
 
-    gradients = tf.gradients(average_pred, average_samples)[0]
+#     alpha = tf.constant([alpha], tf.float32)
+#     average_pred = discriminator(([average_samples, alpha]))
+
+#     gradients = tf.gradients(average_pred, average_samples)[0]
+
+#     gradients_squared = tf.square(gradients)
+#     gradients_sqr_sum = tf.reduce_sum(gradients_squared, axis=tf.range(1, tf.rank(gradients_squared)))
+#     gradient_l2_norm = tf.sqrt(gradients_sqr_sum)
+
+#     gradient_penalty =  gp_weight * tf.square(1 - gradient_l2_norm)
+
+#     real_pred, _ = discriminator(([reals, alpha]))
+#     epsilon_loss = epsilon_weight * tf.square(real_pred)
+
+#     return  gradient_penalty + epsilon_loss
+
+def gradient_penalty(gradients, real_pred, gp_weight=10, epsilon_weight=0.001):
 
     gradients_squared = tf.square(gradients)
     gradients_sqr_sum = tf.reduce_sum(gradients_squared, axis=tf.range(1, tf.rank(gradients_squared)))
@@ -238,13 +253,12 @@ def wasserstein_gp(reals, fakes, discriminator=None, alpha=0, gp_weight=10, epsi
 
     gradient_penalty =  gp_weight * tf.square(1 - gradient_l2_norm)
 
-    real_pred, _ = discriminator(([reals, alpha]))
     epsilon_loss = epsilon_weight * tf.square(real_pred)
 
     return  gradient_penalty + epsilon_loss
 
 
-class WassersteinGP(LossFunctionWrapper):
+class GradientPenalty(LossFunctionWrapper):
     """Computes Gradient Penalty for Wasserstein Loss.
     Improvement to gradient clipping for Wasserstein-GAN to enforce the Lipschitz constraint.
     Uses the points interpolated between real and fake to ensure a gradient norm of 1.
@@ -261,17 +275,13 @@ class WassersteinGP(LossFunctionWrapper):
 
     def __init__(
         self,
-        discriminator=None,
-        alpha=0,
         gp_weight=10,
         epsilon_weight=0.001,
         reduction=ReductionV2.AUTO,
         name="wasserstein_gp",
     ):
         super().__init__(
-            wasserstein_gp, 
-            discriminator=discriminator,
-            alpha=alpha,
+            gradient_penalty, 
             gp_weight=gp_weight,
             epsilon_weight=epsilon_weight,
             reduction=reduction,
@@ -293,8 +303,8 @@ def get(loss):
         "ELBO": ELBO,
         "wasserstein": wasserstein,
         "Wasserstein": Wasserstein,
-        "wasserstein_gp": wasserstein_gp,
-        "WassersteinGP": WassersteinGP
+        "GradientPenalty": GradientPenalty,
+        "gradient_penalty": gradient_penalty
     }
     with tf.keras.utils.CustomObjectScope(objects):
         return tf.keras.losses.get(loss)
