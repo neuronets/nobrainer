@@ -1,30 +1,48 @@
 '''training utilities (supports training on single and multiple GPUs)'''
 
-from pathlib import Path
-from functools import partial
-import time
-
-import numpy as np
-from PIL import Image
-import tensorflow as tf
-import nibabel as nib
-
 import os
 
+import tensorflow as tf
 from tensorflow.python.keras.engine import compile_utils
+
 from nobrainer.volume import adjust_dynamic_range as _adjust_dynamic_range
 from nobrainer.losses import gradient_penalty
 
 
 class ProgressiveGANTrainer(tf.keras.Model):
-    def __init__(self, discriminator, generator, latent_size, gradient_penalty=False):
+    """Progressive Generative Adversarial Network Trainer.
+
+    Trains discriminator and generator alternatively in an adversarial manner for generation of
+    brain MRI images. Uses a progressive method for each resolution and supports the smooth
+    transition of new layers, as explained in the reference.
+
+    Parameters
+    ----------
+    discriminator : tf.keras.Model, Instantiated using nobrainer.models
+    generator : tf.keras.Model, Instantiated using nobrainer.models
+    gradient_penalty : boolean, Use gradient penalty on discriminator for smooth training.
+
+    References
+    ----------
+    Progressive Growing of GANs for Improved Quality, Stability, and Variation. T. Karras, T. Aila, S. Laine & J. Lehtinen, 
+    International Conference on Learning Representations. 2018.
+
+    Links
+    -----
+    [https://research.nvidia.com/sites/default/files/pubs/2017-10_Progressive-Growing-of/karras2018iclr-paper.pdf](https://research.nvidia.com/sites/default/files/pubs/2017-10_Progressive-Growing-of/karras2018iclr-paper.pdf)
+    """
+
+    def __init__(self, discriminator, generator, gradient_penalty=False):
         super(ProgressiveGANTrainer, self).__init__()
         self.discriminator = discriminator 
         self.generator = generator
-        self.latent_size = latent_size
-        self.train_step_counter = 0 # For calculating alpha in transition phase
-        self.phase = 'transition'
         self.gradient_penalty = gradient_penalty
+        self.latent_size = generator.latent_size
+        self.resolution = 8 # Default resolution
+        
+        # tf.Variable is used for the following as the values change after compiling the trainer
+        self.train_step_counter = tf.Variable(0.) # For calculating alpha in transition phase
+        self.phase = tf.Variable('resolution') # For determining whether alpha is 1
 
     def compile(self, d_optimizer, g_optimizer, g_loss_fn, d_loss_fn):
         super(ProgressiveGANTrainer, self).compile()
@@ -37,21 +55,27 @@ class ProgressiveGANTrainer(tf.keras.Model):
         if self.gradient_penalty:
             self.gradient_penalty_fn = compile_utils.LossesContainer(gradient_penalty)
 
-    def train_step(self, reals, phase='transition'):
+    def train_step(self, reals):
         if isinstance(reals, tuple):
             reals = reals[0]
+
+        # get batch size dynamically
         batch_size = tf.shape(reals)[0]
 
-        # reals = _adjust_dynamic_range(reals, [0.0, 255.0], [-1.0, 1.0])
+        # normalize the real images using minmax to [-1, 1]
+        reals = _adjust_dynamic_range(reals, [0.0, 255.0], [-1.0, 1.0])
 
-        if phase == 'transition':
-            alpha = self.train_step_counter / self.steps_per_epoch
-            self.train_step_counter += 1
-        else:
-            alpha = 1.0
+        self.train_step_counter.assign_add(1.)
 
-        alpha = tf.constant([alpha], tf.float32)
+        # calculate alpha differently for transition and resolution phase 
+        alpha = tf.cond(tf.math.equal(self.phase, 'transition'),
+            lambda: self.train_step_counter / self.steps_per_epoch, # transition: alpha = ratio of step and total_steps
+            lambda: tf.constant([1.0])) # resolution: alpha = 1.0
 
+        # reshape alpha for input to network
+        alpha = tf.reshape(alpha, (1,))
+
+        # train discriminator
         latents = tf.random.normal((batch_size, self.latent_size))
         fake_labels = tf.ones((batch_size, 1))*-1
         real_labels = tf.ones((batch_size, 1))
@@ -65,8 +89,9 @@ class ProgressiveGANTrainer(tf.keras.Model):
             real_loss = self.d_loss_fn(real_labels, reals_pred)
             d_loss = 0.5 * (fake_loss + real_loss)
 
+            # calculate and add the gradient penalty loss using average samples for discriminator
             if self.gradient_penalty:
-                weight_shape = (tf.shape(reals)[0],) + (1,1,1,1)
+                weight_shape = (tf.shape(reals)[0],) + (1,1,1,1) # broadcasting to right shape
                 weight = tf.random.uniform(weight_shape, minval=0, maxval=1)
                 average_samples = (weight * reals) + ((1 - weight) * fakes)
                 average_pred = self.discriminator(([average_samples, alpha]))
@@ -77,6 +102,7 @@ class ProgressiveGANTrainer(tf.keras.Model):
         d_gradients = tape.gradient(d_loss, self.discriminator.trainable_variables)
         self.d_optimizer.apply_gradients(zip(d_gradients, self.discriminator.trainable_variables))
 
+        # train generator
         misleading_labels = tf.ones((batch_size, 1))
 
         latents = tf.random.normal((batch_size, self.latent_size))
@@ -91,20 +117,17 @@ class ProgressiveGANTrainer(tf.keras.Model):
 
         return {'d_loss': d_loss, 'g_loss': g_loss}
 
-    def fit(self, *args, phase='resolution', resolution=8, steps_per_epoch=300, **kwargs):
-        self.phase = phase
-        self.train_step_counter = 0
+    def fit(self, *args, resolution=8, phase='resolution', steps_per_epoch=300, **kwargs):
         self.resolution = resolution
         self.steps_per_epoch = steps_per_epoch
+        self.train_step_counter.assign(0.)
+        self.phase.assign(phase)
         super().fit(*args, steps_per_epoch=steps_per_epoch, **kwargs)
 
-    def save_weights(filepath, **kwargs):
-    	self.generator.save_weights(os.path.join(filepath, 'g_{}'.format(self.resolution)), **kwargs)
-    	self.discriminator.save_weights(os.path.join(filepath, 'd_{}'.format(self.resolution)), **kwargs)
-
-    def generate_images(self):
-    	pass
-
-
-
+    def save_weights(self, filepath, **kwargs):
+        '''
+        Override base class function to save the weights of the constituent models
+        '''
+        self.generator.save_weights(os.path.join(filepath, 'g_res_{}.h5'.format(self.resolution)), **kwargs)
+        self.discriminator.save_weights(os.path.join(filepath, 'd_res_{}.h5'.format(self.resolution)), **kwargs)
 
