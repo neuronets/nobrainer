@@ -5,6 +5,8 @@ import math
 import tensorflow as tf
 from tensorflow.keras import layers, models
 
+import nobrainer
+from nobrainer.volume import adjust_dynamic_range as _adjust_dynamic_range 
 
 def progressivegan(
     latent_size,
@@ -42,8 +44,7 @@ def progressivegan(
         num_channels=num_channels, 
         dimensionality=dimensionality,
         fmap_base=g_fmap_base,
-        fmap_max=g_fmap_max,
-        # name=name+'_generator'
+        fmap_max=g_fmap_max
     )
 
     discriminator = Discriminator(
@@ -51,8 +52,7 @@ def progressivegan(
         num_channels=num_channels, 
         dimensionality=dimensionality,
         fmap_base=d_fmap_base,
-        fmap_max=d_fmap_max,
-        # name=name+'_discriminator'
+        fmap_max=d_fmap_max
     )
 
     return generator, discriminator
@@ -81,9 +81,9 @@ class Generator(tf.keras.Model):
 
         self.resolution_blocks = []
 
-        self.base_dense = layers.Dense(self._nf(1)*(2**self.dimensionality))
-        self.HeadConv1 = self.Conv(self.num_channels, kernel_size=1)
-        self.HeadConv2 = self.Conv(self.num_channels, kernel_size=1)
+        self.base_dense = tf.keras.layers.Dense(units=self._nf(1)*(2**self.dimensionality))
+        self.HeadConv1 = self.Conv(filters=self.num_channels, kernel_size=1)
+        self.HeadConv2 = self.Conv(filters=self.num_channels, kernel_size=1)
 
         self.build([(None, latent_size), (1,)])
 
@@ -128,12 +128,11 @@ class Generator(tf.keras.Model):
 
         # block_layers.append(self.ConvTranspose(nf, kernel_size=3, strides=2, padding='same'))
         block_layers.append(self.Upsampling())
-        #block_layers.append(self.Conv(nf, kernel_size=kernel_size, strides=1, padding='same'))
-        #block_layers.append(layers.Activation(tf.nn.leaky_relu))
-        #block_layers.append(self._pixel_norm())
+        # block_layers.append(self.Conv(filters=nf, kernel_size=kernel_size, strides=1, padding='same'))
+        # block_layers.append(layers.Activation(tf.nn.leaky_relu))
+        # block_layers.append(self._pixel_norm())
 
-        # block_layers.append(self.Conv(nf, kernel_size=3, strides=1, padding='same'))
-        block_layers.append(self.Conv(nf, kernel_size=kernel_size, strides=1, padding='same'))
+        block_layers.append(self.Conv(filters=nf, kernel_size=kernel_size, strides=1, padding='same'))
         block_layers.append(layers.Activation(tf.nn.leaky_relu))
         block_layers.append(self._pixel_norm())
 
@@ -147,7 +146,7 @@ class Generator(tf.keras.Model):
         y = self.HeadConv2(y)
 
         output = self._weighted_sum()([x, y, alpha])
-        # output = layers.Activation('tanh')(output)
+        output = layers.Activation('tanh')(output)
 
         return output
 
@@ -158,13 +157,12 @@ class Generator(tf.keras.Model):
         self.highest_resolution_block = self._make_generator_block(
             self._nf(self.current_resolution), name='g_block_{}'.format(self.current_resolution))
 
-        self.HeadConv1 = self.Conv(self.num_channels, kernel_size=1)
-        self.HeadConv2 = self.Conv(self.num_channels, kernel_size=1)
+        self.HeadConv1 = self.Conv(filters=self.num_channels, kernel_size=1)
+        self.HeadConv2 = self.Conv(filters=self.num_channels, kernel_size=1)
         
         self.build([(None, self.latent_size), (1,)])
 
     def call(self, inputs):
-
         latents, alpha = inputs
         x = self.generator_base(latents)
 
@@ -173,6 +171,20 @@ class Generator(tf.keras.Model):
 
         y = self.highest_resolution_block(x)
         return self.generator_head(x, y, alpha)
+
+    def generate(self, latents):
+        alpha = tf.constant([1.0], tf.float32)
+        image = self.call([latents, alpha])
+        image = _adjust_dynamic_range(image, [-1,1], [0,255])
+        return {'generated': image} 
+
+    def save(self, filepath, **kwargs):
+         # force retrace of tf.function to track new and deleted variables
+        super().save(
+            filepath, 
+            signatures=tf.function(self.generate, 
+                input_signature=(tf.TensorSpec(shape=[None, self.latent_size], dtype=tf.float32),)), 
+            **kwargs)
 
 class Discriminator(tf.keras.Model):
     '''
@@ -198,10 +210,10 @@ class Discriminator(tf.keras.Model):
             self._nf(self.current_resolution-1), name='d_block_{}'.format(self.current_resolution))
         self.resolution_blocks = []
 
-        self.BaseConv = self.Conv(self._nf(self.current_resolution-1), kernel_size=1, padding='same')
-        self.FadeConv = self.Conv(self._nf(self.current_resolution), kernel_size=1, padding='same')
-        self.HeadDense1 = layers.Dense(self._nf(1))
-        self.HeadDense2 = layers.Dense(1+self.label_size)
+        self.BaseConv = self.Conv(filters=self._nf(self.current_resolution-1), kernel_size=1, padding='same')
+        self.FadeConv = self.Conv(filters=self._nf(self.current_resolution), kernel_size=1, padding='same')
+        self.HeadDense1 = tf.keras.layers.Dense(units=self._nf(1))
+        self.HeadDense2 = tf.keras.layers.Dense(units=1+self.label_size)
 
         images_shape = (None,)+(int(2.0**self.current_resolution),)*self.dimensionality + (self.num_channels,)
         alpha_shape = (1,)
@@ -236,10 +248,10 @@ class Discriminator(tf.keras.Model):
 
         block_layers = []
 
-        #block_layers.append(self.Conv(nf, kernel_size=kernel_size, strides=1, padding='same'))
-        #block_layers.append(layers.Activation(tf.nn.leaky_relu))
+        # block_layers.append(self.Conv(filters=nf, kernel_size=kernel_size, strides=1, padding='same'))
+        # block_layers.append(layers.Activation(tf.nn.leaky_relu))
 
-        block_layers.append(self.Conv(nf, kernel_size=kernel_size, strides=2, padding='same'))
+        block_layers.append(self.Conv(filters=nf, kernel_size=kernel_size, strides=2, padding='same'))
         block_layers.append(layers.Activation(tf.nn.leaky_relu))
 
         return models.Sequential(block_layers, name=name)
@@ -274,8 +286,8 @@ class Discriminator(tf.keras.Model):
         self.highest_resolution_block = self._make_discriminator_block(
             self._nf(self.current_resolution-1), name='d_block_{}'.format(self.current_resolution))
 
-        self.BaseConv = self.Conv(self._nf(self.current_resolution-1), kernel_size=1, padding='same')
-        self.FadeConv = self.Conv(self._nf(self.current_resolution), kernel_size=1, padding='same')
+        self.BaseConv = self.Conv(filters=self._nf(self.current_resolution-1), kernel_size=1, padding='same')
+        self.FadeConv = self.Conv(filters=self._nf(self.current_resolution), kernel_size=1, padding='same')
 
         images_shape = (None,)+(int(2.0**self.current_resolution),)*self.dimensionality + (self.num_channels,)
         alpha_shape = (1,)

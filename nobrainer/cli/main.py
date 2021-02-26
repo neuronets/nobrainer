@@ -27,6 +27,8 @@ from nobrainer.volume import standardize_numpy as _standardize_numpy
 from nobrainer.volume import to_blocks_numpy as _to_blocks_numpy
 from nobrainer.volume import adjust_dynamic_range_numpy as _adjust_dynamic_range_numpy
 
+from nobrainer.models import progressivegan
+
 
 _option_kwds = {"show_default": True}
 
@@ -498,40 +500,30 @@ def generate(
         click.echo("Generating ...")
     try:
         latents = tf.random.normal((1, latent_size))
-        # 1.0 in the generator is the alpha value which is the ratio between upsampling and generation from previous 
-        # resolutions. The values are between 0 to 1.0 for training and 1.0 for inference. This is done
-        # for smooth transition. For more details see https://arxiv.org/abs/1710.10196.
+        
         if multi_resolution:
             images = []
-            model_paths = glob.glob(os.path.join(model, "g_*.h5"))
-            resolutions = [os.path.splitext(m)[0].split('_')[-1] for m in model_paths]
+            model_paths = glob.glob(os.path.join(model, "generator_res*"))
+            resolutions = []
+
             for model_path in model_paths:
-                generator = tf.keras.models.load_model(model_path, custom_objects={'tf': tf, 'leaky_relu': tf.nn.leaky_relu})
-                img = generator([latents, 1.0])
+                generator = tf.saved_model.load(model_path)
+                generate = generator.signatures['serving_default']
+                img = generate(latents)['generated']
                 img = np.squeeze(img)
                 images.append(img)
+                resolutions.append(os.path.splitext(model_path)[0].split('_')[-1])
+
         else:
             output_resolution = int(np.log2(output_shape[0]))
-            model = os.path.join(model, 'g_{}.h5'.format(output_resolution))
-            generator = tf.keras.models.load_model(model, custom_objects={'tf': tf, 'leaky_relu': tf.nn.leaky_relu})
-            img = generator([latents, 1.0])
+            model = os.path.join(model, 'generator_res_{}'.format(output_resolution))
+            generate = generator.signatures['serving_default']
+            img = generate(latents)['generated']
             img = np.squeeze(img)            
 
     except Exception:
         click.echo(click.style("ERROR: generation failed. See error trace.", fg="red"))
         raise
-
-    # Scale and shift values from model output range to desired range
-    if verbose:
-        click.echo(
-            "Adjusting range of output values from {} to {}".format(
-                drange_in, drange_out
-            )
-        )
-    if multi_resolution:
-        images = _adjust_dynamic_range_numpy(images, drange_in, drange_out)
-    else:
-        img = _adjust_dynamic_range_numpy(img, drange_in, drange_out)
 
     if verbose:
         click.echo("Saving ...")
@@ -539,7 +531,7 @@ def generate(
         for img, resolution in zip(images, resolutions):
             img = nib.Nifti1Image(img.astype(np.uint8), np.eye(4))
             # Add resolution to the outfile as an id
-            nib.save(img, "{0}_res_{3}.{1}.{2}".format(*outfile.split('.') + [2**int(resolution)]))
+            nib.save(img, "{0}_res_{3}.{1}.{2}".format(*outfile.split('.') + [int(resolution)]))
     else:
         img = nib.Nifti1Image(img.astype(np.uint8), np.eye(4))
         nib.save(img, outfile)

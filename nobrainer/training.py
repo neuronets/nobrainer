@@ -39,8 +39,6 @@ class ProgressiveGANTrainer(tf.keras.Model):
         self.gradient_penalty = gradient_penalty
         self.latent_size = generator.latent_size
         self.resolution = 8 # Default resolution
-        
-        # tf.Variable is used for the following as the values change after compiling the trainer
         self.train_step_counter = tf.Variable(0.) # For calculating alpha in transition phase
         self.phase = tf.Variable('resolution') # For determining whether alpha is 1
 
@@ -65,14 +63,11 @@ class ProgressiveGANTrainer(tf.keras.Model):
         # normalize the real images using minmax to [-1, 1]
         reals = _adjust_dynamic_range(reals, [0.0, 255.0], [-1.0, 1.0])
 
+        # calculate alpha differently for transition and resolution phase
         self.train_step_counter.assign_add(1.)
-
-        # calculate alpha differently for transition and resolution phase 
         alpha = tf.cond(tf.math.equal(self.phase, 'transition'),
-            lambda: self.train_step_counter / self.steps_per_epoch, # transition: alpha = ratio of step and total_steps
-            lambda: tf.constant([1.0])) # resolution: alpha = 1.0
-
-        # reshape alpha for input to network
+            lambda: self.train_step_counter / self.steps_per_epoch,
+            lambda: tf.constant([1.0]))
         alpha = tf.reshape(alpha, (1,))
 
         # train discriminator
@@ -128,6 +123,7 @@ class ProgressiveGANTrainer(tf.keras.Model):
         '''
         Override base class function to save the weights of the constituent models
         '''
-        self.generator.save_weights(os.path.join(filepath, 'g_res_{}.h5'.format(self.resolution)), **kwargs)
-        self.discriminator.save_weights(os.path.join(filepath, 'd_res_{}.h5'.format(self.resolution)), **kwargs)
+        self.generator.save_weights(os.path.join(filepath, 'g_weights_res_{}.h5'.format(self.resolution)), **kwargs)
+        self.discriminator.save_weights(os.path.join(filepath, 'd_weights_res_{}.h5'.format(self.resolution)), **kwargs)
+        self.generator.save(os.path.join(filepath, 'generator_res_{}'.format(self.resolution)))
 
