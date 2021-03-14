@@ -101,7 +101,9 @@ def verify_features_labels(
 
     if scalar_labels:
         map_fn = functools.partial(
-            _verify_features_scalar_labels, volume_shape=volume_shape
+            _verify_features_scalar_labels,
+            volume_shape=volume_shape,
+            check_shape=check_shape,
         )
     else:
         map_fn = functools.partial(
@@ -166,14 +168,19 @@ def _verify_features_nonscalar_labels(
     return True
 
 
-def _verify_features_scalar_labels(path_scalar, *, volume_shape):
+def _verify_features_scalar_labels(path_scalar, *, volume_shape, check_shape):
     """Check that feature has the desired shape and that label is scalar."""
     from nobrainer.tfrecord import _is_int_or_float
 
     feature, label = path_scalar
     x = nib.load(feature)
-    if x.shape != volume_shape:
-        return False
+    if check_shape:
+        if not volume_shape:
+            raise ValueError(
+                "`volume_shape` must be specified if `check_shape` is true."
+            )
+        if x.shape != volume_shape:
+            return False
     if not _is_int_or_float(label):
         return False
     return True
