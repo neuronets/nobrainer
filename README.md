@@ -34,15 +34,15 @@ Please refer to the Jupyter notebooks in the [guide](/guide) directory to get st
 
 ### Container
 
-We recommend using the official _Nobrainer_ Docker container, which includes all of the dependencies necessary to use the framework. Please see the available images on [DockerHub](https://hub.docker.com/r/kaczmarj/nobrainer)
+We recommend using the official _Nobrainer_ Docker container, which includes all of the dependencies necessary to use the framework. Please see the available images on [DockerHub](https://hub.docker.com/r/neuronets/nobrainer)
 
 #### GPU support
 
 The _Nobrainer_ containers with GPU support use CUDA 10, which requires Linux NVIDIA drivers `>=410.48`. These drivers are not included in the container.
 
 ```
-$ docker pull kaczmarj/nobrainer:latest-gpu
-$ singularity pull docker://kaczmarj/nobrainer:latest-gpu
+$ docker pull neuronets/nobrainer:latest-gpu
+$ singularity pull docker://neuronets/nobrainer:latest-gpu
 ```
 
 #### CPU only
@@ -50,8 +50,8 @@ $ singularity pull docker://kaczmarj/nobrainer:latest-gpu
 This container can be used on all systems that have Docker or Singularity and does not require special hardware. This container, however, should not be used for model training (it will be very slow).
 
 ```
-$ docker pull kaczmarj/nobrainer:latest
-$ singularity pull docker://kaczmarj/nobrainer:latest
+$ docker pull neuronets/nobrainer:latest-cpu
+$ singularity pull docker://neuronets/nobrainer:latest-cpu
 ```
 
 ### pip
@@ -75,7 +75,7 @@ In the base case, we run the T1w scan through the model for prediction.
 ```bash
 # Get sample T1w scan.
 wget -nc https://dl.dropbox.com/s/g1vn5p3grifro4d/T1w.nii.gz
-docker run --rm -v $PWD:/data kaczmarj/nobrainer \
+docker run --rm -v $PWD:/data neuronets/nobrainer \
   predict \
     --model=/models/brain-extraction-unet-128iso-model.h5 \
     --verbose \
@@ -88,7 +88,7 @@ For binary segmentation where we expect one predicted region, as is the case wit
 ```bash
 # Get sample T1w scan.
 wget -nc https://dl.dropbox.com/s/g1vn5p3grifro4d/T1w.nii.gz
-docker run --rm -v $PWD:/data kaczmarj/nobrainer \
+docker run --rm -v $PWD:/data neuronets/nobrainer \
   predict \
     --model=/models/brain-extraction-unet-128iso-model.h5 \
     --largest-label \
@@ -102,7 +102,7 @@ Because the network was trained on randomly rotated data, it should be agnostic 
 ```bash
 # Get sample T1w scan.
 wget -nc https://dl.dropbox.com/s/g1vn5p3grifro4d/T1w.nii.gz
-docker run --rm -v $PWD:/data kaczmarj/nobrainer \
+docker run --rm -v $PWD:/data neuronets/nobrainer \
   predict \
     --model=/models/brain-extraction-unet-128iso-model.h5 \
     --rotate-and-predict \
@@ -116,7 +116,7 @@ Combining the above, we can usually achieve the best brain extraction by using `
 ```bash
 # Get sample T1w scan.
 wget -nc https://dl.dropbox.com/s/g1vn5p3grifro4d/T1w.nii.gz
-docker run --rm -v $PWD:/data kaczmarj/nobrainer \
+docker run --rm -v $PWD:/data neuronets/nobrainer \
   predict \
     --model=/models/brain-extraction-unet-128iso-model.h5 \
     --largest-label \
@@ -132,7 +132,7 @@ The pre-trained models can be used for transfer learning. To avoid forgetting im
 
 As an example of transfer learning, [@kaczmarj](https://github.com/kaczmarj) re-trained a brain extraction model to label meningiomas in 3D T1-weighted, contrast-enhanced MR scans. The original model is publicly available and was trained on 10,000 T1-weighted MR brain scans from healthy participants. These were all research scans (i.e., non-clinical) and did not include any contrast agents. The meningioma dataset, on the other hand, was composed of relatively few scans, all of which were clinical and used gadolinium as a contrast agent. You can observe the differences in contrast below.
 
-![Brain extraction model prediction](https://github.com/kaczmarj/nobrainer-models/blob/master/images/brain-extraction/unet-best-prediction.png?raw=true)
+![Brain extraction model prediction](https://github.com/neuronets/nobrainer-models/blob/master/images/brain-extraction/unet-best-prediction.png?raw=true)
 ![Meningioma extraction model prediction](https://user-images.githubusercontent.com/17690870/55470578-e6cb7800-55d5-11e9-991f-fe13c03ab0bd.png)
 
 Despite the differences between the two datasets, transfer learning led to a much better model than training from randomly-initialized weights. As evidence, please see below violin plots of Dice coefficients on a validation set. In the left plot are Dice coefficients of predictions obtained with the model trained from randomly-initialized weights, and on the right are Dice coefficients of predictions obtained with the transfer-learned model. In general, Dice coefficients are higher on the right, and the variance of Dice scores is lower. Overall, the model on the right is more accurate and more robust than the one on the left.

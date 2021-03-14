@@ -122,27 +122,6 @@ def get_dataset(
     # Standard-score the features.
     dataset = dataset.map(lambda x, y: (standardize(x), y))
 
-    # Separate into blocks, if requested.
-    if block_shape is not None:
-        if not scalar_label:
-            dataset = dataset.map(
-                lambda x, y: (to_blocks(x, block_shape), to_blocks(y, block_shape)),
-                num_parallel_calls=num_parallel_calls,
-            )
-            # This step is necessary because separating into blocks adds a dimension.
-            dataset = dataset.unbatch()
-        if scalar_label:
-
-            def _f(x, y):
-                x = to_blocks(x, block_shape)
-                n_blocks = x.shape[0]
-                y = tf.repeat(y, n_blocks)
-                return (x, y)
-
-            dataset = dataset.map(_f, num_parallel_calls=num_parallel_calls)
-            # This step is necessary because separating into blocks adds a dimension.
-            dataset = dataset.unbatch()
-
     # Augment examples if requested.
     if augment:
         if not scalar_label:
@@ -163,6 +142,27 @@ def get_dataset(
                 ),
                 num_parallel_calls=num_parallel_calls,
             )
+
+    # Separate into blocks, if requested.
+    if block_shape is not None:
+        if not scalar_label:
+            dataset = dataset.map(
+                lambda x, y: (to_blocks(x, block_shape), to_blocks(y, block_shape)),
+                num_parallel_calls=num_parallel_calls,
+            )
+            # This step is necessary because separating into blocks adds a dimension.
+            dataset = dataset.unbatch()
+        if scalar_label:
+
+            def _f(x, y):
+                x = to_blocks(x, block_shape)
+                n_blocks = x.shape[0]
+                y = tf.repeat(y, n_blocks)
+                return (x, y)
+
+            dataset = dataset.map(_f, num_parallel_calls=num_parallel_calls)
+            # This step is necessary because separating into blocks adds a dimension.
+            dataset = dataset.unbatch()
 
     # Binarize or replace labels according to mapping.
     if not scalar_label:
