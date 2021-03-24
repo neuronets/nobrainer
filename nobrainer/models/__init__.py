@@ -2,7 +2,7 @@ from nobrainer.models.highresnet import highresnet
 from nobrainer.models.meshnet import meshnet
 from nobrainer.models.unet import unet
 from nobrainer.models.autoencoder import autoencoder
-from nobrainer.models.progressivegan_v2 import progressivegan
+from nobrainer.models.progressivegan import progressivegan
 
 
 def get(name):
