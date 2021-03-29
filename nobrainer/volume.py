@@ -85,7 +85,6 @@ def binarize(x):
     return tf.cast(x > 0, dtype=x.dtype)
 
 
-# numpy implementation https://stackoverflow.com/a/47171600
 def replace(x, mapping, zero=True):
     """Replace values in tensor `x` using dictionary `mapping`.
 
@@ -297,3 +296,26 @@ def to_blocks_numpy(a, block_shape):
     new_shape = (-1,) + block_shape
     perm = (0, 2, 4, 1, 3, 5)
     return a.reshape(inter_shape).transpose(perm).reshape(new_shape)
+
+# Based on https://stackoverflow.com/a/47171600
+def replace_in_numpy(x, mapping, zero=True):
+    """Replace values in numpy ndarray `x` using dictionary `mapping`.
+
+    """
+    # Extract out keys and values
+    k = np.array(list(mapping.keys()))
+    v = np.array(list(mapping.values()))
+
+    # Get argsort indices
+    sidx = k.argsort()
+
+    ks = k[sidx]
+    vs = v[sidx]
+    idx = np.searchsorted(ks,x)
+
+    if not zero:
+        idx[idx==len(vs)] = 0
+        mask = ks[idx] == x
+        return np.where(mask, vs[idx], x)
+    else:
+        return vs[idx]
