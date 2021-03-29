@@ -8,6 +8,7 @@ import tensorflow as tf
 
 from nobrainer import prediction
 from nobrainer.models.meshnet import meshnet
+from nobrainer.models.bayesian import variational_meshnet
 
 
 def test_predict(tmp_path):
@@ -76,8 +77,36 @@ def test_predict(tmp_path):
         y_img4_other.get_fdata(caching="unchanged"),
     )
     assert_array_equal(y_img3.shape, x.shape)
+    
+def test_variational_predict(tmp_path):
+    x = np.ones((4, 4, 4))
+    img = nib.Nifti1Image(x, affine=np.eye(4))
+    path = str(tmp_path / "features.nii.gz")
+    img.to_filename(path)
 
+    x2 = x * -50
+    img2 = nib.Nifti1Image(x2, affine=np.eye(4))
+    path2 = str(tmp_path / "features2.nii.gz")
+    img2.to_filename(path2)
 
+    model = variational_meshnet(1, (*x.shape, 1), receptive_field=37)
+
+    # From array.
+    mean,var,entropy = prediction.predict_from_array(x, model=model, block_shape=None, 
+                                       n_samples=2, return_variance=True,
+                                       return_entropy=True)
+    #y_blocks = prediction.predict_from_array(x, model=model, block_shape=x.shape)
+    #y_other = prediction.predict(x, model=model, block_shape=None)
+    assert isinstance(mean, np.ndarray)
+    assert isinstance(var, np.ndarray)
+    assert isinstance(entropy, np.ndarray)
+    assert_array_equal(mean.shape, *x.shape)
+    assert_array_equal(var.shape, *x.shape)
+    assert_array_equal(entropy.shape, *x.shape)
+    #assert_array_equal(y_, y_other)
+    #assert_array_equal(y_, y_blocks)
+    
+    
 def test_get_model(tmp_path):
     model = meshnet(3, (10, 10, 10, 1), receptive_field=37)
     path = str(tmp_path / "model.h5")
