@@ -167,7 +167,7 @@ def predict_from_array(
     n_batches = math.ceil(n_blocks / batch_size)
 
     if not return_variance and not return_entropy and n_samples == 1:
-        outputs = model.predict(features, batch_size=1, verbose=0)
+        outputs = model(features)
         if outputs.shape[-1] == 1:
             # Binarize according to threshold.
             outputs = outputs > 0.3
@@ -191,7 +191,7 @@ def predict_from_array(
             this_x = features[j : j + batch_size]
             s = StreamingStats()
             for n in range(n_samples):
-                new_prediction = model.predict(this_x, batch_size=1, verbose=1)
+                new_prediction = model(this_x)
                 s.update(new_prediction)
             
             means[j : j + batch_size] = np.argmax(s.mean(),axis=-1)  # max mean
