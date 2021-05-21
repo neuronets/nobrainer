@@ -12,7 +12,7 @@ from nobrainer.transform import warp
 from nobrainer.volume import from_blocks_numpy
 from nobrainer.volume import standardize_numpy
 from nobrainer.volume import to_blocks_numpy
-from utils import StreamingStats
+from nobrainer.utils import StreamingStats
 
 
 def predict(
@@ -158,7 +158,7 @@ def predict_from_array(
         features = to_blocks_numpy(features, block_shape=block_shape)
     else:
         features = features[None]  # Add batch dimension.
-
+        
     # Add a dimension for single channel.
     features = features[..., None]
 
@@ -167,7 +167,8 @@ def predict_from_array(
     n_batches = math.ceil(n_blocks / batch_size)
 
     if not return_variance and not return_entropy and n_samples == 1:
-        outputs = model(features)
+        #outputs = model(features).numpy() #has better performance but output should change to numpy array
+        outputs = model.predict(features, batch_size=1, verbose=0)
         if outputs.shape[-1] == 1:
             # Binarize according to threshold.
             outputs = outputs > 0.3
@@ -191,7 +192,8 @@ def predict_from_array(
             this_x = features[j : j + batch_size]
             s = StreamingStats()
             for n in range(n_samples):
-                new_prediction = model(this_x)
+                #new_prediction = model(this_x).numpy() #has better performance but output should change to numpy array
+                new_prediction = model.predict(this_x, batch_size=1, verbose=0)
                 s.update(new_prediction)
             
             means[j : j + batch_size] = np.argmax(s.mean(),axis=-1)  # max mean
