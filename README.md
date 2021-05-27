@@ -1,6 +1,6 @@
 # Nobrainer
 
-[![Build Status](https://travis-ci.com/neuronets/nobrainer.svg?branch=master)](https://travis-ci.com/neuronets/nobrainer)
+![Build status](https://github.com/neuronets/nobrainer/actions/workflows/ci.yml/badge.svg)
 
 ![Model's prediction of brain mask](https://github.com/neuronets/nobrainer-models/blob/master/images/brain-extraction/unet-best-prediction.png?raw=true) ![Model's prediction of brain mask](https://github.com/neuronets/nobrainer-models/blob/master/images/brain-extraction/unet-worst-prediction.png?raw=true) <sub>__Figure__: In the first column are T1-weighted brain scans, in the middle are a trained model's predictions, and on the right are binarized FreeSurfer segmentations. Despite being trained on binarized FreeSurfer segmentations, the model outperforms FreeSurfer in the bottom scan, which exhibits motion distortion. It took about three seconds for the model to predict each brainmask using an NVIDIA GTX 1080Ti. It takes about 70 seconds on a recent CPU.</sub>
 
