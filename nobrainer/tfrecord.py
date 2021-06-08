@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 import numpy as np
+import psutil
 import skimage.transform
 import tensorflow as tf
 
@@ -102,7 +103,10 @@ def write(
     if processes is None:
         # Get number of processes allocated to the current process.
         # Note the difference from `os.cpu_count()`.
-        processes = len(os.sched_getaffinity(0))
+        try:
+            processes = len(psutil.Process().cpu_affinity())
+        except AttributeError:
+            processes = psutil.cpu_count()
     with mp.Pool(processes) as p:
         for _ in p.imap_unordered(
             __writer_func, iterable=iterable, chunksize=chunksize
