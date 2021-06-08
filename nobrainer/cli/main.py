@@ -4,6 +4,7 @@ import datetime
 import json
 import logging
 import os
+import psutil
 import platform
 import sys
 
@@ -124,7 +125,10 @@ def convert(
     if num_parallel_calls is None:
         # Get number of processes allocated to the current process.
         # Note the difference from `os.cpu_count()`.
-        num_parallel_calls = len(os.sched_getaffinity(0))
+        try:
+            num_parallel_calls = len(psutil.Process().cpu_affinity())
+        except AttributeError:
+            num_parallel_calls = psutil.cpu_count()
 
     _dirname = os.path.dirname(tfrecords_template)
     if not os.path.exists(_dirname):
