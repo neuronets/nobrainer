@@ -25,9 +25,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools
           pip install --upgrade --force-reinstall --no-cache-dir --editable=".[cpu,dev]"
-      - name: Lint with flake8
+      - name: Lint with pre-commit
         run: |
-          flake8
+          pre-commit run -a
       - name: Test with pytest
         run: |
           pytest
