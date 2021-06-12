@@ -3,7 +3,6 @@
 import datetime
 import json
 import logging
-import os
 import psutil
 import platform
 import sys
