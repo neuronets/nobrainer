@@ -1,12 +1,12 @@
 """Main command-line interface for nobrainer."""
 
 import datetime
+import glob
 import json
 import logging
 import os
 import platform
 import sys
-import glob
 
 import click
 import nibabel as nib
@@ -17,18 +17,14 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from nobrainer import __version__
-from nobrainer.io import verify_features_labels as _verify_features_labels
 from nobrainer.io import read_csv as _read_csv
 from nobrainer.io import read_volume as _read_volume
+from nobrainer.io import verify_features_labels as _verify_features_labels
 from nobrainer.prediction import _transform_and_predict
 from nobrainer.tfrecord import write as _write_tfrecord
 from nobrainer.volume import from_blocks_numpy as _from_blocks_numpy
 from nobrainer.volume import standardize_numpy as _standardize_numpy
 from nobrainer.volume import to_blocks_numpy as _to_blocks_numpy
-from nobrainer.volume import adjust_dynamic_range_numpy as _adjust_dynamic_range_numpy
-
-from nobrainer.models import progressivegan
-
 
 _option_kwds = {"show_default": True}
 
@@ -112,8 +108,9 @@ def cli():
     type=int,
     default=4,
     help=(
-        "Set if `multi-resolution` is true. Indicates smallest resolution for tfrecords, all resolutions "
-        "in exponents of 2 from `start-resolution` to `volume-shape` are generated as tfrecords"
+        "Set if `multi-resolution` is true. Indicates smallest resolution for "
+        "tfrecords, all resolutions in exponents of 2 from `start-resolution` to"
+        " `volume-shape` are generated as tfrecords"
     ),
     **_option_kwds,
 )
@@ -181,7 +178,9 @@ def convert(
     if multi_resolution:
         start_resolution_log = np.log2(start_resolution).astype(np.int32)
         target_resolution_log = np.log2(volume_shape[0]).astype(np.int32)
-        resolutions = [2**res for res in range(start_resolution_log, target_resolution_log+1)]
+        resolutions = [
+            2 ** res for res in range(start_resolution_log, target_resolution_log + 1)
+        ]
     else:
         resolutions = None
 
@@ -294,7 +293,7 @@ def predict(
     """
 
     if not verbose:
-        # Supress most logging messages.
+        # Suppress most logging messages.
         os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
         tf.get_logger().setLevel(logging.ERROR)
 
@@ -429,9 +428,7 @@ def predict(
     "--latent-size",
     type=int,
     default=1024,
-    help=(
-        "Input latent size for the generator."
-    ),
+    help=("Input latent size for the generator."),
     **_option_kwds,
 )
 @click.option(
@@ -487,7 +484,7 @@ def generate(
     """
 
     if not verbose:
-        # Supress most logging messages.
+        # Suppress most logging messages.
         os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
         tf.get_logger().setLevel(logging.ERROR)
 
@@ -500,7 +497,7 @@ def generate(
         click.echo("Generating ...")
     try:
         latents = tf.random.normal((1, latent_size))
-        
+
         if multi_resolution:
             images = []
             model_paths = glob.glob(os.path.join(model, "generator_res*"))
@@ -508,18 +505,18 @@ def generate(
 
             for model_path in model_paths:
                 generator = tf.saved_model.load(model_path)
-                generate = generator.signatures['serving_default']
-                img = generate(latents)['generated']
+                generate = generator.signatures["serving_default"]
+                img = generate(latents)["generated"]
                 img = np.squeeze(img)
                 images.append(img)
-                resolutions.append(os.path.splitext(model_path)[0].split('_')[-1])
+                resolutions.append(os.path.splitext(model_path)[0].split("_")[-1])
 
         else:
             output_resolution = int(np.log2(output_shape[0]))
-            model = os.path.join(model, 'generator_res_{}'.format(output_resolution))
-            generate = generator.signatures['serving_default']
-            img = generate(latents)['generated']
-            img = np.squeeze(img)            
+            model = os.path.join(model, "generator_res_{}".format(output_resolution))
+            generate = generator.signatures["serving_default"]
+            img = generate(latents)["generated"]
+            img = np.squeeze(img)
 
     except Exception:
         click.echo(click.style("ERROR: generation failed. See error trace.", fg="red"))
@@ -531,13 +528,17 @@ def generate(
         for img, resolution in zip(images, resolutions):
             img = nib.Nifti1Image(img.astype(np.uint8), np.eye(4))
             # Add resolution to the outfile as an id
-            nib.save(img, "{0}_res_{3}.{1}.{2}".format(*outfile.split('.') + [int(resolution)]))
+            nib.save(
+                img,
+                "{0}_res_{3}.{1}.{2}".format(*outfile.split(".") + [int(resolution)]),
+            )
     else:
         img = nib.Nifti1Image(img.astype(np.uint8), np.eye(4))
         nib.save(img, outfile)
 
     if verbose:
         click.echo("Output saved to {}".format(outfile))
+
 
 @cli.command()
 def save():

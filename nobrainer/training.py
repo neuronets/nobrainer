@@ -1,12 +1,12 @@
-'''training utilities (supports training on single and multiple GPUs)'''
+"""training utilities (supports training on single and multiple GPUs)"""
 
 import os
 
 import tensorflow as tf
 from tensorflow.python.keras.engine import compile_utils
 
-from nobrainer.volume import adjust_dynamic_range as _adjust_dynamic_range
-from nobrainer.losses import gradient_penalty
+from .losses import gradient_penalty
+from .volume import adjust_dynamic_range as _adjust_dynamic_range
 
 
 class ProgressiveGANTrainer(tf.keras.Model):
@@ -24,8 +24,9 @@ class ProgressiveGANTrainer(tf.keras.Model):
 
     References
     ----------
-    Progressive Growing of GANs for Improved Quality, Stability, and Variation. T. Karras, T. Aila, S. Laine & J. Lehtinen, 
-    International Conference on Learning Representations. 2018.
+    Progressive Growing of GANs for Improved Quality, Stability, and Variation.
+    T. Karras, T. Aila, S. Laine & J. Lehtinen, International Conference on
+    Learning Representations. 2018.
 
     Links
     -----
@@ -34,13 +35,15 @@ class ProgressiveGANTrainer(tf.keras.Model):
 
     def __init__(self, discriminator, generator, gradient_penalty=False):
         super(ProgressiveGANTrainer, self).__init__()
-        self.discriminator = discriminator 
+        self.discriminator = discriminator
         self.generator = generator
         self.gradient_penalty = gradient_penalty
         self.latent_size = generator.latent_size
-        self.resolution = 8 # Default resolution
-        self.train_step_counter = tf.Variable(0.) # For calculating alpha in transition phase
-        self.phase = tf.Variable('resolution') # For determining whether alpha is 1
+        self.resolution = 8  # Default resolution
+        self.train_step_counter = tf.Variable(
+            0.0
+        )  # For calculating alpha in transition phase
+        self.phase = tf.Variable("resolution")  # For determining whether alpha is 1
 
     def compile(self, d_optimizer, g_optimizer, g_loss_fn, d_loss_fn):
         super(ProgressiveGANTrainer, self).compile()
@@ -64,15 +67,17 @@ class ProgressiveGANTrainer(tf.keras.Model):
         reals = _adjust_dynamic_range(reals, [0.0, 255.0], [-1.0, 1.0])
 
         # calculate alpha differently for transition and resolution phase
-        self.train_step_counter.assign_add(1.)
-        alpha = tf.cond(tf.math.equal(self.phase, 'transition'),
+        self.train_step_counter.assign_add(1.0)
+        alpha = tf.cond(
+            tf.math.equal(self.phase, "transition"),
             lambda: self.train_step_counter / self.steps_per_epoch,
-            lambda: tf.constant([1.0]))
+            lambda: tf.constant([1.0]),
+        )
         alpha = tf.reshape(alpha, (1,))
 
         # train discriminator
         latents = tf.random.normal((batch_size, self.latent_size))
-        fake_labels = tf.ones((batch_size, 1))*-1
+        fake_labels = tf.ones((batch_size, 1)) * -1
         real_labels = tf.ones((batch_size, 1))
 
         with tf.GradientTape() as tape:
@@ -86,7 +91,12 @@ class ProgressiveGANTrainer(tf.keras.Model):
 
             # calculate and add the gradient penalty loss using average samples for discriminator
             if self.gradient_penalty:
-                weight_shape = (tf.shape(reals)[0],) + (1,1,1,1) # broadcasting to right shape
+                weight_shape = (tf.shape(reals)[0],) + (
+                    1,
+                    1,
+                    1,
+                    1,
+                )  # broadcasting to right shape
                 weight = tf.random.uniform(weight_shape, minval=0, maxval=1)
                 average_samples = (weight * reals) + ((1 - weight) * fakes)
                 average_pred = self.discriminator(([average_samples, alpha]))
@@ -95,7 +105,9 @@ class ProgressiveGANTrainer(tf.keras.Model):
                 d_loss += gp_loss
 
         d_gradients = tape.gradient(d_loss, self.discriminator.trainable_variables)
-        self.d_optimizer.apply_gradients(zip(d_gradients, self.discriminator.trainable_variables))
+        self.d_optimizer.apply_gradients(
+            zip(d_gradients, self.discriminator.trainable_variables)
+        )
 
         # train generator
         misleading_labels = tf.ones((batch_size, 1))
@@ -108,22 +120,33 @@ class ProgressiveGANTrainer(tf.keras.Model):
             g_loss = self.g_loss_fn(misleading_labels, fakes_pred)
 
         g_gradients = tape.gradient(g_loss, self.generator.trainable_variables)
-        self.g_optimizer.apply_gradients(zip(g_gradients, self.generator.trainable_variables))
+        self.g_optimizer.apply_gradients(
+            zip(g_gradients, self.generator.trainable_variables)
+        )
 
-        return {'d_loss': d_loss, 'g_loss': g_loss}
+        return {"d_loss": d_loss, "g_loss": g_loss}
 
-    def fit(self, *args, resolution=8, phase='resolution', steps_per_epoch=300, **kwargs):
+    def fit(
+        self, *args, resolution=8, phase="resolution", steps_per_epoch=300, **kwargs
+    ):
         self.resolution = resolution
         self.steps_per_epoch = steps_per_epoch
-        self.train_step_counter.assign(0.)
+        self.train_step_counter.assign(0.0)
         self.phase.assign(phase)
         super().fit(*args, steps_per_epoch=steps_per_epoch, **kwargs)
 
     def save_weights(self, filepath, **kwargs):
-        '''
+        """
         Override base class function to save the weights of the constituent models
-        '''
-        self.generator.save_weights(os.path.join(filepath, 'g_weights_res_{}.h5'.format(self.resolution)), **kwargs)
-        self.discriminator.save_weights(os.path.join(filepath, 'd_weights_res_{}.h5'.format(self.resolution)), **kwargs)
-        self.generator.save(os.path.join(filepath, 'generator_res_{}'.format(self.resolution)))
-
+        """
+        self.generator.save_weights(
+            os.path.join(filepath, "g_weights_res_{}.h5".format(self.resolution)),
+            **kwargs
+        )
+        self.discriminator.save_weights(
+            os.path.join(filepath, "d_weights_res_{}.h5".format(self.resolution)),
+            **kwargs
+        )
+        self.generator.save(
+            os.path.join(filepath, "generator_res_{}".format(self.resolution))
+        )

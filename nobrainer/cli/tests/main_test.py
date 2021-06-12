@@ -156,12 +156,14 @@ def test_predict():
 def test_generate():
     runner = CliRunner()
     with runner.isolated_filesystem():
-        generator, _ = progressivegan(latent_size=256, g_fmap_base=1024, d_fmap_base=1024)
+        generator, _ = progressivegan(
+            latent_size=256, g_fmap_base=1024, d_fmap_base=1024
+        )
         resolutions = [8, 16]
-        Path('models').mkdir(exist_ok=True)
+        Path("models").mkdir(exist_ok=True)
         for res in resolutions:
             generator.add_resolution()
-            generator([np.random.random((1, 256)), 1.0]) # to build the model by a call
+            generator([np.random.random((1, 256)), 1.0])  # to build the model by a call
             model_path = "models/generator_res_{}".format(res)
             generator.save(model_path)
 
@@ -170,15 +172,19 @@ def test_generate():
         args = """\
     generate --model={} --multi-resolution {}
     """.format(
-            'models', out_path
+            "models", out_path
         )
 
         result = runner.invoke(climain.cli, args.split())
         assert result.exit_code == 0
         for res in resolutions:
             assert Path("predictions_res_{}.nii.gz".format(res)).is_file()
-            assert nib.load("predictions_res_{}.nii.gz".format(res)).shape == (res, res, res)
-            
+            assert nib.load("predictions_res_{}.nii.gz".format(res)).shape == (
+                res,
+                res,
+                res,
+            )
+
 
 @pytest.mark.xfail
 def test_save():

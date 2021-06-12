@@ -1,8 +1,7 @@
 from distutils.version import LooseVersion
 
 import numpy as np
-from numpy.testing import assert_allclose
-from numpy.testing import assert_array_equal
+from numpy.testing import assert_allclose, assert_array_equal
 import pytest
 import scipy.spatial.distance
 import tensorflow as tf
@@ -61,7 +60,7 @@ def test_generalized_dice():
     shape = (8, 32, 32, 32, 16)
     x = np.ones(shape)
     y = np.zeros(shape)
-    # Why aren't the losses exactly one? Could it be the propogation of floating
+    # Why aren't the losses exactly one? Could it be the propagation of floating
     # point inaccuracies when summing?
     assert_allclose(losses.generalized_dice(x, y), np.ones(shape[0]), atol=1e-03)
     assert_allclose(
@@ -166,13 +165,13 @@ def test_gradient_penalty():
     x = np.array([0.0, -1.0, 1.0, -1.0])
     y = np.array([1.0, -1.0, 1.0, 1.0])
     out = losses.gradient_penalty(x, y)
-    ref = [1.0001e+01, 1.0000e-03, 1.0000e-03, 1.0000e-03]
+    ref = [1.0001e01, 1.0000e-03, 1.0000e-03, 1.0000e-03]
     assert_allclose(out, ref)
 
     x = np.array([0.0, 0.0, 1.0, 1.0])
     y = np.array([1.0, 1.0, 0.0, 0.0])
     out = losses.gradient_penalty(x, y)
-    ref = [10.001, 10.001,  0.   ,  0.   ]
+    ref = [10.001, 10.001, 0.0, 0.0]
     assert_allclose(out, ref)
 
 
@@ -195,4 +194,4 @@ def test_get():
         assert losses.get("binary_crossentropy")
         assert losses.get("gradient_penalty") is losses.gradient_penalty
         assert losses.get("wasserstein") is losses.wasserstein
-        assert isinstance(losses.get('Wasserstein'), losses.Wasserstein)
+        assert isinstance(losses.get("Wasserstein"), losses.Wasserstein)

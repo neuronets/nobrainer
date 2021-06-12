@@ -86,7 +86,7 @@ def verify_features_labels(
         if len(pair) != 2:
             raise ValueError(
                 "all items in 'volume_filepaths' must have length of 2, but"
-                " found at least one item with lenght != 2."
+                " found at least one item with length != 2."
             )
 
     labels = (y for _, y in volume_filepaths)

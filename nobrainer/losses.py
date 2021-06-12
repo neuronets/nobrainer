@@ -4,7 +4,7 @@ import tensorflow as tf
 from tensorflow.python.keras.losses import LossFunctionWrapper
 from tensorflow.python.keras.utils.losses_utils import ReductionV2
 
-from nobrainer import metrics
+from . import metrics
 
 
 def dice(y_true, y_pred, axis=(1, 2, 3, 4)):
@@ -196,7 +196,7 @@ def wasserstein(y_true, y_pred):
 class Wasserstein(LossFunctionWrapper):
     """Computes Wasserstein loss between labels and predictions.
 
-    Aims to score the realness or fakeness of a given image and measures the Earth Mover (EM) 
+    Aims to score the realness or fakeness of a given image and measures the Earth Mover (EM)
     distance. Use this loss for training GANs. Values for `y_true` is 1 or -1 for real and fake,
     and `y_pred` is from discriminator. Use in combination with gradient clipping or gradient
     penalty (WassersteinGP defined below).
@@ -213,27 +213,23 @@ class Wasserstein(LossFunctionWrapper):
     ```
     """
 
-    def __init__(
-        self,
-        reduction=ReductionV2.AUTO,
-        name="wasserstein",
-    ):
-        super().__init__(
-            wasserstein, reduction=reduction, name=name
-        )
+    def __init__(self, reduction=ReductionV2.AUTO, name="wasserstein"):
+        super().__init__(wasserstein, reduction=reduction, name=name)
 
 
 def gradient_penalty(gradients, real_pred, gp_weight=10, epsilon_weight=0.001):
 
     gradients_squared = tf.square(gradients)
-    gradients_sqr_sum = tf.reduce_sum(gradients_squared, axis=tf.range(1, tf.rank(gradients_squared)))
+    gradients_sqr_sum = tf.reduce_sum(
+        gradients_squared, axis=tf.range(1, tf.rank(gradients_squared))
+    )
     gradient_l2_norm = tf.sqrt(gradients_sqr_sum)
 
-    gradient_penalty =  gp_weight * tf.square(1 - gradient_l2_norm)
+    gradient_penalty = gp_weight * tf.square(1 - gradient_l2_norm)
 
     epsilon_loss = epsilon_weight * tf.square(real_pred)
 
-    return  gradient_penalty + epsilon_loss
+    return gradient_penalty + epsilon_loss
 
 
 class GradientPenalty(LossFunctionWrapper):
@@ -259,11 +255,11 @@ class GradientPenalty(LossFunctionWrapper):
         name="wasserstein_gp",
     ):
         super().__init__(
-            gradient_penalty, 
+            gradient_penalty,
             gp_weight=gp_weight,
             epsilon_weight=epsilon_weight,
             reduction=reduction,
-            name=name
+            name=name,
         )
 
 
@@ -282,7 +278,7 @@ def get(loss):
         "wasserstein": wasserstein,
         "Wasserstein": Wasserstein,
         "gradient_penalty": gradient_penalty,
-        "GradientPenalty": GradientPenalty
+        "GradientPenalty": GradientPenalty,
     }
     with tf.keras.utils.CustomObjectScope(objects):
         return tf.keras.losses.get(loss)

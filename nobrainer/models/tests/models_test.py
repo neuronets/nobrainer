@@ -2,11 +2,12 @@ import numpy as np
 import pytest
 import tensorflow as tf
 
+from nobrainer.models.autoencoder import autoencoder
 from nobrainer.models.highresnet import highresnet
 from nobrainer.models.meshnet import meshnet
-from nobrainer.models.unet import unet
-from nobrainer.models.autoencoder import autoencoder
 from nobrainer.models.progressivegan import progressivegan
+from nobrainer.models.unet import unet
+
 
 def model_test(model_cls, n_classes, input_shape, kwds={}):
     """Tests for models."""
@@ -81,7 +82,12 @@ def test_progressivegan():
     d_fmap_base = 1024
     alpha = 1.0
 
-    generator, discriminator = progressivegan(latent_size, label_size=label_size, g_fmap_base=g_fmap_base, d_fmap_base=d_fmap_base)
+    generator, discriminator = progressivegan(
+        latent_size,
+        label_size=label_size,
+        g_fmap_base=g_fmap_base,
+        d_fmap_base=d_fmap_base,
+    )
 
     resolutions = [8, 16]
 

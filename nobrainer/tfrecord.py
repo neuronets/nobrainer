@@ -5,10 +5,10 @@ import os
 from pathlib import Path
 
 import numpy as np
-import tensorflow as tf
 import skimage.transform
+import tensorflow as tf
 
-from nobrainer.io import read_volume
+from .io import read_volume
 
 _TFRECORDS_DTYPE = "float32"
 
@@ -27,14 +27,14 @@ def write(
 ):
     """Write features and labels to TFRecord files.
 
-    This method supports the use of scalar or nD labels. All labels, however, must be
-    scalar, or all labels must be nD. If labels are nD, their shape must be the same
+    This method supports the use of scalar or n-D labels. All labels, however, must be
+    scalar, or all labels must be n-D. If labels are n-D, their shape must be the same
     as the shape of features.
 
     Parameters
     ----------
     features_labels: nested sequence, pairs of features and labels. If the labels are
-        nD, each pair should be `(path_to_feature, path_to_label)`. If labels are
+        n-D, each pair should be `(path_to_feature, path_to_label)`. If labels are
         scalar, each pair should be `(path_to_feature, scalar_label)`.
     filename_template: str, the path to which TFRecord files should be written. A string
         formatting key `shard` should be included to indicate the unique TFRecord file
@@ -49,8 +49,8 @@ def write(
         cores.
     chunksize: int, multiprocessing chunksize.
     multi_resolution: boolean, if `True`, different tfrecords for each resolution in each shard
-    resolutions: list of ints, if multi_resolution is `True`, set resolutions for which tfrecords are created
-        For example, [4, 8, 16, 32, 64, 128, 256]
+    resolutions: list of ints, if multi_resolution is `True`, set resolutions for
+        which tfrecords are created. For example, [4, 8, 16, 32, 64, 128, 256]
     verbose: int, if 1, print progress bar. If 0, print nothing.
     """
     n_examples = len(features_labels)
@@ -73,14 +73,21 @@ def write(
 
     # This is the object that returns a protocol buffer string of the feature and label
     # on each iteration. It is pickle-able, unlike a generator.
-    proto_iterators = [_ProtoIterator(s, multi_resolution=multi_resolution, resolutions=resolutions) for s in shards]
+    proto_iterators = [
+        _ProtoIterator(s, multi_resolution=multi_resolution, resolutions=resolutions)
+        for s in shards
+    ]
     # Set up positional arguments for the core writer function.
     iterable = [
         (p, filename_template.format(shard=j)) for j, p in enumerate(proto_iterators)
     ]
     # Set keyword arguments so the resulting function accepts one positional argument.
-    map_fn = functools.partial(_write_tfrecords, compressed=True, 
-        multi_resolution=multi_resolution, resolutions=resolutions)
+    map_fn = functools.partial(
+        _write_tfrecords,
+        compressed=True,
+        multi_resolution=multi_resolution,
+        resolutions=resolutions,
+    )
 
     # This is a hack to allow multiprocessing to pickle
     # the __writer_func object. Pickles don't like local functions.
@@ -270,7 +277,9 @@ class _ProtoIterator:
     https://stackoverflow.com/a/7180424/5666087 for more information.
     """
 
-    def __init__(self, features_labels, to_ras=True, multi_resolution=False, resolutions=None):
+    def __init__(
+        self, features_labels, to_ras=True, multi_resolution=False, resolutions=None
+    ):
         self.features_labels = features_labels
         self.to_ras = to_ras
         self.multi_resolution = multi_resolution
@@ -340,7 +349,7 @@ class _ProtoIterator:
             # only scalar label
             proto_dict = {}
             original, affine = read_volume(
-                    x, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras
+                x, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras
             )
             for resolution in self.resolutions[::-1]:
                 x = skimage.transform.resize(
@@ -359,7 +368,13 @@ class _ProtoIterator:
             return proto_dict
 
 
-def _write_tfrecords(protobuf_iterator, filename, compressed=True, multi_resolution=False, resolutions=None):
+def _write_tfrecords(
+    protobuf_iterator,
+    filename,
+    compressed=True,
+    multi_resolution=False,
+    resolutions=None,
+):
     """
     protobuf_iterator: iterator, iterator which yields protocol-buffer serialized
         strings.
@@ -374,10 +389,14 @@ def _write_tfrecords(protobuf_iterator, filename, compressed=True, multi_resolut
                 f.write(proto_string)
     else:
         tf_record_writers = {}
-        filenames = ['{0}-res-{2:03d}{1}'.format(*os.path.splitext(filename)+(res,))
-         for res in resolutions]
+        filenames = [
+            "{0}-res-{2:03d}{1}".format(*os.path.splitext(filename) + (res,))
+            for res in resolutions
+        ]
         for resolution, filename in zip(resolutions, filenames):
-            tf_record_writers[resolution] = tf.io.TFRecordWriter(filename, options=options)
+            tf_record_writers[resolution] = tf.io.TFRecordWriter(
+                filename, options=options
+            )
         for proto_string_dict in protobuf_iterator:
             for resolution in resolutions:
                 tf_record_writers[resolution].write(proto_string_dict[resolution])

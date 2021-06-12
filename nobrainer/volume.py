@@ -5,8 +5,7 @@ import itertools
 import numpy as np
 import tensorflow as tf
 
-from nobrainer.transform import get_affine
-from nobrainer.transform import warp_features_labels
+from nobrainer.transform import get_affine, warp_features_labels
 
 
 def apply_random_transform(features, labels):
@@ -211,6 +210,7 @@ def from_blocks(x, output_shape):
         tf.transpose(tf.reshape(x, shape=intershape), perm=perm), shape=output_shape
     )
 
+
 def adjust_dynamic_range(x, drange_in, drange_out):
     """Scale and shift tensor.
 
@@ -252,6 +252,23 @@ def standardize_numpy(a):
     """
     a = np.asarray(a)
     return (a - a.mean()) / a.std()
+
+
+def normalize_numpy(a):
+    """Normalize the array between 0 and 1.
+
+    Implements `(x - min(x)) / (max(x) - min(x))`.
+
+    Parameters
+    ----------
+    x: array, values to normalize.
+
+    Returns
+    -------
+    Array of normalized values. Output has min 0 and max 1.
+    """
+    a = np.asarray(a)
+    return (a - a.min()) / (a.max() - a.min())
 
 
 def from_blocks_numpy(a, output_shape):
@@ -317,6 +334,7 @@ def to_blocks_numpy(a, block_shape):
     new_shape = (-1,) + block_shape
     perm = (0, 2, 4, 1, 3, 5)
     return a.reshape(inter_shape).transpose(perm).reshape(new_shape)
+
 
 def adjust_dynamic_range_numpy(a, drange_in, drange_out):
     """Scale and shift numpy array.

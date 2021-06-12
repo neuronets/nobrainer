@@ -6,14 +6,15 @@ import math
 import numpy as np
 import tensorflow as tf
 
-from nobrainer.io import _is_gzipped
-from nobrainer.tfrecord import parse_example_fn
-from nobrainer.volume import apply_random_transform
-from nobrainer.volume import apply_random_transform_scalar_labels
-from nobrainer.volume import binarize
-from nobrainer.volume import replace
-from nobrainer.volume import standardize
-from nobrainer.volume import to_blocks
+from .io import _is_gzipped
+from .tfrecord import parse_example_fn
+from .volume import (
+    apply_random_transform,
+    apply_random_transform_scalar_labels,
+    binarize,
+    replace,
+    to_blocks,
+)
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
@@ -122,7 +123,7 @@ def get_dataset(
 
     if standardize:
         # Standard-score the features.
-        dataset = dataset.map(lambda x, y: (standardize(x), y))        
+        dataset = dataset.map(lambda x, y: (standardize(x), y))
 
     # Augment examples if requested.
     if augment:

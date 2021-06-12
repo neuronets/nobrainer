@@ -140,7 +140,7 @@ docker run --rm -v $PWD:/data neuronets/nobrainer \
   generate \
     --model=/models/progressivegan_models \
     --output-shape=128 128 128 \
-    /data/generated.nii.gz 
+    /data/generated.nii.gz
 ```
 
 We can also generate multiple resolutions of the brain image using the same latents to visualize the progression
@@ -151,7 +151,7 @@ docker run --rm -v $PWD:/data neuronets/nobrainer \
   generate \
     --model=/models/progressivegan_models \
     --multi-resolution=True \
-    /data/generated.nii.gz 
+    /data/generated.nii.gz
 ```
 
 In the above example, the multi resolution images will be saved as `generated_res_{resolution}.nii.gz`

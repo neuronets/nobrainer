@@ -5,8 +5,7 @@ from numpy.testing import assert_array_equal
 import pytest
 import tensorflow as tf
 
-from nobrainer import io
-from nobrainer import tfrecord
+from nobrainer import io, tfrecord
 from nobrainer.tests.utils import csv_of_volumes  # noqa: F401
 
 
