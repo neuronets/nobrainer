@@ -5,9 +5,8 @@ from numpy.testing import assert_array_equal
 import pytest
 import tensorflow as tf
 
-from nobrainer import io
-from nobrainer import tfrecord
-from nobrainer.tests.utils import csv_of_volumes  # noqa: F401
+from .utils import csv_of_volumes  # noqa: F401
+from .. import io, tfrecord
 
 
 def test_write_read_volume_labels(csv_of_volumes, tmp_path):  # noqa: F811

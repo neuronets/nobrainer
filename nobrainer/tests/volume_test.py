@@ -3,7 +3,7 @@ from numpy.testing import assert_array_equal
 import pytest
 import tensorflow as tf
 
-from nobrainer import volume
+from .. import volume
 
 
 def test_apply_random_transform():

@@ -1,13 +1,12 @@
 from distutils.version import LooseVersion
 
 import numpy as np
-from numpy.testing import assert_allclose
-from numpy.testing import assert_array_equal
+from numpy.testing import assert_allclose, assert_array_equal
 import pytest
 import scipy.spatial.distance
 import tensorflow as tf
 
-from nobrainer import losses
+from .. import losses
 
 
 def test_dice():
@@ -61,7 +60,7 @@ def test_generalized_dice():
     shape = (8, 32, 32, 32, 16)
     x = np.ones(shape)
     y = np.zeros(shape)
-    # Why aren't the losses exactly one? Could it be the propogation of floating
+    # Why aren't the losses exactly one? Could it be the propagation of floating
     # point inaccuracies when summing?
     assert_allclose(losses.generalized_dice(x, y), np.ones(shape[0]), atol=1e-03)
     assert_allclose(
@@ -129,6 +128,53 @@ def test_elbo():
     assert False
 
 
+def test_wasserstein():
+    x = np.zeros(4)
+    y = np.zeros(4)
+    out = losses.wasserstein(x, y)
+    assert_allclose(out, 0)
+
+    x = np.ones(4)
+    y = np.ones(4)
+    out = losses.wasserstein(x, y)
+    assert_allclose(out, 1)
+
+    x = np.array([0.0, -1.0, 1.0, -1.0])
+    y = np.array([1.0, -1.0, 1.0, 1.0])
+    out = losses.wasserstein(x, y)
+    ref = [0.0, 1.0, 1.0, -1.0]
+    assert_allclose(out, ref)
+
+    x = np.array([0.0, 0.0, 1.0, 1.0])
+    y = np.array([1.0, 1.0, 0.0, 0.0])
+    out = losses.wasserstein(x, y)
+    assert_allclose(out, 0)
+
+
+def test_gradient_penalty():
+    x = np.zeros(4)
+    y = np.zeros(4)
+    out = losses.gradient_penalty(x, y)
+    assert_allclose(out, 10)
+
+    x = np.ones(4)
+    y = np.ones(4)
+    out = losses.gradient_penalty(x, y)
+    assert_allclose(out, 0.001)
+
+    x = np.array([0.0, -1.0, 1.0, -1.0])
+    y = np.array([1.0, -1.0, 1.0, 1.0])
+    out = losses.gradient_penalty(x, y)
+    ref = [1.0001e01, 1.0000e-03, 1.0000e-03, 1.0000e-03]
+    assert_allclose(out, ref)
+
+    x = np.array([0.0, 0.0, 1.0, 1.0])
+    y = np.array([1.0, 1.0, 0.0, 0.0])
+    out = losses.gradient_penalty(x, y)
+    ref = [10.001, 10.001, 0.0, 0.0]
+    assert_allclose(out, ref)
+
+
 def test_get():
     if LooseVersion(tf.__version__) < LooseVersion("1.14.1-dev20190408"):
         assert losses.get("dice") is losses.dice
@@ -146,3 +192,6 @@ def test_get():
         assert losses.get("tversky") is losses.tversky
         assert isinstance(losses.get("Tversky"), losses.Tversky)
         assert losses.get("binary_crossentropy")
+        assert losses.get("gradient_penalty") is losses.gradient_penalty
+        assert losses.get("wasserstein") is losses.wasserstein
+        assert isinstance(losses.get("Wasserstein"), losses.Wasserstein)
