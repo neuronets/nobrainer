@@ -9,11 +9,11 @@ import tensorflow as tf
 
 from .transform import get_affine, warp
 from .volume import (
-    StreamingStats,
     from_blocks_numpy,
     standardize_numpy,
     to_blocks_numpy,
 )
+from .utils import StreamingStats
 
 
 def predict(
