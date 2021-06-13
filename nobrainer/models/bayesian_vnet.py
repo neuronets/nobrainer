@@ -1,5 +1,11 @@
-# Full bayesian adaptation of the Vnet model from https://arxiv.org/pdf/1606.04797.pdf 
-from tensorflow.keras.layers import Input, Conv3D, MaxPooling3D, UpSampling3D, concatenate
+# Full bayesian adaptation of the Vnet model from https://arxiv.org/pdf/1606.04797.pdf
+from tensorflow.keras.layers import (
+    Conv3D,
+    Input,
+    MaxPooling3D,
+    UpSampling3D,
+    concatenate,
+)
 from tensorflow.keras.models import Model
 import tensorflow_probability as tfp
 

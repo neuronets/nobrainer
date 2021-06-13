@@ -3,21 +3,21 @@
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from nobrainer.layers.dropout import BernoulliDropout
-from nobrainer.layers.dropout import ConcreteDropout
 from nobrainer.bayesian_utils import divergence_fn_bayesian, prior_fn_for_bayesian
+from nobrainer.layers.dropout import BernoulliDropout, ConcreteDropout
 
 tfk = tf.keras
 tfkl = tfk.layers
 tfpl = tfp.layers
 tfd = tfp.distributions
 
+
 def variational_meshnet(
     n_classes,
     input_shape,
     receptive_field=67,
     filters=71,
-    no_examples = 3000,
+    no_examples=3000,
     is_monte_carlo=False,
     dropout=None,
     activation=tf.nn.relu,
@@ -39,14 +39,14 @@ def variational_meshnet(
         MeshNet manuscript uses 21 filters for a binary segmentation task
         (i.e., brain extraction) and 71 filters for a multi-class segmentation task.
     activation: str or optimizer object, the non-linearity to use.
-    scale_factor: A tf float 32 variable to scale up the KLD loss.  
-    is_monte_carlo: bool, only Related to dropout version! 
+    scale_factor: A tf float 32 variable to scale up the KLD loss.
+    is_monte_carlo: bool, only Related to dropout version!
     dropout: string, type of dropout layer.
     batch_size: int, number of samples in each batch. This must be set when
         training on TPUs.
     name: str, name to give to the resulting model object.
-    
-    Please set priors, divergence and posteriors for training with this model.  
+
+    Please set priors, divergence and posteriors for training with this model.
     Returns
     -------
     Model object.
@@ -57,13 +57,19 @@ def variational_meshnet(
 
     if receptive_field not in {37, 67, 129}:
         raise ValueError("unknown receptive field. Legal values are 37, 67, and 129.")
-    
-    def one_layer(x, layer_num, no_examples = 3000,dilation_rate=(1, 1, 1)):
-        x = tfpl.Convolution3DFlipout(filters,
-            kernel_size=3, padding="same",dilation_rate=dilation_rate,
-            kernel_prior_fn=prior_fn_for_bayesian(), 
-            kernel_divergence_fn=divergence_fn_bayesian(prior_std = 1.0, examples_per_epoch= no_examples), 
-            name="layer{}/vwnconv3d".format(layer_num),)(x)
+
+    def one_layer(x, layer_num, no_examples=3000, dilation_rate=(1, 1, 1)):
+        x = tfpl.Convolution3DFlipout(
+            filters,
+            kernel_size=3,
+            padding="same",
+            dilation_rate=dilation_rate,
+            kernel_prior_fn=prior_fn_for_bayesian(),
+            kernel_divergence_fn=divergence_fn_bayesian(
+                prior_std=1.0, examples_per_epoch=no_examples
+            ),
+            name="layer{}/vwnconv3d".format(layer_num),
+        )(x)
         if dropout is None:
             pass
         elif dropout == "bernoulli":
@@ -86,8 +92,8 @@ def variational_meshnet(
         return x
 
     inputs = tfkl.Input(shape=input_shape, batch_size=batch_size, name="inputs")
-    prior_fn = normal_prior(prior_std = 1.0)
-    
+    prior_fn = normal_prior(prior_std=1.0)
+
     if receptive_field == 37:
         x = one_layer(inputs, 1)
         x = one_layer(x, 2)
@@ -115,7 +121,7 @@ def variational_meshnet(
 
     x = tfpl.Convolution3DFlipout(
         filters=n_classes,
-        kernel_size=1, 
+        kernel_size=1,
         padding="same",
         name="classification/vwnconv3d",
     )(x)
