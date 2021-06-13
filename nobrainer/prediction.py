@@ -8,12 +8,8 @@ import numpy as np
 import tensorflow as tf
 
 from .transform import get_affine, warp
-from .volume import (
-    from_blocks_numpy,
-    standardize_numpy,
-    to_blocks_numpy,
-)
 from .utils import StreamingStats
+from .volume import from_blocks_numpy, standardize_numpy, to_blocks_numpy
 
 
 def predict(
