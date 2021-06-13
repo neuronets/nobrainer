@@ -102,7 +102,7 @@ def write(
     progbar.update(0)
     if processes is None:
         processes = get_num_parallel()
-    with mp.Pool(processes) as p:
+    with mp.get_context("fork").Pool(processes) as p:
         for _ in p.imap_unordered(
             __writer_func, iterable=iterable, chunksize=chunksize
         ):
