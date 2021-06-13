@@ -6,7 +6,7 @@ from numpy.testing import assert_array_equal
 import pytest
 from scipy.stats import entropy
 
-from nobrainer.utils import StreamingStats
+from ..utils import StreamingStats
 
 
 @pytest.fixture(scope="session")
