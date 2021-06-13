@@ -3,7 +3,7 @@ from numpy.testing import assert_allclose, assert_array_equal
 import pytest
 import scipy.spatial.distance
 
-from nobrainer import metrics
+from .. import metrics
 
 
 def test_dice():

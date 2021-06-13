@@ -6,8 +6,9 @@ import os
 
 import nibabel as nib
 import numpy as np
-import psutil
 import tensorflow as tf
+
+from .utils import get_num_parallel
 
 _TFRECORDS_FEATURES_DTYPE = "float32"
 
@@ -113,12 +114,7 @@ def verify_features_labels(
             check_labels_gte_zero=check_labels_gte_zero,
         )
     if num_parallel_calls is None:
-        # Get number of processes allocated to the current process.
-        # Note the difference from `os.cpu_count()`.
-        try:
-            num_parallel_calls = len(psutil.Process().cpu_affinity())
-        except AttributeError:
-            num_parallel_calls = psutil.cpu_count()
+        num_parallel_calls = get_num_parallel()
 
     print("Verifying {} examples".format(len(volume_filepaths)))
     progbar = tf.keras.utils.Progbar(len(volume_filepaths), verbose=verbose)

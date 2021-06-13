@@ -6,7 +6,7 @@ import pytest
 import scipy.spatial.distance
 import tensorflow as tf
 
-from nobrainer import losses
+from .. import losses
 
 
 def test_dice():

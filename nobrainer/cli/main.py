@@ -11,7 +11,6 @@ import sys
 import click
 import nibabel as nib
 import numpy as np
-import psutil
 import skimage.measure
 import skimage.transform
 import tensorflow as tf
@@ -23,6 +22,7 @@ from ..io import read_volume as _read_volume
 from ..io import verify_features_labels as _verify_features_labels
 from ..prediction import _transform_and_predict
 from ..tfrecord import write as _write_tfrecord
+from ..utils import get_num_parallel
 from ..volume import from_blocks_numpy as _from_blocks_numpy
 from ..volume import standardize_numpy as _standardize_numpy
 from ..volume import to_blocks_numpy as _to_blocks_numpy
@@ -140,14 +140,9 @@ def convert(
     """
     # TODO: improve docs.
     volume_filepaths = _read_csv(csv)
-    num_parallel_calls = None if num_parallel_calls == -1 else num_parallel_calls
-    if num_parallel_calls is None:
-        # Get number of processes allocated to the current process.
-        # Note the difference from `os.cpu_count()`.
-        try:
-            num_parallel_calls = len(psutil.Process().cpu_affinity())
-        except AttributeError:
-            num_parallel_calls = psutil.cpu_count()
+    num_parallel_calls = (
+        get_num_parallel() if num_parallel_calls == -1 else num_parallel_calls
+    )
 
     _dirname = os.path.dirname(tfrecords_template)
     if not os.path.exists(_dirname):
@@ -518,6 +513,7 @@ def generate(
         else:
             output_resolution = int(np.log2(output_shape[0]))
             model = os.path.join(model, "generator_res_{}".format(output_resolution))
+            generator = tf.saved_model.load(model)
             generate = generator.signatures["serving_default"]
             img = generate(latents)["generated"]
             img = np.squeeze(img)

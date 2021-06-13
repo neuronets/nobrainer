@@ -5,11 +5,11 @@ import os
 from pathlib import Path
 
 import numpy as np
-import psutil
 import skimage.transform
 import tensorflow as tf
 
 from .io import read_volume
+from .utils import get_num_parallel
 
 _TFRECORDS_DTYPE = "float32"
 
@@ -101,12 +101,7 @@ def write(
     progbar = tf.keras.utils.Progbar(target=len(iterable), verbose=verbose)
     progbar.update(0)
     if processes is None:
-        # Get number of processes allocated to the current process.
-        # Note the difference from `os.cpu_count()`.
-        try:
-            processes = len(psutil.Process().cpu_affinity())
-        except AttributeError:
-            processes = psutil.cpu_count()
+        processes = get_num_parallel()
     with mp.Pool(processes) as p:
         for _ in p.imap_unordered(
             __writer_func, iterable=iterable, chunksize=chunksize
