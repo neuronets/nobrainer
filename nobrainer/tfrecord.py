@@ -324,43 +324,37 @@ class _ProtoIterator:
             x, y = self.features_labels[index]
         except IndexError:
             raise StopIteration
+        x, affine_x = read_volume(
+            x, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras
+        )
+        label_affine = None
+        if not self.scalar_label:
+            y, label_affine = read_volume(
+                y, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras
+            )
         if not self.multi_resolution:
-            if self.scalar_label:
-                x, affine = read_volume(
-                    x, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras
-                )
-                proto = _to_proto(
-                    feature=x, label=y, feature_affine=affine, label_affine=None
-                )
-                return proto.SerializeToString()
-            else:
-                x, affine_x = read_volume(
-                    x, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras
-                )
-                y, affine_y = read_volume(
-                    y, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras
-                )
-                proto = _to_proto(
-                    feature=x, label=y, feature_affine=affine_x, label_affine=affine_y
-                )
-                return proto.SerializeToString()
+            proto = _to_proto(
+                feature=x,
+                label=y,
+                feature_affine=affine_x,
+                label_affine=label_affine,
+            )
+            return proto.SerializeToString()
         else:
             # only scalar label
             proto_dict = {}
-            original, affine = read_volume(
-                x, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras
-            )
             for resolution in self.resolutions[::-1]:
-                x = skimage.transform.resize(
-                    original,
+                x_res = skimage.transform.resize(
+                    x,
                     output_shape=(resolution, resolution, resolution),
                     order=1,  # linear
                     mode="constant",
                     preserve_range=True,
                     anti_aliasing=True,
                 )
+                # TODO: Affine should be adjusted when resizing
                 proto = _to_proto(
-                    feature=x, label=y, feature_affine=affine, label_affine=None
+                    feature=x_res, label=y, feature_affine=affine_x, label_affine=None
                 )
                 proto_dict[resolution] = proto.SerializeToString()
 
