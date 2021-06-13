@@ -8,7 +8,12 @@ import numpy as np
 import tensorflow as tf
 
 from .transform import get_affine, warp
-from .volume import from_blocks_numpy, standardize_numpy, to_blocks_numpy, StreamingStats
+from .volume import (
+    StreamingStats,
+    from_blocks_numpy,
+    standardize_numpy,
+    to_blocks_numpy,
+)
 
 
 def predict(
@@ -154,7 +159,7 @@ def predict_from_array(
         features = to_blocks_numpy(features, block_shape=block_shape)
     else:
         features = features[None]  # Add batch dimension.
-        
+
     # Add a dimension for single channel.
     features = features[..., None]
 
@@ -163,7 +168,7 @@ def predict_from_array(
     n_batches = math.ceil(n_blocks / batch_size)
 
     if not return_variance and not return_entropy and n_samples == 1:
-        #outputs = model(features).numpy() #has better performance but output should change to numpy array
+        # outputs = model(features).numpy() #has better performance but output should change to numpy array
         outputs = model.predict(features, batch_size=1, verbose=0)
         if outputs.shape[-1] == 1:
             # Binarize according to threshold.
@@ -184,19 +189,19 @@ def predict_from_array(
         progbar = tf.keras.utils.Progbar(n_batches)
         progbar.update(0)
         for j in range(0, n_blocks, batch_size):
-            
+
             this_x = features[j : j + batch_size]
             s = StreamingStats()
             for n in range(n_samples):
-                #new_prediction = model(this_x).numpy() #has better performance but output should change to numpy array
+                # new_prediction = model(this_x).numpy() #has better performance but output should change to numpy array
                 new_prediction = model.predict(this_x, batch_size=1, verbose=0)
                 s.update(new_prediction)
-            
-            means[j : j + batch_size] = np.argmax(s.mean(),axis=-1)  # max mean
-            variances[j : j + batch_size] = np.sum(s.var(), axis = -1)
-            entropies[j : j + batch_size] = np.sum(s.entropy(), axis = -1) # entropy
+
+            means[j : j + batch_size] = np.argmax(s.mean(), axis=-1)  # max mean
+            variances[j : j + batch_size] = np.sum(s.var(), axis=-1)
+            entropies[j : j + batch_size] = np.sum(s.entropy(), axis=-1)  # entropy
             progbar.add(1)
-            
+
         total_means = from_blocks_numpy(means, output_shape=inputs.shape)
         total_variance = from_blocks_numpy(variances, output_shape=inputs.shape)
         total_entropy = from_blocks_numpy(entropies, output_shape=inputs.shape)

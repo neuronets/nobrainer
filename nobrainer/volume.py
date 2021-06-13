@@ -349,10 +349,10 @@ def replace_in_numpy(x, mapping, zero=True):
 
     ks = k[sidx]
     vs = v[sidx]
-    idx = np.searchsorted(ks,x)
+    idx = np.searchsorted(ks, x)
 
     if not zero:
-        idx[idx==len(vs)] = 0
+        idx[idx == len(vs)] = 0
         mask = ks[idx] == x
         return np.where(mask, vs[idx], x)
     else:
