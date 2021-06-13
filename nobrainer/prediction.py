@@ -8,6 +8,7 @@ import numpy as np
 import tensorflow as tf
 
 from .transform import get_affine, warp
+from .utils import StreamingStats
 from .volume import from_blocks_numpy, standardize_numpy, to_blocks_numpy
 
 
@@ -163,6 +164,8 @@ def predict_from_array(
     n_batches = math.ceil(n_blocks / batch_size)
 
     if not return_variance and not return_entropy and n_samples == 1:
+        # TODO: has better performance but output should change to numpy array
+        # outputs = model(features).numpy()
         outputs = model.predict(features, batch_size=1, verbose=0)
         if outputs.shape[-1] == 1:
             # Binarize according to threshold.
@@ -175,46 +178,31 @@ def predict_from_array(
             outputs = np.argmax(outputs, -1)
         outputs = from_blocks_numpy(outputs, output_shape=inputs.shape)
         return outputs
+    else:
+        # Bayesian prediction based on sampling from distributions
+        means = np.zeros_like(features.squeeze(-1))
+        variances = np.zeros_like(features.squeeze(-1))
+        entropies = np.zeros_like(features.squeeze(-1))
+        progbar = tf.keras.utils.Progbar(n_batches)
+        progbar.update(0)
+        for j in range(0, n_blocks, batch_size):
 
-    raise NotImplementedError("Predicting from Bayesian nets is not implemented yet.")
+            this_x = features[j : j + batch_size]
+            s = StreamingStats()
+            for n in range(n_samples):
+                # TODO: has better performance but output should change to numpy array
+                # new_prediction = model(this_x).numpy()
+                new_prediction = model.predict(this_x, batch_size=1, verbose=0)
+                s.update(new_prediction)
 
-    means = np.zeros_like(features)
-    variances = np.zeros_like(features)
-    entropies = np.zeros_like(features)
-    progbar = tf.keras.utils.Progbar(n_batches)
-    progbar.update(0)
-    for j in range(0, n_blocks, batch_size):
+            means[j : j + batch_size] = np.argmax(s.mean(), axis=-1)  # max mean
+            variances[j : j + batch_size] = np.sum(s.var(), axis=-1)
+            entropies[j : j + batch_size] = np.sum(s.entropy(), axis=-1)  # entropy
+            progbar.add(1)
 
-        this_x = features[j : j + batch_size]
-
-        new_prediction = model.predict(this_x, batch_size=1, verbose=0)
-
-        prev_mean = np.zeros_like(new_prediction["probabilities"])
-        curr_mean = new_prediction["probabilities"]
-
-        M = np.zeros_like(new_prediction["probabilities"])
-        for n in range(1, n_samples):
-
-            new_prediction = model.predict(this_x)
-            prev_mean = curr_mean
-            curr_mean = prev_mean + (
-                new_prediction["probabilities"] - prev_mean
-            ) / float(n + 1)
-            M = M + np.multiply(
-                prev_mean - new_prediction["probabilities"],
-                curr_mean - new_prediction["probabilities"],
-            )
-
-        means[j : j + batch_size] = np.argmax(curr_mean, axis=-1)  # max mean
-        variances[j : j + batch_size] = np.sum(M / n_samples, axis=-1)
-        entropies[j : j + batch_size] = -np.sum(
-            np.multiply(np.log(curr_mean + 0.001), curr_mean), axis=-1
-        )  # entropy
-        progbar.add(1)
-
-    total_means = from_blocks_numpy(means, output_shape=inputs.shape)
-    total_variance = from_blocks_numpy(variances, output_shape=inputs.shape)
-    total_entropy = from_blocks_numpy(entropies, output_shape=inputs.shape)
+        total_means = from_blocks_numpy(means, output_shape=inputs.shape)
+        total_variance = from_blocks_numpy(variances, output_shape=inputs.shape)
+        total_entropy = from_blocks_numpy(entropies, output_shape=inputs.shape)
 
     include_variance = (n_samples > 1) and (return_variance)
     if include_variance:
@@ -226,7 +214,7 @@ def predict_from_array(
         if return_entropy:
             return total_means, total_entropy
         else:
-            return (total_means,)
+            return total_means
 
 
 def predict_from_img(
