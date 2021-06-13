@@ -1,4 +1,4 @@
-FROM tensorflow/tensorflow:2.3.1-gpu-jupyter
+FROM tensorflow/tensorflow:2.5.0-gpu-jupyter
 COPY [".", "/opt/nobrainer"]
 RUN python3 -m pip install --no-cache-dir --editable /opt/nobrainer
 ENV LC_ALL=C.UTF-8 \
