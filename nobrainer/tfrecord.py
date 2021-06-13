@@ -5,9 +5,11 @@ import os
 from pathlib import Path
 
 import numpy as np
+import skimage.transform
 import tensorflow as tf
 
-from nobrainer.io import read_volume
+from .io import read_volume
+from .utils import get_num_parallel
 
 _TFRECORDS_DTYPE = "float32"
 
@@ -20,18 +22,20 @@ def write(
     compressed=True,
     processes=None,
     chunksize=1,
+    multi_resolution=False,
+    resolutions=None,
     verbose=1,
 ):
     """Write features and labels to TFRecord files.
 
-    This method supports the use of scalar or nD labels. All labels, however, must be
-    scalar, or all labels must be nD. If labels are nD, their shape must be the same
+    This method supports the use of scalar or n-D labels. All labels, however, must be
+    scalar, or all labels must be n-D. If labels are n-D, their shape must be the same
     as the shape of features.
 
     Parameters
     ----------
     features_labels: nested sequence, pairs of features and labels. If the labels are
-        nD, each pair should be `(path_to_feature, path_to_label)`. If labels are
+        n-D, each pair should be `(path_to_feature, path_to_label)`. If labels are
         scalar, each pair should be `(path_to_feature, scalar_label)`.
     filename_template: str, the path to which TFRecord files should be written. A string
         formatting key `shard` should be included to indicate the unique TFRecord file
@@ -45,6 +49,9 @@ def write(
         `examples_per_shard` < `len(features_labels)`). If `None`, uses all available
         cores.
     chunksize: int, multiprocessing chunksize.
+    multi_resolution: boolean, if `True`, different tfrecords for each resolution in each shard
+    resolutions: list of ints, if multi_resolution is `True`, set resolutions for
+        which tfrecords are created. For example, [4, 8, 16, 32, 64, 128, 256]
     verbose: int, if 1, print progress bar. If 0, print nothing.
     """
     n_examples = len(features_labels)
@@ -59,16 +66,29 @@ def write(
             "`filename_template` must include a string formatting key 'shard' that"
             " accepts an integer."
         )
+    # Test if resolutions is set
+    if multi_resolution and not isinstance(resolutions, list):
+        raise ValueError(
+            "`resolutions` must be set with a list of ints indicating resolutions for tfrecords"
+        )
 
     # This is the object that returns a protocol buffer string of the feature and label
     # on each iteration. It is pickle-able, unlike a generator.
-    proto_iterators = [_ProtoIterator(s) for s in shards]
+    proto_iterators = [
+        _ProtoIterator(s, multi_resolution=multi_resolution, resolutions=resolutions)
+        for s in shards
+    ]
     # Set up positional arguments for the core writer function.
     iterable = [
         (p, filename_template.format(shard=j)) for j, p in enumerate(proto_iterators)
     ]
     # Set keyword arguments so the resulting function accepts one positional argument.
-    map_fn = functools.partial(_write_tfrecords, compressed=True)
+    map_fn = functools.partial(
+        _write_tfrecords,
+        compressed=True,
+        multi_resolution=multi_resolution,
+        resolutions=resolutions,
+    )
 
     # This is a hack to allow multiprocessing to pickle
     # the __writer_func object. Pickles don't like local functions.
@@ -81,10 +101,8 @@ def write(
     progbar = tf.keras.utils.Progbar(target=len(iterable), verbose=verbose)
     progbar.update(0)
     if processes is None:
-        # Get number of processes allocated to the current process.
-        # Note the difference from `os.cpu_count()`.
-        processes = len(os.sched_getaffinity(0))
-    with mp.Pool(processes) as p:
+        processes = get_num_parallel()
+    with mp.get_context("fork").Pool(processes) as p:
         for _ in p.imap_unordered(
             __writer_func, iterable=iterable, chunksize=chunksize
         ):
@@ -258,9 +276,13 @@ class _ProtoIterator:
     https://stackoverflow.com/a/7180424/5666087 for more information.
     """
 
-    def __init__(self, features_labels, to_ras=True):
+    def __init__(
+        self, features_labels, to_ras=True, multi_resolution=False, resolutions=None
+    ):
         self.features_labels = features_labels
         self.to_ras = to_ras
+        self.multi_resolution = multi_resolution
+        self.resolutions = resolutions
 
         # Try to "intelligently" deduce if the labels are scalars or not.
         # An alternative here would be to check if these point to existing
@@ -302,28 +324,52 @@ class _ProtoIterator:
             x, y = self.features_labels[index]
         except IndexError:
             raise StopIteration
-        if self.scalar_label:
-            x, affine = read_volume(
-                x, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras
-            )
-            proto = _to_proto(
-                feature=x, label=y, feature_affine=affine, label_affine=None
-            )
-            return proto.SerializeToString()
+        x, affine_x = read_volume(
+            x, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras
+        )
+        if self.multi_resolution:
+            # only scalar label
+            if not self.scalar_label:
+                y = 0
+            proto_dict = {}
+            for resolution in self.resolutions[::-1]:
+                x_res = skimage.transform.resize(
+                    x,
+                    output_shape=(resolution, resolution, resolution),
+                    order=1,  # linear
+                    mode="constant",
+                    preserve_range=True,
+                    anti_aliasing=True,
+                )
+                # TODO: Affine should be adjusted when resizing
+                proto = _to_proto(
+                    feature=x_res, label=y, feature_affine=affine_x, label_affine=None
+                )
+                proto_dict[resolution] = proto.SerializeToString()
+
+            return proto_dict
         else:
-            x, affine_x = read_volume(
-                x, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras
-            )
-            y, affine_y = read_volume(
-                y, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras
-            )
+            label_affine = None
+            if not self.scalar_label:
+                y, label_affine = read_volume(
+                    y, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras
+                )
             proto = _to_proto(
-                feature=x, label=y, feature_affine=affine_x, label_affine=affine_y
+                feature=x,
+                label=y,
+                feature_affine=affine_x,
+                label_affine=label_affine,
             )
             return proto.SerializeToString()
 
 
-def _write_tfrecords(protobuf_iterator, filename, compressed=True):
+def _write_tfrecords(
+    protobuf_iterator,
+    filename,
+    compressed=True,
+    multi_resolution=False,
+    resolutions=None,
+):
     """
     protobuf_iterator: iterator, iterator which yields protocol-buffer serialized
         strings.
@@ -332,9 +378,24 @@ def _write_tfrecords(protobuf_iterator, filename, compressed=True):
         options = tf.io.TFRecordOptions(compression_type="GZIP")
     else:
         options = None
-    with tf.io.TFRecordWriter(filename, options=options) as f:
-        for proto_string in protobuf_iterator:
-            f.write(proto_string)
+    if not multi_resolution:
+        with tf.io.TFRecordWriter(filename, options=options) as f:
+            for proto_string in protobuf_iterator:
+                f.write(proto_string)
+    else:
+        tf_record_writers = {}
+        filenames = [
+            "{0}-res-{2:03d}{1}".format(*os.path.splitext(filename) + (res,))
+            for res in resolutions
+        ]
+        for resolution, filename in zip(resolutions, filenames):
+            tf_record_writers[resolution] = tf.io.TFRecordWriter(
+                filename, options=options
+            )
+        for proto_string_dict in protobuf_iterator:
+            for resolution in resolutions:
+                tf_record_writers[resolution].write(proto_string_dict[resolution])
+        [tf_record_writers[writer].close() for writer in tf_record_writers]
 
 
 def _is_int_or_float(value):

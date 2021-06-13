@@ -1,10 +1,9 @@
 import numpy as np
-from numpy.testing import assert_allclose
-from numpy.testing import assert_array_equal
+from numpy.testing import assert_allclose, assert_array_equal
 import pytest
 import scipy.spatial.distance
 
-from nobrainer import metrics
+from .. import metrics
 
 
 def test_dice():
@@ -58,7 +57,7 @@ def test_generalized_dice():
     shape = (8, 32, 32, 32, 16)
     x = np.ones(shape)
     y = np.zeros(shape)
-    # Why aren't the scores exactly zero? Could it be the propogation of floating
+    # Why aren't the scores exactly zero? Could it be the propagation of floating
     # point inaccuracies when summing?
     assert_allclose(metrics.generalized_dice(x, y), np.zeros(shape[0]), atol=1e-03)
 
