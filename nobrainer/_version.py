@@ -12,6 +12,7 @@
 import errno
 import os
 import re
+import runpy
 import subprocess
 import sys
 
@@ -164,14 +165,22 @@ def git_get_keywords(versionfile_abs):
         f.close()
     except EnvironmentError:
         pass
+    # CJM: Nibabel hack to ensure we can git-archive off-release versions and
+    # revert to old X.Y.Zdev versions + githash
+    try:
+        rel = runpy.run_path(os.path.join(os.path.dirname(versionfile_abs), "info.py"))
+        keywords["fallback"] = rel["VERSION"]
+    except (FileNotFoundError, KeyError):
+        pass
     return keywords
 
 
 @register_vcs_handler("git", "keywords")
 def git_versions_from_keywords(keywords, tag_prefix, verbose):
     """Get version information from git keywords."""
-    if not keywords:
-        raise NotThisMethod("no keywords at all, weird")
+    # CJM: Nibabel fix to avoid hitting unguarded dictionary lookup, better explanation
+    if "refnames" not in keywords:
+        raise NotThisMethod("Short version file found")
     date = keywords.get("date")
     if date is not None:
         # git-2.2.0 added "%cI", which expands to an ISO-8601 -compliant
@@ -217,11 +226,11 @@ def git_versions_from_keywords(keywords, tag_prefix, verbose):
                 "error": None,
                 "date": date,
             }
-    # no suitable tags, so version is "0+unknown", but full hex is still there
+    # no suitable tags, so inspect ./info.py
     if verbose:
-        print("no suitable tags, using unknown + full revision id")
+        print("no suitable tags, falling back to info.VERSION or 0+unknown")
     return {
-        "version": "0+unknown",
+        "version": keywords.get("fallback", "0+unknown"),
         "full-revisionid": keywords["full"].strip(),
         "dirty": False,
         "error": "no suitable tags",
@@ -259,6 +268,8 @@ def git_pieces_from_vcs(tag_prefix, root, verbose, run_command=run_command):
             "--long",
             "--match",
             "%s*" % tag_prefix,
+            "--exclude",
+            "[^0-9]*",
         ],
         cwd=root,
     )

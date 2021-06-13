@@ -5,8 +5,7 @@ import itertools
 import numpy as np
 import tensorflow as tf
 
-from nobrainer.transform import get_affine
-from nobrainer.transform import warp_features_labels
+from nobrainer.transform import get_affine, warp_features_labels
 
 
 def apply_random_transform(features, labels):
@@ -211,6 +210,27 @@ def from_blocks(x, output_shape):
     )
 
 
+def adjust_dynamic_range(x, drange_in, drange_out):
+    """Scale and shift tensor.
+
+    Implements `(x * scale) + bias`.
+
+    Parameters
+    ----------
+    x: array, values to scale and shift.
+    drange_in: tuple, input range of values
+    drange_out: tuple, output range of values
+
+    Returns
+    -------
+    Array of scaled and shifted values. Output values has range in drange_out.
+    """
+    x = tf.convert_to_tensor(x)
+    scale = (drange_out[1] - drange_out[0]) / (drange_in[1] - drange_in[0])
+    bias = drange_out[0] - drange_in[0] * scale
+    return (x * scale) + bias
+
+
 # Below this line, we implement methods similar to those above but using Numpy.
 # This is particularly useful when we use models to predict, because it is
 # usually more pleasant to predict on Numpy arrays.
@@ -231,6 +251,23 @@ def standardize_numpy(a):
     """
     a = np.asarray(a)
     return (a - a.mean()) / a.std()
+
+
+def normalize_numpy(a):
+    """Normalize the array between 0 and 1.
+
+    Implements `(x - min(x)) / (max(x) - min(x))`.
+
+    Parameters
+    ----------
+    x: array, values to normalize.
+
+    Returns
+    -------
+    Array of normalized values. Output has min 0 and max 1.
+    """
+    a = np.asarray(a)
+    return (a - a.min()) / (a.max() - a.min())
 
 
 def from_blocks_numpy(a, output_shape):
@@ -297,10 +334,11 @@ def to_blocks_numpy(a, block_shape):
     perm = (0, 2, 4, 1, 3, 5)
     return a.reshape(inter_shape).transpose(perm).reshape(new_shape)
 
-# Based on https://stackoverflow.com/a/47171600
+
 def replace_in_numpy(x, mapping, zero=True):
     """Replace values in numpy ndarray `x` using dictionary `mapping`.
 
+    # Based on https://stackoverflow.com/a/47171600
     """
     # Extract out keys and values
     k = np.array(list(mapping.keys()))
@@ -319,3 +357,24 @@ def replace_in_numpy(x, mapping, zero=True):
         return np.where(mask, vs[idx], x)
     else:
         return vs[idx]
+
+
+def adjust_dynamic_range_numpy(a, drange_in, drange_out):
+    """Scale and shift numpy array.
+
+    Implements `(a * scale) + bias`.
+
+    Parameters
+    ----------
+    a: array, values to scale and shift.
+    drange_in: tuple, input range of values
+    drange_out: tuple, output range of values
+
+    Returns
+    -------
+    Array of scaled and shifted values. Output values has range in drange_out.
+    """
+    a = np.asarray(a)
+    scale = (drange_out[1] - drange_out[0]) / (drange_in[1] - drange_in[0])
+    bias = drange_out[0] - drange_in[0] * scale
+    return a * scale + bias

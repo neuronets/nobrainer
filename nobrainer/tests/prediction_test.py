@@ -6,9 +6,9 @@ from numpy.testing import assert_array_equal
 import pytest
 import tensorflow as tf
 
-from nobrainer import prediction
-from nobrainer.models.meshnet import meshnet
-from nobrainer.models.bayesian import variational_meshnet
+from .. import prediction
+from ..models.meshnet import meshnet
+from ..models.bayesian import variational_meshnet
 
 
 def test_predict(tmp_path):
