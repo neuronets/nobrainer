@@ -6,7 +6,7 @@ Implemented according to the [HighResNet manuscript](https://arxiv.org/abs/1707.
 import tensorflow as tf
 from tensorflow.keras import layers
 
-from nobrainer.layers.padding import ZeroPadding3DChannels
+from ..layers.padding import ZeroPadding3DChannels
 
 
 def highresnet(

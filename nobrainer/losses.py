@@ -4,7 +4,7 @@ import tensorflow as tf
 from tensorflow.python.keras.losses import LossFunctionWrapper
 from tensorflow.python.keras.utils.losses_utils import ReductionV2
 
-from nobrainer import metrics
+from . import metrics
 
 
 def dice(y_true, y_pred, axis=(1, 2, 3, 4)):
@@ -189,6 +189,80 @@ class ELBO(LossFunctionWrapper):
         )
 
 
+def wasserstein(y_true, y_pred):
+    return y_true * y_pred
+
+
+class Wasserstein(LossFunctionWrapper):
+    """Computes Wasserstein loss between labels and predictions.
+
+    Aims to score the realness or fakeness of a given image and measures the Earth Mover (EM)
+    distance. Use this loss for training GANs. Values for `y_true` is 1 or -1 for real and fake,
+    and `y_pred` is from discriminator. Use in combination with gradient clipping or gradient
+    penalty (WassersteinGP defined below).
+    https://arxiv.org/abs/1701.07875
+
+    Usage:
+    ```python
+    real_pred = discriminator(real)
+    fake_pred = discriminator(fake)
+
+    wasserstein_loss = Wasserstein()
+    disciminator_loss = wasserstein_loss(1, real_pred) + wasserstein_loss(-1, fake_pred)
+    generator_loss = wasserstein_loss(1, fake_pred)
+    ```
+    """
+
+    def __init__(self, reduction=ReductionV2.AUTO, name="wasserstein"):
+        super().__init__(wasserstein, reduction=reduction, name=name)
+
+
+def gradient_penalty(gradients, real_pred, gp_weight=10, epsilon_weight=0.001):
+
+    gradients_squared = tf.square(gradients)
+    gradients_sqr_sum = tf.reduce_sum(
+        gradients_squared, axis=tf.range(1, tf.rank(gradients_squared))
+    )
+    gradient_l2_norm = tf.sqrt(gradients_sqr_sum)
+
+    gradient_penalty = gp_weight * tf.square(1 - gradient_l2_norm)
+
+    epsilon_loss = epsilon_weight * tf.square(real_pred)
+
+    return gradient_penalty + epsilon_loss
+
+
+class GradientPenalty(LossFunctionWrapper):
+    """Computes Gradient Penalty for Wasserstein Loss.
+    Improvement to gradient clipping for Wasserstein-GAN to enforce the Lipschitz constraint.
+    Uses the points interpolated between real and fake to ensure a gradient norm of 1.
+    https://arxiv.org/pdf/1704.00028.pdf
+
+    Usage:
+    ```python
+    fakes = generator(latents)
+
+    wasserstein_gp = WassersteinGP(discriminator=discriminator, alpha=alpha)
+    gradient_penalty = wasserstein_gp(reals, fakes)
+    ```
+    """
+
+    def __init__(
+        self,
+        gp_weight=10,
+        epsilon_weight=0.001,
+        reduction=ReductionV2.AUTO,
+        name="wasserstein_gp",
+    ):
+        super().__init__(
+            gradient_penalty,
+            gp_weight=gp_weight,
+            epsilon_weight=epsilon_weight,
+            reduction=reduction,
+            name=name,
+        )
+
+
 def get(loss):
     """Wrapper for `tf.keras.losses.get` that includes Nobrainer's losses."""
     objects = {
@@ -201,6 +275,10 @@ def get(loss):
         "Tversky": Tversky,
         "elbo": elbo,
         "ELBO": ELBO,
+        "wasserstein": wasserstein,
+        "Wasserstein": Wasserstein,
+        "gradient_penalty": gradient_penalty,
+        "GradientPenalty": GradientPenalty,
     }
     with tf.keras.utils.CustomObjectScope(objects):
         return tf.keras.losses.get(loss)

@@ -1,7 +1,8 @@
-from nobrainer.models.highresnet import highresnet
-from nobrainer.models.meshnet import meshnet
-from nobrainer.models.unet import unet
-from nobrainer.models.autoencoder import autoencoder
+from .autoencoder import autoencoder
+from .highresnet import highresnet
+from .meshnet import meshnet
+from .progressivegan import progressivegan
+from .unet import unet
 
 
 def get(name):
@@ -23,6 +24,7 @@ def get(name):
         "meshnet": meshnet,
         "unet": unet,
         "autoencoder": autoencoder,
+        "progressivegan": progressivegan,
     }
 
     try:
@@ -30,5 +32,5 @@ def get(name):
     except KeyError:
         avail = ", ".join(models.keys())
         raise ValueError(
-            "Uknown model: '{}'. Available models are {}.".format(name, avail)
+            "Unknown model: '{}'. Available models are {}.".format(name, avail)
         )

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 from pathlib import Path
+
 import nibabel as nib
 import numpy as np
-from nobrainer.volume import normalize_zero_one
-from nobrainer.volume import replace
-from nobrainer.io import read_mapping
-from nobrainer.io import read_volume
-from nobrainer.metrics import dice_numpy
-from nobrainer.predict import predict as _predict
+
+from .io import read_mapping, read_volume
+from .metrics import dice as dice_numpy
+from .prediction import predict as _predict
+from .volume import normalize_numpy, replace
 
 DT_X = "float32"
 
@@ -23,14 +23,13 @@ def validate_from_filepath(
     return_entropy=False,
     return_array_from_images=False,
     n_samples=1,
-    normalizer=normalize_zero_one,
+    normalizer=normalize_numpy,
     batch_size=4,
-    dtype=DT_X,
 ):
     """Computes dice for a prediction compared to a ground truth image.
 
     Args:
-        filepath: tuple, tupel of paths to existing neuroimaging volume (index 0)
+        filepath: tuple, tuple of paths to existing neuroimaging volume (index 0)
          and ground truth (index 1).
         predictor: TensorFlow Predictor object, predictor from previously
             trained model.
@@ -110,7 +109,7 @@ def validate_from_filepaths(
     return_entropy=False,
     return_array_from_images=False,
     n_samples=1,
-    normalizer=normalize_zero_one,
+    normalizer=normalize_numpy,
     batch_size=4,
     dtype=DT_X,
 ):
