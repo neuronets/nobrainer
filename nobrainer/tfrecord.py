@@ -327,20 +327,7 @@ class _ProtoIterator:
         x, affine_x = read_volume(
             x, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras
         )
-        label_affine = None
-        if not self.scalar_label:
-            y, label_affine = read_volume(
-                y, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras
-            )
-        if not self.multi_resolution:
-            proto = _to_proto(
-                feature=x,
-                label=y,
-                feature_affine=affine_x,
-                label_affine=label_affine,
-            )
-            return proto.SerializeToString()
-        else:
+        if self.multi_resolution:
             # only scalar label
             if not self.scalar_label:
                 y = 0
@@ -361,6 +348,19 @@ class _ProtoIterator:
                 proto_dict[resolution] = proto.SerializeToString()
 
             return proto_dict
+        else:
+            label_affine = None
+            if not self.scalar_label:
+                y, label_affine = read_volume(
+                    y, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras
+                )
+            proto = _to_proto(
+                feature=x,
+                label=y,
+                feature_affine=affine_x,
+                label_affine=label_affine,
+            )
+            return proto.SerializeToString()
 
 
 def _write_tfrecords(
