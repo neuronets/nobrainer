@@ -30,11 +30,8 @@ def minmaxIntensityScaling(x, y=None, trans_xy=False):
         x = tf.convert_to_tensor(x)
     x = tf.cast(x, tf.float32)
     ep = tf.cast(
-        tf.convert_to_tensor(
-            1e-8 * np.ones(
-                x.shape).astype(
-                np.float32)),
-        tf.float32)
+        tf.convert_to_tensor(1e-8 * np.ones(x.shape).astype(np.float32)), tf.float32
+    )
     xmin = tf.cast(tf.reduce_min(x), tf.float32)
     xmax = tf.cast(tf.reduce_max(x), tf.float32)
     x = tf.divide(tf.subtract(x, xmin), tf.add(tf.subtract(xmax, xmin), ep))
@@ -48,26 +45,20 @@ def minmaxIntensityScaling(x, y=None, trans_xy=False):
         y = tf.cast(y, tf.float32)
         ymin = tf.cast(tf.reduce_min(y), tf.float32)
         ymax = tf.cast(tf.reduce_max(y), tf.float32)
-        y = tf.divide(tf.subtract(y, ymin),
-                      tf.add(tf.subtract(ymax, ymin), ep))
+        y = tf.divide(tf.subtract(y, ymin), tf.add(tf.subtract(ymax, ymin), ep))
     return x, y
 
 
-def customIntensityScaling(x, y=None, trans_xy=False, scale_x=[0.0, 1.0],
-                           scale_y=None):
+def customIntensityScaling(x, y=None, trans_xy=False, scale_x=[0.0, 1.0], scale_y=None):
     x_norm, y_norm = minmaxIntensityScaling(x, y, trans_xy)
     minx = tf.cast(
-        tf.convert_to_tensor(
-            scale_x[0] * np.ones(
-                x_norm.shape).astype(
-                np.float32)),
-        tf.float32)
+        tf.convert_to_tensor(scale_x[0] * np.ones(x_norm.shape).astype(np.float32)),
+        tf.float32,
+    )
     maxx = tf.cast(
-        tf.convert_to_tensor(
-            scale_x[1] * np.ones(
-                x_norm.shape).astype(
-                np.float32)),
-        tf.float32)
+        tf.convert_to_tensor(scale_x[1] * np.ones(x_norm.shape).astype(np.float32)),
+        tf.float32,
+    )
 
     diff_x = tf.subtract(maxx, minx)
     x = tf.add(tf.multiply(x_norm, diff_x), minx)
@@ -78,17 +69,13 @@ def customIntensityScaling(x, y=None, trans_xy=False, scale_x=[0.0, 1.0],
             raise ValueError("LabelMap scaling arguments as: scale_Y=[a,b]")
         y = tf.cast(y, tf.float32)
         miny = tf.cast(
-            tf.convert_to_tensor(
-                scale_y[0] * np.ones(
-                    y_norm.shape).astype(
-                    np.float32)),
-            tf.float32)
+            tf.convert_to_tensor(scale_y[0] * np.ones(y_norm.shape).astype(np.float32)),
+            tf.float32,
+        )
         maxy = tf.cast(
-            tf.convert_to_tensor(
-                scale_y[1] * np.ones(
-                    y_norm.shape).astype(
-                    np.float32)),
-            tf.float32)
+            tf.convert_to_tensor(scale_y[1] * np.ones(y_norm.shape).astype(np.float32)),
+            tf.float32,
+        )
         diff_y = tf.subtract(maxy, miny)
         y = tf.add(tf.multiply(y_norm, diff_y), miny)
         return x, y
@@ -128,17 +115,11 @@ def contrastAdjust(x, y=None, trans_xy=False, gamma=1.0):
         x = tf.convert_to_tensor(x)
     x = tf.cast(x, tf.float32)
     ep = tf.cast(
-        tf.convert_to_tensor(
-            1e-7 * np.ones(
-                x.shape).astype(
-                np.float32)),
-        tf.float32)
+        tf.convert_to_tensor(1e-7 * np.ones(x.shape).astype(np.float32)), tf.float32
+    )
     gamma = tf.cast(
-        tf.convert_to_tensor(
-            gamma * np.ones(
-                x.shape).astype(
-                np.float32)),
-        tf.float32)
+        tf.convert_to_tensor(gamma * np.ones(x.shape).astype(np.float32)), tf.float32
+    )
     xmin = tf.cast(tf.reduce_min(x), tf.float32)
     xmax = tf.cast(tf.reduce_max(x), tf.float32)
     x_range = tf.subtract(xmax, xmin)

@@ -1,5 +1,6 @@
-import pytest
 import numpy as np
+import pytest
+
 from nobrainer import spatial_transforms as transformations
 
 
@@ -39,58 +40,82 @@ def test_centercrop():
     x2 = x2.numpy()
     y1 = y1.numpy()
     y2 = y2.numpy()
-    assert x1.shape[1] == min(
-        shape[1], finesize[0]) & x1.shape[0] == min(
-        shape[0], finesize[0]) & x1.shape[2] == shape[2]
-    assert y1.shape[1] == min(
-        shape[1], finesize[0]) & y1.shape[0] == min(
-        shape[0], finesize[0]) & y1.shape[2] == shape[2]
+    assert (
+        x1.shape[1]
+        == min(shape[1], finesize[0]) & x1.shape[0]
+        == min(shape[0], finesize[0]) & x1.shape[2]
+        == shape[2]
+    )
+    assert (
+        y1.shape[1]
+        == min(shape[1], finesize[0]) & y1.shape[0]
+        == min(shape[0], finesize[0]) & y1.shape[2]
+        == shape[2]
+    )
 
-    assert x2.shape[1] == min(
-        shape[1], finesize[1]) & x2.shape[0] == min(
-        shape[0], finesize[1])
-    assert y2.shape[1] == min(
-        shape[1], finesize[1]) & y2.shape[0] == min(
-        shape[0], finesize[1])
+    assert (
+        x2.shape[1]
+        == min(shape[1], finesize[1]) & x2.shape[0]
+        == min(shape[0], finesize[1])
+    )
+    assert (
+        y2.shape[1]
+        == min(shape[1], finesize[1]) & y2.shape[0]
+        == min(shape[0], finesize[1])
+    )
     assert y2.shape[2] == shape[2] & x2.shape[2] == shape[2]
 
 
 def test_spatialConstantPadding():
-    x = np.array([[[1, 1, 1], [2, 2, 2], [3, 3, 3]],
-                  [[4, 4, 4], [5, 5, 5], [6, 6, 6]]])
-    y = np.array([[[1, 0, 1], [0, 2, 2], [3, 3, 0]],
-                  [[4, 1, 4], [5, 0, 0], [0, 0, 0]]])
-    x_expected = np.array([[[0., 0., 0., 0., 0., 0., 0.],
-                            [0., 0., 0., 0., 0., 0., 0.],
-                            [0., 0., 1., 1., 1., 0., 0.],
-                            [0., 0., 2., 2., 2., 0., 0.],
-                            [0., 0., 3., 3., 3., 0., 0.],
-                            [0., 0., 0., 0., 0., 0., 0.],
-                            [0., 0., 0., 0., 0., 0., 0.]],
-                           [[0., 0., 0., 0., 0., 0., 0.],
-                            [0., 0., 0., 0., 0., 0., 0.],
-                            [0., 0., 4., 4., 4., 0., 0.],
-                            [0., 0., 5., 5., 5., 0., 0.],
-                            [0., 0., 6., 6., 6., 0., 0.],
-                            [0., 0., 0., 0., 0., 0., 0.],
-                            [0., 0., 0., 0., 0., 0., 0.]]])
-    y_expected = np.array([[[0., 0., 0., 0., 0., 0., 0.],
-                            [0., 0., 0., 0., 0., 0., 0.],
-                            [0., 0., 1., 0., 1., 0., 0.],
-                            [0., 0., 0., 2., 2., 0., 0.],
-                            [0., 0., 3., 3., 0., 0., 0.],
-                            [0., 0., 0., 0., 0., 0., 0.],
-                            [0., 0., 0., 0., 0., 0., 0.]],
-
-                           [[0., 0., 0., 0., 0., 0., 0.],
-                            [0., 0., 0., 0., 0., 0., 0.],
-                            [0., 0., 4., 1., 4., 0., 0.],
-                            [0., 0., 5., 0., 0., 0., 0.],
-                            [0., 0., 0., 0., 0., 0., 0.],
-                            [0., 0., 0., 0., 0., 0., 0.],
-                            [0., 0., 0., 0., 0., 0., 0.]]])
+    x = np.array([[[1, 1, 1], [2, 2, 2], [3, 3, 3]], [[4, 4, 4], [5, 5, 5], [6, 6, 6]]])
+    y = np.array([[[1, 0, 1], [0, 2, 2], [3, 3, 0]], [[4, 1, 4], [5, 0, 0], [0, 0, 0]]])
+    x_expected = np.array(
+        [
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 2.0, 2.0, 2.0, 0.0, 0.0],
+                [0.0, 0.0, 3.0, 3.0, 3.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            ],
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 4.0, 4.0, 4.0, 0.0, 0.0],
+                [0.0, 0.0, 5.0, 5.0, 5.0, 0.0, 0.0],
+                [0.0, 0.0, 6.0, 6.0, 6.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            ],
+        ]
+    )
+    y_expected = np.array(
+        [
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 2.0, 2.0, 0.0, 0.0],
+                [0.0, 0.0, 3.0, 3.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            ],
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 4.0, 1.0, 4.0, 0.0, 0.0],
+                [0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            ],
+        ]
+    )
     resultx, resulty = transformations.spatialConstantPadding(
-        x, y, trans_xy=True, padding_zyx=[0, 2, 2])
+        x, y, trans_xy=True, padding_zyx=[0, 2, 2]
+    )
     np.testing.assert_allclose(x_expected, resultx.numpy())
     np.testing.assert_allclose(y_expected, resulty.numpy())
 
@@ -111,7 +136,8 @@ def test_resize():
     y = np.random.randint(0, 2, size=(10, 10, 10)).astype(np.float32)
     expected_shape = (5, 5, 10)
     results_x, results_y = transformations.resize(
-        x, y, trans_xy=True, size=[5, 5], mode='bicubic')
+        x, y, trans_xy=True, size=[5, 5], mode="bicubic"
+    )
     assert np.shape(results_x.numpy()) == expected_shape
     assert np.shape(results_y.numpy()) == expected_shape
 
