@@ -73,7 +73,8 @@ def bayesian_vnet(input_shape=(280, 280, 280, 1), kernel_size=3,
     inputs = Input(input_shape)
 
     conv1, pool1 = down_stage(inputs, 16,
-                              kernel_size=kernel_size,prior_fn,
+                              prior_fn,
+                              kernel_size=kernel_size,
                               activation=activation,
                               padding=padding)
     conv2, pool2 = down_stage(pool1, 32,prior_fn,
