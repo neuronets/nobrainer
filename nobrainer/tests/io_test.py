@@ -5,8 +5,8 @@ import nibabel as nib
 import numpy as np
 import pytest
 
-from nobrainer import io
-from nobrainer.tests.utils import csv_of_volumes  # noqa: F401
+from .utils import csv_of_volumes  # noqa: F401
+from .. import io
 
 
 def test_read_csv():

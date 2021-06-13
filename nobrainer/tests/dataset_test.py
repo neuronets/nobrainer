@@ -1,6 +1,6 @@
 import pytest
 
-from nobrainer import dataset
+from .. import dataset
 
 
 # TODO: need to implement this soon.

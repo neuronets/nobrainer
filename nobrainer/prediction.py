@@ -7,11 +7,8 @@ import nibabel as nib
 import numpy as np
 import tensorflow as tf
 
-from nobrainer.transform import get_affine
-from nobrainer.transform import warp
-from nobrainer.volume import from_blocks_numpy
-from nobrainer.volume import standardize_numpy
-from nobrainer.volume import to_blocks_numpy
+from .transform import get_affine, warp
+from .volume import from_blocks_numpy, standardize_numpy, to_blocks_numpy
 
 
 def predict(

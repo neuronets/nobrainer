@@ -11,7 +11,6 @@ def autoencoder(
     n_base_filters=16,
     batchnorm=True,
     batch_size=None,
-    name="autoencoder",
 ):
     """Instantiate Autoencoder Architecture.
 
