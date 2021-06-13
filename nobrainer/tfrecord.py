@@ -342,6 +342,8 @@ class _ProtoIterator:
             return proto.SerializeToString()
         else:
             # only scalar label
+            if not self.scalar_label:
+                y = 0
             proto_dict = {}
             for resolution in self.resolutions[::-1]:
                 x_res = skimage.transform.resize(
