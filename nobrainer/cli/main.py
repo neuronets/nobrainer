@@ -17,15 +17,15 @@ import skimage.transform
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from nobrainer import __version__
-from nobrainer.io import read_csv as _read_csv
-from nobrainer.io import read_volume as _read_volume
-from nobrainer.io import verify_features_labels as _verify_features_labels
-from nobrainer.prediction import _transform_and_predict
-from nobrainer.tfrecord import write as _write_tfrecord
-from nobrainer.volume import from_blocks_numpy as _from_blocks_numpy
-from nobrainer.volume import standardize_numpy as _standardize_numpy
-from nobrainer.volume import to_blocks_numpy as _to_blocks_numpy
+from .. import __version__
+from ..io import read_csv as _read_csv
+from ..io import read_volume as _read_volume
+from ..io import verify_features_labels as _verify_features_labels
+from ..prediction import _transform_and_predict
+from ..tfrecord import write as _write_tfrecord
+from ..volume import from_blocks_numpy as _from_blocks_numpy
+from ..volume import standardize_numpy as _standardize_numpy
+from ..volume import to_blocks_numpy as _to_blocks_numpy
 
 _option_kwds = {"show_default": True}
 

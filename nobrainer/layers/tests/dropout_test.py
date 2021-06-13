@@ -8,7 +8,7 @@ using TensorFlow version 1.13.1.
 from numpy.testing import assert_allclose
 import tensorflow as tf
 
-from nobrainer.layers import dropout as dpl
+from .. import dropout as dpl
 
 a = tf.constant(
     [

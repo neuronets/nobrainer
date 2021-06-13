@@ -2,11 +2,11 @@ import numpy as np
 import pytest
 import tensorflow as tf
 
-from nobrainer.models.autoencoder import autoencoder
-from nobrainer.models.highresnet import highresnet
-from nobrainer.models.meshnet import meshnet
-from nobrainer.models.progressivegan import progressivegan
-from nobrainer.models.unet import unet
+from ..autoencoder import autoencoder
+from ..highresnet import highresnet
+from ..meshnet import meshnet
+from ..progressivegan import progressivegan
+from ..unet import unet
 
 
 def model_test(model_cls, n_classes, input_shape, kwds={}):

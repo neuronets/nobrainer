@@ -8,17 +8,17 @@ import nibabel as nib
 import numpy as np
 import pytest
 
-from nobrainer.cli import main as climain
-from nobrainer.io import read_csv
-from nobrainer.models.meshnet import meshnet
-from nobrainer.models.progressivegan import progressivegan
-from nobrainer.utils import get_data
+from .. import main as climain
+from ...io import read_csv
+from ...models.meshnet import meshnet
+from ...models.progressivegan import progressivegan
+from ...utils import get_data
 
 
 def test_convert_nonscalar_labels(tmp_path):
     runner = CliRunner()
     with runner.isolated_filesystem():
-        csvpath = get_data(str(tmp_path))
+        csvpath = get_data(tmp_path)
         tfrecords_template = Path("data/shard-{shard:03d}.tfrecords")
         tfrecords_template.parent.mkdir(exist_ok=True)
         args = """\
@@ -174,7 +174,7 @@ def test_generate():
     """.format(
             "models", out_path
         )
-
+        print(args)
         result = runner.invoke(climain.cli, args.split())
         assert result.exit_code == 0
         for res in resolutions:
