@@ -6,6 +6,7 @@ import os
 import tempfile
 
 import numpy as np
+import psutil
 import tensorflow as tf
 
 _cache_dir = os.path.join(tempfile.gettempdir(), "nobrainer-data")
@@ -185,3 +186,13 @@ class StreamingStats:
         mult = np.multiply(np.log(self.mean() + eps), self.mean())
         return -mult
         # return -np.sum(mult, axis=axis)
+
+
+def get_num_parallel():
+    # Get number of processes allocated to the current process.
+    # Note the difference from `os.cpu_count()`.
+    try:
+        num_parallel_calls = len(psutil.Process().cpu_affinity())
+    except AttributeError:
+        num_parallel_calls = psutil.cpu_count()
+    return num_parallel_calls

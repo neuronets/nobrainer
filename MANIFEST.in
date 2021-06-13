@@ -1,2 +1,8 @@
+# This line includes versioneer.py in sdists, which is necessary for wheels
+# built from sdists to have the version set in their metadata.
 include versioneer.py
-include nobrainer/_version.py
+include CHANGELOG.md tox.ini
+
+graft nobrainer
+
+global-exclude *.py[cod]

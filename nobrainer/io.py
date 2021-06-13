@@ -8,6 +8,8 @@ import nibabel as nib
 import numpy as np
 import tensorflow as tf
 
+from .utils import get_num_parallel
+
 _TFRECORDS_FEATURES_DTYPE = "float32"
 
 
@@ -86,7 +88,7 @@ def verify_features_labels(
         if len(pair) != 2:
             raise ValueError(
                 "all items in 'volume_filepaths' must have length of 2, but"
-                " found at least one item with lenght != 2."
+                " found at least one item with length != 2."
             )
 
     labels = (y for _, y in volume_filepaths)
@@ -112,9 +114,7 @@ def verify_features_labels(
             check_labels_gte_zero=check_labels_gte_zero,
         )
     if num_parallel_calls is None:
-        # Get number of processes allocated to the current process.
-        # Note the difference from `os.cpu_count()`.
-        num_parallel_calls = len(os.sched_getaffinity(0))
+        num_parallel_calls = get_num_parallel()
 
     print("Verifying {} examples".format(len(volume_filepaths)))
     progbar = tf.keras.utils.Progbar(len(volume_filepaths), verbose=verbose)

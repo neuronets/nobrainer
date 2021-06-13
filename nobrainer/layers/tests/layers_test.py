@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
-from nobrainer.layers import ZeroPadding3DChannels
+from ..padding import ZeroPadding3DChannels
 
 
 def test_zeropadding3dchannels():
