@@ -153,7 +153,6 @@ def test_predict():
         assert nib.load(out_path).shape == (20, 20, 20)
 
 
-@pytest.mark.xfail
 def test_generate():
     runner = CliRunner()
     with runner.isolated_filesystem():
@@ -167,19 +166,20 @@ def test_generate():
             generator([np.random.random((1, 256)), 1.0])  # to build the model by a call
             model_path = "models/generator_res_{}".format(res)
             generator.save(model_path)
+            assert Path(model_path).is_dir()
 
-        out_path = "predictions.nii.gz"
+        out_path = "generated.nii.gz"
 
         args = """\
-    generate --model={} --multi-resolution {}
+    generate --model {} --multi-resolution --latent-size 256 {}
     """.format(
             "models", out_path
         )
         result = runner.invoke(climain.cli, args.split())
         assert result.exit_code == 0
         for res in resolutions:
-            assert Path("predictions_res_{}.nii.gz".format(res)).is_file()
-            assert nib.load("predictions_res_{}.nii.gz".format(res)).shape == (
+            assert Path("generated_res_{}.nii.gz".format(res)).is_file()
+            assert nib.load("generated_res_{}.nii.gz".format(res)).shape == (
                 res,
                 res,
                 res,
