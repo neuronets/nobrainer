@@ -150,7 +150,7 @@ We can also generate multiple resolutions of the brain image using the same late
 docker run --rm -v $PWD:/data neuronets/nobrainer \
   generate \
     --model=/models/progressivegan_models \
-    --multi-resolution=True \
+    --multi-resolution \
     /data/generated.nii.gz
 ```
 
