@@ -1,4 +1,4 @@
-ame: Auto-release on PR merge
+name: Auto-release on PR merge
 
 on:
   # ATM, this is the closest trigger to a PR merging
