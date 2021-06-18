@@ -9,8 +9,7 @@ import tensorflow as tf
 
 from .transform import get_affine, warp
 from .utils import StreamingStats
-from .volume import from_blocks_numpy, standardize_numpy, to_blocks_numpy
-from .volume import from_blocks
+from .volume import from_blocks, from_blocks_numpy, standardize_numpy, to_blocks_numpy
 
 
 def predict(
@@ -428,13 +427,13 @@ def _get_model(path):
     raise ValueError(
         "Failed to load model. Is the model in HDF5 format or SavedModel" " format?"
     )
-    
-    
+
+
 def _get_predictor(model_path):
     """restores the tf estimator model.
     The output is a tf2 estimator"""
     predictor = tf.saved_model.load(model_path)
-    return predictor.signatures['serving_default']
+    return predictor.signatures["serving_default"]
 
 
 def _transform_and_predict(
@@ -490,15 +489,15 @@ def _transform_and_predict(
     return y
 
 
-def predict_by_estimator(filepath,
-        model_path,
-        block_shape,
-        batch_size=4,
-        normalizer=None,
-        n_samples=1,
-        return_variance=True,
-        return_entropy=True,
-        
+def predict_by_estimator(
+    filepath,
+    model_path,
+    block_shape,
+    batch_size=4,
+    normalizer=None,
+    n_samples=1,
+    return_variance=True,
+    return_entropy=True,
 ):
     """Predict on a volume given a filepath and a path to tensorflow1 estimator
     saved model.
@@ -529,13 +528,13 @@ def predict_by_estimator(filepath,
 
     if not Path(filepath).is_file():
         raise FileNotFoundError("could not find file {}".format(filepath))
-    
+
     img = nib.load(filepath)
     inputs = np.asarray(img.dataobj)
     img.uncache()
     inputs = inputs.astype(np.float32)
 
-    print("Normalizer being used {n}".format(n = normalizer))
+    print("Normalizer being used {n}".format(n=normalizer))
     if normalizer:
         features = normalizer(inputs)
         print(features.mean())
@@ -544,14 +543,14 @@ def predict_by_estimator(filepath,
         features = inputs
 
     features = to_blocks_numpy(features, block_shape=block_shape)
-    
+
     # Add a dimension for single channel.
     features = features[..., None]
-    
+
     # restores the tf estimator model
     predictor = _get_predictor(model_path)
-    #predictor = tf.saved_model.load(model_path)
-    #predictor.signatures['serving_default']
+    # predictor = tf.saved_model.load(model_path)
+    # predictor.signatures['serving_default']
 
     # Predict per block to reduce memory consumption.
     n_blocks = features.shape[0]
@@ -568,48 +567,78 @@ def predict_by_estimator(filepath,
         s = StreamingStats()
         for n in range(n_samples):
             new_prediction = predictor(this_x)
-            s.update(new_prediction['probabilities'])
+            s.update(new_prediction["probabilities"])
 
-        means[j : j + batch_size] = np.argmax(s.mean(),axis=-1)  # max mean
-        variances[j : j + batch_size] = np.sum(s.var(), axis = -1)
-        entropies[j : j + batch_size] = np.sum(s.entropy(), axis = -1) # entropy
+        means[j : j + batch_size] = np.argmax(s.mean(), axis=-1)  # max mean
+        variances[j : j + batch_size] = np.sum(s.var(), axis=-1)
+        entropies[j : j + batch_size] = np.sum(s.entropy(), axis=-1)  # entropy
         progbar.add(1)
 
         total_means = from_blocks(means, output_shape=inputs.shape).numpy()
         total_variance = from_blocks(variances, output_shape=inputs.shape).numpy()
         total_entropy = from_blocks(entropies, output_shape=inputs.shape).numpy()
-        
-        
 
     include_variance = (n_samples > 1) and (return_variance)
     if include_variance:
         if return_entropy:
             # return in the form of a nifti image
             total_means = nib.spatialimages.SpatialImage(
-                dataobj=total_means, affine=img.affine, header=img.header, extra=img.extra)
-            
+                dataobj=total_means,
+                affine=img.affine,
+                header=img.header,
+                extra=img.extra,
+            )
+
             total_variance = nib.spatialimages.SpatialImage(
-                dataobj=total_variance, affine=img.affine, header=img.header, extra=img.extra)
-            
+                dataobj=total_variance,
+                affine=img.affine,
+                header=img.header,
+                extra=img.extra,
+            )
+
             total_entropy = nib.spatialimages.SpatialImage(
-                dataobj=total_entropy, affine=img.affine, header=img.header, extra=img.extra)
+                dataobj=total_entropy,
+                affine=img.affine,
+                header=img.header,
+                extra=img.extra,
+            )
             return total_means, total_variance, total_entropy
         else:
             total_means = nib.spatialimages.SpatialImage(
-                dataobj=total_means, affine=img.affine, header=img.header, extra=img.extra)
-            
+                dataobj=total_means,
+                affine=img.affine,
+                header=img.header,
+                extra=img.extra,
+            )
+
             total_variance = nib.spatialimages.SpatialImage(
-                dataobj=total_variance, affine=img.affine, header=img.header, extra=img.extra)
+                dataobj=total_variance,
+                affine=img.affine,
+                header=img.header,
+                extra=img.extra,
+            )
             return total_means, total_variance
     else:
         if return_entropy:
             total_means = nib.spatialimages.SpatialImage(
-                dataobj=total_means, affine=img.affine, header=img.header, extra=img.extra)
-            
+                dataobj=total_means,
+                affine=img.affine,
+                header=img.header,
+                extra=img.extra,
+            )
+
             total_entropy = nib.spatialimages.SpatialImage(
-                dataobj=total_entropy, affine=img.affine, header=img.header, extra=img.extra)
+                dataobj=total_entropy,
+                affine=img.affine,
+                header=img.header,
+                extra=img.extra,
+            )
             return total_means, total_entropy
         else:
             total_means = nib.spatialimages.SpatialImage(
-                dataobj=total_means, affine=img.affine, header=img.header, extra=img.extra)
+                dataobj=total_means,
+                affine=img.affine,
+                header=img.header,
+                extra=img.extra,
+            )
             return total_means
