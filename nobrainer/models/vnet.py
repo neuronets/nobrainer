@@ -46,7 +46,7 @@ def end_stage(inputs, kernel_size=3, activation="relu", padding="SAME"):
     return conv
 
 
-def dropout_vnet(
+def vnet(
     input_shape=(256, 256, 256, 1), kernel_size=3, activation="relu", padding="SAME"
 ):
     inputs = Input(input_shape)
