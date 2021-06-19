@@ -4,9 +4,12 @@ import tensorflow.compat.v2 as tf2
 import tensorflow_probability as tfp
 from tensorflow_probability.python.distributions import (
     deterministic as deterministic_lib,
-from tensorflow_probability.python.distributions import (
-        independent as independent_lib
 )
+from tensorflow_probability.python.distributions import (
+    tensorflow_probability.python.distributions,
+)
+from tensorflow_probability.python.distributions import from, import
+from tensorflow_probability.python.distributions import independent as independent_lib
 from tensorflow_probability.python.distributions import normal as normal_lib
 
 tfd = tfp.distributions
