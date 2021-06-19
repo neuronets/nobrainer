@@ -152,7 +152,6 @@ class ProgressiveGANTrainer(tf.keras.Model):
         )
 
 
-
 class GANTrainer(tf.keras.Model):
     """Generative Adversarial Network Trainer.
 
@@ -167,7 +166,7 @@ class GANTrainer(tf.keras.Model):
 
     References
     ----------
-    
+
     Links
     -----
     """
@@ -251,7 +250,6 @@ class GANTrainer(tf.keras.Model):
 
         return {"d_loss": d_loss, "g_loss": g_loss}
 
-
     def save_weights(self, filepath, **kwargs):
         """
         Override base class function to save the weights of the constituent models
@@ -264,4 +262,3 @@ class GANTrainer(tf.keras.Model):
             os.path.join(filepath, "d_weights_res_{}.h5".format(self.resolution)),
             **kwargs
         )
-

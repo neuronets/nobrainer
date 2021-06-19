@@ -3,11 +3,12 @@ import pytest
 import tensorflow as tf
 
 from ..autoencoder import autoencoder
+from ..dcgan import dcgan
 from ..highresnet import highresnet
 from ..meshnet import meshnet
-from ..unet import unet
 from ..progressivegan import progressivegan
-from ..dcgan import dcgan
+from ..unet import unet
+
 
 def model_test(model_cls, n_classes, input_shape, kwds={}):
     """Tests for models."""
@@ -72,6 +73,7 @@ def test_autoencoder():
     actual_output = model.predict(x)
     assert actual_output.shape == x.shape
 
+
 def test_progressivegan():
     """Test for both discriminator and generator of progressive gan"""
 
@@ -107,18 +109,19 @@ def test_progressivegan():
         assert real_labels_pred.shape == (real_image_input.shape[0], label_size)
         assert fake_labels_pred.shape == (real_image_input.shape[0], label_size)
 
+
 def test_dcgan():
     """Special test for dcgan."""
 
-    output_shape = (1,32,32,32,1)
+    output_shape = (1, 32, 32, 32, 1)
     z_dim = 32
-    z = np.random.random((1,z_dim))
+    z = np.random.random((1, z_dim))
 
-    pred_shape = (1,8,8,8,1)
+    pred_shape = (1, 8, 8, 8, 1)
 
     generator, discriminator = dcgan(output_shape[1:], z_dim=z_dim)
-    generator.compile(tf.train.AdamOptimizer(), 'mse')
-    discriminator.compile(tf.train.AdamOptimizer(), 'mse')
+    generator.compile(tf.train.AdamOptimizer(), "mse")
+    discriminator.compile(tf.train.AdamOptimizer(), "mse")
 
     fake_images = generator.predict(z)
     fake_pred = discriminator.predict(fake_images)

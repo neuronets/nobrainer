@@ -5,7 +5,15 @@ import math
 import tensorflow as tf
 from tensorflow.keras import layers, models
 
-def dcgan(output_shape, z_dim=256, n_base_filters=16, batchnorm=True, batch_size=None, name='dcgan'):
+
+def dcgan(
+    output_shape,
+    z_dim=256,
+    n_base_filters=16,
+    batchnorm=True,
+    batch_size=None,
+    name="dcgan",
+):
     """Instantiate DCGAN Architecture.
 
     Parameters
@@ -27,63 +35,62 @@ def dcgan(output_shape, z_dim=256, n_base_filters=16, batchnorm=True, batch_size
     Discriminator Model object.
     """
 
-    conv_kwds = {
-        'kernel_size': 4,
-        'activation': None,
-        'padding': 'same',
-        'strides': 2
-    }
+    conv_kwds = {"kernel_size": 4, "activation": None, "padding": "same", "strides": 2}
 
     conv_transpose_kwds = {
-        'kernel_size': 4,
-        'strides': 2,
-        'activation': None,
-        'padding': 'same',
+        "kernel_size": 4,
+        "strides": 2,
+        "activation": None,
+        "padding": "same",
     }
 
     dimensions = output_shape[:-1]
     n_dims = len(dimensions)
 
-    if not (n_dims in [2,3] and dimensions[1:]==dimensions[:-1]):
-        raise ValueError('Dimensions should be of square or cube!')
+    if not (n_dims in [2, 3] and dimensions[1:] == dimensions[:-1]):
+        raise ValueError("Dimensions should be of square or cube!")
 
-    Conv = getattr(layers, 'Conv{}D'.format(n_dims))
-    ConvTranspose = getattr(layers, 'Conv{}DTranspose'.format(n_dims))
+    Conv = getattr(layers, "Conv{}D".format(n_dims))
+    ConvTranspose = getattr(layers, "Conv{}DTranspose".format(n_dims))
     n_layers = int(math.log(dimensions[0], 2))
 
-    # Generator 
+    # Generator
     z_input = layers.Input(shape=(z_dim,), batch_size=batch_size)
 
-    project = layers.Dense(pow(4, n_dims)*z_dim)(z_input)
+    project = layers.Dense(pow(4, n_dims) * z_dim)(z_input)
     project = layers.ReLU()(project)
-    project = layers.Reshape((4,)*n_dims+(z_dim,))(project)
+    project = layers.Reshape((4,) * n_dims + (z_dim,))(project)
     x = project
 
-    for i in range(n_layers-2)[::-1]:
-        n_filters = min(n_base_filters*(2**(i)), z_dim)
+    for i in range(n_layers - 2)[::-1]:
+        n_filters = min(n_base_filters * (2 ** (i)), z_dim)
 
         x = ConvTranspose(n_filters, **conv_transpose_kwds)(x)
         if batchnorm:
             x = layers.BatchNormalization()(x)
         x = layers.LeakyReLU()(x)
 
-    outputs = Conv(1, 3, activation='sigmoid', padding='same')(x)
+    outputs = Conv(1, 3, activation="sigmoid", padding="same")(x)
 
-    generator = models.Model(inputs=[z_input], outputs=[outputs], name=name+'_generator')
+    generator = models.Model(
+        inputs=[z_input], outputs=[outputs], name=name + "_generator"
+    )
 
     # PatchGAN Discriminator with output of 8x8(x8)
-    inputs =  layers.Input(shape=(output_shape), batch_size=batch_size)
+    inputs = layers.Input(shape=(output_shape), batch_size=batch_size)
     x = inputs
-    for i in range(n_layers-3):
-        n_filters = min(n_base_filters*(2**(i)), z_dim)
+    for i in range(n_layers - 3):
+        n_filters = min(n_base_filters * (2 ** (i)), z_dim)
 
         x = Conv(n_filters, **conv_kwds)(x)
         if batchnorm:
             x = layers.BatchNormalization()(x)
         x = layers.ReLU()(x)
 
-    pred = Conv(1, 3, padding='same', activation='sigmoid')(x)
+    pred = Conv(1, 3, padding="same", activation="sigmoid")(x)
 
-    discriminator = models.Model(inputs=[inputs], outputs=[pred], name=name+'_discriminator')
+    discriminator = models.Model(
+        inputs=[inputs], outputs=[pred], name=name + "_discriminator"
+    )
 
     return generator, discriminator
