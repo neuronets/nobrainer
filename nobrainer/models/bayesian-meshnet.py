@@ -92,7 +92,6 @@ def variational_meshnet(
         return x
 
     inputs = tfkl.Input(shape=input_shape, batch_size=batch_size, name="inputs")
-    prior_fn = normal_prior(prior_std=1.0)
 
     if receptive_field == 37:
         x = one_layer(inputs, 1)
