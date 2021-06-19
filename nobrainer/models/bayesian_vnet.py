@@ -1,6 +1,5 @@
 # Full bayesian adaptation of the Vnet model from https://arxiv.org/pdf/1606.04797.pdf
 from tensorflow.keras.layers import (
-    Conv3D,
     Input,
     MaxPooling3D,
     UpSampling3D,
@@ -10,17 +9,20 @@ from tensorflow.keras.models import Model
 import tensorflow_probability as tfp
 
 from nobrainer.layers.groupnorm import GroupNormalization
-from nobrainer.models.bayesian_utils import normal_prior
+from nobrainer.bayesian_utils import normal_prior
 
 
 def down_stage(
-    inputs, filters, prior_fn, kernel_size=3, activation="relu", padding="SAME"
+    inputs, filters, prior_fn, kernel_posterior_fn,
+        kld, kernel_size=3, activation="relu", padding="SAME"
 ):
     conv = tfp.layers.Convolution3DFlipout(
         filters,
         kernel_size,
         activation=activation,
         padding=padding,
+        kernel_divergence_fn=kld,
+        kernel_posterior_fn=kernel_posterior_fn,
         kernel_prior_fn=prior_fn,
     )(inputs)
     conv = GroupNormalization()(conv)
@@ -29,6 +31,8 @@ def down_stage(
         kernel_size,
         activation=activation,
         padding=padding,
+        kernel_divergence_fn=kld,
+        kernel_posterior_fn=kernel_posterior_fn,
         kernel_prior_fn=prior_fn,
     )(conv)
     conv = GroupNormalization()(conv)
@@ -37,11 +41,15 @@ def down_stage(
 
 
 def up_stage(
-    inputs, skip, filters, prior_fn, kernel_size=3, activation="relu", padding="SAME"
+    inputs, skip, filters, prior_fn, kernel_posterior_fn,
+        kld, kernel_size=3, activation="relu", padding="SAME"
 ):
     up = UpSampling3D()(inputs)
     up = tfp.layers.Convolution3DFlipout(
-        filters, 2, activation=activation, padding=padding, kernel_prior_fn=prior_fn
+        filters, 2, activation=activation, padding=padding, 
+        kernel_divergence_fn=kld,
+        kernel_posterior_fn=kernel_posterior_fn,
+        kernel_prior_fn=prior_fn,
     )(up)
     up = GroupNormalization()(up)
 
@@ -53,6 +61,8 @@ def up_stage(
         kernel_size,
         activation=activation,
         padding=padding,
+        kernel_divergence_fn=kld,
+        kernel_posterior_fn=kernel_posterior_fn,
         kernel_prior_fn=prior_fn,
     )(merge)
     conv = GroupNormalization()(conv)
@@ -61,33 +71,64 @@ def up_stage(
         kernel_size,
         activation=activation,
         padding=padding,
+        kernel_divergence_fn=kld,
+        kernel_posterior_fn=kernel_posterior_fn,
         kernel_prior_fn=prior_fn,
     )(conv)
     conv = GroupNormalization()(conv)
 
     return conv
 
-
-def end_stage(inputs, prior_fn, kernel_size=3, activation="relu", padding="SAME"):
+def end_stage(
+    inputs,
+    prior_fn,
+    kernel_posterior_fn,
+    kld,
+    n_classes=1,
+    kernel_size=3,
+    activation="relu",
+    padding="SAME",
+):
     conv = tfp.layers.Convolution3DFlipout(
-        1, kernel_size, activation=activation, padding="SAME", kernel_prior_fn=prior_fn
+        n_classes,
+        kernel_size,
+        activation=activation,
+        padding="SAME",
+        kernel_divergence_fn=kld,
+        kernel_posterior_fn=kernel_posterior_fn,
+        kernel_prior_fn=prior_fn,
     )(inputs)
-    conv = tfp.layers.Convolution3DFlipout(
-        1, 1, activation="sigmoid", kernel_prior_fn=prior_fn
-    )(conv)
-
+    if n_classes == 1:
+        conv = tfp.layers.Convolution3DFlipout(
+            n_classes,
+            1,
+            activation="sigmoid",
+            kernel_divergence_fn=kld,
+            kernel_posterior_fn=kernel_posterior_fn,
+            kernel_prior_fn=prior_fn,
+        )(conv)
+    else:
+        conv = tfp.layers.Convolution3DFlipout(
+            n_classes,
+            1,
+            activation="softmax",
+            kernel_divergence_fn=kld,
+            kernel_posterior_fn=kernel_posterior_fn,
+            kernel_prior_fn=prior_fn,
+        )(conv)
     return conv
 
 
 def bayesian_vnet(
+    n_classes = 1,
     input_shape=(280, 280, 280, 1),
     kernel_size=3,
+    prior_fn=normal_prior(),
+    kernel_posterior_fn=tfp.layers.default_mean_field_normal_fn(),
+    kld=None,
     activation="relu",
     padding="SAME",
-    **kwargs
 ):
-    prior_std = kwargs.get("prior_std", 1)
-    prior_fn = normal_prior(prior_std)
 
     inputs = Input(input_shape)
 
@@ -95,6 +136,8 @@ def bayesian_vnet(
         inputs,
         16,
         prior_fn,
+        kernel_posterior_fn,
+        kld,
         kernel_size=kernel_size,
         activation=activation,
         padding=padding,
@@ -103,6 +146,8 @@ def bayesian_vnet(
         pool1,
         32,
         prior_fn,
+        kernel_posterior_fn,
+        kld,
         kernel_size=kernel_size,
         activation=activation,
         padding=padding,
@@ -111,6 +156,8 @@ def bayesian_vnet(
         pool2,
         64,
         prior_fn,
+        kernel_posterior_fn,
+        kld,
         kernel_size=kernel_size,
         activation=activation,
         padding=padding,
@@ -119,6 +166,8 @@ def bayesian_vnet(
         pool3,
         128,
         prior_fn,
+        kernel_posterior_fn,
+        kld,
         kernel_size=kernel_size,
         activation=activation,
         padding=padding,
@@ -129,6 +178,8 @@ def bayesian_vnet(
         conv3,
         64,
         prior_fn,
+        kernel_posterior_fn,
+        kld,
         kernel_size=kernel_size,
         activation=activation,
         padding=padding,
@@ -138,6 +189,8 @@ def bayesian_vnet(
         conv2,
         32,
         prior_fn,
+        kernel_posterior_fn,
+        kld,
         kernel_size=kernel_size,
         activation=activation,
         padding=padding,
@@ -147,13 +200,22 @@ def bayesian_vnet(
         conv1,
         16,
         prior_fn,
+        kernel_posterior_fn,
+        kld,
         kernel_size=kernel_size,
         activation=activation,
         padding=padding,
     )
 
     conv8 = end_stage(
-        conv7, prior_fn, kernel_size=kernel_size, activation=activation, padding=padding
+        conv7, 
+        prior_fn,
+        kernel_posterior_fn,
+        kld,
+        n_classes=n_classes,
+        kernel_size=kernel_size, 
+        activation=activation, 
+        padding=padding
     )
 
     return Model(inputs=inputs, outputs=conv8)
