@@ -13,7 +13,7 @@ tfd = tfp.distributions
 
 def default_mean_field_normal_fn(
     is_singular=False,
-    loc_initializer=tf.keras.initializers.he_normal(),  # tf1.initializers.random_normal(stddev=0.1),
+    loc_initializer=tf.keras.initializers.he_normal(),
     untransformed_scale_initializer=tf1.initializers.random_normal(
         mean=-3.0, stddev=0.1
     ),
