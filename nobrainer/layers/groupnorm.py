@@ -22,12 +22,9 @@
 #
 # Retrieved from https://github.com/titu1994/Keras-Group-Normalization/blob/master/group_norm.py
 
-from tensorflow.keras.layers import Layer, InputSpec
-from tensorflow.keras import initializers
-from tensorflow.keras import regularizers
-from tensorflow.keras import constraints
 from tensorflow.keras import backend as K
-
+from tensorflow.keras import constraints, initializers, regularizers
+from tensorflow.keras.layers import InputSpec, Layer
 from tensorflow.keras.utils import get_custom_objects
 
 
@@ -70,19 +67,21 @@ class GroupNormalization(Layer):
         - [Group Normalization](https://arxiv.org/abs/1803.08494)
     """
 
-    def __init__(self,
-                 groups=4,
-                 axis=-1,
-                 epsilon=1e-5,
-                 center=True,
-                 scale=True,
-                 beta_initializer="zeros",
-                 gamma_initializer="ones",
-                 beta_regularizer=None,
-                 gamma_regularizer=None,
-                 beta_constraint=None,
-                 gamma_constraint=None,
-                 **kwargs):
+    def __init__(
+        self,
+        groups=4,
+        axis=-1,
+        epsilon=1e-5,
+        center=True,
+        scale=True,
+        beta_initializer="zeros",
+        gamma_initializer="ones",
+        beta_regularizer=None,
+        gamma_regularizer=None,
+        beta_constraint=None,
+        gamma_constraint=None,
+        **kwargs
+    ):
         super(GroupNormalization, self).__init__(**kwargs)
         self.supports_masking = True
         self.groups = groups
@@ -101,39 +100,45 @@ class GroupNormalization(Layer):
         dim = input_shape[self.axis]
 
         if dim is None:
-            raise ValueError("Axis " + str(self.axis) + " of "
-                             "input tensor should have a defined dimension "
-                             "but the layer received an input with shape " +
-                             str(input_shape) + ".")
+            raise ValueError(
+                "Axis " + str(self.axis) + " of "
+                "input tensor should have a defined dimension "
+                "but the layer received an input with shape " + str(input_shape) + "."
+            )
 
         if dim < self.groups:
-            raise ValueError("Number of groups (" + str(self.groups) + ") "
-                             "cannot be more than the number of channels (" +
-                             str(dim) + ").")
+            raise ValueError(
+                "Number of groups (" + str(self.groups) + ") "
+                "cannot be more than the number of channels (" + str(dim) + ")."
+            )
 
         if dim % self.groups != 0:
-            raise ValueError("Number of groups (" + str(self.groups) + ") "
-                             "must be a multiple of the number of channels (" +
-                             str(dim) + ").")
+            raise ValueError(
+                "Number of groups (" + str(self.groups) + ") "
+                "must be a multiple of the number of channels (" + str(dim) + ")."
+            )
 
-        self.input_spec = InputSpec(ndim=len(input_shape),
-                                    axes={self.axis: dim})
+        self.input_spec = InputSpec(ndim=len(input_shape), axes={self.axis: dim})
         shape = (dim,)
 
         if self.scale:
-            self.gamma = self.add_weight(shape=shape,
-                                         name="gamma",
-                                         initializer=self.gamma_initializer,
-                                         regularizer=self.gamma_regularizer,
-                                         constraint=self.gamma_constraint)
+            self.gamma = self.add_weight(
+                shape=shape,
+                name="gamma",
+                initializer=self.gamma_initializer,
+                regularizer=self.gamma_regularizer,
+                constraint=self.gamma_constraint,
+            )
         else:
             self.gamma = None
         if self.center:
-            self.beta = self.add_weight(shape=shape,
-                                        name="beta",
-                                        initializer=self.beta_initializer,
-                                        regularizer=self.beta_regularizer,
-                                        constraint=self.beta_constraint)
+            self.beta = self.add_weight(
+                shape=shape,
+                name="beta",
+                initializer=self.beta_initializer,
+                regularizer=self.beta_regularizer,
+                constraint=self.beta_constraint,
+            )
         else:
             self.beta = None
         self.built = True
@@ -196,7 +201,7 @@ class GroupNormalization(Layer):
             "beta_regularizer": regularizers.serialize(self.beta_regularizer),
             "gamma_regularizer": regularizers.serialize(self.gamma_regularizer),
             "beta_constraint": constraints.serialize(self.beta_constraint),
-            "gamma_constraint": constraints.serialize(self.gamma_constraint)
+            "gamma_constraint": constraints.serialize(self.gamma_constraint),
         }
         base_config = super(GroupNormalization, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
@@ -211,6 +216,7 @@ get_custom_objects().update({"GroupNormalization": GroupNormalization})
 if __name__ == "__main__":
     from tensorflow.keras.layers import Input
     from tensorflow.keras.models import Model
+
     ip = Input(shape=(None, None, 4))
     x = GroupNormalization(groups=2, axis=-1, epsilon=0.1)(ip)
     model = Model(inputs=ip, outputs=x)
