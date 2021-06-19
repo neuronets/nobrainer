@@ -3,10 +3,13 @@ import pytest
 import tensorflow as tf
 
 from ..autoencoder import autoencoder
+from ..bayesian_vnet import bayesian_vnet
+from ..bayesian_vnet_semi import bayesian_vnet_semi
 from ..highresnet import highresnet
 from ..meshnet import meshnet
 from ..progressivegan import progressivegan
 from ..unet import unet
+from ..vnet import vnet
 
 
 def model_test(model_cls, n_classes, input_shape, kwds={}):
@@ -107,3 +110,15 @@ def test_progressivegan():
         assert fake_pred.shape == (real_image_input.shape[0],)
         assert real_labels_pred.shape == (real_image_input.shape[0], label_size)
         assert fake_labels_pred.shape == (real_image_input.shape[0], label_size)
+
+
+def test_vnet():
+    model_test(vnet, n_classes=1, input_shape=(1, 32, 32, 32, 1))
+
+
+def test_bayesian_vnet_semi():
+    model_test(bayesian_vnet_semi, n_classes=1, input_shape=(1, 32, 32, 32, 1))
+
+
+def test_bayesian_vnet():
+    model_test(bayesian_vnet, n_classes=1, input_shape=(1, 32, 32, 32, 1))
