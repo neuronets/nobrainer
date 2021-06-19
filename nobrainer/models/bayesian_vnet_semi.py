@@ -8,12 +8,12 @@ from tensorflow.keras.layers import (
 from tensorflow.keras.models import Model
 import tensorflow_probability as tfp
 
-from nobrainer.layers.groupnorm import GroupNormalization
 from nobrainer.bayesian_utils import (
     divergence_fn_bayesian,
     normal_prior,
     prior_fn_for_bayesian,
 )
+from nobrainer.layers.groupnorm import GroupNormalization
 
 tfd = tfp.distributions
 
