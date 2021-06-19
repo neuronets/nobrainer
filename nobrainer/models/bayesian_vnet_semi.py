@@ -127,8 +127,7 @@ def bayesian_vnet_semi(
     activation="relu",
     padding="SAME",
 ):
-    if kld:
-        kld = divergence_fn_bayesian(prior_std=0.1, examples_per_epoch=3000)
+
     inputs = Input(input_shape)
 
     conv1, pool1 = down_stage(
