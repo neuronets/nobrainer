@@ -82,7 +82,7 @@ def end_stage(
     prior_fn,
     kernel_posterior_fn,
     kld,
-    n_classes = 1,
+    n_classes=1,
     kernel_size=3,
     activation="relu",
     padding="SAME",
@@ -106,7 +106,7 @@ def end_stage(
             kernel_prior_fn=prior_fn,
         )(conv)
     else:
-       conv = tfp.layers.Convolution3DFlipout(
+        conv = tfp.layers.Convolution3DFlipout(
             n_classes,
             1,
             activation="softmax",
@@ -118,7 +118,7 @@ def end_stage(
 
 
 def bayesian_vnet_semi(
-    n_classes = 1,
+    n_classes=1,
     input_shape=(256, 256, 256, 1),
     kernel_size=3,
     prior_fn=prior_fn_for_bayesian(),
@@ -183,7 +183,7 @@ def bayesian_vnet_semi(
         prior_fn,
         kernel_posterior_fn,
         kld,
-        n_classes = n_classes,
+        n_classes=n_classes,
         kernel_size=kernel_size,
         activation=activation,
         padding=padding,
