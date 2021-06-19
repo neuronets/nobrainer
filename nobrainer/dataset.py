@@ -13,6 +13,7 @@ from .volume import (
     apply_random_transform_scalar_labels,
     binarize,
     replace,
+    standardize,
     to_blocks,
 )
 
@@ -55,7 +56,7 @@ def get_dataset(
     n_epochs=None,
     mapping=None,
     augment=False,
-    normalizer=None,
+    normalizer=standardize,
     shuffle_buffer_size=None,
     num_parallel_calls=AUTOTUNE,
 ):
@@ -89,7 +90,8 @@ def get_dataset(
         features and labels. The rigid transformations are applied to the full
         volumes.
     normalizer: callable, applies this normalization function when creating the
-        dataset.
+        dataset. to maintain compatibility with prior nobrainer release, this is
+        set to standardize by default.
     shuffle_buffer_size: int, buffer of full volumes to shuffle. If this is not
         None, then the list of files found by 'file_pattern' is also shuffled
         at every iteration.
