@@ -108,6 +108,7 @@ def test_progressivegan():
         assert fake_pred.shape == (real_image_input.shape[0],)
         assert real_labels_pred.shape == (real_image_input.shape[0], label_size)
         assert fake_labels_pred.shape == (real_image_input.shape[0], label_size)
-        
+
+
 def test_vnet():
     model_test(vnet, n_classes=1, input_shape=(1, 32, 32, 32, 1))
