@@ -3,8 +3,8 @@ from tensorflow.keras.layers import Input, MaxPooling3D, UpSampling3D, concatena
 from tensorflow.keras.models import Model
 import tensorflow_probability as tfp
 
-from nobrainer.bayesian_utils import normal_prior
-from nobrainer.layers.groupnorm import GroupNormalization
+from ..bayesian_utils import normal_prior
+from ..layers.groupnorm import GroupNormalization
 
 
 def down_stage(

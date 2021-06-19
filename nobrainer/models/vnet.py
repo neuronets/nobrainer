@@ -10,7 +10,7 @@ from tensorflow.keras.layers import (
 )
 from tensorflow.keras.models import Model
 
-from nobrainer.layers.groupnorm import GroupNormalization
+from ..layers.groupnorm import GroupNormalization
 
 
 def down_stage(inputs, filters, kernel_size=3, activation="relu", padding="SAME"):

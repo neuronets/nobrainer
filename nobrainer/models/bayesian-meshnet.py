@@ -3,8 +3,8 @@
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from nobrainer.bayesian_utils import divergence_fn_bayesian, prior_fn_for_bayesian
-from nobrainer.layers.dropout import BernoulliDropout, ConcreteDropout
+from ..bayesian_utils import divergence_fn_bayesian, prior_fn_for_bayesian
+from ..layers.dropout import BernoulliDropout, ConcreteDropout
 
 tfk = tf.keras
 tfkl = tfk.layers
