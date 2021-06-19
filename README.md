@@ -80,7 +80,7 @@ In the base case, we run the T1w scan through the model for prediction.
 wget -nc https://dl.dropbox.com/s/g1vn5p3grifro4d/T1w.nii.gz
 docker run --rm -v $PWD:/data neuronets/nobrainer \
   predict \
-    --model=/models/brain-extraction-unet-128iso-model.h5 \
+    --model=/models/neuronets/brainy/0.1.0/brain-extraction-unet-128iso-model.h5 \
     --verbose \
     /data/T1w.nii.gz \
     /data/brainmask.nii.gz
@@ -93,7 +93,7 @@ For binary segmentation where we expect one predicted region, as is the case wit
 wget -nc https://dl.dropbox.com/s/g1vn5p3grifro4d/T1w.nii.gz
 docker run --rm -v $PWD:/data neuronets/nobrainer \
   predict \
-    --model=/models/brain-extraction-unet-128iso-model.h5 \
+    --model=/models/neuronets/brainy/0.1.0/brain-extraction-unet-128iso-model.h5 \
     --largest-label \
     --verbose \
     /data/T1w.nii.gz \
@@ -107,7 +107,7 @@ Because the network was trained on randomly rotated data, it should be agnostic 
 wget -nc https://dl.dropbox.com/s/g1vn5p3grifro4d/T1w.nii.gz
 docker run --rm -v $PWD:/data neuronets/nobrainer \
   predict \
-    --model=/models/brain-extraction-unet-128iso-model.h5 \
+    --model=/models/neuronets/brainy/0.1.0/brain-extraction-unet-128iso-model.h5 \
     --rotate-and-predict \
     --verbose \
     /data/T1w.nii.gz \
@@ -121,7 +121,7 @@ Combining the above, we can usually achieve the best brain extraction by using `
 wget -nc https://dl.dropbox.com/s/g1vn5p3grifro4d/T1w.nii.gz
 docker run --rm -v $PWD:/data neuronets/nobrainer \
   predict \
-    --model=/models/brain-extraction-unet-128iso-model.h5 \
+    --model=/models/neuronets/brainy/0.1.0/brain-extraction-unet-128iso-model.h5 \
     --largest-label \
     --rotate-and-predict \
     --verbose \
@@ -138,7 +138,7 @@ In the base case, we generate a T1w scan through the model for a given resolutio
 ```bash
 docker run --rm -v $PWD:/data neuronets/nobrainer \
   generate \
-    --model=/models/progressivegan_models \
+    --model=/models/neuronets/braingen/0.1.0 \
     --output-shape=128 128 128 \
     /data/generated.nii.gz
 ```
@@ -149,8 +149,8 @@ We can also generate multiple resolutions of the brain image using the same late
 # Get sample T1w scan.
 docker run --rm -v $PWD:/data neuronets/nobrainer \
   generate \
-    --model=/models/progressivegan_models \
-    --multi-resolution=True \
+    --model=/models/neuronets/braingen/0.1.0 \
+    --multi-resolution \
     /data/generated.nii.gz
 ```
 

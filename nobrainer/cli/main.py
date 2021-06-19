@@ -511,7 +511,7 @@ def generate(
                 resolutions.append(os.path.splitext(model_path)[0].split("_")[-1])
 
         else:
-            output_resolution = int(np.log2(output_shape[0]))
+            output_resolution = int(output_shape[0])
             model = os.path.join(model, "generator_res_{}".format(output_resolution))
             generator = tf.saved_model.load(model)
             generate = generator.signatures["serving_default"]

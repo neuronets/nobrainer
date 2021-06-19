@@ -13,8 +13,9 @@ from .volume import (
     apply_random_transform_scalar_labels,
     binarize,
     replace,
-    to_blocks,
 )
+from .volume import standardize as standardize_op
+from .volume import to_blocks
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
@@ -123,7 +124,7 @@ def get_dataset(
 
     if standardize:
         # Standard-score the features.
-        dataset = dataset.map(lambda x, y: (standardize(x), y))
+        dataset = dataset.map(lambda x, y: (standardize_op(x), y))
 
     # Augment examples if requested.
     if augment:

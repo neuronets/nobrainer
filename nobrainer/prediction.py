@@ -9,7 +9,7 @@ import tensorflow as tf
 
 from .transform import get_affine, warp
 from .utils import StreamingStats
-from .volume import from_blocks_numpy, standardize_numpy, to_blocks_numpy
+from .volume import from_blocks, from_blocks_numpy, standardize_numpy, to_blocks_numpy
 
 
 def predict(
@@ -429,6 +429,13 @@ def _get_model(path):
     )
 
 
+def _get_predictor(model_path):
+    """restores the tf estimator model.
+    The output is a tf2 estimator"""
+    predictor = tf.saved_model.load(model_path)
+    return predictor.signatures["serving_default"]
+
+
 def _transform_and_predict(
     model, x, block_shape, rotation, translation=[0, 0, 0], verbose=False
 ):
@@ -480,3 +487,156 @@ def _transform_and_predict(
     y = warp(y, inverse_affine, order=0).numpy()
 
     return y
+
+
+def predict_by_estimator(
+    filepath,
+    model_path,
+    block_shape,
+    batch_size=4,
+    normalizer=None,
+    n_samples=1,
+    return_variance=True,
+    return_entropy=True,
+):
+    """Predict on a volume given a filepath and a path to tensorflow1 estimator
+    saved model.
+
+    Parameters
+    ----------
+    filepath: path-like, path to existing neuroimaging volume on which
+        to predict.
+    model_path: path_like, path to saved tf1 estimator model, trained model.
+    block_shape: tuple of length 3, shape of sub-volumes on which to
+        predict.
+    batch_size: int, number of sub-volumes per batch for predictions.
+    normalizer: callable, function that accepts an ndarray and returns an
+        ndarray. Called before separating volume into blocks.
+    n_samples: The number of sampling. If set as 1, it will just return the
+        single prediction value. The default value is 1
+    return_variance: Boolean. If set True, it returns the running population
+        variance along with mean. Note, if the n_samples is smaller or equal to 1,
+        the variance will not be returned; instead it will return None
+    return_entropy: Boolean. If set True, it returns the running entropy.
+        along with mean.
+
+    Returns
+    -------
+    `nibabel.spatialimages.SpatialImage` or arrays of predictions of
+        mean, variance(optional), and entropy (optional).
+    """
+
+    if not Path(filepath).is_file():
+        raise FileNotFoundError("could not find file {}".format(filepath))
+
+    img = nib.load(filepath)
+    inputs = np.asarray(img.dataobj)
+    img.uncache()
+    inputs = inputs.astype(np.float32)
+
+    print("Normalizer being used {n}".format(n=normalizer))
+    if normalizer:
+        features = normalizer(inputs)
+        print(features.mean())
+        print(features.std())
+    else:
+        features = inputs
+
+    features = to_blocks_numpy(features, block_shape=block_shape)
+
+    # Add a dimension for single channel.
+    features = features[..., None]
+
+    # restores the tf estimator model
+    predictor = _get_predictor(model_path)
+
+    # Predict per block to reduce memory consumption.
+    n_blocks = features.shape[0]
+    n_batches = math.ceil(n_blocks / batch_size)
+
+    # Variational inference
+    means = np.zeros_like(features.squeeze(-1))
+    variances = np.zeros_like(features.squeeze(-1))
+    entropies = np.zeros_like(features.squeeze(-1))
+    progbar = tf.keras.utils.Progbar(n_batches)
+    progbar.update(0)
+    for j in range(0, n_blocks, batch_size):
+        this_x = tf.convert_to_tensor(features[j : j + batch_size])
+        s = StreamingStats()
+        for n in range(n_samples):
+            new_prediction = predictor(this_x)
+            s.update(new_prediction["probabilities"])
+
+        means[j : j + batch_size] = np.argmax(s.mean(), axis=-1)  # max mean
+        variances[j : j + batch_size] = np.sum(s.var(), axis=-1)
+        entropies[j : j + batch_size] = np.sum(s.entropy(), axis=-1)  # entropy
+        progbar.add(1)
+
+        total_means = from_blocks(means, output_shape=inputs.shape).numpy()
+        total_variance = from_blocks(variances, output_shape=inputs.shape).numpy()
+        total_entropy = from_blocks(entropies, output_shape=inputs.shape).numpy()
+
+    include_variance = (n_samples > 1) and (return_variance)
+    if include_variance:
+        if return_entropy:
+            # return in the form of a nifti image
+            total_means = nib.spatialimages.SpatialImage(
+                dataobj=total_means,
+                affine=img.affine,
+                header=img.header,
+                extra=img.extra,
+            )
+
+            total_variance = nib.spatialimages.SpatialImage(
+                dataobj=total_variance,
+                affine=img.affine,
+                header=img.header,
+                extra=img.extra,
+            )
+
+            total_entropy = nib.spatialimages.SpatialImage(
+                dataobj=total_entropy,
+                affine=img.affine,
+                header=img.header,
+                extra=img.extra,
+            )
+            return total_means, total_variance, total_entropy
+        else:
+            total_means = nib.spatialimages.SpatialImage(
+                dataobj=total_means,
+                affine=img.affine,
+                header=img.header,
+                extra=img.extra,
+            )
+
+            total_variance = nib.spatialimages.SpatialImage(
+                dataobj=total_variance,
+                affine=img.affine,
+                header=img.header,
+                extra=img.extra,
+            )
+            return total_means, total_variance
+    else:
+        if return_entropy:
+            total_means = nib.spatialimages.SpatialImage(
+                dataobj=total_means,
+                affine=img.affine,
+                header=img.header,
+                extra=img.extra,
+            )
+
+            total_entropy = nib.spatialimages.SpatialImage(
+                dataobj=total_entropy,
+                affine=img.affine,
+                header=img.header,
+                extra=img.extra,
+            )
+            return total_means, total_entropy
+        else:
+            total_means = nib.spatialimages.SpatialImage(
+                dataobj=total_means,
+                affine=img.affine,
+                header=img.header,
+                extra=img.extra,
+            )
+            return total_means
