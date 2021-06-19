@@ -117,8 +117,8 @@ def test_vnet():
 
 
 def test_bayesian_vnet_semi():
-    model_test(bayesian_vnet_semi, n_classes=30, input_shape=(1, 32, 32, 32, 1))
+    model_test(bayesian_vnet_semi, n_classes=1, input_shape=(32, 32, 32, 1))
 
 
 def test_bayesian_vnet():
-    model_test(bayesian_vnet, n_classes=50, input_shape=(1, 32, 32, 32, 1))
+    model_test(bayesian_vnet, n_classes=1, input_shape=(32, 32, 32, 1))
