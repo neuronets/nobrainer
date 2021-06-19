@@ -13,9 +13,9 @@ from .volume import (
     apply_random_transform_scalar_labels,
     binarize,
     replace,
+    standardize,
+    to_blocks,
 )
-from .volume import standardize as standardize_op
-from .volume import to_blocks
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
@@ -56,7 +56,7 @@ def get_dataset(
     n_epochs=None,
     mapping=None,
     augment=False,
-    standardize=True,
+    normalizer=standardize,
     shuffle_buffer_size=None,
     num_parallel_calls=AUTOTUNE,
 ):
@@ -89,6 +89,9 @@ def get_dataset(
     augment: boolean, if true, apply random rigid transformations to the
         features and labels. The rigid transformations are applied to the full
         volumes.
+    normalizer: callable, applies this normalization function when creating the
+        dataset. to maintain compatibility with prior nobrainer release, this is
+        set to standardize by default.
     shuffle_buffer_size: int, buffer of full volumes to shuffle. If this is not
         None, then the list of files found by 'file_pattern' is also shuffled
         at every iteration.
@@ -122,9 +125,9 @@ def get_dataset(
         num_parallel_calls=num_parallel_calls,
     )
 
-    if standardize:
+    if normalizer is not None:
         # Standard-score the features.
-        dataset = dataset.map(lambda x, y: (standardize_op(x), y))
+        dataset = dataset.map(lambda x, y: (normalizer(x), y))
 
     # Augment examples if requested.
     if augment:
