@@ -1,15 +1,12 @@
 import tensorflow as tf
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf2
-import tensorflow.keras.backend as K
-from tensorflow.keras.callbacks import Callback
-from tensorflow.keras.losses import binary_crossentropy
-from tensorflow.python.keras.losses import LossFunctionWrapper
 import tensorflow_probability as tfp
 from tensorflow_probability.python.distributions import (
     deterministic as deterministic_lib,
+from tensorflow_probability.python.distributions import (
+        independent as independent_lib
 )
-from tensorflow_probability.python.distributions import independent as independent_lib
 from tensorflow_probability.python.distributions import normal as normal_lib
 
 tfd = tfp.distributions
