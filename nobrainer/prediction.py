@@ -549,8 +549,6 @@ def predict_by_estimator(
 
     # restores the tf estimator model
     predictor = _get_predictor(model_path)
-    # predictor = tf.saved_model.load(model_path)
-    # predictor.signatures['serving_default']
 
     # Predict per block to reduce memory consumption.
     n_blocks = features.shape[0]
