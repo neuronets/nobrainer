@@ -1,1 +1,0 @@
-# asdnet tensorflow implementation
