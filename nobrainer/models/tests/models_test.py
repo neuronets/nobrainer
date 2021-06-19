@@ -9,7 +9,8 @@ from ..meshnet import meshnet
 from ..progressivegan import progressivegan
 from ..unet import unet
 from ..vnet import vnet
-
+from ..bayesian_vnet_semi import bayesian_vnet_semi
+from ..bayesian_vnet import bayesian_vnet
 
 def model_test(model_cls, n_classes, input_shape, kwds={}):
     """Tests for models."""
@@ -114,10 +115,8 @@ def test_progressivegan():
 def test_vnet():
     model_test(vnet, n_classes=1, input_shape=(1, 32, 32, 32, 1))
 
-
 def test_bayesian_vnet_semi():
     model_test(bayesian_vnet_semi, n_classes=30, input_shape=(1, 32, 32, 32, 1))
-
 
 def test_bayesian_vnet():
     model_test(bayesian_vnet, n_classes=50, input_shape=(1, 32, 32, 32, 1))
