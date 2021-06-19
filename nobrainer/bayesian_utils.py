@@ -83,7 +83,7 @@ def prior_fn_for_bayesian(init_scale_mean=-1, init_scale_std=0.1):
     return prior_fn
 
 
-def normal_prior(prior_std):
+def normal_prior(prior_std = 1.0):
     """Defines normal distributions prior for Bayesian neural network."""
 
     def prior_fn(dtype, shape, name, trainable, add_variable_fn):
