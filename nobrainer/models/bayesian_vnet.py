@@ -1,20 +1,21 @@
 # Full bayesian adaptation of the Vnet model from https://arxiv.org/pdf/1606.04797.pdf
-from tensorflow.keras.layers import (
-    Input,
-    MaxPooling3D,
-    UpSampling3D,
-    concatenate,
-)
+from tensorflow.keras.layers import Input, MaxPooling3D, UpSampling3D, concatenate
 from tensorflow.keras.models import Model
 import tensorflow_probability as tfp
 
-from nobrainer.layers.groupnorm import GroupNormalization
 from nobrainer.bayesian_utils import normal_prior
+from nobrainer.layers.groupnorm import GroupNormalization
 
 
 def down_stage(
-    inputs, filters, prior_fn, kernel_posterior_fn,
-        kld, kernel_size=3, activation="relu", padding="SAME"
+    inputs,
+    filters,
+    prior_fn,
+    kernel_posterior_fn,
+    kld,
+    kernel_size=3,
+    activation="relu",
+    padding="SAME",
 ):
     conv = tfp.layers.Convolution3DFlipout(
         filters,
@@ -41,12 +42,22 @@ def down_stage(
 
 
 def up_stage(
-    inputs, skip, filters, prior_fn, kernel_posterior_fn,
-        kld, kernel_size=3, activation="relu", padding="SAME"
+    inputs,
+    skip,
+    filters,
+    prior_fn,
+    kernel_posterior_fn,
+    kld,
+    kernel_size=3,
+    activation="relu",
+    padding="SAME",
 ):
     up = UpSampling3D()(inputs)
     up = tfp.layers.Convolution3DFlipout(
-        filters, 2, activation=activation, padding=padding, 
+        filters,
+        2,
+        activation=activation,
+        padding=padding,
         kernel_divergence_fn=kld,
         kernel_posterior_fn=kernel_posterior_fn,
         kernel_prior_fn=prior_fn,
@@ -78,6 +89,7 @@ def up_stage(
     conv = GroupNormalization()(conv)
 
     return conv
+
 
 def end_stage(
     inputs,
@@ -120,7 +132,7 @@ def end_stage(
 
 
 def bayesian_vnet(
-    n_classes = 1,
+    n_classes=1,
     input_shape=(280, 280, 280, 1),
     kernel_size=3,
     prior_fn=normal_prior(),
@@ -208,14 +220,14 @@ def bayesian_vnet(
     )
 
     conv8 = end_stage(
-        conv7, 
+        conv7,
         prior_fn,
         kernel_posterior_fn,
         kld,
         n_classes=n_classes,
-        kernel_size=kernel_size, 
-        activation=activation, 
-        padding=padding
+        kernel_size=kernel_size,
+        activation=activation,
+        padding=padding,
     )
 
     return Model(inputs=inputs, outputs=conv8)
