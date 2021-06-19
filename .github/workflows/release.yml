@@ -41,7 +41,10 @@ jobs:
           chmod a+x ~/auto
 
       - name: Create release
-        run: ~/auto shipit -vv
+        run: |
+          ~/auto shipit -vv
+          python -m build
+          twine upload dist/*          
         env:
           GH_TOKEN: ${{ secrets.AUTO_USER_TOKEN }}
           TWINE_USERNAME: __token__
