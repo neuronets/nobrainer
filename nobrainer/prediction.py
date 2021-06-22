@@ -534,11 +534,8 @@ def predict_by_estimator(
     img.uncache()
     inputs = inputs.astype(np.float32)
 
-    print("Normalizer being used {n}".format(n=normalizer))
     if normalizer:
         features = normalizer(inputs)
-        print(features.mean())
-        print(features.std())
     else:
         features = inputs
 

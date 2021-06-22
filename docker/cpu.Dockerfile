@@ -2,7 +2,8 @@ FROM tensorflow/tensorflow:2.5.0-jupyter
 RUN curl -sSL http://neuro.debian.net/lists/bionic.us-nh.full | tee /etc/apt/sources.list.d/neurodebian.sources.list \
   && export GNUPGHOME="$(mktemp -d)" \
   && echo "disable-ipv6" >> ${GNUPGHOME}/dirmngr.conf \
-  && apt-key adv --homedir $GNUPGHOME --recv-keys --keyserver hkp://pool.sks-keyservers.net:80 0xA5D32F012649A5A9 \
+  && (apt-key adv --homedir $GNUPGHOME --recv-keys --keyserver hkp://pgpkeys.eu 0xA5D32F012649A5A9 \
+  || { curl -sSL http://neuro.debian.net/_static/neuro.debian.net.asc | apt-key add -; } ) \
   && apt-get update \
   && apt-get install -y git-annex-standalone git \
   && rm -rf /tmp/*
