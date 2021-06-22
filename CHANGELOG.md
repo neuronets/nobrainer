@@ -1,3 +1,22 @@
+# 0.1.1 (Tue Jun 22 2021)
+
+#### 🐛 Bug Fix
+
+- fix: replace key retrieval and normalizers [#157](https://github.com/neuronets/nobrainer/pull/157) ([@satra](https://github.com/satra))
+- fix: separate auto release and publish to pypi [#156](https://github.com/neuronets/nobrainer/pull/156) ([@satra](https://github.com/satra))
+- [pre-commit.ci] pre-commit autoupdate [#154](https://github.com/neuronets/nobrainer/pull/154) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+
+#### ⚠️ Pushed to `master`
+
+- fix: add twine upload to release ([@satra](https://github.com/satra))
+
+#### Authors: 2
+
+- [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot])
+- Satrajit Ghosh ([@satra](https://github.com/satra))
+
+---
+
 # 0.1.0 (Sat Jun 19 2021)
 
 #### 🚀 Enhancement
