@@ -2,10 +2,14 @@ import numpy as np
 import pytest
 import tensorflow as tf
 
-from nobrainer.models.highresnet import highresnet
-from nobrainer.models.meshnet import meshnet
-from nobrainer.models.unet import unet
-from nobrainer.models.autoencoder import autoencoder
+from ..autoencoder import autoencoder
+from ..bayesian_vnet import bayesian_vnet
+from ..bayesian_vnet_semi import bayesian_vnet_semi
+from ..highresnet import highresnet
+from ..meshnet import meshnet
+from ..progressivegan import progressivegan
+from ..unet import unet
+from ..vnet import vnet
 
 
 def model_test(model_cls, n_classes, input_shape, kwds={}):
@@ -70,3 +74,51 @@ def test_autoencoder():
 
     actual_output = model.predict(x)
     assert actual_output.shape == x.shape
+
+
+def test_progressivegan():
+    """Test for both discriminator and generator of progressive gan"""
+
+    latent_size = 256
+    label_size = 2
+    g_fmap_base = 1024
+    d_fmap_base = 1024
+    alpha = 1.0
+
+    generator, discriminator = progressivegan(
+        latent_size,
+        label_size=label_size,
+        g_fmap_base=g_fmap_base,
+        d_fmap_base=d_fmap_base,
+    )
+
+    resolutions = [8, 16]
+
+    for res in resolutions:
+        generator.add_resolution()
+        discriminator.add_resolution()
+
+        latent_input = np.random.random((10, latent_size))
+        real_image_input = np.random.random((10, res, res, res, 1))
+
+        fake_images = generator([latent_input, alpha])
+        real_pred, real_labels_pred = discriminator([real_image_input, alpha])
+        fake_pred, fake_labels_pred = discriminator([fake_images, alpha])
+
+        assert fake_images.shape == real_image_input.shape
+        assert real_pred.shape == (real_image_input.shape[0],)
+        assert fake_pred.shape == (real_image_input.shape[0],)
+        assert real_labels_pred.shape == (real_image_input.shape[0], label_size)
+        assert fake_labels_pred.shape == (real_image_input.shape[0], label_size)
+
+
+def test_vnet():
+    model_test(vnet, n_classes=1, input_shape=(1, 32, 32, 32, 1))
+
+
+def test_bayesian_vnet_semi():
+    model_test(bayesian_vnet_semi, n_classes=1, input_shape=(1, 32, 32, 32, 1))
+
+
+def test_bayesian_vnet():
+    model_test(bayesian_vnet, n_classes=1, input_shape=(1, 32, 32, 32, 1))

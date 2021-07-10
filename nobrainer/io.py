@@ -8,6 +8,8 @@ import nibabel as nib
 import numpy as np
 import tensorflow as tf
 
+from .utils import get_num_parallel
+
 _TFRECORDS_FEATURES_DTYPE = "float32"
 
 
@@ -86,7 +88,7 @@ def verify_features_labels(
         if len(pair) != 2:
             raise ValueError(
                 "all items in 'volume_filepaths' must have length of 2, but"
-                " found at least one item with lenght != 2."
+                " found at least one item with length != 2."
             )
 
     labels = (y for _, y in volume_filepaths)
@@ -101,7 +103,9 @@ def verify_features_labels(
 
     if scalar_labels:
         map_fn = functools.partial(
-            _verify_features_scalar_labels, volume_shape=volume_shape
+            _verify_features_scalar_labels,
+            volume_shape=volume_shape,
+            check_shape=check_shape,
         )
     else:
         map_fn = functools.partial(
@@ -112,9 +116,7 @@ def verify_features_labels(
             check_labels_gte_zero=check_labels_gte_zero,
         )
     if num_parallel_calls is None:
-        # Get number of processes allocated to the current process.
-        # Note the difference from `os.cpu_count()`.
-        num_parallel_calls = len(os.sched_getaffinity(0))
+        num_parallel_calls = get_num_parallel()
 
     print("Verifying {} examples".format(len(volume_filepaths)))
     progbar = tf.keras.utils.Progbar(len(volume_filepaths), verbose=verbose)
@@ -166,14 +168,19 @@ def _verify_features_nonscalar_labels(
     return True
 
 
-def _verify_features_scalar_labels(path_scalar, *, volume_shape):
+def _verify_features_scalar_labels(path_scalar, *, volume_shape, check_shape):
     """Check that feature has the desired shape and that label is scalar."""
     from nobrainer.tfrecord import _is_int_or_float
 
     feature, label = path_scalar
     x = nib.load(feature)
-    if x.shape != volume_shape:
-        return False
+    if check_shape:
+        if not volume_shape:
+            raise ValueError(
+                "`volume_shape` must be specified if `check_shape` is true."
+            )
+        if x.shape != volume_shape:
+            return False
     if not _is_int_or_float(label):
         return False
     return True

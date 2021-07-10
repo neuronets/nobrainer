@@ -3,8 +3,8 @@ from pathlib import Path
 import numpy as np
 from numpy.testing import assert_allclose
 
-from nobrainer.io import read_csv
-import nobrainer.utils as nbutils
+from .. import utils as nbutils
+from ..io import read_csv
 
 
 def test_get_data():

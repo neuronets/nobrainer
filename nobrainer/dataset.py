@@ -6,14 +6,16 @@ import math
 import numpy as np
 import tensorflow as tf
 
-from nobrainer.io import _is_gzipped
-from nobrainer.tfrecord import parse_example_fn
-from nobrainer.volume import apply_random_transform
-from nobrainer.volume import apply_random_transform_scalar_labels
-from nobrainer.volume import binarize
-from nobrainer.volume import replace
-from nobrainer.volume import standardize
-from nobrainer.volume import to_blocks
+from .io import _is_gzipped
+from .tfrecord import parse_example_fn
+from .volume import (
+    apply_random_transform,
+    apply_random_transform_scalar_labels,
+    binarize,
+    replace,
+    standardize,
+    to_blocks,
+)
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
@@ -54,6 +56,7 @@ def get_dataset(
     n_epochs=None,
     mapping=None,
     augment=False,
+    normalizer=standardize,
     shuffle_buffer_size=None,
     num_parallel_calls=AUTOTUNE,
 ):
@@ -86,6 +89,9 @@ def get_dataset(
     augment: boolean, if true, apply random rigid transformations to the
         features and labels. The rigid transformations are applied to the full
         volumes.
+    normalizer: callable, applies this normalization function when creating the
+        dataset. to maintain compatibility with prior nobrainer release, this is
+        set to standardize by default.
     shuffle_buffer_size: int, buffer of full volumes to shuffle. If this is not
         None, then the list of files found by 'file_pattern' is also shuffled
         at every iteration.
@@ -119,8 +125,9 @@ def get_dataset(
         num_parallel_calls=num_parallel_calls,
     )
 
-    # Standard-score the features.
-    dataset = dataset.map(lambda x, y: (standardize(x), y))
+    if normalizer is not None:
+        # Standard-score the features.
+        dataset = dataset.map(lambda x, y: (normalizer(x), y))
 
     # Augment examples if requested.
     if augment:
