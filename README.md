@@ -86,7 +86,7 @@ $ singularity pull docker://neuronets/nobrainer:latest-cpu
 
 ### pip
 
-_Nobrainer_ can also be installed with pip. 
+_Nobrainer_ can also be installed with pip.
 
 ```
 $ pip install --no-cache-dir nobrainer
