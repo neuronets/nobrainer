@@ -10,10 +10,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Prepare repository
-        # Fetch full git history and tags
-        run: git fetch --unshallow --tags
-
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
