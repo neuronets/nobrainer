@@ -20,7 +20,7 @@ repos:
     hooks:
     - id: flake8
 -   repo: https://github.com/PyCQA/isort
-    rev: 5.9.1
+    rev: 5.9.2
     hooks:
     -   id: isort
         exclude: ^(nobrainer/_version\.py|versioneer\.py)$
