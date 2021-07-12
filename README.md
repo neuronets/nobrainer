@@ -86,13 +86,10 @@ $ singularity pull docker://neuronets/nobrainer:latest-cpu
 
 ### pip
 
-_Nobrainer_ can also be installed with pip. Use the extra `[gpu]` to install
-TensorFlow with GPU support and the `[cpu]` extra to install TensorFlow without
-GPU support. GPU support requires CUDA 10, which requires Linux NVIDIA drivers
-`>=410.48`.
+_Nobrainer_ can also be installed with pip. 
 
 ```
-$ pip install --no-cache-dir nobrainer[gpu]
+$ pip install --no-cache-dir nobrainer
 ```
 
 ## Using pre-trained networks
