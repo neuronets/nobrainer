@@ -1,5 +1,3 @@
-"""Implementations of metrics for 3D semantic segmentation."""
-
 import tensorflow as tf
 
 
@@ -9,11 +7,9 @@ def average_volume_difference():
 
 def dice(y_true, y_pred, axis=(1, 2, 3, 4)):
     """Calculate Dice similarity between labels and predictions.
-
     Dice similarity is in [0, 1], where 1 is perfect overlap and 0 is no
     overlap. If both labels and predictions are empty (e.g., all background),
     then Dice similarity is 1.
-
     If we assume the inputs are rank 5 [`(batch, x, y, z, classes)`], then an
     axis parameter of `(1, 2, 3)` will result in a tensor that contains a Dice
     score for every class in every item in the batch. The shape of this tensor
@@ -21,13 +17,10 @@ def dice(y_true, y_pred, axis=(1, 2, 3, 4)):
     segmentation), then an axis parameter of `(1, 2, 3, 4)` should be used.
     This will result in a tensor of shape `(batch,)`, where every value is the
     Dice similarity for that prediction.
-
     Implemented according to https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4533825/#Equ6
-
     Returns
     -------
     Tensor of Dice similarities.
-
     Citations
     ---------
     Taha AA, Hanbury A. Metrics for evaluating 3D medical image segmentation:
@@ -46,12 +39,10 @@ def dice(y_true, y_pred, axis=(1, 2, 3, 4)):
 def generalized_dice(y_true, y_pred, axis=(1, 2, 3)):
     """Calculate Generalized Dice similarity. This is useful for multi-class
     predictions.
-
     If we assume the inputs are rank 5 [`(batch, x, y, z, classes)`], then an
     axis parameter of `(1, 2, 3)` should be used. This will result in a tensor
     of shape `(batch,)`, where every value is the Generalized Dice similarity
     for that prediction, across all classes.
-
     Returns
     -------
     Tensor of Generalized Dice similarities.
@@ -63,10 +54,14 @@ def generalized_dice(y_true, y_pred, axis=(1, 2, 3)):
         raise ValueError("y_true and y_pred must be at least rank 2.")
 
     epsilon = tf.keras.backend.epsilon()
-    w = tf.math.reciprocal(tf.square(tf.reduce_sum(y_true, axis=axis)) + epsilon)
-    num = 2 * tf.reduce_sum(w * tf.reduce_sum(y_true * y_pred, axis=axis), axis=-1)
-    den = tf.reduce_sum(w * tf.reduce_sum(y_true + y_pred, axis=axis), axis=-1)
-    return (num + epsilon) / (den + epsilon)
+    
+    w = tf.math.reciprocal(tf.square(tf.reduce_sum(y_true, axis=axis)))
+    w = tf.where(tf.math.is_finite(w), w, epsilon)
+    num = 2 * tf.reduce_sum(w * tf.reduce_sum(y_true * y_pred, axis= axis), axis=-1)
+    den = tf.reduce_sum(w * tf.reduce_sum(y_true + y_pred, axis= axis), axis=-1)
+    gdice = num/den
+    gdice = tf.where(tf.math.is_finite(gdice), gdice, tf.zeros_like(gdice))
+    return gdice
 
 
 def hamming(y_true, y_pred, axis=(1, 2, 3)):
@@ -81,11 +76,9 @@ def haussdorf():
 
 def jaccard(y_true, y_pred, axis=(1, 2, 3, 4)):
     """Calculate Jaccard similarity between labels and predictions.
-
     Jaccard similarity is in [0, 1], where 1 is perfect overlap and 0 is no
     overlap. If both labels and predictions are empty (e.g., all background),
     then Jaccard similarity is 1.
-
     If we assume the inputs are rank 5 [`(batch, x, y, z, classes)`], then an
     axis parameter of `(1, 2, 3)` will result in a tensor that contains a Jaccard
     score for every class in every item in the batch. The shape of this tensor
@@ -93,13 +86,10 @@ def jaccard(y_true, y_pred, axis=(1, 2, 3, 4)):
     segmentation), then an axis parameter of `(1, 2, 3, 4)` should be used.
     This will result in a tensor of shape `(batch,)`, where every value is the
     Jaccard similarity for that prediction.
-
     Implemented according to https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4533825/#Equ7
-
     Returns
     -------
     Tensor of Jaccard similarities.
-
     Citations
     ---------
     Taha AA, Hanbury A. Metrics for evaluating 3D medical image segmentation:
@@ -132,3 +122,10 @@ def tversky(y_true, y_pred, axis=(1, 2, 3), alpha=0.3, beta=0.7):
     )
     # Sum over classes.
     return tf.reduce_sum((num + eps) / (den + eps), axis=-1)
+
+def dice_coef_multilabel(y_true, y_pred):
+    n_classes= tf.shape(y_pred)[-1]
+    dice_coeff=0
+    for index in range(n_classes):
+        dice_coeff -= dice(y_true[:,:,:,:,index], y_pred[:,:,:,:,index])
+    return dice_coeff
