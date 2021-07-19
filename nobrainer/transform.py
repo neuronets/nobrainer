@@ -93,8 +93,8 @@ def get_affine(volume_shape, rotation=[0, 0, 0], translation=[0, 0, 0]):
     volume_shape = tf.cast(volume_shape, tf.float32)
     rotation = tf.cast(rotation, tf.float32)
     translation = tf.cast(translation, tf.float32)
-    if volume_shape.shape[0] != 3:
-        raise ValueError("`volume_shape` must have three values")
+    if volume_shape.shape[0] < 3:
+        raise ValueError("`volume_shape` must have at least three values")
     if rotation.shape[0] != 3:
         raise ValueError("`rotation` must have three values")
     if translation.shape[0] != 3:
@@ -137,7 +137,7 @@ def get_affine(volume_shape, rotation=[0, 0, 0], translation=[0, 0, 0]):
     # Rotation around origin.
     transform = rz @ ry @ rx
 
-    center = tf.convert_to_tensor(volume_shape / 2 - 0.5, dtype=tf.float32)
+    center = tf.convert_to_tensor(volume_shape[:3] / 2 - 0.5, dtype=tf.float32)
     neg_center = tf.math.negative(center)
     center_to_origin = tf.convert_to_tensor(
         [
@@ -196,10 +196,10 @@ def _get_coordinates(volume_shape):
     -------
     Tensor of coordinates with shape `(prod(volume_shape), 3)`.
     """
-    if len(volume_shape) != 3:
-        raise ValueError("shape must have 3 items.")
+    if len(volume_shape) < 3:
+        raise ValueError("shape must have at least 3 items.")
     dtype = tf.float32
-    rows, cols, depth = volume_shape
+    rows, cols, depth = volume_shape[:3]
 
     out = tf.meshgrid(
         tf.range(rows, dtype=dtype),
@@ -260,7 +260,11 @@ def _trilinear_interpolation(volume, coords):
     i111 = x1 * ylen * zlen + y1 * zlen + z1
 
     # Get volume values at corners of cube.
-    volume_flat = tf.reshape(volume, [-1])
+    if len(volume.shape) == 3:
+        volume_flat = tf.reshape(volume, [-1])
+    else:
+        volume_flat = tf.reshape(volume, [-1, volume.shape[-1]])
+
     c000 = tf.gather(volume_flat, i000)
     c001 = tf.gather(volume_flat, i001)
     c010 = tf.gather(volume_flat, i010)
@@ -273,6 +277,12 @@ def _trilinear_interpolation(volume, coords):
     xd = coords[:, 0] - tf.cast(x0, tf.float32)
     yd = coords[:, 1] - tf.cast(y0, tf.float32)
     zd = coords[:, 2] - tf.cast(z0, tf.float32)
+
+    if len(volume.shape) == 4:
+        # Add a channels axis for proper broadcasting
+        xd = xd[:, tf.newaxis]
+        yd = yd[:, tf.newaxis]
+        zd = zd[:, tf.newaxis]
 
     # Interpolate along x-axis.
     c00 = c000 * (1 - xd) + c100 * xd

@@ -15,8 +15,8 @@ def apply_random_transform(features, labels):
     interpolated trilinearly, and labels are interpolated with nearest
     neighbors.
     """
-    if len(features.shape) != 3 or len(labels.shape) != 3:
-        raise ValueError("features and labels must be rank 3")
+    if len(features.shape) < 3 or len(labels.shape) < 3:
+        raise ValueError("features and labels must be at least rank 3")
     if features.shape != labels.shape:
         raise ValueError("shape of features and labels must be the same.")
     # Rotate -180 degrees to 180 degrees in three dimensions.
@@ -44,8 +44,8 @@ def apply_random_transform_scalar_labels(features, labels):
     Features are interpolated trilinearly, and labels are unchanged because they are
     scalars.
     """
-    if len(features.shape) != 3:
-        raise ValueError("features must be rank 3")
+    if len(features.shape) < 3:
+        raise ValueError("features must be at least rank 3")
     if len(labels.shape) != 1:
         raise ValueError("labels must be rank 1")
     # Rotate -180 degrees to 180 degrees in three dimensions.
@@ -146,6 +146,52 @@ def standardize(x):
     return (x - mean) / std
 
 
+def _to_blocks_perm(ndims):
+    """Build permutation vector to go from volume to blocks.
+    
+    For 3D input, perm will be (0, 2, 4, 1, 3, 5). For 4D input (i.e. 3D volume
+    with channels), perm will be (0, 2, 4, 6, 1, 3, 5, 7). Higher dimensional
+    input is possible here.
+
+    Parameters
+    ----------
+    ndims : int
+        Number of dimensions in blocks and volumes.
+    
+    Returns
+    -------
+    perm : tuple
+        The permutation vector
+    """
+    perm = np.empty(2 * ndims, dtype=int)
+    perm[:ndims] = np.arange(0, ndims * 2, 2)
+    perm[ndims:] = np.arange(1, ndims * 2, 2)
+    return tuple(perm)
+
+
+def _from_blocks_perm(ndims):
+    """Build permutation vector to go from blocks to volume.
+    
+    For 3D input, perm will be (0, 3, 1, 4, 2, 5). For 4D input (i.e. 3D volume
+    with channels), perm will be (0, 4, 1, 5, 2, 6, 3, 7). Higher dimensional
+    input is possible here.
+
+    Parameters
+    ----------
+    ndims : int
+        Number of dimensions in blocks and volumes.
+    
+    Returns
+    -------
+    perm : tuple
+        The permutation vector
+    """
+    perm = np.empty(2 * ndims, dtype=int)
+    perm[::2] = np.arange(ndims)
+    perm[1::2] = np.arange(ndims, 2 * ndims)
+    return tuple(perm)
+
+
 def to_blocks(x, block_shape):
     """Split tensor into non-overlapping blocks of shape `block_shape`.
 
@@ -165,15 +211,16 @@ def to_blocks(x, block_shape):
 
     if isinstance(block_shape, int) == 1:
         block_shape = list(block_shape) * 3
-    elif len(block_shape) != 3:
-        raise ValueError("expected block_shape to be 1 or 3 values.")
+    elif len(block_shape) < 3:
+        raise ValueError("expected block_shape to be 1 or >= 3 values.")
 
     block_shape = np.asarray(block_shape)
     blocks = volume_shape // block_shape
 
     inter_shape = list(itertools.chain(*zip(blocks, block_shape)))
     new_shape = (-1, *block_shape)
-    perm = (0, 2, 4, 1, 3, 5)  # 3D only
+    perm = _to_blocks_perm(ndims=len(block_shape))
+
     return tf.reshape(
         tf.transpose(tf.reshape(x, shape=inter_shape), perm=perm), shape=new_shape
     )
@@ -202,8 +249,11 @@ def from_blocks(x, output_shape):
     if not ncbrt.is_integer():
         raise ValueError("Cubed root of number of blocks is not an integer")
     ncbrt = int(ncbrt)
+    perm = _from_blocks_perm(ndims=len(block_shape))
     intershape = (ncbrt, ncbrt, ncbrt, *block_shape)
-    perm = (0, 3, 1, 4, 2, 5)  # 3D only
+    # Allow channels (i.e. 4D)
+    if len(block_shape) == 4:
+        intershape = (ncbrt, ncbrt, ncbrt, 1, *block_shape)
 
     return tf.reshape(
         tf.transpose(tf.reshape(x, shape=intershape), perm=perm), shape=output_shape
@@ -299,9 +349,13 @@ def from_blocks_numpy(a, output_shape):
     if not ncbrt.is_integer():
         raise ValueError("Cubed root of number of blocks is not an integer")
     ncbrt = int(ncbrt)
+    perm = _from_blocks_perm(ndims=len(block_shape))
     intershape = (ncbrt, ncbrt, ncbrt, *block_shape)
+    # Allow channels (i.e. 4D)
+    if len(block_shape) == 4:
+        intershape = (ncbrt, ncbrt, ncbrt, 1, *block_shape)
 
-    return a.reshape(intershape).transpose((0, 3, 1, 4, 2, 5)).reshape(output_shape)
+    return a.reshape(intershape).transpose(perm).reshape(output_shape)
 
 
 def to_blocks_numpy(a, block_shape):
@@ -331,7 +385,8 @@ def to_blocks_numpy(a, block_shape):
     blocks = orig_shape // block_shape
     inter_shape = tuple(e for tup in zip(blocks, block_shape) for e in tup)
     new_shape = (-1,) + block_shape
-    perm = (0, 2, 4, 1, 3, 5)
+    perm = _to_blocks_perm(ndims=len(block_shape))
+
     return a.reshape(inter_shape).transpose(perm).reshape(new_shape)
 
 
