@@ -1,10 +1,8 @@
-import math
-
 import numpy as np
 import tensorflow as tf
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf2
-from tensorflow.python.ops import init_ops, nn_impl
+from tensorflow.python.ops import nn_impl
 import tensorflow_probability as tfp
 from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.distributions import (
