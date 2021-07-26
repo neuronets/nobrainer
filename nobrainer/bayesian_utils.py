@@ -15,7 +15,6 @@ from tensorflow_probability.python.distributions import normal as normal_lib
 
 tfd = tfp.distributions
 
-
 def default_loc_scale_fn(
     is_singular=True,
     loc_initializer=tf1.initializers.random_normal(stddev=0.1),
@@ -75,8 +74,8 @@ def default_loc_scale_fn(
 
 def default_mean_field_normal_fn(
     is_singular=True,
-    loc_initializer=tf.keras.initializers.he_normal(),  # tf1.initializers.random_normal(stddev=0.1),
-    untransformed_scale_initializer=tf.constant_initializer(0.0001),  #
+    loc_initializer=tf.keras.initializers.he_normal(), 
+    untransformed_scale_initializer=tf.constant_initializer(0.0001),
     loc_regularizer=None,  # tf.keras.regularizers.l2(), #None
     untransformed_scale_regularizer=None,  # tf.keras.regularizers.l2(), #None
     loc_constraint=None,  # tf.keras.constraints.UnitNorm(axis = [0, 1, 2,3]),
@@ -95,13 +94,15 @@ def default_mean_field_normal_fn(
     )
 
     def _fn(dtype, shape, name, trainable, add_variable_fn):
-        loc, scale = loc_scale_fn(dtype, shape, name, trainable, add_variable_fn)
+        loc, scale = loc_scale_fn(dtype, shape, name, 
+                                  trainable, add_variable_fn)
         if scale is None:
             dist = deterministic_lib.Deterministic(loc=loc)
         else:
             dist = normal_lib.Normal(loc=loc, scale=scale)
         batch_ndims = tf2.size(dist.batch_shape_tensor())
-        return independent_lib.Independent(dist, reinterpreted_batch_ndims=batch_ndims)
+        return independent_lib.Independent(dist,
+                                  reinterpreted_batch_ndims=batch_ndims)
 
     return _fn
 
