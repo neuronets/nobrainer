@@ -3,6 +3,7 @@
 import glob
 import math
 
+import fsspec
 import numpy as np
 import tensorflow as tf
 
@@ -126,15 +127,15 @@ def get_dataset(
     labels is `(batch_size, *volume_shape, n_classes)`. If `scalar_label` is `True,
     the shape of labels is always `(batch_size,)`.
     """
-
-    files = glob.glob(file_pattern)
+    fs, _, _ = fsspec.get_fs_token_paths(file_pattern)
+    files = fs.glob(file_pattern)
     if not files:
         raise ValueError("no files found for pattern '{}'".format(file_pattern))
 
     # Create dataset of all TFRecord files. After this point, the dataset will have
     # two value per iteration: (feature, label).
     shuffle = bool(shuffle_buffer_size)
-    compressed = _is_gzipped(files[0])
+    compressed = _is_gzipped(files[0], filesys=fs)
     dataset = tfrecord_dataset(
         file_pattern=file_pattern,
         volume_shape=volume_shape,
