@@ -273,9 +273,9 @@ def cosine_similarity(encoder_out, pred_out):
 class CosineSimilarity(LossFunctionWrapper):
     """Computes the similarity loss between two outputs from a contrastive or self
     supervised learning frameworks involving two augmented pairs of an image/volume as
-    pairwise input to the network. The final value is in the range of [-1, 1]. When it is a negative number between -1 and 0, 
+    pairwise input to the network. The final value is in the range of [-1, 1]. When it is a negative number between -1 and 0,
     0 indicates orthogonality and values closer to -1 indicate greater similarity.
-    The values closer to 1 indicate greater dissimilarity. Minimizing this value, i.e. bringing it closer to -1, 
+    The values closer to 1 indicate greater dissimilarity. Minimizing this value, i.e. bringing it closer to -1,
     implies maximizing the similarity between representations. RETURNS a weighted-loss float Tensor.
 
     Use this loss for self supervised representation tasks. `encoder out` and `pred_out`

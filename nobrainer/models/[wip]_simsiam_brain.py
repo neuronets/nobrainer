@@ -3,13 +3,13 @@ Extending the SimSiam network architecture to brain volumes
 author: Dhritiman Das
 """
 
-import tensorflow as tf
-
-import nobrainer
-import numpy as np
 import nibabel
 import nilearn
 from nilearn import plotting
+import numpy as np
+import tensorflow as tf
+
+import nobrainer
 
 csv_of_filepaths = nobrainer.utils.get_data()
 filepaths = nobrainer.io.read_csv(csv_of_filepaths)
@@ -24,7 +24,6 @@ evaluate_paths = filepaths[9:]
 
 import matplotlib.pyplot as plt
 
-
 invalid = nobrainer.io.verify_features_labels(pre_train_paths_1)
 assert not invalid
 
@@ -38,125 +37,121 @@ invalid = nobrainer.io.verify_features_labels(evaluate_paths)
 assert not invalid
 
 
-#convert pretrain, train and validation data to tf records
+# convert pretrain, train and validation data to tf records
 
-#for pretrain
+# for pretrain
 nobrainer.tfrecord.write(
     features_labels=pre_train_paths_1,
-    filename_template = 'data/data-pre-train-1_shard-{shard:03d}.tfrec',
-    examples_per_shard = 2
+    filename_template="data/data-pre-train-1_shard-{shard:03d}.tfrec",
+    examples_per_shard=2,
 )
 
 nobrainer.tfrecord.write(
     features_labels=pre_train_paths_2,
-    filename_template = 'data/data-pre-train-2_shard-{shard:03d}.tfrec',
-    examples_per_shard = 2
+    filename_template="data/data-pre-train-2_shard-{shard:03d}.tfrec",
+    examples_per_shard=2,
 )
 
-#for training
+# for training
 nobrainer.tfrecord.write(
     features_labels=train_paths,
-    filename_template = 'data/data-train_shard-{shard:03d}.tfrec',
-    examples_per_shard = 3
+    filename_template="data/data-train_shard-{shard:03d}.tfrec",
+    examples_per_shard=3,
 )
 
 # for validation
 nobrainer.tfrecord.write(
     features_labels=evaluate_paths,
-    filename_template = 'data/data-evaluate_shard-{shard:03d}.tfrec',
-    examples_per_shard = 1
+    filename_template="data/data-evaluate_shard-{shard:03d}.tfrec",
+    examples_per_shard=1,
 )
 
-n_classes=1
-batch_size=1
+n_classes = 1
+batch_size = 1
 volume_shape = (256, 256, 256)
 block_shape = (64, 64, 64)
 n_epochs = None
 shuffle_buffer_size = 10
 num_parallel_calls = 2
 
-#----for downstream tasks---------
+# ----for downstream tasks---------
 
 # create dataset -- train
 dataset_train = nobrainer.dataset.get_dataset(
-    file_pattern = "data/data-train_shard*.tfrec",
-    n_classes = n_classes,
-    batch_size = batch_size,
-    volume_shape = volume_shape,
+    file_pattern="data/data-train_shard*.tfrec",
+    n_classes=n_classes,
+    batch_size=batch_size,
+    volume_shape=volume_shape,
     block_shape=block_shape,
     n_epochs=n_epochs,
     shuffle_buffer_size=shuffle_buffer_size,
     num_parallel_calls=num_parallel_calls,
-
 )
 
 # create dataset -- evaluate
 
 dataset_evaluate = nobrainer.dataset.get_dataset(
-    file_pattern = "data/data-evaluate_shard*.tfrec",
-    n_classes = n_classes,
-    batch_size = batch_size,
-    volume_shape = volume_shape,
+    file_pattern="data/data-evaluate_shard*.tfrec",
+    n_classes=n_classes,
+    batch_size=batch_size,
+    volume_shape=volume_shape,
     block_shape=block_shape,
     n_epochs=n_epochs,
     shuffle_buffer_size=shuffle_buffer_size,
     num_parallel_calls=num_parallel_calls,
-
 )
 
-#-------create tfrecords for pretrain datasets with two different views---------------
+# -------create tfrecords for pretrain datasets with two different views---------------
 
-#pretrain dataset 1: with random rigid augmentations
+# pretrain dataset 1: with random rigid augmentations
 
 dataset_pretrain_1 = nobrainer.dataset.get_dataset(
-    file_pattern = "data/data-pre-train-1_shard*.tfrec",
-    n_classes = n_classes,
-    batch_size = batch_size,
-    volume_shape = volume_shape,
+    file_pattern="data/data-pre-train-1_shard*.tfrec",
+    n_classes=n_classes,
+    batch_size=batch_size,
+    volume_shape=volume_shape,
     block_shape=block_shape,
     n_epochs=n_epochs,
     augment=True,
     shuffle_buffer_size=shuffle_buffer_size,
     num_parallel_calls=num_parallel_calls,
-
 )
 
 # pretrain dataset 2: with no augmentations
 
 dataset_pretrain_2 = nobrainer.dataset.get_dataset(
-    file_pattern = "data/data-pre-train-2_shard*.tfrec",
-    n_classes = n_classes,
-    batch_size = batch_size,
-    volume_shape = volume_shape,
+    file_pattern="data/data-pre-train-2_shard*.tfrec",
+    n_classes=n_classes,
+    batch_size=batch_size,
+    volume_shape=volume_shape,
     block_shape=block_shape,
     n_epochs=n_epochs,
     augment=False,
     shuffle_buffer_size=shuffle_buffer_size,
     num_parallel_calls=num_parallel_calls,
-
 )
 
-#----------------------------------------------------------
+# ----------------------------------------------------------
 
 # view shapes
-print("dataset_train ",dataset_train)
-print("dataset_evaluate ",dataset_evaluate)
-print("dataset_pretrain 1 ",dataset_pretrain_1)
-print("dataset_pretrain 2 ",dataset_pretrain_2)
+print("dataset_train ", dataset_train)
+print("dataset_evaluate ", dataset_evaluate)
+print("dataset_pretrain 1 ", dataset_pretrain_1)
+print("dataset_pretrain 2 ", dataset_pretrain_2)
 
 
 # transform pretrain dataset to an unlabeled dataset having only features (or image volumes)
-dataset_pretrain_1 = dataset_pretrain_1.map(lambda x, y:x)
-dataset_pretrain_2 = dataset_pretrain_2.map(lambda x, y:x)
+dataset_pretrain_1 = dataset_pretrain_1.map(lambda x, y: x)
+dataset_pretrain_2 = dataset_pretrain_2.map(lambda x, y: x)
 
 print("pretrain 1", dataset_pretrain_1)
 print("pretrain 2", dataset_pretrain_2)
 
 
-#----TODO-spatial and intensity transforms 
+# ----TODO-spatial and intensity transforms
 
-import nobrainer.spatial_transforms as st
 import nobrainer.intensity_transforms as it
+import nobrainer.spatial_transforms as st
 
 # augment_one = (
 #       dataset_pretrain_1.map(it.addGaussianNoise)
@@ -179,8 +174,8 @@ import nobrainer.intensity_transforms as it
 # print(augment_one)
 # print(augment_two)
 # print(augment_example)
-#------------------------------------------------------
- 
+# ------------------------------------------------------
+
 augment_one = dataset_pretrain_1
 augment_two = dataset_pretrain_2
 
@@ -192,60 +187,68 @@ weight_decay = 0.0005
 projection_dim = 2048
 latent_dim = 512
 
-from tensorflow.keras import layers, regularizers, activations
+from tensorflow.keras import activations, layers, regularizers
+
 
 # define the encoder and projector: this is built on the highresnet backbone
 def encoder():
-  resnet = nobrainer.models.highresnet(n_classes=n_classes, input_shape=(*block_shape, 1),)
-  print("resnet shape", resnet)
-  
-  input = tf.keras.layers.Input(shape=(*block_shape, 1))
-  print("first input after resnet", input)
+    resnet = nobrainer.models.highresnet(
+        n_classes=n_classes,
+        input_shape=(*block_shape, 1),
+    )
+    print("resnet shape", resnet)
 
-  resnet_out = resnet(input)
-  
-  x = layers.GlobalAveragePooling3D(name="backbone_pool")(resnet_out)
+    input = tf.keras.layers.Input(shape=(*block_shape, 1))
+    print("first input after resnet", input)
 
-  x = layers.Dense(
+    resnet_out = resnet(input)
+
+    x = layers.GlobalAveragePooling3D(name="backbone_pool")(resnet_out)
+
+    x = layers.Dense(
         projection_dim, use_bias=False, kernel_regularizer=regularizers.l2(weight_decay)
     )(x)
-  x = layers.BatchNormalization()(x)
-  x = layers.ReLU()(x)
-  x = layers.Dense(
+    x = layers.BatchNormalization()(x)
+    x = layers.ReLU()(x)
+    x = layers.Dense(
         projection_dim, use_bias=False, kernel_regularizer=regularizers.l2(weight_decay)
     )(x)
-  output = layers.BatchNormalization()(x)
+    output = layers.BatchNormalization()(x)
 
-  encoder_model = tf.keras.Model(input, output, name="encoder")
-  return encoder_model
+    encoder_model = tf.keras.Model(input, output, name="encoder")
+    return encoder_model
+
 
 exm_encoder = encoder()
-exm_encoder.summary() #view encoder details
+exm_encoder.summary()  # view encoder details
 
 # define predictor
 
+
 def predictor():
-  model = tf.keras.Sequential(
-          [
-              # Note the AutoEncoder-like structure.
-              tf.keras.layers.InputLayer((projection_dim,)),
-              tf.keras.layers.Dense(
-                  latent_dim, 
-                  use_bias=False,
-                  kernel_regularizer=regularizers.l2(weight_decay),
-                ),
-              tf.keras.layers.ReLU(),
-              tf.keras.layers.BatchNormalization(),
-              tf.keras.layers.Dense(projection_dim),
-          ],
-          name="predictor",
-      )
-  return model
+    model = tf.keras.Sequential(
+        [
+            # Note the AutoEncoder-like structure.
+            tf.keras.layers.InputLayer((projection_dim,)),
+            tf.keras.layers.Dense(
+                latent_dim,
+                use_bias=False,
+                kernel_regularizer=regularizers.l2(weight_decay),
+            ),
+            tf.keras.layers.ReLU(),
+            tf.keras.layers.BatchNormalization(),
+            tf.keras.layers.Dense(projection_dim),
+        ],
+        name="predictor",
+    )
+    return model
+
 
 predictor_ch = predictor()
 predictor_ch.summary()
 
-def compute_loss(p, z):    
+
+def compute_loss(p, z):
     print("p as input is ", p.shape)
     print("z as input is ", z.shape)
     z = tf.stop_gradient(z)
@@ -254,9 +257,10 @@ def compute_loss(p, z):
     z = tf.math.l2_normalize(z, axis=1)
     print("p after normalization is ", p.shape)
     print("z after normalization is ", z.shape)
-    
+
     # Negative cosine similarity loss
     return -tf.reduce_mean(tf.reduce_sum((p * z), axis=1))
+
 
 class SimSiam(tf.keras.Model):
     def __init__(self, encoder, predictor):
@@ -270,7 +274,7 @@ class SimSiam(tf.keras.Model):
         return [self.loss_tracker]
 
     def train_step(self, data):
-        
+
         data_one, data_two = data
         print("data_one check", tf.is_tensor(data_one))
         print("data_two check", tf.is_tensor(data_two))
@@ -296,7 +300,6 @@ class SimSiam(tf.keras.Model):
             print("p1 ", p1.shape)
             print("p2 ", p2.shape)
 
-
             loss = compute_loss(p1, z2) / 2 + compute_loss(p2, z1) / 2
 
         # Compute gradients and update the parameters.
@@ -317,19 +320,19 @@ print(augment_data)
 
 
 pretrain_steps = nobrainer.dataset.get_steps_per_epoch(
-    n_volumes = len(pre_train_paths_1),
+    n_volumes=len(pre_train_paths_1),
     volume_shape=volume_shape,
     block_shape=block_shape,
-    batch_size=batch_size
+    batch_size=batch_size,
 )
 
 pretrain_steps
 
 validation_steps = nobrainer.dataset.get_steps_per_epoch(
-    n_volumes = len(evaluate_paths),
+    n_volumes=len(evaluate_paths),
     volume_shape=volume_shape,
     block_shape=block_shape,
-    batch_size=batch_size
+    batch_size=batch_size,
 )
 
 validation_steps
@@ -347,10 +350,15 @@ print("augment two", augment_two)
 print("augment data", augment_data)
 
 # Compile model and start training.
-EPOCHS = 1 #should be higher say >100
+EPOCHS = 1  # should be higher say >100
 simsiam = SimSiam(encoder(), predictor())
 simsiam.compile(optimizer=tf.keras.optimizers.SGD(lr_decayed_fn, momentum=0.6))
-history = simsiam.fit(augment_data, epochs=EPOCHS, steps_per_epoch = pretrain_steps, callbacks=[early_stopping])
+history = simsiam.fit(
+    augment_data,
+    epochs=EPOCHS,
+    steps_per_epoch=pretrain_steps,
+    callbacks=[early_stopping],
+)
 
 plt.plot(history.history["loss"])
 plt.grid()
@@ -372,8 +380,8 @@ y_train = tf.keras.utils.to_categorical(dataset_evaluate)
 backbone.trainable = False
 inputs = layers.Input((*block_shape, 1))
 x = backbone(inputs, training=False)
-#x = tf.keras.layers.Flatten()(x)
-#x = tf.keras.layers.Dense(64)(x)
+# x = tf.keras.layers.Flatten()(x)
+# x = tf.keras.layers.Dense(64)(x)
 outputs = layers.Dense(64, activation="sigmoid")(x)
 linear_model = tf.keras.Model(inputs, outputs, name="linear_model")
 
@@ -382,20 +390,25 @@ linear_model.summary()
 linear_model.compile(
     loss="binary_crossentropy",
     metrics=["accuracy"],
-    optimizer=tf.keras.optimizers.SGD(lr_decayed_fn, momentum=0.9) #momentum=0.9),
+    optimizer=tf.keras.optimizers.SGD(lr_decayed_fn, momentum=0.9),  # momentum=0.9),
 )
 
 train_steps = nobrainer.dataset.get_steps_per_epoch(
-    n_volumes = len(train_paths),
+    n_volumes=len(train_paths),
     volume_shape=volume_shape,
     block_shape=block_shape,
-    batch_size=batch_size
+    batch_size=batch_size,
 )
 
 train_steps
 
 history = linear_model.fit(
-    dataset_train, validation_data=dataset_evaluate, epochs=EPOCHS, steps_per_epoch = train_steps, validation_steps = validation_steps, callbacks=[early_stopping]
+    dataset_train,
+    validation_data=dataset_evaluate,
+    epochs=EPOCHS,
+    steps_per_epoch=train_steps,
+    validation_steps=validation_steps,
+    callbacks=[early_stopping],
 )
 
 _, test_acc = linear_model.evaluate(dataset_evaluate)
