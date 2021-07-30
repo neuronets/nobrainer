@@ -263,6 +263,52 @@ class GradientPenalty(LossFunctionWrapper):
         )
 
 
+def cosine_similarity(encoder_out, pred_out):
+    encoder_out = tf.stop_gradient(encoder_out)
+    pred_out = tf.math.l2_normalize(pred_out, axis=1)
+    encoder_out = tf.math.l2_normalize(encoder_out, axis=1)
+    return -tf.reduce_mean(tf.reduce_sum((pred_out * encoder_out), axis=1))
+
+
+class CosineSimilarity(LossFunctionWrapper):
+    """Computes the similarity loss between two outputs from a contrastive or self
+    supervised learning frameworks involving two augmented pairs of an image/volume as
+    pairwise input to the network. The final value is in the range of [-1, 1]. When it is a negative number between -1 and 0, 
+    0 indicates orthogonality and values closer to -1 indicate greater similarity.
+    The values closer to 1 indicate greater dissimilarity. Minimizing this value, i.e. bringing it closer to -1, 
+    implies maximizing the similarity between representations. RETURNS a weighted-loss float Tensor.
+
+    Use this loss for self supervised representation tasks. `encoder out` and `pred_out`
+    would each have the shape = [batch_size, d0, d1,....., dN].
+
+    Usage:
+
+    ```python
+    y_true = [[0., 1.], [1., 1.]]
+    y_pred = [[1., 0.], [1., 1.]]
+    # Using 'auto'/'sum_over_batch_size' reduction type.
+    cosine_loss = tf.keras.losses.CosineSimilarity(axis=1)
+    # l2_norm(y_true) = [[0., 1.], [1./1.414], 1./1.414]]]
+    # l2_norm(y_pred) = [[1., 0.], [1./1.414], 1./1.414]]]
+    # l2_norm(y_true) . l2_norm(y_pred) = [[0., 0.], [0.5, 0.5]]
+    # loss = mean(sum(l2_norm(y_true) . l2_norm(y_pred), axis=1))
+    #       = -((0. + 0.) +  (0.5 + 0.5)) / 2
+    cosine_loss(y_true, y_pred).numpy() #loss = -0.5
+    ```
+
+    Usage with tf.keras API:
+    ```python
+    model = tf.keras.Model(inputs, outputs)
+    model.compile(optimizer='sgd', loss=tf.keras.losses.CosineSimilarity(axis=1))
+    ```
+    """
+
+    def __init__(
+        self, axis=-1, reduction=losses_utils.ReductionV2.AUTO, name="cosine_similarity"
+    ):
+        super().__init__(cosine_similarity, axis=axis, reduction=reduction, name=name)
+
+
 def get(loss):
     """Wrapper for `tf.keras.losses.get` that includes Nobrainer's losses."""
     objects = {
@@ -279,6 +325,8 @@ def get(loss):
         "Wasserstein": Wasserstein,
         "gradient_penalty": gradient_penalty,
         "GradientPenalty": GradientPenalty,
+        "cosine_similarity": cosine_similarity,
+        "CosineSimilarity": CosineSimilarity,
     }
     with tf.keras.utils.CustomObjectScope(objects):
         return tf.keras.losses.get(loss)
