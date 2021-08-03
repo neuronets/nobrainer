@@ -586,12 +586,15 @@ Timestamp: {datetime.datetime.utcnow().strftime('%Y/%m/%d %T')}"""
 
     click.echo(s)
 
+
 @cli.command()
 def gpu_check():
-    if tf.test.gpu_device_name() != '/device:GPU:0':
-        click.echo('WARNING: GPU device not found. Using CPU')
+    if tf.test.gpu_device_name() != "/device:GPU:0":
+        click.echo("WARNING: GPU device not found. Using CPU")
     else:
-        click.echo('SUCCESS: Found GPU: {}'.format(tf.config.list_physical_devices('GPU')))
+        click.echo(
+            "SUCCESS: Found GPU: {}".format(tf.config.list_physical_devices("GPU"))
+        )
 
 
 # For debugging only.
