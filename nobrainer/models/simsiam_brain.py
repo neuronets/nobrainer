@@ -153,28 +153,7 @@ print("pretrain 2", dataset_pretrain_2)
 import nobrainer.intensity_transforms as it
 import nobrainer.spatial_transforms as st
 
-# augment_one = (
-#       dataset_pretrain_1.map(it.addGaussianNoise)
-#       .batch(batch_size)
-#       .prefetch(tf.data.AUTOTUNE)
-# )
 
-# augment_two = (
-#     dataset_pretrain_2.map(it.contrastAdjust)
-#     .batch(batch_size)
-#     .prefetch(tf.data.AUTOTUNE)
-# )
-
-# augment_example = (
-#     dataset_train.map(it.minmaxIntensityScaling)
-#     .batch(batch_size)
-#     .prefetch(tf.data.AUTOTUNE)
-# )
-
-# print(augment_one)
-# print(augment_two)
-# print(augment_example)
-# ------------------------------------------------------
 
 augment_one = dataset_pretrain_1
 augment_two = dataset_pretrain_2
