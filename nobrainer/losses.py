@@ -304,7 +304,7 @@ class CosineSimilarity(LossFunctionWrapper):
     """
 
     def __init__(
-        self, axis=-1, reduction=losses_utils.ReductionV2.AUTO, name="cosine_similarity"
+        self, axis=-1, reduction=ReductionV2.AUTO, name="cosine_similarity"
     ):
         super().__init__(cosine_similarity, axis=axis, reduction=reduction, name=name)
 
