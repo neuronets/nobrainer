@@ -144,7 +144,7 @@ def get_dataset(
             dataset = dataset.map(
                 lambda x, y: tf.cond(
                     tf.random.uniform((1,)) > 0.5,
-                    true_fn=lambda: addGaussianNoise(x, y),
+                    true_fn=lambda: centercrop(x, y),
                     false_fn=lambda: (x, y),
                 ),
                 num_parallel_calls=num_parallel_calls,
