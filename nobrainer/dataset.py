@@ -16,6 +16,15 @@ from .volume import (
     standardize,
     to_blocks,
 )
+from .intensity_transforms import (
+    addGaussianNoise,
+    contrastAdjust
+)
+from .spatial_transforms import (
+    centercrop,
+    randomCrop,
+    randomflip_leftright
+)
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
@@ -135,7 +144,7 @@ def get_dataset(
             dataset = dataset.map(
                 lambda x, y: tf.cond(
                     tf.random.uniform((1,)) > 0.5,
-                    true_fn=lambda: apply_random_transform(x, y),
+                    true_fn=lambda: addGaussianNoise(x, y),
                     false_fn=lambda: (x, y),
                 ),
                 num_parallel_calls=num_parallel_calls,
