@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 
 
 def centercrop(x, y=None, finesize=64, trans_xy=False):
