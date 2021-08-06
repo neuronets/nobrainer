@@ -142,12 +142,11 @@ def get_dataset(
     if augment:
         if not scalar_label:
             dataset = dataset.map(
-#                 lambda x, y: tf.cond(
-#                     tf.random.uniform((1,)) > 0.9,
-#                     true_fn=lambda: apply_random_transform(x, y),
-#                     false_fn=lambda: (x, y),
-#                 ),
-                  lambda x, y: addGaussianNoise(x, y),
+                lambda x, y: tf.cond(
+                    tf.random.uniform((1,)) > 0.0,
+                    true_fn=lambda: centercrop(x, y),
+                    false_fn=lambda: (x, y),
+                ),
                 num_parallel_calls=num_parallel_calls,
             )
         else:
