@@ -141,13 +141,13 @@ def get_dataset(
     # Augment examples if requested.
     if augment:
         if not scalar_label:
-            dataset = dataset.map(
-                lambda x, y: tf.cond(
-                    tf.random.uniform((1,)) > 0.0,
-                    true_fn=lambda: addGaussianNoise(x, y),
-                    false_fn=lambda: (x, y),
-                ),
-                num_parallel_calls=num_parallel_calls,
+#             dataset = dataset.map(
+#                 lambda x, y: tf.cond(
+#                     tf.random.uniform((1,)) > 0.0,
+#                     true_fn=lambda: addGaussianNoise(x, y),
+#                     false_fn=lambda: (x, y),
+#                 ),
+#                 num_parallel_calls=num_parallel_calls,
             )
         else:
             dataset = dataset.map(
