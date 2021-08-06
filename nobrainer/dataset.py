@@ -23,7 +23,8 @@ from .intensity_transforms import (
 from .spatial_transforms import (
     centercrop,
     randomCrop,
-    randomflip_leftright
+    randomflip_leftright,
+    flip3D
 )
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
@@ -144,7 +145,7 @@ def get_dataset(
             dataset = dataset.map(
                 lambda x, y: tf.cond(
                     tf.random.uniform((1,)) > 0.0,
-                    true_fn=lambda: randomflip_leftright(x, y),
+                    true_fn=lambda: flip3D(x, y),
                     false_fn=lambda: (x, y),
                 ),
                 num_parallel_calls=num_parallel_calls,
