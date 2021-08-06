@@ -114,6 +114,14 @@ def randomflip_leftright(x, y=None, trans_xy=False):
         return tf.image.random_flip_left_right(x, seed=None)
 
 def flip3D(features, labels):
+    """
+    Flip the 3D image respect one of the 3 axis chosen randomly
+    """
+    if len(features.shape) != 3 or len(labels.shape) != 3:
+        raise ValueError("features and labels must be rank 3")
+    if features.shape != labels.shape:
+        raise ValueError("shape of features and labels must be the same.")
+    choice = np.random.randint(3)
     if choice == 0: # flip on x
         x_flip, y_flip = features[::-1, :, :], labels[::-1, :, :]
     if choice == 1: # flip on y
