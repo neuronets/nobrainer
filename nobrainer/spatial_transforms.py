@@ -112,3 +112,12 @@ def randomflip_leftright(x, y=None, trans_xy=False):
         return c[0:split_channel, :, :], c[split_channel : c.shape[0], :, :]
     else:
         return tf.image.random_flip_left_right(x, seed=None)
+
+def flip3D(features, labels):
+    if choice == 0: # flip on x
+        x_flip, y_flip = features[::-1, :, :], labels[::-1, :, :]
+    if choice == 1: # flip on y
+        x_flip, y_flip = features[:, ::-1, :], labels[:, ::-1, :]
+    if choice == 2: # flip on z
+        x_flip, y_flip = features[:, :, ::-1], labels[:, :, ::-1]
+    return x_flip, y_flip
