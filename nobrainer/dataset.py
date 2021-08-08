@@ -169,7 +169,7 @@ def get_dataset(
             dataset = dataset.map(
                 lambda x, y: tf.cond(
                     tf.random.uniform((1,)) > 0.0,
-                    true_fn=lambda: addGaussianNoise(x,y),#flip3D(x,y),#apply_random_transform_scalar_labels(x, y),
+                    true_fn=lambda: apply_random_transform_scalar_labels(x, y),#addGaussianNoise(x,y),#flip3D(x,y),#apply_random_transform_scalar_labels(x, y),
                     false_fn=lambda: (x, y),
                 ),
                 num_parallel_calls=num_parallel_calls,
