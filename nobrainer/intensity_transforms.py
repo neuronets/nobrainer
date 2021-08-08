@@ -22,7 +22,7 @@ def addGaussianNoise(x, y=None, trans_xy=False, noise_mean=0.0, noise_std=0.1):
         y = tf.cast(y, tf.float32)
         return tf.math.add(x, noise), tf.math.add(y, noise)
     else:
-        return tf.math.add(x, noise)
+        return tf.math.add(x, noise), y
 
 
 def minmaxIntensityScaling(x, y=None, trans_xy=False):
