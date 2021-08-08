@@ -66,6 +66,7 @@ def get_dataset(
     n_epochs=None,
     mapping=None,
     augment=False,
+    augmentType=True,
     normalizer=standardize,
     shuffle_buffer_size=None,
     num_parallel_calls=AUTOTUNE,
@@ -141,7 +142,8 @@ def get_dataset(
 
     # Augment examples if requested.
     if augment:
-        if not scalar_label:
+        if scalar_label:
+            print("scalar true")
             dataset = dataset.map(
                 lambda x, y: tf.cond(
                     tf.random.uniform((1,)) > 0.0,
@@ -151,6 +153,7 @@ def get_dataset(
                 num_parallel_calls=num_parallel_calls,
            )
         else:
+            print("scalar false")
             dataset = dataset.map(
                 lambda x, y: tf.cond(
                     tf.random.uniform((1,)) > 0.0,
