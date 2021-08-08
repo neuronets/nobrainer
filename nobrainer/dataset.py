@@ -144,14 +144,26 @@ def get_dataset(
     if augment:
         if scalar_label:
             print("scalar true")
-            dataset = dataset.map(
-                lambda x, y: tf.cond(
-                    tf.random.uniform((1,)) > 0.0,
-                    true_fn=lambda: addGaussianNoise(x,y),#flip3D(x, y),
-                    false_fn=lambda: (x, y),
-                ),
-                num_parallel_calls=num_parallel_calls,
-           )
+            if augmentType:
+                print("augment type: true, add Gaussian Noise")
+                dataset = dataset.map(
+                    lambda x, y: tf.cond(
+                        tf.random.uniform((1,)) > 0.0,
+                        true_fn=lambda: addGaussianNoise(x,y),#flip3D(x, y),
+                        false_fn=lambda: (x, y),
+                    ),
+                    num_parallel_calls=num_parallel_calls,
+               )
+            else:
+                print("augment type: false, add random transform")
+                dataset = dataset.map(
+                    lambda x, y: tf.cond(
+                        tf.random.uniform((1,)) > 0.0,
+                        true_fn=lambda: apply_random_transform_scalar_labels(x, y),#addGaussianNoise(x,y),#flip3D(x, y),
+                        false_fn=lambda: (x, y),
+                    ),
+                    num_parallel_calls=num_parallel_calls,
+               )
         else:
             print("scalar false")
             dataset = dataset.map(
