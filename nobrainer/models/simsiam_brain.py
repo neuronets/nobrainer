@@ -70,7 +70,5 @@ def simsiam_brain(
     encoder_model = encoder()
     predictor_model = predictor()
     
-    encoder_model.summary()
-    predictor_model.summary()
 
     return encoder_model, predictor_model
