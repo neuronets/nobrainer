@@ -1,27 +1,25 @@
 """
-Extending the SimSiam network architecture to brain volumes
-Implemented according to the [Simple Siamese Representation manuscript by Chen et al.](https://arxiv.org/abs/2011.10566).
+SimSiam network architecture for 3D brain volumes
+Reference: [Simple Siamese Representation manuscript by Chen et al.](https://arxiv.org/abs/2011.10566).
 author: Dhritiman Das
 """
 
-import numpy as np
 import tensorflow as tf
-from tensorflow.keras import activations, layers, regularizers
 
+from tensorflow.keras import layers, regularizers
 import nobrainer
-
 
 def brainsiam(
     n_classes,
     input_shape,
-    weight_decay=0.0005,
-    projection_dim=2048,
-    latent_dim=512,
+    weight_decay = 0.0005,
+    projection_dim = 2048,
+    latent_dim = 512,
     name="brainsiam",
     **kwargs
 ):
     """Instantiate Brain Siamese Network model."""
-
+    
     """ Parameters
     ------------------
     input_shape: list or tuple of four ints, the shape of the input data. Should be
@@ -36,60 +34,56 @@ def brainsiam(
     -------
     2 Model objects: encoder, predictor.
     """
-
+    
     print("projection dimension is: ", projection_dim)
     print("latent dimension: ", latent_dim)
 
     def encoder():
-        resnet = nobrainer.models.highresnet(
-            n_classes=n_classes, input_shape=input_shape
-        )
-
+        resnet = nobrainer.models.highresnet(n_classes=n_classes, input_shape=input_shape)
+           
         input = tf.keras.layers.Input(shape=input_shape)
 
         resnet_out = resnet(input)
-
+        
         x = layers.GlobalAveragePooling3D(name="backbone_pool")(resnet_out)
 
         x = layers.Dense(
-            projection_dim,
-            use_bias=False,
-            kernel_regularizer=regularizers.l2(weight_decay),
-        )(x)
+                projection_dim, use_bias=False, kernel_regularizer=regularizers.l2(weight_decay)
+            )(x)
         x = layers.BatchNormalization()(x)
         x = layers.LeakyReLU()(x)
         x = layers.Dense(
-            projection_dim,
-            use_bias=False,
-            kernel_regularizer=regularizers.l2(weight_decay),
-        )(x)
+                projection_dim, use_bias=False, kernel_regularizer=regularizers.l2(weight_decay)
+            )(x)
         output = layers.BatchNormalization()(x)
 
         encoder_model = tf.keras.Model(input, output, name="encoder")
         return encoder_model
 
+
     def predictor():
         predictor_model = tf.keras.Sequential(
-            [
-                # Note the AutoEncoder-like structure.
-                tf.keras.layers.InputLayer((projection_dim,)),
-                tf.keras.layers.Dense(
-                    latent_dim,
-                    use_bias=False,
-                    kernel_regularizer=regularizers.l2(weight_decay),
-                ),
-                tf.keras.layers.LeakyReLU(),
-                tf.keras.layers.BatchNormalization(),
-                tf.keras.layers.Dense(projection_dim),
-            ],
-            name="predictor",
-        )
-
+                [
+                    # Note the AutoEncoder-like structure.
+                    tf.keras.layers.InputLayer((projection_dim,)),
+                    tf.keras.layers.Dense(
+                        latent_dim, 
+                        use_bias=False,
+                        kernel_regularizer=regularizers.l2(weight_decay)
+                        ),
+                    tf.keras.layers.LeakyReLU(),
+                    tf.keras.layers.BatchNormalization(),
+                    tf.keras.layers.Dense(projection_dim),
+                ],
+                name="predictor",
+            )
+        
         return predictor_model
+
 
     encoder_model = encoder()
     predictor_model = predictor()
-
+    
     encoder_model.summary()
     predictor_model.summary()
 
