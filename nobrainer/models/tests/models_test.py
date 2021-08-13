@@ -1,4 +1,3 @@
-from models.brainsiam import brainsiam
 import numpy as np
 import pytest
 import tensorflow as tf
@@ -77,23 +76,23 @@ def test_autoencoder():
     actual_output = model.predict(x)
     assert actual_output.shape == x.shape
 
-
 def test_brainsiam():
     """Testing the encoder-projector and predictor structures of the brainsiam architecture"""
-    input_shape = (1, 32, 32, 32, 1)
+    input_shape=(1, 32, 32, 32, 1)
     x = 10 * np.random.random(input_shape)
 
-    n_classes = 1
+    n_classes=1
     weight_decay = 0.0005
     projection_dim = 2048
     latent_dim = 512
-
+    
+    
     encoder, predictor = brainsiam(
-        n_classes,
-        input_shape=input_shape[1:],
-        weight_decay=weight_decay,
-        projection_dim=projection_dim,
-        latent_dim=latent_dim,
+      n_classes,
+      input_shape=input_shape[1:],
+      weight_decay=weight_decay,
+      projection_dim=projection_dim,
+      latent_dim=latent_dim,
     )
 
     encoder_output = encoder(x[1:])
@@ -101,13 +100,9 @@ def test_brainsiam():
 
     predictor_out = predictor(encoder_output)
     pred_output_shape = predictor_out.get_shape().as_list()
-
-    assert (
-        enc_output_shape[1] == projection_dim
-    ), "encoder output shape not the same as projection dim"
-    assert (
-        pred_output_shape[1] == projection_dim
-    ), "predictor output shape not the same as projection dim"
+    
+    assert enc_output_shape[1] == projection_dim, 'encoder output shape not the same as projection dim'
+    assert pred_output_shape[1] == projection_dim, 'predictor output shape not the same as projection dim'
 
 
 def test_progressivegan():
