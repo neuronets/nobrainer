@@ -12,6 +12,7 @@ from ..progressivegan import progressivegan
 from ..unet import unet
 from ..vnet import vnet
 
+
 def model_test(model_cls, n_classes, input_shape, kwds={}):
     """Tests for models."""
     x = 10 * np.random.random(input_shape)
