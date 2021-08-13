@@ -5,7 +5,6 @@ author: Dhritiman Das
 
 import tensorflow as tf
 
-
 class BrainSiamese(tf.keras.Model):
     def __init__(self, encoder, predictor):
         super(BrainSiamese, self).__init__()
