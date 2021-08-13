@@ -3,11 +3,11 @@ Extending the SimSiam network architecture to brain volumes
 author: Dhritiman Das
 """
 
-import tensorflow as tf
-
-from tensorflow.keras import layers, regularizers, activations
-import nobrainer
 import numpy as np
+import tensorflow as tf
+from tensorflow.keras import activations, layers, regularizers
+
+import nobrainer
 
 
 class SimSiam(tf.keras.Model):
@@ -22,13 +22,13 @@ class SimSiam(tf.keras.Model):
         return [self.loss_tracker]
 
     def train_step(self, data):
-        data_one, data_two = data #unpacking the data
+        data_one, data_two = data  # unpacking the data
 
         # Forward pass through the encoder and predictor.
         with tf.GradientTape() as tape:
             proj_1, proj_2 = self.encoder(data_one), self.encoder(data_two)
             pred_1, pred_2 = self.predictor(proj_1), self.predictor(proj_2)
-            loss =  compute_loss(pred_1, proj_2) / 2 + compute_loss(pred_2, proj_1) / 2
+            loss = compute_loss(pred_1, proj_2) / 2 + compute_loss(pred_2, proj_1) / 2
 
         # Compute gradients and update the parameters.
         learnable_params = (
@@ -40,15 +40,12 @@ class SimSiam(tf.keras.Model):
         # Monitor loss.
         self.loss_tracker.update_state(loss)
         return {"loss": self.loss_tracker.result()}
-        
 
 
-def compute_loss(pred, proj):  
+def compute_loss(pred, proj):
     proj = tf.stop_gradient(proj)
     pred = tf.math.l2_normalize(pred, axis=1)
     proj = tf.math.l2_normalize(proj, axis=1)
 
     # Negative cosine similarity loss
     return -tf.reduce_mean(tf.reduce_sum((pred * proj), axis=1))
-
-
