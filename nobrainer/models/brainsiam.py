@@ -1,6 +1,6 @@
 """
 SimSiam network architecture for 3D brain volumes
-Reference: [Simple Siamese Representation manuscript by Chen et al.](https://arxiv.org/abs/2011.10566).
+Ref: [Simple Siamese Representation Learning by Chen et al.](https://arxiv.org/abs/2011.10566).
 author: Dhritiman Das
 """
 
