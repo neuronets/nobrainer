@@ -10,9 +10,9 @@ from tensorflow.keras import activations, layers, regularizers
 import nobrainer
 
 
-class SimSiam(tf.keras.Model):
+class BrainSiamese(tf.keras.Model):
     def __init__(self, encoder, predictor):
-        super(SimSiam, self).__init__()
+        super(BrainSiamese, self).__init__()
         self.encoder = encoder
         self.predictor = predictor
         self.loss_tracker = tf.keras.metrics.Mean(name="loss")
