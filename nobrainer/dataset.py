@@ -34,14 +34,26 @@ def tfrecord_dataset(
     # Assume all files have same compression type as the first file.
     compression_type = "GZIP" if compressed else None
     cycle_length = 1 if num_parallel_calls is None else num_parallel_calls
+    parse_fn = parse_example_fn(volume_shape=volume_shape, scalar_label=scalar_label)
+
+    # Determine examples_per_shard from the first TFRecord shard
+    first_shard = (
+        dataset.take(1)
+        .flat_map(
+            lambda x: tf.data.TFRecordDataset(x, compression_type=compression_type)
+        )
+        .map(map_func=parse_fn, num_parallel_calls=num_parallel_calls)
+    )
+    block_length = len([0 for _ in first_shard])
+
     dataset = dataset.interleave(
         map_func=lambda x: tf.data.TFRecordDataset(
             x, compression_type=compression_type
         ),
         cycle_length=cycle_length,
+        block_length=block_length,
         num_parallel_calls=num_parallel_calls,
     )
-    parse_fn = parse_example_fn(volume_shape=volume_shape, scalar_label=scalar_label)
     dataset = dataset.map(map_func=parse_fn, num_parallel_calls=num_parallel_calls)
     return dataset
 
