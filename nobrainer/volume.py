@@ -148,7 +148,7 @@ def standardize(x):
 
 def _to_blocks_perm(ndims):
     """Build permutation vector to go from volume to blocks.
-    
+
     For 3D input, perm will be (0, 2, 4, 1, 3, 5). For 4D input (i.e. 3D volume
     with channels), perm will be (0, 2, 4, 6, 1, 3, 5, 7). Higher dimensional
     input is possible here.
@@ -157,7 +157,7 @@ def _to_blocks_perm(ndims):
     ----------
     ndims : int
         Number of dimensions in blocks and volumes.
-    
+
     Returns
     -------
     perm : tuple
@@ -171,7 +171,7 @@ def _to_blocks_perm(ndims):
 
 def _from_blocks_perm(ndims):
     """Build permutation vector to go from blocks to volume.
-    
+
     For 3D input, perm will be (0, 3, 1, 4, 2, 5). For 4D input (i.e. 3D volume
     with channels), perm will be (0, 4, 1, 5, 2, 6, 3, 7). Higher dimensional
     input is possible here.
@@ -180,7 +180,7 @@ def _from_blocks_perm(ndims):
     ----------
     ndims : int
         Number of dimensions in blocks and volumes.
-    
+
     Returns
     -------
     perm : tuple

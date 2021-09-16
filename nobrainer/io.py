@@ -4,10 +4,10 @@ import functools
 import multiprocessing
 import os
 
+from fsspec.implementations.local import LocalFileSystem
 import nibabel as nib
 import numpy as np
 import tensorflow as tf
-from fsspec.implementations.local import LocalFileSystem
 
 from .utils import get_num_parallel
 
