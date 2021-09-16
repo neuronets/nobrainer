@@ -1,6 +1,5 @@
 """Methods for creating `tf.data.Dataset` objects."""
 
-import glob
 import math
 
 import fsspec
