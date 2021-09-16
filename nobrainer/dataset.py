@@ -36,15 +36,22 @@ def tfrecord_dataset(
     cycle_length = 1 if num_parallel_calls is None else num_parallel_calls
     parse_fn = parse_example_fn(volume_shape=volume_shape, scalar_label=scalar_label)
 
-    # Determine examples_per_shard from the first TFRecord shard
-    first_shard = (
-        dataset.take(1)
-        .flat_map(
-            lambda x: tf.data.TFRecordDataset(x, compression_type=compression_type)
+    if not shuffle:
+        # Determine examples_per_shard from the first TFRecord shard
+        # Then set block_length to equal the number of examples per shard
+        # so that the interleave method does not inadvertently shuffle data.
+        first_shard = (
+            dataset.take(1)
+            .flat_map(
+                lambda x: tf.data.TFRecordDataset(x, compression_type=compression_type)
+            )
+            .map(map_func=parse_fn, num_parallel_calls=num_parallel_calls)
         )
-        .map(map_func=parse_fn, num_parallel_calls=num_parallel_calls)
-    )
-    block_length = len([0 for _ in first_shard])
+        block_length = len([0 for _ in first_shard])
+    else:
+        # If the dataset is being shuffled, then we don't care if interleave
+        # further shuffles that data even further
+        block_length = None
 
     dataset = dataset.interleave(
         map_func=lambda x: tf.data.TFRecordDataset(
