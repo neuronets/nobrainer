@@ -1,6 +1,5 @@
 import numpy as np
 import tensorflow as tf
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf2
 from tensorflow.python.ops import nn_impl
 import tensorflow_probability as tfp
