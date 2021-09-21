@@ -16,10 +16,8 @@ tfd = tfp.distributions
 
 def default_loc_scale_fn(
     is_singular=True,
-    loc_initializer=tf1.initializers.random_normal(stddev=0.1),
-    untransformed_scale_initializer=tf1.initializers.random_normal(
-        mean=-3.0, stddev=0.1
-    ),
+    loc_initializer=tf.keras.initializers.he_normal(),
+    untransformed_scale_initializer=tf.constant_initializer(0.0001),
     loc_regularizer=None,
     untransformed_scale_regularizer=None,
     loc_constraint=None,
