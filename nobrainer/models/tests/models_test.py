@@ -118,9 +118,7 @@ def test_vnet():
     model_test(vnet, n_classes=1, input_shape=(1, 32, 32, 32, 1))
 
 
-def model_test_bayesian(
-    model_cls, n_classes, input_shape, kernel_posterior_fn
-):
+def model_test_bayesian(model_cls, n_classes, input_shape, kernel_posterior_fn):
     """Tests for models."""
     x = 10 * np.random.random(input_shape)
     y = np.random.choice([True, False], input_shape)
