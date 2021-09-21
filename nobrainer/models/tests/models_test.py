@@ -3,7 +3,7 @@ import pytest
 import tensorflow as tf
 
 from ..autoencoder import autoencoder
-from ..bayesian_utils import default_mean_field_normal_fn, normal_prior
+from .bayesian_utils import default_mean_field_normal_fn, normal_prior
 from ..bayesian_vnet import bayesian_vnet
 from ..bayesian_vnet_semi import bayesian_vnet_semi
 from ..highresnet import highresnet
