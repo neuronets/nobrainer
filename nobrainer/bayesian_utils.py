@@ -79,7 +79,7 @@ def default_loc_scale_fn(
 
 
 def default_mean_field_normal_fn(
-    is_singular=True,
+    is_singular=False,
     loc_initializer=tf.keras.initializers.he_normal(),
     untransformed_scale_initializer=tf.constant_initializer(0.0001),
     loc_regularizer=None,  # tf.keras.regularizers.l2(), #None
