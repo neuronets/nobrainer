@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import tensorflow as tf
 
-from nobrainer.bayesian_utils import default_mean_field_normal_fn, normal_prior
+from nobrainer.bayesian_utils import default_mean_field_normal_fn
 
 from ..autoencoder import autoencoder
 from ..bayesian_vnet import bayesian_vnet
