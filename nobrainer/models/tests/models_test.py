@@ -119,7 +119,7 @@ def test_vnet():
 
 
 def model_test_bayesian(
-    model_cls, n_classes, input_shape, prior_fn, kernel_posterior_fn
+    model_cls, n_classes, input_shape, kernel_posterior_fn
 ):
     """Tests for models."""
     x = 10 * np.random.random(input_shape)
@@ -130,7 +130,6 @@ def model_test_bayesian(
         n_classes=n_classes,
         input_shape=input_shape[1:],
         kernel_posterior_fn=kernel_posterior_fn,
-        prior_fn=prior_fn(),
     )
     model.compile(tf.optimizers.Adam(), "binary_crossentropy")
     model.fit(x, y)
@@ -144,7 +143,6 @@ def test_bayesian_vnet_semi():
         bayesian_vnet_semi,
         n_classes=1,
         input_shape=(1, 32, 32, 32, 1),
-        prior_fn=normal_prior(),
         kernel_posterior_fn=default_mean_field_normal_fn(weightnorm=True),
     )
 
@@ -154,7 +152,6 @@ def test_bayesian_vnet():
         bayesian_vnet,
         n_classes=1,
         input_shape=(1, 32, 32, 32, 1),
-        prior_fn=normal_prior(),
         kernel_posterior_fn=default_mean_field_normal_fn(
             is_singular=True, weightnorm=True
         ),
