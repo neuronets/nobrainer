@@ -305,12 +305,12 @@ def _get_voxels(volume, coords):
     x = tf.cast(volume, tf.float32)
     coords = tf.cast(coords, tf.float32)
 
-    if len(x.shape) != 3:
-        raise ValueError("`volume` must be rank 3")
+    if len(x.shape) < 3:
+        raise ValueError("`volume` must be at least rank 3")
     if len(coords.shape) != 2 or coords.shape[1] != 3:
         raise ValueError("`coords` must have shape `(N, 3)`.")
 
-    rows, cols, depth = x.shape
+    rows, cols, depth, *n_channels = x.shape
 
     # Points in flattened array representation.
     fcoords = coords[:, 0] * cols * depth + coords[:, 1] * depth + coords[:, 2]
@@ -319,7 +319,7 @@ def _get_voxels(volume, coords):
     # Zero those so we don't get errors. These points in the volume are filled later.
     fcoords_size = tf.size(fcoords, out_type=fcoords.dtype)
     fcoords = tf.clip_by_value(fcoords, 0, fcoords_size - 1)
-    xflat = tf.reshape(x, [-1])
+    xflat = tf.squeeze(tf.reshape(x, [tf.math.reduce_prod(x.shape[:3]), -1]))
 
     # Reorder image data to transformed space.
     xflat = tf.gather(params=xflat, indices=tf.cast(fcoords, tf.int32))
@@ -331,6 +331,10 @@ def _get_voxels(volume, coords):
         | (coords[:, 1] > cols)
         | (coords[:, 2] > depth)
     )
+
+    if n_channels:
+        outofframe = tf.stack([outofframe for _ in range(n_channels[0])], axis=-1)
+
     xflat = tf.multiply(xflat, tf.cast(tf.logical_not(outofframe), xflat.dtype))
 
     return xflat

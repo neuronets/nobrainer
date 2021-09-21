@@ -113,14 +113,10 @@ def replace(x, mapping, zero=True):
     # Zero values that are equal to len(vs).
     idx = tf.multiply(idx, tf.cast(tf.not_equal(idx, vs.shape[0]), tf.int32))
     mask = tf.equal(tf.gather(ks, idx), x)
-    out = tf.where(mask, tf.gather(vs, idx), x)
-
     if zero:
-        # Zero values in the data array that are not in the mapping values.
-        mask = tf.reduce_any(
-            tf.equal(tf.expand_dims(out, -1), tf.expand_dims(vals, 0)), -1
-        )
-        out = tf.multiply(out, tf.cast(mask, tf.int32))
+        out = tf.where(mask, tf.gather(vs, idx), 0)
+    else:
+        out = tf.where(mask, tf.gather(vs, idx), x)
 
     return out
 
@@ -209,8 +205,8 @@ def to_blocks(x, block_shape):
     x = tf.convert_to_tensor(x)
     volume_shape = np.array(x.shape)
 
-    if isinstance(block_shape, int) == 1:
-        block_shape = list(block_shape) * 3
+    if isinstance(block_shape, int):
+        block_shape = list([block_shape]) * 3
     elif len(block_shape) < 3:
         raise ValueError("expected block_shape to be 1 or >= 3 values.")
 
@@ -328,9 +324,9 @@ def from_blocks_numpy(a, output_shape):
 
     Parameters
     ----------
-    a: array-like, 4D array of blocks with shape (N, *block_shape), where N is
-        the number of blocks.
-    output_shape: tuple of len 3, shape of the combined array.
+    a: array-like, 4D or 5D array of blocks with shape (N, *block_shape), where
+        N is the number of blocks.
+    output_shape: tuple of len 3 or 4, shape of the combined array.
 
     Returns
     -------
@@ -338,10 +334,10 @@ def from_blocks_numpy(a, output_shape):
     """
     a = np.asarray(a)
 
-    if a.ndim != 4:
-        raise ValueError("This function only works for 4D arrays.")
-    if len(output_shape) != 3:
-        raise ValueError("output_shape must have three values.")
+    if a.ndim not in [4, 5]:
+        raise ValueError("This function only works for 4D or 5D arrays.")
+    if len(output_shape) not in [3, 4]:
+        raise ValueError("output_shape must have three or four values.")
 
     n_blocks = a.shape[0]
     block_shape = a.shape[1:]
@@ -366,20 +362,24 @@ def to_blocks_numpy(a, block_shape):
 
     Parameters
     ----------
-    a: array-like, 3D array to block
-    block_shape: tuple of len 3, shape of non-overlapping blocks.
+    a: array-like, 3D or 4D array to block
+    block_shape: tuple of len 3 or 4, shape of non-overlapping blocks.
 
     Returns
     -------
-    Rank 4 array with shape `(N, *block_shape)`, where N is the number of
+    Rank 4 or 5 array with shape `(N, *block_shape)`, where N is the number of
     blocks.
     """
     a = np.asarray(a)
     orig_shape = np.asarray(a.shape)
 
-    if a.ndim != 3:
-        raise ValueError("This function only supports 3D arrays.")
-    if len(block_shape) != 3:
+    if a.ndim not in [3, 4]:
+        raise ValueError("This function only supports 3D or 4D arrays.")
+
+    if isinstance(block_shape, int):
+        block_shape = tuple(list([block_shape]) * 3)
+
+    if len(block_shape) not in [3, 4]:
         raise ValueError("block_shape must have three values.")
 
     blocks = orig_shape // block_shape
@@ -406,12 +406,13 @@ def replace_in_numpy(x, mapping, zero=True):
     vs = v[sidx]
     idx = np.searchsorted(ks, x)
 
+    idx[idx == len(vs)] = 0
+    mask = ks[idx] == x
+
     if not zero:
-        idx[idx == len(vs)] = 0
-        mask = ks[idx] == x
         return np.where(mask, vs[idx], x)
     else:
-        return vs[idx]
+        return np.where(mask, vs[idx], 0)
 
 
 def adjust_dynamic_range_numpy(a, drange_in, drange_out):
