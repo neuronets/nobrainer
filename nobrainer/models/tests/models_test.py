@@ -150,4 +150,5 @@ def test_bayesian_vnet():
         bayesian_vnet,
         n_classes=1,
         input_shape=(1, 32, 32, 32, 1),
-        kernel_posterior_fn=default_mean_field_normal_fn(weightnorm=True))
+        kernel_posterior_fn=default_mean_field_normal_fn(weightnorm=True),
+    )
