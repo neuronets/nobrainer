@@ -24,7 +24,7 @@ class BrainSiamese(tf.keras.Model):
         with tf.GradientTape() as tape:
             proj_1, proj_2 = self.encoder(data_one), self.encoder(data_two)
             pred_1, pred_2 = self.predictor(proj_1), self.predictor(proj_2)
-            loss = compute_loss(pred_1, proj_2) / 2 + compute_loss(pred_2, proj_1) / 2
+            loss = negative_cosine_loss(pred_1, proj_2) / 2 + negative_cosine_loss(pred_2, proj_1) / 2
 
         # Compute gradients and update the parameters.
         learnable_params = (
@@ -38,7 +38,7 @@ class BrainSiamese(tf.keras.Model):
         return {"loss": self.loss_tracker.result()}
 
 
-def compute_loss(pred, proj):
+def negative_cosine_loss(pred, proj):
     proj = tf.stop_gradient(proj)
     pred = tf.math.l2_normalize(pred, axis=1)
     proj = tf.math.l2_normalize(proj, axis=1)
