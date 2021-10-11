@@ -123,8 +123,8 @@ def test_dcgan():
     pred_shape = (1, 8, 8, 8, 1)
 
     generator, discriminator = dcgan(output_shape[1:], z_dim=z_dim)
-    generator.compile(tf.train.AdamOptimizer(), "mse")
-    discriminator.compile(tf.train.AdamOptimizer(), "mse")
+    generator.compile(tf.optimizers.Adam(), "mse")
+    discriminator.compile(tf.optimizers.Adam(), "mse")
 
     fake_images = generator.predict(z)
     fake_pred = discriminator.predict(fake_images)
