@@ -2,7 +2,6 @@
 """
 import math
 
-import tensorflow as tf
 from tensorflow.keras import layers, models
 
 
@@ -18,12 +17,13 @@ def dcgan(
 
     Parameters
     ----------
-    output_shape: list or tuple of four ints, the shape of the output images. Should be scaled to [0,1]. Omit
-        the batch dimension, and include the number of channels. Currently, only squares and cubes supported.
+    output_shape: list or tuple of four ints, the shape of the output images. Should be 
+        scaled to [0,1]. Omit the batch dimension, and include the number of channels. 
+        Currently, only squares and cubes supported.
     z_dim: int, the dimensions of the encoding of the latent code. This would translate
         to a latent code of dimensions encoding_dimx1.
-    n_base_filters: int, number of base filters the models first convolutional layer. The subsequent layers
-        have n_filters which are multiples of n_base_filters.
+    n_base_filters: int, number of base filters the models first convolutional layer. 
+        The subsequent layers have n_filters which are multiples of n_base_filters.
     batchnorm: bool, whether to use batch normalization in the network.
     batch_size: int, number of samples in each batch. This must be set when
         training on TPUs.
