@@ -3,9 +3,9 @@ import pytest
 import tensorflow as tf
 
 from ..autoencoder import autoencoder
-from ..dcgan import dcgan
 from ..bayesian_vnet import bayesian_vnet
 from ..bayesian_vnet_semi import bayesian_vnet_semi
+from ..dcgan import dcgan
 from ..highresnet import highresnet
 from ..meshnet import meshnet
 from ..progressivegan import progressivegan
