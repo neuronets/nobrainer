@@ -2,6 +2,8 @@ import numpy as np
 import pytest
 import tensorflow as tf
 
+from nobrainer.bayesian_utils import default_mean_field_normal_fn
+
 from ..autoencoder import autoencoder
 from ..bayesian_vnet import bayesian_vnet
 from ..bayesian_vnet_semi import bayesian_vnet_semi
@@ -136,9 +138,37 @@ def test_vnet():
     model_test(vnet, n_classes=1, input_shape=(1, 32, 32, 32, 1))
 
 
+def model_test_bayesian(model_cls, n_classes, input_shape, kernel_posterior_fn):
+    """Tests for models."""
+    x = 10 * np.random.random(input_shape)
+    y = np.random.choice([True, False], input_shape)
+
+    # Assume every model class has n_classes and input_shape arguments.
+    model = model_cls(
+        n_classes=n_classes,
+        input_shape=input_shape[1:],
+        kernel_posterior_fn=kernel_posterior_fn,
+    )
+    model.compile(tf.optimizers.Adam(), "binary_crossentropy")
+    model.fit(x, y)
+
+    actual_output = model.predict(x)
+    assert actual_output.shape == x.shape[:-1] + (n_classes,)
+
+
 def test_bayesian_vnet_semi():
-    model_test(bayesian_vnet_semi, n_classes=1, input_shape=(1, 32, 32, 32, 1))
+    model_test_bayesian(
+        bayesian_vnet_semi,
+        n_classes=1,
+        input_shape=(1, 32, 32, 32, 1),
+        kernel_posterior_fn=default_mean_field_normal_fn(weightnorm=True),
+    )
 
 
 def test_bayesian_vnet():
-    model_test(bayesian_vnet, n_classes=1, input_shape=(1, 32, 32, 32, 1))
+    model_test_bayesian(
+        bayesian_vnet,
+        n_classes=1,
+        input_shape=(1, 32, 32, 32, 1),
+        kernel_posterior_fn=default_mean_field_normal_fn(weightnorm=True),
+    )
