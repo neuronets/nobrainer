@@ -7,6 +7,7 @@ from nobrainer.bayesian_utils import default_mean_field_normal_fn
 from ..autoencoder import autoencoder
 from ..bayesian_vnet import bayesian_vnet
 from ..bayesian_vnet_semi import bayesian_vnet_semi
+from ..dcgan import dcgan
 from ..highresnet import highresnet
 from ..meshnet import meshnet
 from ..progressivegan import progressivegan
@@ -112,6 +113,25 @@ def test_progressivegan():
         assert fake_pred.shape == (real_image_input.shape[0],)
         assert real_labels_pred.shape == (real_image_input.shape[0], label_size)
         assert fake_labels_pred.shape == (real_image_input.shape[0], label_size)
+
+
+def test_dcgan():
+    """Special test for dcgan."""
+
+    output_shape = (1, 32, 32, 32, 1)
+    z_dim = 32
+    z = np.random.random((1, z_dim))
+
+    pred_shape = (1, 8, 8, 8, 1)
+
+    generator, discriminator = dcgan(output_shape[1:], z_dim=z_dim)
+    generator.compile(tf.optimizers.Adam(), "mse")
+    discriminator.compile(tf.optimizers.Adam(), "mse")
+
+    fake_images = generator.predict(z)
+    fake_pred = discriminator.predict(fake_images)
+
+    assert fake_images.shape == output_shape and fake_pred.shape == pred_shape
 
 
 def test_vnet():

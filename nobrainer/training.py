@@ -150,3 +150,115 @@ class ProgressiveGANTrainer(tf.keras.Model):
         self.generator.save(
             os.path.join(filepath, "generator_res_{}".format(self.resolution))
         )
+
+
+class GANTrainer(tf.keras.Model):
+    """Generative Adversarial Network Trainer.
+
+    Trains discriminator and generator alternatively in an adversarial manner for generation of
+    brain MRI images.
+
+    Parameters
+    ----------
+    discriminator : tf.keras.Model, Instantiated using nobrainer.models
+    generator : tf.keras.Model, Instantiated using nobrainer.models
+    gradient_penalty : boolean, Use gradient penalty on discriminator for smooth training.
+
+    References
+    ----------
+
+    Links
+    -----
+    """
+
+    def __init__(self, discriminator, generator, gradient_penalty=False):
+        super(GANTrainer, self).__init__()
+        self.discriminator = discriminator
+        self.generator = generator
+        self.gradient_penalty = gradient_penalty
+        self.latent_size = generator.latent_size
+
+    def compile(self, d_optimizer, g_optimizer, g_loss_fn, d_loss_fn):
+        super(GANTrainer, self).compile()
+        self.d_optimizer = d_optimizer
+        self.g_optimizer = g_optimizer
+
+        self.g_loss_fn = compile_utils.LossesContainer(g_loss_fn)
+        self.d_loss_fn = compile_utils.LossesContainer(d_loss_fn)
+
+        if self.gradient_penalty:
+            self.gradient_penalty_fn = compile_utils.LossesContainer(gradient_penalty)
+
+    def train_step(self, reals):
+        if isinstance(reals, tuple):
+            reals = reals[0]
+
+        # get batch size dynamically
+        batch_size = tf.shape(reals)[0]
+
+        # normalize the real images using minmax to [-1, 1]
+        reals = _adjust_dynamic_range(reals, [0.0, 255.0], [-1.0, 1.0])
+
+        # train discriminator
+        latents = tf.random.normal((batch_size, self.latent_size))
+        fake_labels = tf.ones((batch_size, 1)) * -1
+        real_labels = tf.ones((batch_size, 1))
+
+        with tf.GradientTape() as tape:
+            fakes = self.generator(latents)
+            fakes_pred, labels_pred_fake = self.discriminator(fakes)
+            reals_pred, labels_pred_real = self.discriminator(reals)
+
+            fake_loss = self.d_loss_fn(fake_labels, fakes_pred)
+            real_loss = self.d_loss_fn(real_labels, reals_pred)
+            d_loss = 0.5 * (fake_loss + real_loss)
+
+            # calculate and add the gradient penalty loss using average samples for discriminator
+            if self.gradient_penalty:
+                weight_shape = (tf.shape(reals)[0],) + (
+                    1,
+                    1,
+                    1,
+                    1,
+                )  # broadcasting to right shape
+                weight = tf.random.uniform(weight_shape, minval=0, maxval=1)
+                average_samples = (weight * reals) + ((1 - weight) * fakes)
+                average_pred = self.discriminator(average_samples)
+                gradients = tf.gradients(average_pred, average_samples)[0]
+                gp_loss = self.gradient_penalty_fn(gradients, reals_pred)
+                d_loss += gp_loss
+
+        d_gradients = tape.gradient(d_loss, self.discriminator.trainable_variables)
+        self.d_optimizer.apply_gradients(
+            zip(d_gradients, self.discriminator.trainable_variables)
+        )
+
+        # train generator
+        misleading_labels = tf.ones((batch_size, 1))
+
+        latents = tf.random.normal((batch_size, self.latent_size))
+        with tf.GradientTape() as tape:
+            fakes = self.generator(latents)
+            fakes_pred, labels_pred = self.discriminator(fakes)
+
+            g_loss = self.g_loss_fn(misleading_labels, fakes_pred)
+
+        g_gradients = tape.gradient(g_loss, self.generator.trainable_variables)
+        self.g_optimizer.apply_gradients(
+            zip(g_gradients, self.generator.trainable_variables)
+        )
+
+        return {"d_loss": d_loss, "g_loss": g_loss}
+
+    def save_weights(self, filepath, **kwargs):
+        """
+        Override base class function to save the weights of the constituent models
+        """
+        self.generator.save_weights(
+            os.path.join(filepath, "g_weights_res_{}.h5".format(self.resolution)),
+            **kwargs
+        )
+        self.discriminator.save_weights(
+            os.path.join(filepath, "d_weights_res_{}.h5".format(self.resolution)),
+            **kwargs
+        )
