@@ -67,7 +67,7 @@ class BernoulliDropout(tfkl.Layer):
         return config
 
 
-class ConcreteDropout(tf.keras.layers.Layer):
+class ConcreteDropout(tfkl.Layer):
     """Concrete Dropout.
     Outputs the input element multiplied by a random variable sampled from a concrete
     distribution
