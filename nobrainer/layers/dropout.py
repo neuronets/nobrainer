@@ -68,7 +68,25 @@ class BernoulliDropout(tfkl.Layer):
 
 
 class ConcreteDropout(tf.keras.layers.Layer):
-  def __init__(
+    """Concrete Dropout.
+    Outputs the input element multiplied by a random variable sampled from a concrete
+    distribution
+    Parameters
+    ----------
+    is_monte_carlo : A boolean Tensor corresponding to whether or not Monte-Carlo
+        sampling will be used to calculate the networks output temperature.
+    use_expectation : boolean
+    seed : int, value to seed random number generator.
+    name : A name for this layer (optional).
+    References
+    ----------
+    Concrete Dropout. Y. Gal, J. Hron & A. Kendall, Advances in Neural Information
+    Processing Systems. 2017.
+    Links
+    -----
+    [http://papers.nips.cc/paper/6949-concrete-dropout.pdf](http://papers.nips.cc/paper/6949-concrete-dropout.pdf)
+    """
+    def __init__(
         self,
         is_monte_carlo,
         filters,
@@ -77,61 +95,59 @@ class ConcreteDropout(tf.keras.layers.Layer):
         scale_factor = 1,
         seed=None,
         **kwargs):
-
-    super(ConcreteDropout, self).__init__(
+        super(ConcreteDropout, self).__init__(
         **kwargs)
-    self.is_monte_carlo = is_monte_carlo
-    self.filters = filters
-    self.temperature = temperature
-    self.use_expectation = use_expectation,
-    self.seed = seed
-    self.scale_factor = scale_factor
+        self.is_monte_carlo = is_monte_carlo
+        self.filters = filters
+        self.temperature = temperature
+        self.use_expectation = use_expectation,
+        self.seed = seed
+        self.scale_factor = scale_factor
     
     
-  def build(self, input_shape):
-    input_shape = tf.TensorShape(input_shape)
+    def build(self, input_shape):
+        input_shape = tf.TensorShape(input_shape)
     #if self.concrete:
-    p_prior = tfk.initializers.Constant(0.5)
-    initial_p = tfk.initializers.Constant(0.9)
-    self.p_post = self.add_variable(
+        p_prior = tfk.initializers.Constant(0.5)
+        initial_p = tfk.initializers.Constant(0.9)
+        self.p_post = self.add_variable(
             name="p_l", shape=input_shape[-1:], initializer=initial_p, trainable= True)
     
-    self.p_prior = self.add_variable(
+        self.p_prior = self.add_variable(
             name="pr", shape=input_shape[-1:], initializer=p_prior, trainable=False)
-    self.p_post = tfk.backend.clip(self.p_post, 0.05, 0.95)
-    self.built = True
+        self.p_post = tfk.backend.clip(self.p_post, 0.05, 0.95)
+        self.built = True
 
-  def call(self, inputs):
-    outputs = self._apply_concrete(inputs)
-    self._apply_divergence_concrete(self.scale_factor, name='concrete_loss')
-    return outputs
+    def call(self, inputs):
+        outputs = self._apply_concrete(inputs)
+        self._apply_divergence_concrete(self.scale_factor, name='concrete_loss')
+        return outputs
 
-  def compute_output_shape(self, input_shape):
-      return input_shape
+    def compute_output_shape(self, input_shape):
+        return input_shape
       
-  def get_config(self):
-      config = super().get_config()
-      config.update(
+    def get_config(self):
+        config = super().get_config()
+        config.update(
             {
                 "is_monte_carlo": self.is_monte_carlo,
                 "temperature": self.temperature,
                 "use_expectation": self.use_expectation,
                 "seed": self.seed,
                 "scale":self.scale_factor,
-            }
-        )
-      return config    
+                }
+            )
+        return config    
 
-  @classmethod
-  def from_config(cls, config):
-    config = config.copy()
-    return cls(**config)
-  def _apply_concrete(self, outputs):
-      inference = outputs
-      eps = tfk.backend.epsilon()
-      use_expectation = self.use_expectation
-
-      if self.is_monte_carlo:
+    @classmethod
+    def from_config(cls, config):
+        config = config.copy()
+        return cls(**config)
+    def _apply_concrete(self, outputs):
+        inference = outputs
+        eps = tfk.backend.epsilon()
+        use_expectation = self.use_expectation
+        if self.is_monte_carlo:
           noise = tf.random.uniform(tf.shape(inference),
                 minval=0, maxval=1,
                 seed=None,
@@ -143,10 +159,10 @@ class ConcreteDropout(tf.keras.layers.Layer):
                 )/ self.temperature
             )
           return outputs * z
-      else:
-          return inference * self.p_post if use_expectation else inference
-  def _apply_divergence_concrete(self,scale_factor, name):
-      divergence_fn = (lambda pl, pr: (tf.reduce_sum(tf.add(
+        else:
+            return inference * self.p_post if use_expectation else inference
+    def _apply_divergence_concrete(self,scale_factor, name):
+        divergence_fn = (lambda pl, pr: (tf.reduce_sum(tf.add(
                 tf.multiply(pl,tf.subtract(tf.math.log(
                         tf.add(pl,tfk.backend.epsilon())), tf.math.log(pr))),
                 tf.multiply( tf.subtract(tfk.backend.constant(1),pl), 
@@ -154,10 +170,10 @@ class ConcreteDropout(tf.keras.layers.Layer):
                          tf.add(tf.subtract(tfk.backend.constant(1),pl),tfk.backend.epsilon())),
                         tf.math.log(pr))))  )
                  /tf.cast(scale_factor, dtype=tf.float32)))
-      divergence = tf.identity(
+        divergence = tf.identity(
             divergence_fn(self.p_post, self.p_prior),
             name=name)
-      self.add_loss(divergence)
+        self.add_loss(divergence)
 
 
 class GaussianDropout(tfkl.Layer):
