@@ -151,8 +151,11 @@ class ConcreteDropout(tfkl.Layer):
         use_expectation = self.use_expectation
         if self.is_monte_carlo:
             noise = tf.random.uniform(
-                tf.shape(inference), minval=0, 
-                maxval=1, seed=self.seed, dtype=self.dtype
+                tf.shape(inference),
+                minval=0,
+                maxval=1,
+                seed=self.seed,
+                dtype=self.dtype,
             )
             z = tf.nn.sigmoid(
                 (
@@ -168,7 +171,7 @@ class ConcreteDropout(tfkl.Layer):
             return inference * self.p_post if use_expectation else inference
 
     def _apply_divergence_concrete(self, scale_factor, name):
-        divergence_fn = (lambda pl, pr: (
+        divergence_fn = lambda pl, pr: (
             tf.reduce_sum(
                 tf.add(
                     tf.multiply(
@@ -193,7 +196,7 @@ class ConcreteDropout(tfkl.Layer):
                 )
             )
             / tf.cast(scale_factor, dtype=tf.float32)
-        ))
+        )
         divergence = tf.identity(divergence_fn(self.p_post, self.p_prior), name=name)
         self.add_loss(divergence)
 
