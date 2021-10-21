@@ -90,19 +90,17 @@ class ConcreteDropout(tfkl.Layer):
 
     def __init__(
         self,
-        is_monte_carlo,
-        filters,
-        temperature=0.01,
-        use_expectation=tf.constant(True, dtype=tf.bool),
+        is_monte_carlo=False,
+        temperature=0.02,
+        use_expectation=False,
         scale_factor=1,
         seed=None,
         **kwargs
     ):
         super(ConcreteDropout, self).__init__(**kwargs)
         self.is_monte_carlo = is_monte_carlo
-        self.filters = filters
         self.temperature = temperature
-        self.use_expectation = (use_expectation,)
+        self.use_expectation = use_expectation
         self.seed = seed
         self.scale_factor = scale_factor
 
@@ -121,8 +119,8 @@ class ConcreteDropout(tfkl.Layer):
         self.p_post = tfk.backend.clip(self.p_post, 0.05, 0.95)
         self.built = True
 
-    def call(self, inputs):
-        outputs = self._apply_concrete(inputs)
+    def call(self, x):
+        outputs = self._apply_concrete(x)
         self._apply_divergence_concrete(self.scale_factor, name="concrete_loss")
         return outputs
 
@@ -147,13 +145,14 @@ class ConcreteDropout(tfkl.Layer):
         config = config.copy()
         return cls(**config)
 
-    def _apply_concrete(self, outputs):
-        inference = outputs
+    def _apply_concrete(self, inp):
+        inference = inp
         eps = tfk.backend.epsilon()
         use_expectation = self.use_expectation
         if self.is_monte_carlo:
             noise = tf.random.uniform(
-                tf.shape(inference), minval=0, maxval=1, seed=None, dtype=self.dtype
+                tf.shape(inference), minval=0, 
+                maxval=1, seed=self.seed, dtype=self.dtype
             )
             z = tf.nn.sigmoid(
                 (
@@ -164,12 +163,12 @@ class ConcreteDropout(tfkl.Layer):
                 )
                 / self.temperature
             )
-            return outputs * z
+            return inp * z
         else:
             return inference * self.p_post if use_expectation else inference
 
     def _apply_divergence_concrete(self, scale_factor, name):
-        divergence_fn = lambda pl, pr: (
+        divergence_fn = (lambda pl, pr: (
             tf.reduce_sum(
                 tf.add(
                     tf.multiply(
@@ -194,7 +193,7 @@ class ConcreteDropout(tfkl.Layer):
                 )
             )
             / tf.cast(scale_factor, dtype=tf.float32)
-        )
+        ))
         divergence = tf.identity(divergence_fn(self.p_post, self.p_prior), name=name)
         self.add_loss(divergence)
 
