@@ -279,7 +279,7 @@ are transformed in the same way.
 - `nobrainer.volume`: `tf.data.Dataset` creation and data augmentation utilities
 -
 ## Citation
-If you use this package, please [cite](https://github.com/Aakanksha-Rana/nobrainer/blob/main_branch/CITATION) it.
+If you use this package, please [cite](https://github.com/neuronets/nobrainer/CITATION) it.
 
 ## Questions or issues
 
