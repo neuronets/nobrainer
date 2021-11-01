@@ -150,3 +150,64 @@ class ProgressiveGANTrainer(tf.keras.Model):
         self.generator.save(
             os.path.join(filepath, "generator_res_{}".format(self.resolution))
         )
+
+        
+class BrainSiamese(tf.keras.Model):
+    """Self-Supervised Siamese Network Trainer.
+
+    Trains two view - one through an encoder and predictor MLP, and the other through a predictor MLP only. A stop gradient is applied to stabiise the representations.
+
+    Parameters
+    ----------
+    encoder : tf.keras.Model, based on ResNet; Instantiated using nobrainer.models.brainsiam
+    predictor : tf.keras.Model, Dense-MLP; Instantiated using nobrainer.models.brainsiam
+
+    References
+    ----------
+    Exploring Simple Siamese Representation Learning.
+    Xinlei Chen, Kaiming He, CVPR 2021.
+
+    Links
+    -----
+    [SimSiam-CVPR-2021](https://openaccess.thecvf.com/content/CVPR2021/papers/Chen_Exploring_Simple_Siamese_Representation_Learning_CVPR_2021_paper.pdf)
+    """
+    
+    def __init__(self, encoder, predictor):
+        super(BrainSiamese, self).__init__()
+        self.encoder = encoder
+        self.predictor = predictor
+        self.loss_tracker = tf.keras.metrics.Mean(name="loss")
+
+    @property
+    def metrics(self):
+        return [self.loss_tracker]
+
+    def train_step(self, data):
+        data_one, data_two = data #unpacking the data
+
+        # Forward pass through the encoder and predictor.
+        with tf.GradientTape() as tape:
+            proj_1, proj_2 = self.encoder(data_one), self.encoder(data_two)
+            pred_1, pred_2 = self.predictor(proj_1), self.predictor(proj_2)
+            loss =  compute_loss(pred_1, proj_2) / 2 + compute_loss(pred_2, proj_1) / 2
+
+        # Compute gradients and update the parameters.
+        learnable_params = (
+            self.encoder.trainable_variables + self.predictor.trainable_variables
+        )
+        gradients = tape.gradient(loss, learnable_params)
+        self.optimizer.apply_gradients(zip(gradients, learnable_params))
+
+        # Monitor loss.
+        self.loss_tracker.update_state(loss)
+        return {"loss": self.loss_tracker.result()}
+        
+
+
+def compute_loss(pred, proj):  
+    proj = tf.stop_gradient(proj)
+    pred = tf.math.l2_normalize(pred, axis=1)
+    proj = tf.math.l2_normalize(proj, axis=1)
+
+    # Negative cosine similarity loss
+    return -tf.reduce_mean(tf.reduce_sum((pred * proj), axis=1))
