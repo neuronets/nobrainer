@@ -1,7 +1,9 @@
+import numpy as np
 import tensorflow as tf
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf2
+from tensorflow.python.ops import nn_impl
 import tensorflow_probability as tfp
+from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.distributions import (
     deterministic as deterministic_lib,
 )
@@ -11,18 +13,79 @@ from tensorflow_probability.python.distributions import normal as normal_lib
 tfd = tfp.distributions
 
 
+def default_loc_scale_fn(
+    is_singular=True,
+    loc_initializer=tf.keras.initializers.he_normal(),
+    untransformed_scale_initializer=tf.constant_initializer(0.0001),
+    loc_regularizer=None,
+    untransformed_scale_regularizer=None,
+    loc_constraint=None,
+    untransformed_scale_constraint=None,
+    weightnorm=False,
+):
+    def _fn(dtype, shape, name, trainable, add_variable_fn):
+        """Creates `loc`, `scale` parameters."""
+        loc = add_variable_fn(
+            name=name + "_loc",
+            shape=shape,
+            initializer=loc_initializer,
+            regularizer=loc_regularizer,
+            constraint=loc_constraint,
+            dtype=dtype,
+            trainable=trainable,
+        )
+        if weightnorm:
+            g = add_variable_fn(
+                name=name + "_wn",
+                shape=shape,
+                initializer=tf.constant_initializer(1.4142),
+                constraint=loc_constraint,
+                regularizer=loc_regularizer,
+                dtype=dtype,
+                trainable=trainable,
+            )
+            loc_wn = tfp_util.DeferredTensor(
+                loc, lambda x: (tf.multiply(nn_impl.l2_normalize(x), g))
+            )
+        # loc = tfp_util.DeferredTensor(loc, lambda x: (nn_impl.l2_normalize(x)))
+        if is_singular:
+            if weightnorm:
+                return loc_wn, None
+            else:
+                return loc, None
+
+        untransformed_scale = add_variable_fn(
+            name=name + "_untransformed_scale",
+            shape=shape,
+            initializer=untransformed_scale_initializer,
+            regularizer=untransformed_scale_regularizer,
+            constraint=untransformed_scale_constraint,
+            dtype=dtype,
+            trainable=trainable,
+        )
+        scale = tfp_util.DeferredTensor(
+            untransformed_scale,
+            lambda x: (np.finfo(dtype.as_numpy_dtype).eps + tf.nn.softplus(x)),
+        )
+        if weightnorm:
+            return loc_wn, scale
+        else:
+            return loc, scale
+
+    return _fn
+
+
 def default_mean_field_normal_fn(
     is_singular=False,
     loc_initializer=tf.keras.initializers.he_normal(),
-    untransformed_scale_initializer=tf1.initializers.random_normal(
-        mean=-3.0, stddev=0.1
-    ),
-    loc_regularizer=tf.keras.regularizers.l2(),  # None
-    untransformed_scale_regularizer=None,
-    loc_constraint=tf.keras.constraints.UnitNorm(axis=[0, 1, 2, 3]),
+    untransformed_scale_initializer=tf.constant_initializer(0.0001),
+    loc_regularizer=None,  # tf.keras.regularizers.l2(), #None
+    untransformed_scale_regularizer=None,  # tf.keras.regularizers.l2(), #None
+    loc_constraint=None,  # tf.keras.constraints.UnitNorm(axis = [0, 1, 2,3]),
     untransformed_scale_constraint=None,
+    weightnorm=False,
 ):
-    loc_scale_fn = tfp.layers.default_loc_scale_fn(
+    loc_scale_fn = default_loc_scale_fn(
         is_singular=is_singular,
         loc_initializer=loc_initializer,
         untransformed_scale_initializer=untransformed_scale_initializer,
@@ -30,6 +93,7 @@ def default_mean_field_normal_fn(
         untransformed_scale_regularizer=untransformed_scale_regularizer,
         loc_constraint=loc_constraint,
         untransformed_scale_constraint=untransformed_scale_constraint,
+        weightnorm=weightnorm,
     )
 
     def _fn(dtype, shape, name, trainable, add_variable_fn):

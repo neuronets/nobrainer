@@ -151,6 +151,7 @@ class ProgressiveGANTrainer(tf.keras.Model):
             os.path.join(filepath, "generator_res_{}".format(self.resolution))
         )
 
+
 class GANTrainer(tf.keras.Model):
     """Generative Adversarial Network Trainer.
 
@@ -303,3 +304,4 @@ def compute_loss(pred, proj):
 
     # Negative cosine similarity loss
     return -tf.reduce_mean(tf.reduce_sum((pred * proj), axis=1))
+
