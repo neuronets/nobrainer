@@ -1,8 +1,8 @@
 """Methods for creating `tf.data.Dataset` objects."""
 
-import glob
 import math
 
+import fsspec
 import numpy as np
 import tensorflow as tf
 
@@ -92,10 +92,10 @@ def get_dataset(
         binary segmentation (foreground vs background), and values greater than
         2 indicate multiclass segmentation.
     batch_size: int, number of elements per batch.
-    volume_shape: tuple of length 3, the shape of every volume in the TFRecords
+    volume_shape: tuple of at least length 3, the shape of every volume in the TFRecords
         files. Every volume must have the same shape.
     scalar_label: boolean, if `True`, labels are scalars.
-    block_shape: tuple of length 3, the shape of the non-overlapping sub-volumes
+    block_shape: tuple of at least length 3, the shape of the non-overlapping sub-volumes
         to take from the full volumes. If None, do not separate the full volumes
         into sub-volumes. Separating into non-overlapping sub-volumes is useful
         (sometimes even necessary) to overcome memory limitations depending on
@@ -126,15 +126,15 @@ def get_dataset(
     labels is `(batch_size, *volume_shape, n_classes)`. If `scalar_label` is `True,
     the shape of labels is always `(batch_size,)`.
     """
-
-    files = glob.glob(file_pattern)
+    fs, _, _ = fsspec.get_fs_token_paths(file_pattern)
+    files = fs.glob(file_pattern)
     if not files:
         raise ValueError("no files found for pattern '{}'".format(file_pattern))
 
     # Create dataset of all TFRecord files. After this point, the dataset will have
     # two value per iteration: (feature, label).
     shuffle = bool(shuffle_buffer_size)
-    compressed = _is_gzipped(files[0])
+    compressed = _is_gzipped(files[0], filesys=fs)
     dataset = tfrecord_dataset(
         file_pattern=file_pattern,
         volume_shape=volume_shape,
@@ -189,6 +189,9 @@ def get_dataset(
             dataset = dataset.map(_f, num_parallel_calls=num_parallel_calls)
             # This step is necessary because separating into blocks adds a dimension.
             dataset = dataset.unbatch()
+    else:
+        if scalar_label:
+            dataset = dataset.map(lambda x, y: (x, tf.squeeze(y)))
 
     # Binarize or replace labels according to mapping.
     if not scalar_label:
@@ -203,9 +206,10 @@ def get_dataset(
                 dataset = dataset.map(lambda x, y: (x, replace(y, mapping=mapping)))
             dataset = dataset.map(lambda x, y: (x, tf.one_hot(y, n_classes)))
 
-    # Add grayscale channel to features.
-    # TODO: in the future, multi-channel features should be supported.
-    dataset = dataset.map(lambda x, y: (tf.expand_dims(x, -1), y))
+    # If volume_shape is only three dims, add grayscale channel to features.
+    # Otherwise, assume that the channels are already in the features.
+    if len(volume_shape) == 3:
+        dataset = dataset.map(lambda x, y: (tf.expand_dims(x, -1), y))
 
     # Prefetch data to overlap data production with data consumption. The
     # TensorFlow documentation suggests prefetching `batch_size` elements.
