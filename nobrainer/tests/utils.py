@@ -2,7 +2,11 @@ import csv
 
 import nibabel as nib
 import numpy as np
+from numpy.testing import assert_array_equal
 import pytest
+from scipy.stats import entropy
+
+from ..utils import StreamingStats
 
 
 @pytest.fixture(scope="session")
@@ -34,3 +38,19 @@ def csv_of_volumes(tmpdir_factory):
         writer.writerows(list_of_filepaths)
 
     return str(filepath)
+
+
+def test_stream_stat():
+    s1 = np.array([[0.5, 0.1, 0.4]])
+    s2 = np.array([[0.5, 0.2, 0.3]])
+    s3 = np.array([[0.4, 0.2, 0.4]])
+
+    st = np.concatenate((s1, s2, s3), axis=0)
+
+    s = StreamingStats()
+    s.update(s1).update(s2).update(s3)
+
+    assert_array_equal(s.mean(), np.mean(st, axis=0))
+    assert_array_equal(s.var(), np.var(st, axis=0))
+    assert_array_equal(s.std(), np.std(st, axis=0))
+    assert_array_equal(np.sum(s.entropy()), entropy(np.mean(st, axis=0), axis=0))
