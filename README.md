@@ -277,6 +277,9 @@ are transformed in the same way.
 - `nobrainer.training`: training utilities (supports training on single and multiple GPUs)
 - `nobrainer.transform`: random rigid transformations for data augmentation
 - `nobrainer.volume`: `tf.data.Dataset` creation and data augmentation utilities
+-
+## Citation
+If you use this package, please [cite](https://github.com/neuronets/nobrainer/CITATION) it.
 
 ## Questions or issues
 
