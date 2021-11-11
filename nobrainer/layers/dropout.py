@@ -171,28 +171,32 @@ class ConcreteDropout(tfkl.Layer):
             return inference * self.p_post if use_expectation else inference
 
     def _apply_divergence_concrete(self, scale_factor, name):
-        divergence_fn = lambda pl, pr: tf.reduce_sum(
-            tf.add(
-                tf.multiply(
-                    pl,
-                    tf.subtract(
-                        tf.math.log(tf.add(pl, tfk.backend.epsilon())), tf.math.log(pr)
-                    ),
-                ),
-                tf.multiply(
-                    tf.subtract(tfk.backend.constant(1), pl),
-                    tf.subtract(
-                        tf.math.log(
-                            tf.add(
-                                tf.subtract(tfk.backend.constant(1), pl),
-                                tfk.backend.epsilon(),
-                            )
+        divergence_fn = (
+            lambda pl, pr: tf.reduce_sum(
+                tf.add(
+                    tf.multiply(
+                        pl,
+                        tf.subtract(
+                            tf.math.log(tf.add(pl, tfk.backend.epsilon())),
+                            tf.math.log(pr),
                         ),
-                        tf.math.log(pr),
                     ),
-                ),
+                    tf.multiply(
+                        tf.subtract(tfk.backend.constant(1), pl),
+                        tf.subtract(
+                            tf.math.log(
+                                tf.add(
+                                    tf.subtract(tfk.backend.constant(1), pl),
+                                    tfk.backend.epsilon(),
+                                )
+                            ),
+                            tf.math.log(pr),
+                        ),
+                    ),
+                )
             )
-        ) / tf.cast(scale_factor, dtype=tf.float32)
+            / tf.cast(scale_factor, dtype=tf.float32)
+        )
         divergence = tf.identity(divergence_fn(self.p_post, self.p_prior), name=name)
         self.add_loss(divergence)
 
