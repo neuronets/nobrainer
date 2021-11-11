@@ -4,6 +4,7 @@ import functools
 import multiprocessing
 import os
 
+from fsspec.implementations.local import LocalFileSystem
 import nibabel as nib
 import numpy as np
 import tensorflow as tf
@@ -186,7 +187,8 @@ def _verify_features_scalar_labels(path_scalar, *, volume_shape, check_shape):
     return True
 
 
-def _is_gzipped(filepath):
+def _is_gzipped(filepath, filesys=None):
     """Return True if the file is gzip-compressed, False otherwise."""
-    with open(filepath, "rb") as f:
+    fs = filesys if filesys is not None else LocalFileSystem()
+    with fs.open(filepath, "rb") as f:
         return f.read(2) == b"\x1f\x8b"
