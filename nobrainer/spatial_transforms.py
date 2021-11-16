@@ -4,16 +4,16 @@ import tensorflow as tf
 def centercrop(x, y=None, finesize=64, trans_xy=False):
     """
     Crops the given image at the center.
-    Input x is a tensor or numpy to have rank 3, 
-    Label y is a tensor or numpy to have rank 3, 
-    finesize is the size of the cropped output, 
-    If x is smaller than finesize along any edge, image is padded with 0 
+    Input x is a tensor or numpy to have rank 3,
+    Label y is a tensor or numpy to have rank 3,
+    finesize is the size of the cropped output,
+    If x is smaller than finesize along any edge, image is padded with 0
     and then center cropped.
 
     Args:
         finesize (int): Desired output size of the crop. Default = 64;
-        Trans_xy (Boolean): transform both x and y. If set True, function 
-        will require both x,y. 
+        Trans_xy (Boolean): transform both x and y. If set True, function
+        will require both x,y.
     """
     if ~tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
@@ -107,11 +107,11 @@ def resize(x, y=None, trans_xy=False, size=[32, 32], mode="bicubic"):
 def randomflip_leftright(x, y=None, trans_xy=False):
     """
     Randomly flips the input and label randomly with a given probability.
-    x and y is torch Tensor or numpy array, 
+    x and y is torch Tensor or numpy array,
     it is expected to be of rank 3
 
     Args:
-        trans_xy (float): Transform both x and y, default set False. 
+        trans_xy (float): Transform both x and y, default set False.
     """
     if ~tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
