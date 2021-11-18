@@ -11,7 +11,7 @@ def addGaussianNoise(x, y=None, trans_xy=False, noise_mean=0.0, noise_std=0.1):
     noise_mean and Noise_std are parameters for Noise addition,
     Args:
         noise_mean (int): Default = 0.0;
-        noise_std (int): Default=0.1; 
+        noise_std (int): Default=0.1;
         trans_xy(Boolean): transforms both x and y. If set True, function
         will require both x,y.
     """
@@ -71,7 +71,7 @@ def customIntensityScaling(x, y=None, trans_xy=False, scale_x=[0.0, 1.0], scale_
     Input x is a tensor or numpy to have rank 3,
     Label y is a tensor or numpy to have rank 3,
     Args:
-        trans_xy(Boolean): transforms both x and y (Default: False). 
+        trans_xy(Boolean): transforms both x and y (Default: False).
         If set True, function
         will require both x,y.
         scale_x: [minimum(int), maximum(int)]
@@ -117,7 +117,7 @@ def intensityMasking(x, mask_x, y=None, trans_xy=False, mask_y=None):
     Label y is a tensor or numpy array to have rank 3,
     mask_x is a tensor or numpy array of same shape as x
     Args:
-        trans_xy(Boolean): transforms both x and y (Default: False). 
+        trans_xy(Boolean): transforms both x and y (Default: False).
         If set True, function will require both x,y.
     """
     if ~tf.is_tensor(x):
@@ -148,12 +148,12 @@ def intensityMasking(x, mask_x, y=None, trans_xy=False, mask_y=None):
 
 def contrastAdjust(x, y=None, trans_xy=False, gamma=1.0):
     """
-    Contrast Adjustment 
+    Contrast Adjustment
     Input x is a tensor or numpy array to have rank 3,
     Label y is a tensor or numpy array to have rank 3,
     gamma is contrast adjustment constant
     Args:
-        trans_xy(Boolean): transforms both x and y (Default: False). 
+        trans_xy(Boolean): transforms both x and y (Default: False).
         If set True, function will require both x,y.
     """
     if ~tf.is_tensor(x):
