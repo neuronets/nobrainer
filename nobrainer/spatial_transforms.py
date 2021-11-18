@@ -41,6 +41,15 @@ def centercrop(x, y=None, finesize=64, trans_xy=False):
 
 
 def spatialConstantPadding(x, y=None, trans_xy=False, padding_zyx=[1, 1, 1]):
+    """
+    Constant padding
+    Input x is a tensor or numpy to have rank 3,
+    Label y is a tensor or numpy to have rank 3,
+    Args:
+        padding_zyx: Desired padding in three dimensions. Default = 1;
+        Trans_xy (Boolean): transform both x and y. If set True, function
+        will require both x,y.
+    """
     if ~tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
     x = tf.cast(x, tf.float32)
@@ -64,6 +73,19 @@ def spatialConstantPadding(x, y=None, trans_xy=False, padding_zyx=[1, 1, 1]):
 
 
 def randomCrop(x, y=None, trans_xy=False, cropsize=16):
+    """
+    Crops the given image from random locations
+    Input x is a tensor or numpy to have rank 3,
+    Label y is a tensor or numpy to have rank 3,
+    cropsize is the size of the cropped output,
+    If x is smaller than cropsize along any edge, image is padded with 0
+    and then cropped.
+
+    Args:
+        finesize (int): Desired output size of the crop. Default = 64;
+        Trans_xy (Boolean): transform both x and y. If set True, function
+        will require both x,y.
+    """
     if ~tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
     x = tf.cast(x, tf.float32)
