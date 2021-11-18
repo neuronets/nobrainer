@@ -1,11 +1,9 @@
 import numpy as np
 
-"""
-Distributed weight consolidation for Bayesian Deep Neural Networks
-Implemented according to the:
-McClure, Patrick, et al. "Distributed weight consolidation: a brain segmentation case study."
-Advances in neural information processing systems 31 (2018): 4093.
-""""
+#Distributed weight consolidation for Bayesian Deep Neural Networks
+#Implemented according to the:
+#McClure, Patrick, et al. Distributed weight consolidation: a brain segmentation case study.
+#Advances in neural information processing systems 31 (2018): 4093.
 
 def distributed_weight_consolidation(model_weights, model_priors):
     # model_weights is a list of weights of client-models; models = [model1, model2, model3...]
