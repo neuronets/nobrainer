@@ -9,7 +9,7 @@ Advances in neural information processing systems 31 (2018): 4093.
 
 def distributed_weight_consolidation(model_weights, model_priors):
     # model_weights is a list of weights of client-models; models = [model1, model2, model3...]
-    # model_priors is a list of priors of client models sames as models 
+    # model_priors is a list of priors of client models sames as models
     num_layers =  int(len(model_weights[0])/2.0)
     num_datasets  = np.shape(model_weights)[0]
     consolidated_model = model_weights[0]
