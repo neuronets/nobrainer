@@ -5,7 +5,15 @@ import tensorflow as tf
 
 def addGaussianNoise(x, y=None, trans_xy=False, noise_mean=0.0, noise_std=0.1):
     """
-    Adds gaussian noise to 3D tensor and label
+    Add Gaussian Noise to the Input and label
+    Input x is a tensor or numpy to have rank 3,
+    Label y is a tensor or numpy to have rank 3,
+    noise_mean and Noise_std are parameters for Noise addition,
+    Args:
+        noise_mean (int): Default = 0.0;
+        noise_std (int): Default=0.1; 
+        trans_xy(Boolean): transforms both x and y. If set True, function
+        will require both x,y.
     """
     if ~tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
@@ -26,6 +34,14 @@ def addGaussianNoise(x, y=None, trans_xy=False, noise_mean=0.0, noise_std=0.1):
 
 
 def minmaxIntensityScaling(x, y=None, trans_xy=False):
+    """
+    Intensity Scaling between 0-1
+    Input x is a tensor or numpy to have rank 3,
+    Label y is a tensor or numpy to have rank 3,
+    Args:
+        trans_xy(Boolean): transforms both x and y. If set True, function
+        will require both x,y.
+    """
     if ~tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
     x = tf.cast(x, tf.float32)
@@ -50,6 +66,17 @@ def minmaxIntensityScaling(x, y=None, trans_xy=False):
 
 
 def customIntensityScaling(x, y=None, trans_xy=False, scale_x=[0.0, 1.0], scale_y=None):
+    """
+    Custom Intensity Scaling
+    Input x is a tensor or numpy to have rank 3,
+    Label y is a tensor or numpy to have rank 3,
+    Args:
+        trans_xy(Boolean): transforms both x and y (Default: False). 
+        If set True, function
+        will require both x,y.
+        scale_x: [minimum(int), maximum(int)]
+        scale_y: [minimum(int), maximum(int)]
+    """
     x_norm, y_norm = minmaxIntensityScaling(x, y, trans_xy)
     minx = tf.cast(
         tf.convert_to_tensor(scale_x[0] * np.ones(x_norm.shape).astype(np.float32)),
@@ -84,6 +111,15 @@ def customIntensityScaling(x, y=None, trans_xy=False, scale_x=[0.0, 1.0], scale_
 
 
 def intensityMasking(x, mask_x, y=None, trans_xy=False, mask_y=None):
+    """
+    Masking the Intensity values in Input and Label
+    Input x is a tensor or numpy array to have rank 3,
+    Label y is a tensor or numpy array to have rank 3,
+    mask_x is a tensor or numpy array of same shape as x
+    Args:
+        trans_xy(Boolean): transforms both x and y (Default: False). 
+        If set True, function will require both x,y.
+    """
     if ~tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
     x = tf.cast(x, tf.float32)
@@ -111,6 +147,15 @@ def intensityMasking(x, mask_x, y=None, trans_xy=False, mask_y=None):
 
 
 def contrastAdjust(x, y=None, trans_xy=False, gamma=1.0):
+    """
+    Contrast Adjustment 
+    Input x is a tensor or numpy array to have rank 3,
+    Label y is a tensor or numpy array to have rank 3,
+    gamma is contrast adjustment constant
+    Args:
+        trans_xy(Boolean): transforms both x and y (Default: False). 
+        If set True, function will require both x,y.
+    """
     if ~tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
     x = tf.cast(x, tf.float32)
