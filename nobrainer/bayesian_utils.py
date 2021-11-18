@@ -24,9 +24,10 @@ def default_loc_scale_fn(
     weightnorm=False,
 ):
     """
-    This function creates `mean`, `std` 
+    This function creates `mean`, `std`
     and weightnorm parameters for variational layers
-    """ 
+    """
+
     def _fn(dtype, shape, name, trainable, add_variable_fn):
         """Creates `loc`, `scale` and weightnorm parameters."""
         loc = add_variable_fn(
@@ -93,13 +94,13 @@ def default_mean_field_normal_fn(
     This function sets layers: deterministic and variational
     args:
     is_singular(Boolean): True sets deterministic layers, False for variational
-    loc_initializer: mean kernal initializer. 
+    loc_initializer: mean kernal initializer.
     untransformed_scale_initializer: standard deviation kernal initializer
     loc_regularizer: mean kernal regularizer. Deafult= None, options= l1,l2
     untransformed_scale_regularizer: standard deviation kernal regulaizer
     loc_constraint and untransformed_scale_constraint expects tf constraint functions
     weightnorm(Boolean): Sets weightnorm on mean kernal. Default(False).
-    """ 
+    """
     loc_scale_fn = default_loc_scale_fn(
         is_singular=is_singular,
         loc_initializer=loc_initializer,
@@ -125,6 +126,7 @@ def default_mean_field_normal_fn(
 
 def divergence_fn_bayesian(prior_std, examples_per_epoch):
     """Scaled KLD function for ELBO loss with examples per epochs as scaling parameter"""
+
     def divergence_fn(q, p, _):
         log_probs = tfd.LogNormal(0.0, prior_std).log_prob(p.stddev())
         out = tfd.kl_divergence(q, p) - tf.reduce_sum(log_probs)
@@ -135,6 +137,7 @@ def divergence_fn_bayesian(prior_std, examples_per_epoch):
 
 def prior_fn_for_bayesian(init_scale_mean=-1, init_scale_std=0.1):
     """Set priors for the variational Layers (with a possibility of trainable priors)"""
+
     def prior_fn(dtype, shape, name, _, add_variable_fn):
         untransformed_scale = add_variable_fn(
             name=name + "_untransformed_scale",
