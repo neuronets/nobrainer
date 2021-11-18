@@ -1,12 +1,13 @@
 import gzip
 import tempfile
 
+from fsspec.implementations.local import LocalFileSystem
 import nibabel as nib
 import numpy as np
 import pytest
 
-from nobrainer import io
-from nobrainer.tests.utils import csv_of_volumes  # noqa: F401
+from .utils import csv_of_volumes  # noqa: F401
+from .. import io
 
 
 def test_read_csv():
@@ -116,12 +117,13 @@ def test_verify_features_scalar_labels(csv_of_volumes):  # noqa: F811
     assert all(invalid)
 
 
-def test_is_gzipped(tmp_path):
+@pytest.mark.parametrize("filesys", [None, LocalFileSystem()])
+def test_is_gzipped(tmp_path, filesys):
     filename = str(tmp_path / "test.gz")
     with gzip.GzipFile(filename, "w") as f:
         f.write("i'm more than a test!".encode())
-    assert io._is_gzipped(filename)
+    assert io._is_gzipped(filename, filesys=filesys)
 
     with open(filename, "w") as f:
         f.write("i'm just a test...")
-    assert not io._is_gzipped(filename)
+    assert not io._is_gzipped(filename, filesys=filesys)
