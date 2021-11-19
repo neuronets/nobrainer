@@ -1,4 +1,5 @@
-# Model definition of bayesian adaptation of the Vnet model from https://arxiv.org/pdf/1606.04797.pdf
+# Model definition of bayesian adaptation of the Vnet model
+# from https://arxiv.org/pdf/1606.04797.pdf
 from tensorflow.keras.layers import Input, MaxPooling3D, UpSampling3D, concatenate
 from tensorflow.keras.models import Model
 import tensorflow_probability as tfp
@@ -152,7 +153,8 @@ def bayesian_vnet(
     kld: KL Divergence function default(None)
     it can be set to others -->(lambda q, p, ignore: kl_lib.kl_divergence(q, p))
     prior_fn: a func to initialize priors.
-    kernel_posterior_fn:a func to initlaize kernal posteriors(loc, scale and weightnorms)
+    kernel_posterior_fn:a func to initlaize kernal posteriors
+    (loc, scale and weightnorms)
     See Bayesian Utils for more options for kld, prior_fn and kernal_posterior_fn
     """
     inputs = Input(input_shape)
