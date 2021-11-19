@@ -15,9 +15,9 @@ def unet(
 ):
     """
     Instantiate a 3D UNet Architecture
-    UNet model: a 3D deep neural network model from 
+    UNet model: a 3D deep neural network model from
     https://arxiv.org/abs/1606.06650
-    Args: 
+    Args:
     n_classes(int): number of classes
     input_shape(tuple):four ints representating the shape of 3D input
     activation(str): all tf.keras.activations are allowed

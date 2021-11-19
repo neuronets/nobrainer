@@ -11,10 +11,10 @@ def highresnet(
     n_classes, input_shape, activation="relu", dropout_rate=0, name="highresnet"
 ):
     """
-    Instantiate a 3D HighResnet Architecture. 
+    Instantiate a 3D HighResnet Architecture.
     Implementation is according to the
     https://arxiv.org/abs/1707.01992
-    Args: 
+    Args:
     n_classes(int): number of classes
     input_shape(tuple):four ints representating the shape of 3D input
     activation(str): all tf.keras.activations are allowed
