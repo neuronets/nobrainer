@@ -137,7 +137,8 @@ def bayesian_vnet_semi(
     kld: KL Divergence function default(None)
     it can be set to -->(lambda q, p, ignore: kl_lib.kl_divergence(q, p))
     prior_fn: a func to initialize priors.
-    kernel_posterior_fn:a func to initlaize kernal posteriors(loc, scale and weightnorms)
+    kernel_posterior_fn:a func to initlaize kernal posteriors
+    (loc, scale and weightnorms)
     See Bayesian Utils for options for kld, prior_fn and kernal_posterior_fn
     """
     inputs = Input(input_shape)
