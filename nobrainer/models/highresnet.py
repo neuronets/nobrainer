@@ -1,6 +1,4 @@
 """Model definition for HighResNet.
-
-Implemented according to the [HighResNet manuscript](https://arxiv.org/abs/1707.01992).
 """
 
 import tensorflow as tf
@@ -12,7 +10,16 @@ from ..layers.padding import ZeroPadding3DChannels
 def highresnet(
     n_classes, input_shape, activation="relu", dropout_rate=0, name="highresnet"
 ):
-    """Instantiate HighResNet model."""
+    """
+    Instantiate a 3D HighResnet Architecture. 
+    Implementation is according to the
+    https://arxiv.org/abs/1707.01992
+    Args: 
+    n_classes(int): number of classes
+    input_shape(tuple):four ints representating the shape of 3D input
+    activation(str): all tf.keras.activations are allowed
+    dropout_rate(int): [0,1].
+    """
 
     conv_kwds = {"kernel_size": (3, 3, 3), "padding": "same"}
 
