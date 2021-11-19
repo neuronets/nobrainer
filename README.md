@@ -64,7 +64,7 @@ the Apache 2.0 license. It was started under the support of NIH R01 EB020470.
 [Dice](), [Generalized Dice](), [Jaccard](), [Hamming](), [Tversky]()
 
 ### Augmentation methods
-#### Spacial Transforms
+#### Spatial Transforms
 [Center crop](), [Spacial Constant Padding](), [Random Crop](), [Resize](), [Random flip (left and right)]()
 
 #### Intensity Transforms
