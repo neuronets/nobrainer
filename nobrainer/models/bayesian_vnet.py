@@ -18,6 +18,7 @@ def down_stage(
     activation="relu",
     padding="SAME",
 ):
+    # encoding blocks of the model
     conv = tfp.layers.Convolution3DFlipout(
         filters,
         kernel_size,
@@ -53,6 +54,7 @@ def up_stage(
     activation="relu",
     padding="SAME",
 ):
+    # decoding blocks of the VNet model
     up = UpSampling3D()(inputs)
     up = tfp.layers.Convolution3DFlipout(
         filters,
@@ -102,6 +104,7 @@ def end_stage(
     activation="relu",
     padding="SAME",
 ):
+    # Last logit layer
     conv = tfp.layers.Convolution3DFlipout(
         n_classes,
         kernel_size,
