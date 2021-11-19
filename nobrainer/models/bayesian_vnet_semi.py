@@ -1,3 +1,5 @@
+# Model definition for a Semi-Bayesian VNet with deterministic
+# encoder and Bayesian decoder
 from tensorflow.keras.layers import (
     Conv3D,
     Input,
@@ -123,7 +125,21 @@ def bayesian_vnet_semi(
     activation="relu",
     padding="SAME",
 ):
-
+    """
+    Instantiate a 3D Semi-Bayesian VNet Architecture
+    Encoder has 3D Convolutional layers
+    and Decoder has 3D Flipout(variational layers)
+    Args:
+    n_classes(int): number of classes
+    input_shape(tuple):four ints representating the shape of 3D input
+    kernal_size(int): size of the kernal of conv layers
+    activation(str): all tf.keras.activations are allowed
+    kld: KL Divergence function default(None)
+    it can be set to -->(lambda q, p, ignore: kl_lib.kl_divergence(q, p))
+    prior_fn: a func to initialize priors.
+    kernel_posterior_fn:a func to initlaize kernal posteriors(loc, scale and weightnorms)
+    See Bayesian Utils for options for kld, prior_fn and kernal_posterior_fn
+    """
     inputs = Input(input_shape)
 
     conv1, pool1 = down_stage(
