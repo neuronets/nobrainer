@@ -16,6 +16,7 @@ from ..layers.groupnorm import GroupNormalization
 
 
 def down_stage(inputs, filters, kernel_size=3, activation="relu", padding="SAME"):
+    # encoding blocks of the VNet model
     convd = Conv3D(filters, kernel_size, activation=activation, padding=padding)(inputs)
     convd = GroupNormalization()(convd)
     convd = Conv3D(filters, kernel_size, activation=activation, padding=padding)(convd)
@@ -25,6 +26,7 @@ def down_stage(inputs, filters, kernel_size=3, activation="relu", padding="SAME"
 
 
 def up_stage(inputs, skip, filters, kernel_size=3, activation="relu", padding="SAME"):
+    # decoding blocks of the VNet model
     up = UpSampling3D()(inputs)
     up = Conv3D(filters, 2, activation=activation, padding=padding)(up)
     up = GroupNormalization()(up)
@@ -42,6 +44,7 @@ def up_stage(inputs, skip, filters, kernel_size=3, activation="relu", padding="S
 
 
 def end_stage(inputs, n_classes=1, kernel_size=3, activation="relu", padding="SAME"):
+    # last logit layer
     conv = Conv3D(
         filters=n_classes,
         kernel_size=kernel_size,
