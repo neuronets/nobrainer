@@ -1,4 +1,6 @@
-# Adaptation of the Vnet model from https://arxiv.org/pdf/1606.04797.pdf with dropouts and
+# Adaptation of the VNet model from https://arxiv.org/pdf/1606.04797.pdf
+# This 3D deep neural network model is regularized with 3D spatial dropout
+# and Group normalization. 
 
 from tensorflow.keras.layers import (
     Conv3D,
@@ -62,6 +64,17 @@ def vnet(
     padding="SAME",
     **kwargs
 ):
+    """
+    Instantiate a 3D VNet Architecture
+    VNet model: a 3D deep neural network model adapted from 
+    https://arxiv.org/pdf/1606.04797.pdf
+    adatptations include groupnorm and spatial dropout. 
+    Args: 
+    n_classes(int): number of classes
+    input_shape(tuple):four ints representating the shape of 3D input
+    kernal_size(int): size of the kernal of conv layers
+    activation(str): all tf.keras.activations are allowed.
+    """
     inputs = Input(input_shape)
 
     conv1, pool1 = down_stage(
