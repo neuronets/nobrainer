@@ -17,6 +17,7 @@ tfd = tfp.distributions
 
 
 def down_stage(inputs, filters, kernel_size=3, activation="relu", padding="SAME"):
+    # encoding blocks of the model
     conv = Conv3D(filters, kernel_size, activation=activation, padding=padding)(inputs)
     conv = GroupNormalization()(conv)
     conv = Conv3D(filters, kernel_size, activation=activation, padding=padding)(conv)
@@ -36,6 +37,7 @@ def up_stage(
     activation="relu",
     padding="SAME",
 ):
+    # decoding blocks of the VNet model
     up = UpSampling3D()(inputs)
     up = tfp.layers.Convolution3DFlipout(
         filters,
@@ -85,6 +87,7 @@ def end_stage(
     activation="relu",
     padding="SAME",
 ):
+    # last logit layer
     conv = tfp.layers.Convolution3DFlipout(
         n_classes,
         kernel_size,
