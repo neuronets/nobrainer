@@ -74,7 +74,7 @@ def get_dataset(
     block_shape=None,
     n_epochs=None,
     mapping=None,
-    augment=False,
+    augment=None,
     normalizer=standardize,
     shuffle_buffer_size=None,
     num_parallel_calls=AUTOTUNE,
@@ -105,9 +105,7 @@ def get_dataset(
     mapping: dict, mapping to replace label values. Values equal to a key in
         the mapping are replaced with the corresponding values in the mapping.
         Values not in `mapping.keys()` are replaced with zeros.
-    augment: boolean, if true, apply random rigid transformations to the
-        features and labels. The rigid transformations are applied to the full
-        volumes.
+    augment: None, or list of strings, of different transforms 
     normalizer: callable, applies this normalization function when creating the
         dataset. to maintain compatibility with prior nobrainer release, this is
         set to standardize by default.
@@ -149,7 +147,7 @@ def get_dataset(
         dataset = dataset.map(lambda x, y: (normalizer(x), y))
 
     # Augment examples if requested.
-    if augment:
+    if augment is not None:
         if not scalar_label:
             dataset = dataset.map(
                 lambda x, y: tf.cond(
@@ -160,13 +158,17 @@ def get_dataset(
                 num_parallel_calls=num_parallel_calls,
             )
         else:
-            dataset = dataset.map(
-                lambda x, y: tf.cond(
-                    tf.random.uniform((1,)) > 0.5,
-                    true_fn=lambda: apply_random_transform_scalar_labels(x, y),
-                    false_fn=lambda: (x, y),
-                ),
-                num_parallel_calls=num_parallel_calls,
+            # BRAIN HACK PROJECT TBD: a funtion that checks the name of transforms in 
+            # intensity_transforms,py, spatial_transforms.py and volume.py
+            # and raises error if transform doesnot exist
+            # A function for sequential execution of transforms as 
+            #dataset = dataset.map(
+             #   lambda x, y: tf.cond(
+              #      tf.random.uniform((1,)) > 0.5,
+               #     true_fn=lambda: NAME OF TRANSFORM(x, y),
+               #     false_fn=lambda: (x, y),
+               # ),
+               # num_parallel_calls=num_parallel_calls,
             )
 
     # Separate into blocks, if requested.
