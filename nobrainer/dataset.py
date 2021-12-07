@@ -158,7 +158,7 @@ def get_dataset(
                 num_parallel_calls=num_parallel_calls,
             )
         else:
-            # BRAIN HACK PROJECT TBD: a funtion that checks the name of transforms in 
+            # BRAIN HACK PROJECT TBD: a funtion that checks the name of transform functions in 
             # intensity_transforms,py, spatial_transforms.py and volume.py
             # and raises error if transform doesnot exist
             # A function for sequential execution of transforms as 
