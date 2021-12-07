@@ -169,7 +169,7 @@ def get_dataset(
                #     false_fn=lambda: (x, y),
                # ),
                # num_parallel_calls=num_parallel_calls,
-            )
+            #)
 
     # Separate into blocks, if requested.
     if block_shape is not None:
