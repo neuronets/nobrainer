@@ -41,8 +41,8 @@ def centercrop(x, y=None, finesize=64, trans_xy=False):
 
 
 def spatialConstantPadding(x, y=None, trans_xy=False, padding_zyx=[1, 1, 1]):
-    """
-    Constant padding
+    """Add constant padding
+    
     Input x is a tensor or numpy to have rank 3,
     Label y is a tensor or numpy to have rank 3,
     Args:
