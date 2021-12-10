@@ -105,7 +105,7 @@ def get_dataset(
     mapping: dict, mapping to replace label values. Values equal to a key in
         the mapping are replaced with the corresponding values in the mapping.
         Values not in `mapping.keys()` are replaced with zeros.
-    augment: None, or list of strings, of different transforms 
+    augment: None, or list of different transforms as [f1,f2...] 
     normalizer: callable, applies this normalization function when creating the
         dataset. to maintain compatibility with prior nobrainer release, this is
         set to standardize by default.
@@ -149,27 +149,23 @@ def get_dataset(
     # Augment examples if requested.
     if augment is not None:
         if not scalar_label:
-            dataset = dataset.map(
-                lambda x, y: tf.cond(
-                    tf.random.uniform((1,)) > 0.5,
-                    true_fn=lambda: apply_random_transform(x, y),
-                    false_fn=lambda: (x, y),
-                ),
-                num_parallel_calls=num_parallel_calls,
-            )
+            for transform in augment:
+                dataset = dataset.map(
+                        lambda x,y: tf.cond(
+                                tf.random.uniform((1,)) > 0.5,
+                                true_fn = lambda:(transform(x),y),
+                                false_fn=lambda:(x,y),
+                        ),
+                 )
         else:
-            # BRAIN HACK PROJECT TBD: a funtion that checks the name of transform functions in 
-            # intensity_transforms,py, spatial_transforms.py and volume.py
-            # and raises error if transform doesnot exist
-            # A function for sequential execution of transforms as 
-            #dataset = dataset.map(
-             #   lambda x, y: tf.cond(
-              #      tf.random.uniform((1,)) > 0.5,
-               #     true_fn=lambda: NAME OF TRANSFORM(x, y),
-               #     false_fn=lambda: (x, y),
-               # ),
-               # num_parallel_calls=num_parallel_calls,
-            #)
+            for transform in augment:
+                dataset = dataset.map(
+                        lambda x,y: tf.cond(
+                                tf.random.uniform((1,)) > 0.5,
+                                true_fn = lambda:transform(x,y),
+                                false_fn=lambda:(x,y),
+                        ),
+                )
 
     # Separate into blocks, if requested.
     if block_shape is not None:
