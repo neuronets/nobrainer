@@ -127,8 +127,8 @@ def resize(x, y=None, trans_xy=False, size=[32, 32], mode="bicubic"):
 
 
 def randomflip_leftright(x, y=None, trans_xy=False):
-    """
-    Randomly flips the input and label randomly with a given probability.
+    """Randomly flips the input and label randomly with a given probability.
+    
     x and y are Tensors or numpy arrays,
     it is expected to be of rank 3
 
