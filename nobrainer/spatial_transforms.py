@@ -73,8 +73,8 @@ def spatialConstantPadding(x, y=None, trans_xy=False, padding_zyx=[1, 1, 1]):
 
 
 def randomCrop(x, y=None, trans_xy=False, cropsize=16):
-    """
-    Crops the given image from random locations
+    """Crops the given image from random locations
+    
     Input x is a tensor or numpy to have rank 3,
     Label y is a tensor or numpy to have rank 3,
     cropsize is the size of the cropped output,
