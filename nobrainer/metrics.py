@@ -59,8 +59,7 @@ def generalized_dice(y_true, y_pred, axis=(1, 2, 3)):
     w = tf.where(tf.math.is_finite(w), w, epsilon)
     num = 2 * tf.reduce_sum(w * tf.reduce_sum(y_true * y_pred, axis=axis), axis=-1)
     den = tf.reduce_sum(w * tf.reduce_sum(y_true + y_pred, axis=axis), axis=-1)
-    gdice = num / den
-    gdice = tf.where(tf.math.is_finite(gdice), gdice, tf.zeros_like(gdice))
+    gdice = (num+epsilon)/(den+epsilon)
     return gdice
 
 
