@@ -67,8 +67,8 @@ def vnet(
     padding="SAME",
     **kwargs
 ):
-    """
-    Instantiate a 3D VNet Architecture
+    """Instantiate a 3D VNet Architecture
+    
     VNet model: a 3D deep neural network model adapted from
     https://arxiv.org/pdf/1606.04797.pdf
     adatptations include groupnorm and spatial dropout.
