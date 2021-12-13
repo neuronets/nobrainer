@@ -2,15 +2,19 @@ import tensorflow as tf
 
 
 def centercrop(x, y=None, finesize=64, trans_xy=False):
-    """
-    Crops the given image at the center.
-    Input x is a tensor or numpy to have rank 3,
-    Label y is a tensor or numpy to have rank 3,
-    finesize is the size of the cropped output,
-    If x is smaller than finesize along any edge, image is padded with 0
-    and then center cropped.
-
+    """Crops the given image at the center.
+    ...
+    >>> x = np.array([[[1, 1, 1], [2, 2, 2], [3, 3, 3]]])
+    >>> finesize = 1
+    >>> x_out = spatial_transforms.centercrop(x, finesize=finesize)
+    >>> x_out
+        <tf.Tensor: shape=(1, 1, 3), dtype=float32, 
+        numpy=array([[[2., 2., 2.]]], dtype=float32)>
+    ...
     Args:
+        Input x is a tensor or numpy to have rank 3,
+        Label y is a tensor or numpy to have rank 3,
+        finesize is the size of the cropped output,
         finesize (int): Desired output size of the crop. Default = 64;
         Trans_xy (Boolean): transform both x and y. If set True, function
         will require both x,y.
@@ -42,10 +46,21 @@ def centercrop(x, y=None, finesize=64, trans_xy=False):
 
 def spatialConstantPadding(x, y=None, trans_xy=False, padding_zyx=[1, 1, 1]):
     """Add constant padding
-
-    Input x is a tensor or numpy to have rank 3,
-    Label y is a tensor or numpy to have rank 3,
+    ...
+    >>> x = np.array([[[1, 1, 1], [2, 2, 2], [3, 3, 3]]])
+    >>> x_out = spatial_transforms.spatialConstantPadding(
+    x,padding_zyx=[0, 1, 1])
+    >>> x_out
+    <tf.Tensor: shape=(1, 5, 5), dtype=float32, numpy=
+    array([[[0., 0., 0., 0., 0.],
+            [0., 1., 1., 1., 0.],
+            [0., 2., 2., 2., 0.],
+            [0., 3., 3., 3., 0.],
+            [0., 0., 0., 0., 0.]]], dtype=float32)>
+    ...
     Args:
+        Input x is a tensor or numpy to have rank 3,
+        Label y is a tensor or numpy to have rank 3,
         padding_zyx: Desired padding in three dimensions. Default = 1;
         Trans_xy (Boolean): transform both x and y. If set True, function
         will require both x,y.
@@ -74,14 +89,17 @@ def spatialConstantPadding(x, y=None, trans_xy=False, padding_zyx=[1, 1, 1]):
 
 def randomCrop(x, y=None, trans_xy=False, cropsize=16):
     """Crops the given image from random locations
-
-    Input x is a tensor or numpy to have rank 3,
-    Label y is a tensor or numpy to have rank 3,
-    cropsize is the size of the cropped output,
-    If x is smaller than cropsize along any edge, image is padded with 0
-    and then cropped.
-
+    ...
+    >>> x = np.array([[[1, 1, 1], [2, 2, 2], [3, 3, 3]]])
+    >>> x_out = spatial_transforms.randomCrop(x, cropsize=1)
+    >>> x_out
+    <tf.Tensor: shape=(1, 1, 3), dtype=float32,
+    numpy=array([[[6., 2., 5.]]], dtype=float32)>
+    ...
     Args:
+        Input x is a tensor or numpy to have rank 3,
+        Label y is a tensor or numpy to have rank 3,
+        cropsize is the size of the cropped output,
         finesize (int): Desired output size of the crop. Default = 64;
         Trans_xy (Boolean): transform both x and y. If set True, function
         will require both x,y.
@@ -105,8 +123,24 @@ def randomCrop(x, y=None, trans_xy=False, cropsize=16):
 
 
 def resize(x, y=None, trans_xy=False, size=[32, 32], mode="bicubic"):
-    """check image.ResizeMethod enum, or the string equivalent. Options:
-    bilinear, lanczos3, lanczos5, bicubic, gaussian , nearest.
+    """Resize the input and label
+    ...
+    >>> x = np.array([[[1, 2, 3], [6, 2, 5], [3, 4, 9]]])
+    >>> x_out = spatial_transforms.resize(x,size=[2, 2])
+    >>> x_out
+    <tf.Tensor: shape=(2, 2, 3), dtype=float32, numpy=
+    array([[[2.0145986, 1.9562043, 3.2919707],
+            [3.678832 , 3.620438 , 8.284672 ]],
+            
+           [[2.0145986, 1.9562043, 3.2919707],
+            [3.678832 , 3.620438 , 8.284672 ]]], dtype=float32)>
+    ...
+    
+    Args:
+        Input x is a tensor or numpy to have rank 3,
+        Label y is a tensor or numpy to have rank 3,
+        size: the resize output
+        mode: bilinear, lanczos3, lanczos5, bicubic, gaussian , nearest.
     """
     if ~tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
@@ -127,12 +161,19 @@ def resize(x, y=None, trans_xy=False, size=[32, 32], mode="bicubic"):
 
 
 def randomflip_leftright(x, y=None, trans_xy=False):
-    """Randomly flips the input and label randomly with a given probability.
-
-    x and y are Tensors or numpy arrays,
-    it is expected to be of rank 3
-
+    """Randomly flips the input and label randomly with a given probability
+    ...
+    >>> x = np.array([[[1, 2, 3], [6, 2, 5], [3, 4, 9]]])
+    >>> x_out = spatial_transforms.randomflip_leftright(x)
+    >>> x_out
+    <tf.Tensor: shape=(1, 3, 3), dtype=float32, numpy=
+    array([[[3., 4., 9.],
+            [6., 2., 5.],
+            [1., 2., 3.]]], dtype=float32)>
+    ...
     Args:
+        Input x is a tensor or numpy to have rank 3,
+        Label y is a tensor or numpy to have rank 3,
         trans_xy (float): Transform both x and y, default set False.
     """
     if ~tf.is_tensor(x):
