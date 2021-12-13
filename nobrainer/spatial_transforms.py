@@ -8,7 +8,7 @@ def centercrop(x, y=None, finesize=64, trans_xy=False):
     >>> finesize = 1
     >>> x_out = spatial_transforms.centercrop(x, finesize=finesize)
     >>> x_out
-        <tf.Tensor: shape=(1, 1, 3), dtype=float32, 
+        <tf.Tensor: shape=(1, 1, 3), dtype=float32,
         numpy=array([[[2., 2., 2.]]], dtype=float32)>
     ...
     Args:
@@ -131,11 +131,11 @@ def resize(x, y=None, trans_xy=False, size=[32, 32], mode="bicubic"):
     <tf.Tensor: shape=(2, 2, 3), dtype=float32, numpy=
     array([[[2.0145986, 1.9562043, 3.2919707],
             [3.678832 , 3.620438 , 8.284672 ]],
-            
+
            [[2.0145986, 1.9562043, 3.2919707],
             [3.678832 , 3.620438 , 8.284672 ]]], dtype=float32)>
     ...
-    
+
     Args:
         Input x is a tensor or numpy to have rank 3,
         Label y is a tensor or numpy to have rank 3,
