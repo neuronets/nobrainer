@@ -18,7 +18,7 @@ def centercrop(x, y=None, finesize=64, trans_xy=False):
         finesize (int): Desired output size of the crop. Default = 64;
         Trans_xy (Boolean): transform both x and y. If set True, function
         will require both x,y.
-    Returns: 
+    Returns:
         CenterCroped Input and/or Label Tensor
     """
     if ~tf.is_tensor(x):
@@ -66,8 +66,8 @@ def spatialConstantPadding(x, y=None, trans_xy=False, padding_zyx=[1, 1, 1]):
         padding_zyx: Desired padding in three dimensions. Default = 1;
         Trans_xy (Boolean): transform both x and y. If set True, function
         will require both x,y.
-    Returns: 
-        Input and/or Label Tensor with Spatial Padding     
+    Returns:
+        Input and/or Label Tensor with Spatial Padding
     """
     if ~tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
@@ -107,7 +107,7 @@ def randomCrop(x, y=None, trans_xy=False, cropsize=16):
         finesize (int): Desired output size of the crop. Default = 64;
         Trans_xy (Boolean): transform both x and y. If set True, function
         will require both x,y.
-    Returns: 
+    Returns:
         Randomly Croped Input and/or Label Tensor
     """
     if ~tf.is_tensor(x):
@@ -130,25 +130,25 @@ def randomCrop(x, y=None, trans_xy=False, cropsize=16):
 
 def resize(x, y=None, trans_xy=False, size=[32, 32], mode="bicubic"):
     """Resize the input and label
-    ...
-    >>> x = np.array([[[1, 2, 3], [6, 2, 5], [3, 4, 9]]])
-    >>> x_out = spatial_transforms.resize(x,size=[2, 2])
-    >>> x_out
-    <tf.Tensor: shape=(2, 2, 3), dtype=float32, numpy=
-    array([[[2.0145986, 1.9562043, 3.2919707],
-            [3.678832 , 3.620438 , 8.284672 ]],
+     ...
+     >>> x = np.array([[[1, 2, 3], [6, 2, 5], [3, 4, 9]]])
+     >>> x_out = spatial_transforms.resize(x,size=[2, 2])
+     >>> x_out
+     <tf.Tensor: shape=(2, 2, 3), dtype=float32, numpy=
+     array([[[2.0145986, 1.9562043, 3.2919707],
+             [3.678832 , 3.620438 , 8.284672 ]],
 
-           [[2.0145986, 1.9562043, 3.2919707],
-            [3.678832 , 3.620438 , 8.284672 ]]], dtype=float32)>
-    ...
+            [[2.0145986, 1.9562043, 3.2919707],
+             [3.678832 , 3.620438 , 8.284672 ]]], dtype=float32)>
+     ...
 
-    Args:
-        Input x is a tensor or numpy to have rank 3,
-        Label y is a tensor or numpy to have rank 3,
-        size: the resize output
-        mode: bilinear, lanczos3, lanczos5, bicubic, gaussian , nearest.
-   Returns: 
-        Resized Input and/or Label Tensor
+     Args:
+         Input x is a tensor or numpy to have rank 3,
+         Label y is a tensor or numpy to have rank 3,
+         size: the resize output
+         mode: bilinear, lanczos3, lanczos5, bicubic, gaussian , nearest.
+    Returns:
+         Resized Input and/or Label Tensor
     """
     if ~tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
@@ -183,7 +183,7 @@ def randomflip_leftright(x, y=None, trans_xy=False):
         Input x is a tensor or numpy to have rank 3,
         Label y is a tensor or numpy to have rank 3,
         trans_xy (float): Transform both x and y, default set False.
-    Returns: 
+    Returns:
         Randomly flipped Input and/or Label Tensor
     """
     if ~tf.is_tensor(x):
