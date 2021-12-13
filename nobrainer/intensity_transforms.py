@@ -11,7 +11,7 @@ def addGaussianNoise(x, y=None, trans_xy=False, noise_mean=0.0, noise_std=0.1):
     >>> x_out = intensity_transforms.addGaussianNoise(x,
                                   noise_mean=0.0, noise_std=1)
     >>> x_out
-        <tf.Tensor: shape=(1, 1, 3), dtype=float32, 
+        <tf.Tensor: shape=(1, 1, 3), dtype=float32,
         numpy=array([[[0.82689023, 1.9072294 , 1.9717102 ]]], dtype=float32)>
     ...
     noise_mean and Noise_std are parameters for Noise addition,
@@ -48,7 +48,7 @@ def minmaxIntensityScaling(x, y=None, trans_xy=False):
     >>> x = [[[0., 2., 1.]]]
     >>> x_out = intensity_transforms.minmaxIntensityScaling(x)
     >>> x_out
-    <tf.Tensor: shape=(1, 1, 3), dtype=float32, 
+    <tf.Tensor: shape=(1, 1, 3), dtype=float32,
     numpy=array([[[0. , 1. , 0.5]]], dtype=float32)>
     ...
     Args:
@@ -88,7 +88,7 @@ def customIntensityScaling(x, y=None, trans_xy=False, scale_x=[0.0, 1.0], scale_
     >>> x_out, y_out = intensity_transforms.customIntensityScaling(
     x, y, trans_xy=True, scale_x=[0, 4], scale_y=[0, 3])
     >>> x_out
-    <tf.Tensor: shape=(1, 1, 3), dtype=float32, 
+    <tf.Tensor: shape=(1, 1, 3), dtype=float32,
     numpy=array([[[4., 4., 0.]]], dtype=float32)>
     >>> y_out
     <tf.Tensor: shape=(1, 1, 3), dtype=float32,
@@ -141,7 +141,7 @@ def intensityMasking(x, mask_x, y=None, trans_xy=False, mask_y=None):
     ...
     >>> mask_x = np.array([[[0, 0, 0], [0, 1, 0], [0, 0, 0]]])
     >>> x = np.array([[[1, 1, 1], [2, 2, 2], [3, 3, 3]]])
-    >>> x_out = intensity_transforms.intensityMasking(x, 
+    >>> x_out = intensity_transforms.intensityMasking(x,
                 mask_x=mask_x)
     >>> x_out
     (<tf.Tensor: shape=(2, 3, 3), dtype=float32, numpy=
