@@ -4,8 +4,7 @@ import tensorflow as tf
 
 
 def addGaussianNoise(x, y=None, trans_xy=False, noise_mean=0.0, noise_std=0.1):
-    """
-    Add Gaussian Noise to the Input and label
+    """Add Gaussian Noise to the Input and label
     ...
     >>> x = [[[1., 1., 1.]]]
     >>> x_out = intensity_transforms.addGaussianNoise(x,
@@ -42,8 +41,7 @@ def addGaussianNoise(x, y=None, trans_xy=False, noise_mean=0.0, noise_std=0.1):
 
 
 def minmaxIntensityScaling(x, y=None, trans_xy=False):
-    """
-    Intensity Scaling between 0-1
+    """Intensity Scaling between 0-1
     ...
     >>> x = [[[0., 2., 1.]]]
     >>> x_out = intensity_transforms.minmaxIntensityScaling(x)
