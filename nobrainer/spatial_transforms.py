@@ -18,6 +18,8 @@ def centercrop(x, y=None, finesize=64, trans_xy=False):
         finesize (int): Desired output size of the crop. Default = 64;
         Trans_xy (Boolean): transform both x and y. If set True, function
         will require both x,y.
+    Returns: 
+        CenterCroped Input and/or Label Tensor
     """
     if ~tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
@@ -64,6 +66,8 @@ def spatialConstantPadding(x, y=None, trans_xy=False, padding_zyx=[1, 1, 1]):
         padding_zyx: Desired padding in three dimensions. Default = 1;
         Trans_xy (Boolean): transform both x and y. If set True, function
         will require both x,y.
+    Returns: 
+        Input and/or Label Tensor with Spatial Padding     
     """
     if ~tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
@@ -103,6 +107,8 @@ def randomCrop(x, y=None, trans_xy=False, cropsize=16):
         finesize (int): Desired output size of the crop. Default = 64;
         Trans_xy (Boolean): transform both x and y. If set True, function
         will require both x,y.
+    Returns: 
+        Randomly Croped Input and/or Label Tensor
     """
     if ~tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
@@ -141,6 +147,8 @@ def resize(x, y=None, trans_xy=False, size=[32, 32], mode="bicubic"):
         Label y is a tensor or numpy to have rank 3,
         size: the resize output
         mode: bilinear, lanczos3, lanczos5, bicubic, gaussian , nearest.
+   Returns: 
+        Resized Input and/or Label Tensor
     """
     if ~tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
@@ -175,6 +183,8 @@ def randomflip_leftright(x, y=None, trans_xy=False):
         Input x is a tensor or numpy to have rank 3,
         Label y is a tensor or numpy to have rank 3,
         trans_xy (float): Transform both x and y, default set False.
+    Returns: 
+        Randomly flipped Input and/or Label Tensor
     """
     if ~tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
