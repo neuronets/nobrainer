@@ -156,7 +156,7 @@ def default_mean_field_normal_fn(
           the unprojected variable and must return the projected variable (which
           must have the same shape). Constraints are not safe to use when doing
           asynchronous distributed training.
-        untransformed_scale_constraint: An optional projection 
+        untransformed_scale_constraint: An optional projection
         function to behttps://github.com/FedericoVasile1/Project8
           applied to the `scale` parameters after being updated by an `Optimizer`
           (e.g. used to implement norm constraints or value constraints). The
@@ -188,7 +188,7 @@ def default_mean_field_normal_fn(
 
 
 def divergence_fn_bayesian(prior_std, examples_per_epoch):
-    """Scaled KLD function for ELBO loss with 
+    """Scaled KLD function for ELBO loss with
     examples per epochs as scaling parameter
     Args:
         prior_std(int): scale parameter for the priors
