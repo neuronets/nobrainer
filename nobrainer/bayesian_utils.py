@@ -24,8 +24,48 @@ def default_loc_scale_fn(
     weightnorm=False,
 ):
     """
-    This function creates `mean`, `std`
-    and weightnorm parameters for variational layers
+    This function produces a closure which produces `mean`, `std`, 'weightnorm'
+    using`tf.get_variable`. The closure accepts the following arguments:
+    dtype: Type of parameter's event.
+    shape: Python `list`-like representing the parameter's event shape.
+    name: Python `str` name prepended to any created (or existing)
+     `tf.Variable`s.
+    trainable: Python `bool` indicating all created `tf.Variable`s should be
+     added to the graph collection `GraphKeys.TRAINABLE_VARIABLES`.
+    add_variable_fn: `tf.get_variable`-like `callable` used to create (or
+     access existing) `tf.Variable`s.
+    Args:
+        is_singular: Python `bool` indicating if `scale is None`. Default: `False`.
+        loc_initializer: Initializer function for the `loc` parameters.
+          The default is `tf.random_normal_initializer(mean=0., stddev=0.1)`.
+        untransformed_scale_initializer: Initializer function for the `scale`
+          parameters. Default value: `tf.random_normal_initializer(mean=-3.,
+          stddev=0.1)`. This implies the softplus transformed result is initialized
+          near `0`. It allows a `Normal` distribution with `scale` parameter set to
+          this value to approximately act like a point mass.
+        loc_regularizer: Regularizer function for the `loc` parameters.
+          The default (`None`) is to use the `tf.get_variable` default.
+        untransformed_scale_regularizer: Regularizer function for the `scale`
+          parameters. The default (`None`) is to use the `tf.get_variable` default.
+        loc_constraint: An optional projection function to be applied to the
+          loc after being updated by an `Optimizer`. The function must take as input
+          the unprojected variable and must return the projected variable (which
+          must have the same shape). Constraints are not safe to use when doing
+          asynchronous distributed training.
+          The default (`None`) is to use the `tf.get_variable` default.
+        untransformed_scale_constraint: An optional projection function to be
+          applied to the `scale` parameters after being updated by an `Optimizer`
+          (e.g. used to implement norm constraints or value constraints). The
+          function must take as input the unprojected variable and must return the
+          projected variable (which must have the same shape). Constraints are not
+          safe to use when doing asynchronous distributed training. The default
+          (`None`) is to use the `tf.get_variable` default.
+        weightnorm: An optional (boolean) to activate weightnorm for the mean 
+        kernal.
+    Returns:
+        default_loc_scale_fn: Python `callable` which instantiates `loc`, `scale`
+        parameters from args: `dtype, shape, name, trainable, add_variable_fn`.
+    
     """
 
     def _fn(dtype, shape, name, trainable, add_variable_fn):
@@ -91,15 +131,37 @@ def default_mean_field_normal_fn(
     weightnorm=False,
 ):
     """
-    This function sets layers: deterministic and variational
-    args:
-    is_singular(Boolean): True sets deterministic layers, False for variational
-    loc_initializer: mean kernal initializer.
-    untransformed_scale_initializer: standard deviation kernal initializer
-    loc_regularizer: mean kernal regularizer. Deafult= None, options= l1,l2
-    untransformed_scale_regularizer: standard deviation kernal regulaizer
-    loc_constraint and untransformed_scale_constraint expects tf constraint functions
-    weightnorm(Boolean): Sets weightnorm on mean kernal. Default(False).
+    This function sets layers: deterministic and variational layers with
+    trainable params. 
+    This function produces a closure which produces `tfd.Normal`or 
+    tfd.Deterministic parameterized by a `loc` and `scale` each created 
+    using `tf.get_variable`.
+    
+    Args:
+        is_singular: Python `bool` if `True`, forces the special case limit of
+          `scale->0`, i.e., a `Deterministic` distribution. and if set False 
+          put a variational layer.
+        loc_initializer: Initializer function for the `loc` parameters.
+          The default is `tf.random_normal_initializer(mean=0., stddev=0.1)`.
+        untransformed_scale_initializer: Initializer function for the `scale`
+          parameters. Default value: `tf.random_normal_initializer(mean=-3.,
+          stddev=0.1)`. This implies the softplus transformed result is initialized
+          near `0`. It allows a `Normal` distribution with `scale` parameter set to
+          this value to approximately act like a point mass.
+        loc_regularizer: Regularizer function for the `loc` parameters.
+        untransformed_scale_regularizer: Regularizer function for the `scale`
+          parameters.
+        loc_constraint: An optional projection function to be applied to the
+          loc after being updated by an `Optimizer`. The function must take as input
+          the unprojected variable and must return the projected variable (which
+          must have the same shape). Constraints are not safe to use when doing
+          asynchronous distributed training.
+        untransformed_scale_constraint: An optional projection function to behttps://github.com/FedericoVasile1/Project8
+          applied to the `scale` parameters after being updated by an `Optimizer`
+          (e.g. used to implement norm constraints or value constraints). The
+          function must take as input the unprojected variable and must return the
+          projected variable (which must have the same shape). Constraints are not
+          safe to use when doing asynchronous distributed training.
     """
     loc_scale_fn = default_loc_scale_fn(
         is_singular=is_singular,
@@ -136,7 +198,15 @@ def divergence_fn_bayesian(prior_std, examples_per_epoch):
 
 
 def prior_fn_for_bayesian(init_scale_mean=-1, init_scale_std=0.1):
-    """Set priors for the variational Layers (with a possibility of trainable priors)"""
+    """This function set priors for the variational Layers 
+    which can be set trainable. 
+    Args: 
+        iniy_scale_mean(int): mean initialized value 
+        init_scale_std(int): scale initiatlization
+    Returns:
+        prior_fn: Python `callable` which instantiates `loc`, `scale`
+        parameters from args: `dtype, shape, name, trainable, add_variable_fn`.
+    """
 
     def prior_fn(dtype, shape, name, _, add_variable_fn):
         untransformed_scale = add_variable_fn(
@@ -164,7 +234,13 @@ def prior_fn_for_bayesian(init_scale_mean=-1, init_scale_std=0.1):
 
 
 def normal_prior(prior_std=1.0):
-    """Defines normal distributions prior for Bayesian neural network."""
+    """This is a specific normal distributions prior setting 
+    for Bayesian neural network.
+    Args: 
+        prior_std: scale parameter, default setting is 1.0. 
+    Returns: 
+        prior_fn: Python `callable`normal distribution.
+    """
 
     def prior_fn(dtype, shape, name, trainable, add_variable_fn):
         dist = tfd.Normal(
