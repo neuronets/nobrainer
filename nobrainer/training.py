@@ -150,3 +150,98 @@ class ProgressiveGANTrainer(tf.keras.Model):
         self.generator.save(
             os.path.join(filepath, "generator_res_{}".format(self.resolution))
         )
+
+
+class ProgressiveAETrainer(tf.keras.Model):
+    """Progressive Autoencoder Trainer.
+
+    Trains encoder and decoder using reconstruction error to learn latent representations of
+    brain MRI images. Uses a progressive method for each resolution and supports the smooth
+    transition of new layers, as explained in the reference.
+
+    Parameters
+    ----------
+    encoder : tf.keras.Model, Instantiated using nobrainer.models
+    decoder : tf.keras.Model, Instantiated using nobrainer.models
+    fixed : boolean, if True, decoder is fixed and go not undergo training
+
+    References
+    ----------
+    Progressive Growing of GANs for Improved Quality, Stability, and Variation.
+    T. Karras, T. Aila, S. Laine & J. Lehtinen, International Conference on
+    Learning Representations. 2018.
+
+    Links
+    -----
+    [https://research.nvidia.com/sites/default/files/pubs/2017-10_Progressive-Growing-of/karras2018iclr-paper.pdf](https://research.nvidia.com/sites/default/files/pubs/2017-10_Progressive-Growing-of/karras2018iclr-paper.pdf)
+    """
+
+    def __init__(self, encoder, decoder, fixed=False):
+        super(ProgressiveAETrainer, self).__init__()
+
+        self.encoder = encoder
+        self.decoder = decoder
+
+        self.fixed = fixed
+        if self.fixed:
+            self.decoder.trainable = False
+
+        self.latent_size = encoder.latent_size
+        self.resolution = 8
+        self.train_step_counter = tf.Variable(0.0)
+        self.phase = tf.Variable("resolution")
+
+    def compile(self, optimizer, loss_fn):
+        super(ProgressiveAETrainer, self).compile()
+
+        self.optimizer = optimizer
+        self.loss_fn = compile_utils.LossesContainer(loss_fn)
+
+    def train_step(self, images):
+
+        if isinstance(images, tuple):
+            images = images[0]
+        else:
+
+            images = _adjust_dynamic_range(images, [0.0, 255.0], [-1.0, 1.0])
+
+            self.train_step_counter.assign_add(1.0)
+
+            alpha = tf.cond(
+                tf.math.equal(self.phase, "transition"),
+                lambda: self.train_step_counter / self.steps_per_epoch,
+                lambda: tf.constant([1.0]),
+            )
+
+            if self.fixed:
+                alpha = tf.reshape(alpha, (1,))
+                beta = tf.reshape(tf.constant(1.0), (1,))
+            else:
+                alpha = tf.reshape(alpha, (1,))
+                beta = tf.reshape(alpha, (1,))
+
+        with tf.GradientTape() as (tape):
+            latent = self.encoder([images, alpha])
+            reconstructed = self.decoder([latent, beta])
+            loss = tf.math.reduce_mean((self.loss_fn(images, reconstructed)), axis=None)
+
+        gradients = tape.gradient(
+            loss, self.encoder.trainable_variables + self.decoder.trainable_variables
+        )
+        self.optimizer.apply_gradients(
+            zip(
+                gradients,
+                self.encoder.trainable_variables + self.decoder.trainable_variables,
+            )
+        )
+
+        return {"loss": loss}
+
+    def fit(
+        self, *args, resolution=8, phase="resolution", steps_per_epoch=300, **kwargs
+    ):
+        self.resolution = resolution
+        self.steps_per_epoch = steps_per_epoch
+        self.train_step_counter.assign(0.0)
+        self.phase.assign(phase)
+        (super().fit)(args, steps_per_epoch=steps_per_epoch, **kwargs)
