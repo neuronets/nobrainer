@@ -19,14 +19,14 @@ def down_stage(inputs, filters, kernel_size=3, activation="relu", padding="SAME"
     """encoding blocks of the VNet model
     Parameters
     ----------
-    inputs: tf.layer for encoding stage. 
+    inputs: tf.layer for encoding stage.
     filters: list or tuple of four ints, the shape of the input data. Omit
         the batch dimension, and include the number of channels.
     kernal_size: int, size of the kernal of conv layers. Default kernal size
         is set to be 3.
-    activation: str or optimizer object, the non-linearity to use. All 
+    activation: str or optimizer object, the non-linearity to use. All
         tf.activations are allowed to use
-    
+
     Returns
     ----------
     encoding module
@@ -43,12 +43,12 @@ def up_stage(inputs, skip, filters, kernel_size=3, activation="relu", padding="S
     """decoding blocks of the VNet model
     Parameters
     ----------
-    inputs: tf.layer for encoding stage. 
+    inputs: tf.layer for encoding stage.
     filters: list or tuple of four ints, the shape of the input data. Omit
         the batch dimension, and include the number of channels.
     kernal_size: int, size of the kernal of conv layers. Default kernal size
         is set to be 3.
-    activation: str or optimizer object, the non-linearity to use. All 
+    activation: str or optimizer object, the non-linearity to use. All
         tf.activations are allowed to use
     Returns
     ----------
@@ -74,11 +74,11 @@ def end_stage(inputs, n_classes=1, kernel_size=3, activation="relu", padding="SA
     """last logit layer
     Parameters
     ----------
-    inputs: tf.model layer. 
+    inputs: tf.model layer.
     n_classes: int, for binary class use the value 1.
     kernal_size: int, size of the kernal of conv layers. Default kernal size
         is set to be 3.
-    activation: str or optimizer object, the non-linearity to use. All 
+    activation: str or optimizer object, the non-linearity to use. All
         tf.activations are allowed to use
     Result
     ----------
@@ -111,7 +111,7 @@ def vnet(
     VNet model: a 3D deep neural network model adapted from
     https://arxiv.org/pdf/1606.04797.pdf
     adatptations include groupnorm and spatial dropout.
-    
+
     Parameters
     ----------
     n_classes: int, number of classes to classify. For binary applications, use
@@ -120,13 +120,13 @@ def vnet(
         the batch dimension, and include the number of channels.
     kernal_size: int, size of the kernal of conv layers. Default kernal size
         is set to be 3.
-    activation: str or optimizer object, the non-linearity to use. All 
+    activation: str or optimizer object, the non-linearity to use. All
         tf.activations are allowed to use
-    
+
     Returns
     ----------
     Model object.
-    
+
     """
     inputs = Input(input_shape)
 
