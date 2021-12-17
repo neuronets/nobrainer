@@ -105,7 +105,9 @@ def get_dataset(
     mapping: dict, mapping to replace label values. Values equal to a key in
         the mapping are replaced with the corresponding values in the mapping.
         Values not in `mapping.keys()` are replaced with zeros.
-    augment: None, or list of different transforms as [f1,f2...]
+    augment: None, or list of different transforms in the executable sequence
+            the corresponding arguments in tuple as e.g.:
+            [(addGaussianNoise, {'noise_mean':0.1,'noise_std':0.5}), (...)]
     normalizer: callable, applies this normalization function when creating the
         dataset. to maintain compatibility with prior nobrainer release, this is
         set to standardize by default.
@@ -149,20 +151,20 @@ def get_dataset(
     # Augment examples if requested.
     if augment is not None:
         if not scalar_label:
-            for transform in augment:
+            for transform, kwargs in augment:
                 dataset = dataset.map(
                     lambda x, y: tf.cond(
                         tf.random.uniform((1,)) > 0.5,
-                        true_fn=lambda: (transform(x), y),
+                        true_fn=lambda: (transform(x, **kwargs), y),
                         false_fn=lambda: (x, y),
                     ),
                 )
         else:
-            for transform in augment:
+            for transform, kwargs in augment:
                 dataset = dataset.map(
                     lambda x, y: tf.cond(
                         tf.random.uniform((1,)) > 0.5,
-                        true_fn=lambda: transform(x, y),
+                        true_fn=lambda: transform(x, y, **kwargs),
                         false_fn=lambda: (x, y),
                     ),
                 )
