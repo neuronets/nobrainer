@@ -16,7 +16,21 @@ from ..layers.groupnorm import GroupNormalization
 
 
 def down_stage(inputs, filters, kernel_size=3, activation="relu", padding="SAME"):
-    # encoding blocks of the VNet model
+    """encoding blocks of the VNet model
+    Parameters
+    ----------
+    inputs: tf.layer for encoding stage. 
+    filters: list or tuple of four ints, the shape of the input data. Omit
+        the batch dimension, and include the number of channels.
+    kernal_size: int, size of the kernal of conv layers. Default kernal size
+        is set to be 3.
+    activation: str or optimizer object, the non-linearity to use. All 
+        tf.activations are allowed to use
+    
+    Returns
+    ----------
+    encoding module
+    """
     convd = Conv3D(filters, kernel_size, activation=activation, padding=padding)(inputs)
     convd = GroupNormalization()(convd)
     convd = Conv3D(filters, kernel_size, activation=activation, padding=padding)(convd)
@@ -26,7 +40,20 @@ def down_stage(inputs, filters, kernel_size=3, activation="relu", padding="SAME"
 
 
 def up_stage(inputs, skip, filters, kernel_size=3, activation="relu", padding="SAME"):
-    # decoding blocks of the VNet model
+    """decoding blocks of the VNet model
+    Parameters
+    ----------
+    inputs: tf.layer for encoding stage. 
+    filters: list or tuple of four ints, the shape of the input data. Omit
+        the batch dimension, and include the number of channels.
+    kernal_size: int, size of the kernal of conv layers. Default kernal size
+        is set to be 3.
+    activation: str or optimizer object, the non-linearity to use. All 
+        tf.activations are allowed to use
+    Returns
+    ----------
+    decoded module
+    """
     up = UpSampling3D()(inputs)
     up = Conv3D(filters, 2, activation=activation, padding=padding)(up)
     up = GroupNormalization()(up)
@@ -44,7 +71,19 @@ def up_stage(inputs, skip, filters, kernel_size=3, activation="relu", padding="S
 
 
 def end_stage(inputs, n_classes=1, kernel_size=3, activation="relu", padding="SAME"):
-    # last logit layer
+    """last logit layer
+    Parameters
+    ----------
+    inputs: tf.model layer. 
+    n_classes: int, for binary class use the value 1.
+    kernal_size: int, size of the kernal of conv layers. Default kernal size
+        is set to be 3.
+    activation: str or optimizer object, the non-linearity to use. All 
+        tf.activations are allowed to use
+    Result
+    ----------
+    Predicted probablities
+    """
     conv = Conv3D(
         filters=n_classes,
         kernel_size=kernel_size,
@@ -61,7 +100,7 @@ def end_stage(inputs, n_classes=1, kernel_size=3, activation="relu", padding="SA
 
 def vnet(
     n_classes=1,
-    input_shape=(256, 256, 256, 1),
+    input_shape=(128, 128, 128, 1),
     kernel_size=3,
     activation="relu",
     padding="SAME",
@@ -72,11 +111,22 @@ def vnet(
     VNet model: a 3D deep neural network model adapted from
     https://arxiv.org/pdf/1606.04797.pdf
     adatptations include groupnorm and spatial dropout.
-    Args:
-    n_classes(int): number of classes
-    input_shape(tuple):four ints representating the shape of 3D input
-    kernal_size(int): size of the kernal of conv layers
-    activation(str): all tf.keras.activations are allowed.
+    
+    Parameters
+    ----------
+    n_classes: int, number of classes to classify. For binary applications, use
+        a value of 1.
+    input_shape: list or tuple of four ints, the shape of the input data. Omit
+        the batch dimension, and include the number of channels.
+    kernal_size: int, size of the kernal of conv layers. Default kernal size
+        is set to be 3.
+    activation: str or optimizer object, the non-linearity to use. All 
+        tf.activations are allowed to use
+    
+    Returns
+    ----------
+    Model object.
+    
     """
     inputs = Input(input_shape)
 
