@@ -18,7 +18,26 @@ def down_stage(
     activation="relu",
     padding="SAME",
 ):
-    # encoding blocks of the model
+    """encoding blocks of the Bayesian VNet model
+    Parameters
+    ----------
+    inputs: tf.layer for encoding stage.
+    filters: list or tuple of four ints, the shape of the input data. Omit
+        the batch dimension, and include the number of channels.
+    kld: a func to compute KL Divergence loss, default is set None.
+    KLD can be set as (lambda q, p, ignore: kl_lib.kl_divergence(q, p))
+    prior_fn: a func to initialize priors distributions
+    kernel_posterior_fn:a func to initlaize kernal posteriors
+        (loc, scale and weightnorms)
+    kernal_size: int, size of the kernal of conv layers. Default kernal size
+        is set to be 3.
+    activation: str or optimizer object, the non-linearity to use. All
+        tf.activations are allowed to use.
+        
+    Returns
+    ----------
+    encoding module
+    """
     conv = tfp.layers.Convolution3DFlipout(
         filters,
         kernel_size,
@@ -54,7 +73,26 @@ def up_stage(
     activation="relu",
     padding="SAME",
 ):
-    # decoding blocks of the VNet model
+    """decoding blocks of the Bayesian VNet model
+    Parameters
+    ----------
+    inputs: tf.layer for encoding stage.
+    skip: setting skip connections
+    kld: a func to compute KL Divergence loss, default is set None.
+        KLD can be set as (lambda q, p, ignore: kl_lib.kl_divergence(q, p))
+    prior_fn: a func to initialize priors distributions
+    kernel_posterior_fn:a func to initlaize kernal posteriors
+        (loc, scale and weightnorms)
+    filters: list or tuple of four ints, the shape of the input data. Omit
+        the batch dimension, and include the number of channels.
+    kernal_size: int, size of the kernal of conv layers. Default kernal size
+        is set to be 3.
+    activation: str or optimizer object, the non-linearity to use. All
+        tf.activations are allowed to use
+    Returns
+    ----------
+    decoded module
+    """
     up = UpSampling3D()(inputs)
     up = tfp.layers.Convolution3DFlipout(
         filters,
@@ -104,7 +142,24 @@ def end_stage(
     activation="relu",
     padding="SAME",
 ):
-    # Last logit layer
+    """last logit layer
+    Parameters
+    ----------
+    inputs: tf.model layer.
+    kld: a func to compute KL Divergence loss, default is set None.
+        KLD can be set as (lambda q, p, ignore: kl_lib.kl_divergence(q, p))
+    prior_fn: a func to initialize priors distributions
+    kernel_posterior_fn:a func to initlaize kernal posteriors
+        (loc, scale and weightnorms)
+    n_classes: int, for binary class use the value 1.
+    kernal_size: int, size of the kernal of conv layers. Default kernal size
+        is set to be 3.
+    activation: str or optimizer object, the non-linearity to use. All
+        tf.activations are allowed to use
+    Result
+    ----------
+    Predicted probablities
+    """
     conv = tfp.layers.Convolution3DFlipout(
         n_classes,
         kernel_size,
@@ -147,18 +202,29 @@ def bayesian_vnet(
 ):
     """
     Instantiate a 3D Bayesian VNet Architecture
+    Adapted from Deterministic VNet: https://arxiv.org/pdf/1606.04797.pdf
     Encoder and Decoder has 3D Flipout(variational layers)
-    Args:
-    n_classes(int): number of classes
-    input_shape(tuple):four ints representating the shape of 3D input
+
+    Parameters
+    ----------
+    n_classes: int, number of classes to classify. For binary applications, use
+        a value of 1.
+    input_shape: list or tuple of four ints, the shape of the input data. Omit
+        the batch dimension, and include the number of channels.
     kernal_size(int): size of the kernal of conv layers
     activation(str): all tf.keras.activations are allowed
-    kld: KL Divergence function default(None)
-    it can be set to others -->(lambda q, p, ignore: kl_lib.kl_divergence(q, p))
-    prior_fn: a func to initialize priors.
+    kld: a func to compute KL Divergence loss, default is set None.
+        KLD can be set as (lambda q, p, ignore: kl_lib.kl_divergence(q, p))
+    prior_fn: a func to initialize priors distributions
     kernel_posterior_fn:a func to initlaize kernal posteriors
-    (loc, scale and weightnorms)
+        (loc, scale and weightnorms)
     See Bayesian Utils for more options for kld, prior_fn and kernal_posterior_fn
+    activation: str or optimizer object, the non-linearity to use. All
+        tf.activations are allowed to use.
+    
+    Returns
+    ----------
+    Bayesian model object.
     """
     inputs = Input(input_shape)
 
