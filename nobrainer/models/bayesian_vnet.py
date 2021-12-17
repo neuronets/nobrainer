@@ -33,7 +33,7 @@ def down_stage(
         is set to be 3.
     activation: str or optimizer object, the non-linearity to use. All
         tf.activations are allowed to use.
-        
+
     Returns
     ----------
     encoding module
@@ -221,7 +221,7 @@ def bayesian_vnet(
     See Bayesian Utils for more options for kld, prior_fn and kernal_posterior_fn
     activation: str or optimizer object, the non-linearity to use. All
         tf.activations are allowed to use.
-    
+
     Returns
     ----------
     Bayesian model object.
