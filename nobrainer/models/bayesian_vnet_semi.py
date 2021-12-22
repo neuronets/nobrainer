@@ -18,7 +18,7 @@ tfd = tfp.distributions
 
 def down_stage(inputs, filters, kernel_size=3, activation="relu", padding="SAME"):
     """encoding blocks of the Semi-Bayesian VNet model.
-    
+
     Parameters
     ----------
     inputs: tf.layer for encoding stage.
@@ -28,7 +28,7 @@ def down_stage(inputs, filters, kernel_size=3, activation="relu", padding="SAME"
         is set to be 3.
     activation: str or optimizer object, the non-linearity to use. All
         tf.activations are allowed to use
-    
+
     Returns
     ----------
     encoding module
@@ -53,7 +53,7 @@ def up_stage(
     padding="SAME",
 ):
     """decoding blocks of the Semi-Bayesian VNet model.
-    
+
     Parameters
     ----------
     inputs: tf.layer for encoding stage.
@@ -69,7 +69,7 @@ def up_stage(
         is set to be 3.
     activation: str or optimizer object, the non-linearity to use. All
         tf.activations are allowed to use
-    
+
     Returns
     ----------
     decoding module.
@@ -124,7 +124,7 @@ def end_stage(
     padding="SAME",
 ):
     """last logit layer of Semi-Bayesian VNet.
-    
+
     Parameters
     ----------
     inputs: tf.model layer.
@@ -138,7 +138,7 @@ def end_stage(
         is set to be 3.
     activation: str or optimizer object, the non-linearity to use. All
         tf.activations are allowed to use
-    
+
     Result
     ----------
     prediction probablities.
@@ -184,11 +184,11 @@ def bayesian_vnet_semi(
     padding="SAME",
 ):
     """Instantiate a 3D Semi-Bayesian VNet Architecture.
-    
+
     Adapted from Deterministic VNet: https://arxiv.org/pdf/1606.04797.pdf
-    Encoder has 3D Convolutional layers and Decoder has 3D 
+    Encoder has 3D Convolutional layers and Decoder has 3D
     Flipout(variational layers).
-    
+
     Parameters
     ----------
     n_classes: int, number of classes to classify. For binary applications, use
@@ -205,7 +205,7 @@ def bayesian_vnet_semi(
     See Bayesian Utils for more options for kld, prior_fn and kernal_posterior_fn
     activation: str or optimizer object, the non-linearity to use. All
         tf.activations are allowed to use.
-    
+
     Returns
     ----------
     Bayesian model object.
