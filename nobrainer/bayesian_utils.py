@@ -23,7 +23,8 @@ def default_loc_scale_fn(
     untransformed_scale_constraint=None,
     weightnorm=False,
 ):
-    """
+    """ Function for `mean`, `std`, 'weightnorm' tf.variables.
+    
     This function produces a closure which produces `mean`, `std`, 'weightnorm'
     using`tf.get_variable`. The closure accepts the following arguments:
     dtype: Type of parameter's event.
@@ -34,7 +35,9 @@ def default_loc_scale_fn(
      added to the graph collection `GraphKeys.TRAINABLE_VARIABLES`.
     add_variable_fn: `tf.get_variable`-like `callable` used to create (or
      access existing) `tf.Variable`s.
-    Args:
+     
+    Parameters
+    ----------
         is_singular: Python `bool` indicating if `scale is None`. Default: `False`.
         loc_initializer: Initializer function for the `loc` parameters.
           The default is `tf.random_normal_initializer(mean=0., stddev=0.1)`.
@@ -62,7 +65,9 @@ def default_loc_scale_fn(
           (`None`) is to use the `tf.get_variable` default.
         weightnorm: An optional (boolean) to activate weightnorm for the mean
         kernal.
-    Returns:
+        
+    Returns
+    ----------
         default_loc_scale_fn: Python `callable` which instantiates `loc`, `scale`
         parameters from args: `dtype, shape, name, trainable, add_variable_fn`.
 
@@ -130,14 +135,14 @@ def default_mean_field_normal_fn(
     untransformed_scale_constraint=None,
     weightnorm=False,
 ):
-    """
-    This function sets layers: deterministic and variational layers with
-    trainable params.
+    """ Function for deterministic/variational layers. 
+
     This function produces a closure which produces `tfd.Normal`or
     tfd.Deterministic parameterized by a `loc` and `scale` each created
     using `tf.get_variable`.
-
-    Args:
+    
+    Parameters
+    ----------
         is_singular: Python `bool` if `True`, forces the special case limit of
           `scale->0`, i.e., a `Deterministic` distribution. and if set False
           put a variational layer.
@@ -163,6 +168,10 @@ def default_mean_field_normal_fn(
           function must take as input the unprojected variable and must return the
           projected variable (which must have the same shape). Constraints are not
           safe to use when doing asynchronous distributed training.
+    
+    Returns
+    ----------
+        default_mean_field_normal_fn: Python `callable` which instantiates layers.
     """
     loc_scale_fn = default_loc_scale_fn(
         is_singular=is_singular,
@@ -188,11 +197,19 @@ def default_mean_field_normal_fn(
 
 
 def divergence_fn_bayesian(prior_std, examples_per_epoch):
-    """Scaled KLD function for ELBO loss with
-    examples per epochs as scaling parameter
-    Args:
-        prior_std(int): scale parameter for the priors
-        examples_per_epoch: scaling number (batchsize)
+    """ Computes KLD loss.
+    
+    Computes KLD function for ELBO loss with
+    examples per epochs as scaling parameter.
+    
+    Parameters
+    ----------
+        prior_std: int, scale parameter for the priors
+        examples_per_epoch: int, scaling number (batchsize)
+        
+    Returns
+    ----------
+        Scaled KLD loss. 
     """
 
     def divergence_fn(q, p, _):
@@ -204,14 +221,16 @@ def divergence_fn_bayesian(prior_std, examples_per_epoch):
 
 
 def prior_fn_for_bayesian(init_scale_mean=-1, init_scale_std=0.1):
-    """This function set priors for the variational Layers
-    which can be set trainable.
-    Args:
-        iniy_scale_mean(int): mean initialized value
-        init_scale_std(int): scale initiatlization
-    Returns:
-        prior_fn: Python `callable` which instantiates `loc`, `scale`
-        parameters from args: `dtype, shape, name, trainable, add_variable_fn`.
+    """Set priors for the variational layers, possibly trainable.
+    
+    Parameters
+    ----------
+        iniy_scale_mean: int, mean initialized value
+        init_scale_std: int, scale initiatlization
+        
+    Returns
+    ----------
+        prior_fn: Python `callable` which instantiates `loc`, `scale`.
     """
 
     def prior_fn(dtype, shape, name, _, add_variable_fn):
@@ -240,11 +259,14 @@ def prior_fn_for_bayesian(init_scale_mean=-1, init_scale_std=0.1):
 
 
 def normal_prior(prior_std=1.0):
-    """This is a specific normal distributions prior setting
-    for Bayesian neural network.
-    Args:
-        prior_std: scale parameter, default setting is 1.0.
-    Returns:
+    """ Sets normal distributions prior. 
+    
+    Parameters
+    ----------
+        prior_std: int, scale parameter, default setting is 1.0.
+        
+    Returns
+    ----------
         prior_fn: Python `callable`normal distribution.
     """
 
