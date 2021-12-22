@@ -18,7 +18,8 @@ def down_stage(
     activation="relu",
     padding="SAME",
 ):
-    """encoding blocks of the Bayesian VNet model
+    """encoding blocks of the Bayesian VNet model.
+    
     Parameters
     ----------
     inputs: tf.layer for encoding stage.
@@ -73,7 +74,8 @@ def up_stage(
     activation="relu",
     padding="SAME",
 ):
-    """decoding blocks of the Bayesian VNet model
+    """decoding blocks of the Bayesian VNet model.
+    
     Parameters
     ----------
     inputs: tf.layer for encoding stage.
@@ -89,9 +91,10 @@ def up_stage(
         is set to be 3.
     activation: str or optimizer object, the non-linearity to use. All
         tf.activations are allowed to use
+    
     Returns
     ----------
-    decoded module
+    decoding module
     """
     up = UpSampling3D()(inputs)
     up = tfp.layers.Convolution3DFlipout(
@@ -142,7 +145,8 @@ def end_stage(
     activation="relu",
     padding="SAME",
 ):
-    """last logit layer
+    """Last logit layer.
+    
     Parameters
     ----------
     inputs: tf.model layer.
@@ -156,9 +160,10 @@ def end_stage(
         is set to be 3.
     activation: str or optimizer object, the non-linearity to use. All
         tf.activations are allowed to use
+    
     Result
     ----------
-    Predicted probablities
+    prediction probablities
     """
     conv = tfp.layers.Convolution3DFlipout(
         n_classes,
@@ -200,8 +205,8 @@ def bayesian_vnet(
     activation="relu",
     padding="SAME",
 ):
-    """
-    Instantiate a 3D Bayesian VNet Architecture
+    """Instantiate a 3D Bayesian VNet Architecture.
+    
     Adapted from Deterministic VNet: https://arxiv.org/pdf/1606.04797.pdf
     Encoder and Decoder has 3D Flipout(variational layers)
 
