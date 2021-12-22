@@ -17,7 +17,8 @@ tfd = tfp.distributions
 
 
 def down_stage(inputs, filters, kernel_size=3, activation="relu", padding="SAME"):
-    """encoding blocks of the Semi-Bayesian VNet model
+    """encoding blocks of the Semi-Bayesian VNet model.
+    
     Parameters
     ----------
     inputs: tf.layer for encoding stage.
@@ -27,6 +28,7 @@ def down_stage(inputs, filters, kernel_size=3, activation="relu", padding="SAME"
         is set to be 3.
     activation: str or optimizer object, the non-linearity to use. All
         tf.activations are allowed to use
+    
     Returns
     ----------
     encoding module
@@ -50,7 +52,8 @@ def up_stage(
     activation="relu",
     padding="SAME",
 ):
-    """decoding blocks of the Semi-Bayesian VNet model
+    """decoding blocks of the Semi-Bayesian VNet model.
+    
     Parameters
     ----------
     inputs: tf.layer for encoding stage.
@@ -66,9 +69,10 @@ def up_stage(
         is set to be 3.
     activation: str or optimizer object, the non-linearity to use. All
         tf.activations are allowed to use
+    
     Returns
     ----------
-    decoded module
+    decoding module.
     """
     up = UpSampling3D()(inputs)
     up = tfp.layers.Convolution3DFlipout(
@@ -119,7 +123,8 @@ def end_stage(
     activation="relu",
     padding="SAME",
 ):
-    """last logit layer of Semi-Bayesian VNet
+    """last logit layer of Semi-Bayesian VNet.
+    
     Parameters
     ----------
     inputs: tf.model layer.
@@ -133,9 +138,10 @@ def end_stage(
         is set to be 3.
     activation: str or optimizer object, the non-linearity to use. All
         tf.activations are allowed to use
+    
     Result
     ----------
-    Predicted probablities
+    prediction probablities.
     """
     conv = tfp.layers.Convolution3DFlipout(
         n_classes,
@@ -177,11 +183,12 @@ def bayesian_vnet_semi(
     activation="relu",
     padding="SAME",
 ):
-    """
-    Instantiate a 3D Semi-Bayesian VNet Architecture
+    """Instantiate a 3D Semi-Bayesian VNet Architecture.
+    
     Adapted from Deterministic VNet: https://arxiv.org/pdf/1606.04797.pdf
-    Encoder has 3D Convolutional layers
-    and Decoder has 3D Flipout(variational layers)
+    Encoder has 3D Convolutional layers and Decoder has 3D 
+    Flipout(variational layers).
+    
     Parameters
     ----------
     n_classes: int, number of classes to classify. For binary applications, use
@@ -198,6 +205,7 @@ def bayesian_vnet_semi(
     See Bayesian Utils for more options for kld, prior_fn and kernal_posterior_fn
     activation: str or optimizer object, the non-linearity to use. All
         tf.activations are allowed to use.
+    
     Returns
     ----------
     Bayesian model object.
