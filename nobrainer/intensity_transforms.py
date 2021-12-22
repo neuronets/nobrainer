@@ -5,7 +5,7 @@ import tensorflow as tf
 
 def addGaussianNoise(x, y=None, trans_xy=False, noise_mean=0.0, noise_std=0.1):
     """Add Gaussian noise to input and label.
-    
+
     Usage:
     ```python
     >>> x = [[[1., 1., 1.]]]
@@ -15,7 +15,7 @@ def addGaussianNoise(x, y=None, trans_xy=False, noise_mean=0.0, noise_std=0.1):
         <tf.Tensor: shape=(1, 1, 3), dtype=float32,
         numpy=array([[[0.82689023, 1.9072294 , 1.9717102 ]]], dtype=float32)>
     ```
-    
+
     Parameters
     ----------
         x: input is a tensor or numpy to have rank 3,
@@ -24,7 +24,7 @@ def addGaussianNoise(x, y=None, trans_xy=False, noise_mean=0.0, noise_std=0.1):
         noise_std: int, standard deviation of Gaussian kernel. Default=0.1;
         trans_xy: Boolean, transforms both x and y. If set True, function
         will require both x,y.
-        
+
     Returns
     ----------
         Input and/or label tensor with added Gaussian noise.
@@ -49,7 +49,7 @@ def addGaussianNoise(x, y=None, trans_xy=False, noise_mean=0.0, noise_std=0.1):
 
 def minmaxIntensityScaling(x, y=None, trans_xy=False):
     """Apply intensity scaling [0-1] to input and label.
-    
+
     Usage:
     ```python
     >>> x = [[[0., 2., 1.]]]
@@ -58,14 +58,14 @@ def minmaxIntensityScaling(x, y=None, trans_xy=False):
     <tf.Tensor: shape=(1, 1, 3), dtype=float32,
     numpy=array([[[0., 1. , 0.5]]], dtype=float32)>
     ```
-    
+
     Parameters
     ----------
         x: input is a tensor or numpy to have rank 3,
         y: label is a tensor or numpy to have rank 3,
         trans_xy: Boolean, transforms both x and y. If set True, function
         will require both x,y.
-    
+
     Returns
     ----------
         Input and/or label tensor with scaled intensity.
@@ -94,8 +94,8 @@ def minmaxIntensityScaling(x, y=None, trans_xy=False):
 
 
 def customIntensityScaling(x, y=None, trans_xy=False, scale_x=[0.0, 1.0], scale_y=None):
-    """ Apply custom intensity scaling to input and label.
-    
+    """Apply custom intensity scaling to input and label.
+
     Usage:
     ```python
     >>> x = [[[2., 2., 1.]]]
@@ -109,7 +109,7 @@ def customIntensityScaling(x, y=None, trans_xy=False, scale_x=[0.0, 1.0], scale_
     <tf.Tensor: shape=(1, 1, 3), dtype=float32,
     numpy=array([[[3., 0., 3.]]], dtype=float32)>
     ```
-    
+
     Parameters
     ----------
         x: input is a tensor or numpy to have rank 3,
@@ -118,7 +118,7 @@ def customIntensityScaling(x, y=None, trans_xy=False, scale_x=[0.0, 1.0], scale_
            If set True, function will require both x,y.
         scale_x: [minimum(int), maximum(int)]
         scale_y: [minimum(int), maximum(int)]
-    
+
     Returns
     ----------
         Input and/or label tensor with custom scaled Intensity.
@@ -158,7 +158,7 @@ def customIntensityScaling(x, y=None, trans_xy=False, scale_x=[0.0, 1.0], scale_
 
 def intensityMasking(x, mask_x, y=None, trans_xy=False, mask_y=None):
     """Masking the intensity values in input and label.
-    
+
     Usage:
     ```python
     >>> mask_x = np.array([[[0, 0, 0], [0, 1, 0], [0, 0, 0]]])
@@ -171,7 +171,7 @@ def intensityMasking(x, mask_x, y=None, trans_xy=False, mask_y=None):
              [0., 2., 0.],
              [0., 0., 0.]], dtype=float32)>, None)
     ```
-    
+
     Parameters
     ----------
         x: input is a tensor or numpy to have rank 3,
@@ -179,7 +179,7 @@ def intensityMasking(x, mask_x, y=None, trans_xy=False, mask_y=None):
         mask_x: mask tensor or numpy array of same shape as x
         trans_xy: Boolean, transforms both x and y (Default: False).
            If set True, function will require both x,y.
-    
+
     Returns
     ----------
         Masked input and/or label tensor.
@@ -212,7 +212,7 @@ def intensityMasking(x, mask_x, y=None, trans_xy=False, mask_y=None):
 
 def contrastAdjust(x, y=None, trans_xy=False, gamma=1.0):
     """Apply contrast adjustment to input and label.
-    
+
     Usage:
     ```python
     >>> gamma = 1.5
@@ -224,7 +224,7 @@ def contrastAdjust(x, y=None, trans_xy=False, gamma=1.0):
              [1.7071067, 1.7071067, 1.7071067],
              [3.       , 3.       , 3.       ]]], dtype=float32)>, None)
     ```
-    
+
     Parameters
     ----------
         x: input is a tensor or numpy to have rank 3,
@@ -232,7 +232,7 @@ def contrastAdjust(x, y=None, trans_xy=False, gamma=1.0):
         gamma: int, a contrast adjustment constant
         trans_xy: Boolean, transforms both x and y (Default: False).
            If set True, function will require both x,y.
-    
+
     Returns
     ----------
         Input and/or label tensor with adjusted contrast.
