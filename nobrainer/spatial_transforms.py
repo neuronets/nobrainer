@@ -3,7 +3,7 @@ import tensorflow as tf
 
 def centercrop(x, y=None, finesize=64, trans_xy=False):
     """Apply center crop to input and label.
-    
+
     Usage:
     ```python
     >>> x = np.array([[[1, 1, 1], [2, 2, 2], [3, 3, 3]]])
@@ -13,7 +13,7 @@ def centercrop(x, y=None, finesize=64, trans_xy=False):
         <tf.Tensor: shape=(1, 1, 3), dtype=float32,
         numpy=array([[[2., 2., 2.]]], dtype=float32)>
     ```
-    
+
     Parameters
     ----------
         x: input is a tensor or numpy to have rank 3,
@@ -21,7 +21,7 @@ def centercrop(x, y=None, finesize=64, trans_xy=False):
         finesize: int, desired output size of the crop. Default = 64;
         trans_xy: Boolean, transforms both x and y (Default: False).
            If set True, function will require both x,y.
-    
+
     Returns
     ----------
         CenterCroped input and/or label tensor.
@@ -53,7 +53,7 @@ def centercrop(x, y=None, finesize=64, trans_xy=False):
 
 def spatialConstantPadding(x, y=None, trans_xy=False, padding_zyx=[1, 1, 1]):
     """Add constant padding to input and label.
-    
+
     Usage:
     ```python
     >>> x = np.array([[[1, 1, 1], [2, 2, 2], [3, 3, 3]]])
@@ -67,16 +67,16 @@ def spatialConstantPadding(x, y=None, trans_xy=False, padding_zyx=[1, 1, 1]):
             [0., 3., 3., 3., 0.],
             [0., 0., 0., 0., 0.]]], dtype=float32)>
     ```
-    
+
     Parameters
     ----------
         x: input is a tensor or numpy to have rank 3,
         y: label is a tensor or numpy to have rank 3,
-        padding_zyx: int or a list of desired padding in three dimensions. 
+        padding_zyx: int or a list of desired padding in three dimensions.
             Default = 1;
         trans_xy: Boolean, transforms both x and y (Default: False).
            If set True, function will require both x,y.
-        
+
     Returns
     ----------
         Input and/or label tensor with spatial padding.
@@ -105,7 +105,7 @@ def spatialConstantPadding(x, y=None, trans_xy=False, padding_zyx=[1, 1, 1]):
 
 def randomCrop(x, y=None, trans_xy=False, cropsize=16):
     """Apply random crops to input and label.
-    
+
     Usage:
     ```python
     >>> x = np.array([[[1, 1, 1], [2, 2, 2], [3, 3, 3]]])
@@ -114,7 +114,7 @@ def randomCrop(x, y=None, trans_xy=False, cropsize=16):
     <tf.Tensor: shape=(1, 1, 3), dtype=float32,
     numpy=array([[[6., 2., 5.]]], dtype=float32)>
     ```
-    
+
     Parameters
     ----------
         x: input is a tensor or numpy to have rank 3,
@@ -123,7 +123,7 @@ def randomCrop(x, y=None, trans_xy=False, cropsize=16):
         finesize: int, desired output size of the crop. Default = 64;
         trans_xy: Boolean, transforms both x and y (Default: False).
            If set True, function will require both x,y.
-    
+
     Returns
     ----------
         Randomly croped input and/or label tensor.
@@ -148,7 +148,7 @@ def randomCrop(x, y=None, trans_xy=False, cropsize=16):
 
 def resize(x, y=None, trans_xy=False, size=[32, 32], mode="bicubic"):
     """Resize the input and label.
-    
+
     Usage:
     ```python
      >>> x = np.array([[[1, 2, 3], [6, 2, 5], [3, 4, 9]]])
@@ -169,9 +169,9 @@ def resize(x, y=None, trans_xy=False, size=[32, 32], mode="bicubic"):
         size: int or a list, the resize output,
         trans_xy: Boolean, transforms both x and y (Default: False).
            If set True, function will require both x,y.
-        mode [options]: "bilinear", "lanczos3", 
+        mode [options]: "bilinear", "lanczos3",
         "lanczos5", "bicubic", "gaussian" , "nearest".
-         
+
     Returns
     ----------
          Resized input and/or label tensor.
@@ -196,7 +196,7 @@ def resize(x, y=None, trans_xy=False, size=[32, 32], mode="bicubic"):
 
 def randomflip_leftright(x, y=None, trans_xy=False):
     """Randomly flips the input and label.
-    
+
     Usage:
     ```python
     >>> x = np.array([[[1, 2, 3], [6, 2, 5], [3, 4, 9]]])
@@ -207,14 +207,14 @@ def randomflip_leftright(x, y=None, trans_xy=False):
             [6., 2., 5.],
             [1., 2., 3.]]], dtype=float32)>
     ```
-    
+
     Parameters
     ----------
         x: input is a tensor or numpy to have rank 3,
         y: label is a tensor or numpy to have rank 3,
         trans_xy: Boolean, transforms both x and y (Default: False).
            If set True, function will require both x,y.
-    
+
     Returns
     ----------
         Randomly flipped input and/or label tensor.
