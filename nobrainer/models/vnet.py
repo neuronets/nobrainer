@@ -17,7 +17,7 @@ from ..layers.groupnorm import GroupNormalization
 
 def down_stage(inputs, filters, kernel_size=3, activation="relu", padding="SAME"):
     """encoding block of the VNet model.
-    
+
     Parameters
     ----------
     inputs: tf.layer for encoding stage.
@@ -42,7 +42,7 @@ def down_stage(inputs, filters, kernel_size=3, activation="relu", padding="SAME"
 
 def up_stage(inputs, skip, filters, kernel_size=3, activation="relu", padding="SAME"):
     """decoding block of the VNet model.
-    
+
     Parameters
     ----------
     inputs: tf.layer for encoding stage.
@@ -52,7 +52,7 @@ def up_stage(inputs, skip, filters, kernel_size=3, activation="relu", padding="S
         is set to be 3.
     activation: str or optimizer object, the non-linearity to use. All
         tf.activations are allowed to use
-    
+
     Returns
     ----------
     decoded module.
@@ -75,7 +75,7 @@ def up_stage(inputs, skip, filters, kernel_size=3, activation="relu", padding="S
 
 def end_stage(inputs, n_classes=1, kernel_size=3, activation="relu", padding="SAME"):
     """last logit layer.
-    
+
     Parameters
     ----------
     inputs: tf.model layer.
@@ -84,7 +84,7 @@ def end_stage(inputs, n_classes=1, kernel_size=3, activation="relu", padding="SA
         is set to be 3.
     activation: str or optimizer object, the non-linearity to use. All
         tf.activations are allowed to use
-    
+
     Result
     ----------
     prediction probablities
