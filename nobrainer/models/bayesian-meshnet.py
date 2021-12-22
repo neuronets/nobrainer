@@ -25,9 +25,9 @@ def variational_meshnet(
     name="variational_meshnet",
 ):
     """Instantiate variational MeshNet model.
-    
+
     Please see https://arxiv.org/abs/1805.10863 for Meshnet related information.
-    
+
     Parameters
     ----------
     n_classes: int, number of classes to classify. For binary applications, use
@@ -48,11 +48,11 @@ def variational_meshnet(
         training on TPUs.
     name: str, name to give to the resulting model object.
     Set priors, divergence and posteriors for training with this model.
-    
+
     Returns
     -------
     Model object.
-    
+
     Raises
     ------
     ValueError if receptive field is not an allowable value.
