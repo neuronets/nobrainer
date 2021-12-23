@@ -1,7 +1,6 @@
-"""Model definition for 3D U-Net.
-
-Implemented according to the [3D U-Net manuscript](https://arxiv.org/abs/1606.06650)
+"""Model definition for UNet.
 """
+
 import tensorflow as tf
 from tensorflow.keras import layers
 
@@ -14,7 +13,16 @@ def unet(
     batch_size=None,
     name="unet",
 ):
-    """Instantiate 3D U-Net architecture."""
+    """
+    Instantiate a 3D UNet Architecture
+    UNet model: a 3D deep neural network model from
+    https://arxiv.org/abs/1606.06650
+    Args:
+    n_classes(int): number of classes
+    input_shape(tuple):four ints representating the shape of 3D input
+    activation(str): all tf.keras.activations are allowed
+    batch_size(int): batch size.
+    """
 
     conv_kwds = {
         "kernel_size": (3, 3, 3),
