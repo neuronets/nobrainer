@@ -4,8 +4,30 @@ import tensorflow as tf
 
 
 def addGaussianNoise(x, y=None, trans_xy=False, noise_mean=0.0, noise_std=0.1):
-    """
-    Adds gaussian noise to 3D tensor and label
+    """Add Gaussian noise to input and label.
+
+    Usage:
+    ```python
+    >>> x = [[[1., 1., 1.]]]
+    >>> x_out = intensity_transforms.addGaussianNoise(x,
+                                  noise_mean=0.0, noise_std=1)
+    >>> x_out
+        <tf.Tensor: shape=(1, 1, 3), dtype=float32,
+        numpy=array([[[0.82689023, 1.9072294 , 1.9717102 ]]], dtype=float32)>
+    ```
+
+    Parameters
+    ----------
+        x: input is a tensor or numpy to have rank 3,
+        y: label is a tensor or numpy to have rank 3,
+        noise_mean: int, mean of Gaussian kernel. Default = 0.0;
+        noise_std: int, standard deviation of Gaussian kernel. Default=0.1;
+        trans_xy: Boolean, transforms both x and y. If set True, function
+        will require both x,y.
+
+    Returns
+    ----------
+        Input and/or label tensor with added Gaussian noise.
     """
     if ~tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
@@ -26,6 +48,28 @@ def addGaussianNoise(x, y=None, trans_xy=False, noise_mean=0.0, noise_std=0.1):
 
 
 def minmaxIntensityScaling(x, y=None, trans_xy=False):
+    """Apply intensity scaling [0-1] to input and label.
+
+    Usage:
+    ```python
+    >>> x = [[[0., 2., 1.]]]
+    >>> x_out = intensity_transforms.minmaxIntensityScaling(x)
+    >>> x_out
+    <tf.Tensor: shape=(1, 1, 3), dtype=float32,
+    numpy=array([[[0., 1. , 0.5]]], dtype=float32)>
+    ```
+
+    Parameters
+    ----------
+        x: input is a tensor or numpy to have rank 3,
+        y: label is a tensor or numpy to have rank 3,
+        trans_xy: Boolean, transforms both x and y. If set True, function
+        will require both x,y.
+
+    Returns
+    ----------
+        Input and/or label tensor with scaled intensity.
+    """
     if ~tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
     x = tf.cast(x, tf.float32)
@@ -50,6 +94,35 @@ def minmaxIntensityScaling(x, y=None, trans_xy=False):
 
 
 def customIntensityScaling(x, y=None, trans_xy=False, scale_x=[0.0, 1.0], scale_y=None):
+    """Apply custom intensity scaling to input and label.
+
+    Usage:
+    ```python
+    >>> x = [[[2., 2., 1.]]]
+    >>> y = [[[1., 0., 1.]]]
+    >>> x_out, y_out = intensity_transforms.customIntensityScaling(
+    x, y, trans_xy=True, scale_x=[0, 4], scale_y=[0, 3])
+    >>> x_out
+    <tf.Tensor: shape=(1, 1, 3), dtype=float32,
+    numpy=array([[[4., 4., 0.]]], dtype=float32)>
+    >>> y_out
+    <tf.Tensor: shape=(1, 1, 3), dtype=float32,
+    numpy=array([[[3., 0., 3.]]], dtype=float32)>
+    ```
+
+    Parameters
+    ----------
+        x: input is a tensor or numpy to have rank 3,
+        y: label is a tensor or numpy to have rank 3,
+        trans_xy: Boolean, transforms both x and y (Default: False).
+           If set True, function will require both x,y.
+        scale_x: [minimum(int), maximum(int)]
+        scale_y: [minimum(int), maximum(int)]
+
+    Returns
+    ----------
+        Input and/or label tensor with custom scaled Intensity.
+    """
     x_norm, y_norm = minmaxIntensityScaling(x, y, trans_xy)
     minx = tf.cast(
         tf.convert_to_tensor(scale_x[0] * np.ones(x_norm.shape).astype(np.float32)),
@@ -84,6 +157,33 @@ def customIntensityScaling(x, y=None, trans_xy=False, scale_x=[0.0, 1.0], scale_
 
 
 def intensityMasking(x, mask_x, y=None, trans_xy=False, mask_y=None):
+    """Masking the intensity values in input and label.
+
+    Usage:
+    ```python
+    >>> mask_x = np.array([[[0, 0, 0], [0, 1, 0], [0, 0, 0]]])
+    >>> x = np.array([[[1, 1, 1], [2, 2, 2], [3, 3, 3]]])
+    >>> x_out = intensity_transforms.intensityMasking(x,
+                mask_x=mask_x)
+    >>> x_out
+    (<tf.Tensor: shape=(2, 3, 3), dtype=float32, numpy=
+     array([[[0., 0., 0.],
+             [0., 2., 0.],
+             [0., 0., 0.]], dtype=float32)>, None)
+    ```
+
+    Parameters
+    ----------
+        x: input is a tensor or numpy to have rank 3,
+        y: label is a tensor or numpy to have rank 3,
+        mask_x: mask tensor or numpy array of same shape as x
+        trans_xy: Boolean, transforms both x and y (Default: False).
+           If set True, function will require both x,y.
+
+    Returns
+    ----------
+        Masked input and/or label tensor.
+    """
     if ~tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
     x = tf.cast(x, tf.float32)
@@ -111,6 +211,32 @@ def intensityMasking(x, mask_x, y=None, trans_xy=False, mask_y=None):
 
 
 def contrastAdjust(x, y=None, trans_xy=False, gamma=1.0):
+    """Apply contrast adjustment to input and label.
+
+    Usage:
+    ```python
+    >>> gamma = 1.5
+    >>> epsilon = 1e-7
+    >>> x = np.array([[[1, 1, 1], [2, 2, 2], [3, 3, 3]]])
+    >>> x_out
+    (<tf.Tensor: shape=(1, 3, 3), dtype=float32, numpy=
+     array([[[1.       , 1.       , 1.       ],
+             [1.7071067, 1.7071067, 1.7071067],
+             [3.       , 3.       , 3.       ]]], dtype=float32)>, None)
+    ```
+
+    Parameters
+    ----------
+        x: input is a tensor or numpy to have rank 3,
+        y: label is a tensor or numpy to have rank 3,
+        gamma: int, a contrast adjustment constant
+        trans_xy: Boolean, transforms both x and y (Default: False).
+           If set True, function will require both x,y.
+
+    Returns
+    ----------
+        Input and/or label tensor with adjusted contrast.
+    """
     if ~tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
     x = tf.cast(x, tf.float32)
