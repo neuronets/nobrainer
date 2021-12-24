@@ -1,3 +1,16 @@
+# 0.2.1 (Fri Dec 24 2021)
+
+#### 🐛 Bug Fix
+
+- fix: update docker files and citation pointer [#194](https://github.com/neuronets/nobrainer/pull/194) ([@satra](https://github.com/satra) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+
+#### Authors: 2
+
+- [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot])
+- Satrajit Ghosh ([@satra](https://github.com/satra))
+
+---
+
 # 0.2.0 (Fri Dec 24 2021)
 
 #### 🚀 Enhancement
