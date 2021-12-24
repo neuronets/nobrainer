@@ -1,11 +1,10 @@
 """Volume processing methods."""
 
 import itertools
+import warnings
 
 import numpy as np
 import tensorflow as tf
-
-from nobrainer.transform import get_affine, warp_features_labels
 
 
 def apply_random_transform(features, labels):
@@ -15,27 +14,18 @@ def apply_random_transform(features, labels):
     interpolated trilinearly, and labels are interpolated with nearest
     neighbors.
     """
-    if len(features.shape) < 3 or len(labels.shape) < 3:
-        raise ValueError("features and labels must be at least rank 3")
-    if features.shape != labels.shape:
-        raise ValueError("shape of features and labels must be the same.")
-    # Rotate -180 degrees to 180 degrees in three dimensions.
-    rotation = tf.random.uniform(
-        shape=[3], minval=-np.pi, maxval=np.pi, dtype=tf.float32
-    )
 
-    # Translate at most 5% in any direction, so there's less chance of
-    # important data going out of view.
-    maxval = 0.05 * features.shape[0]
-    translation = tf.random.uniform(
-        shape=[3], minval=-maxval, maxval=maxval, dtype=tf.float32
-    )
+    from .transform import apply_random_transform as deprecated_transform_func
 
-    volume_shape = np.asarray(features.shape)
-    matrix = get_affine(
-        volume_shape=volume_shape, rotation=rotation, translation=translation
+    warnings.simplefilter("default")
+    warnings.warn(
+        "`apply_random_transform` will be moved to the transform module"
+        " in the next release of nobrainer. Please import from"
+        " `nobrainer.transform`.",
+        PendingDeprecationWarning,
+        stacklevel=2,
     )
-    return warp_features_labels(features=features, labels=labels, matrix=matrix)
+    return deprecated_transform_func(features, labels)
 
 
 def apply_random_transform_scalar_labels(features, labels):
@@ -44,29 +34,19 @@ def apply_random_transform_scalar_labels(features, labels):
     Features are interpolated trilinearly, and labels are unchanged because they are
     scalars.
     """
-    if len(features.shape) < 3:
-        raise ValueError("features must be at least rank 3")
-    if len(labels.shape) != 1:
-        raise ValueError("labels must be rank 1")
-    # Rotate -180 degrees to 180 degrees in three dimensions.
-    rotation = tf.random.uniform(
-        shape=[3], minval=-np.pi, maxval=np.pi, dtype=tf.float32
+    from .transform import (
+        apply_random_transform_scalar_labels as deprecated_transform_func,
     )
 
-    # Translate at most 5% in any direction, so there's less chance of
-    # important data going out of view.
-    maxval = 0.05 * features.shape[0]
-    translation = tf.random.uniform(
-        shape=[3], minval=-maxval, maxval=maxval, dtype=tf.float32
+    warnings.simplefilter("default")
+    warnings.warn(
+        "`apply_random_transform_scalar_labels` will be moved to the"
+        " transform module in the next release of nobrainer. Please import from"
+        " `nobrainer.transform`.",
+        PendingDeprecationWarning,
+        stacklevel=2,
     )
-
-    volume_shape = np.asarray(features.shape)
-    matrix = get_affine(
-        volume_shape=volume_shape, rotation=rotation, translation=translation
-    )
-    return warp_features_labels(
-        features=features, labels=labels, matrix=matrix, scalar_label=True
-    )
+    return deprecated_transform_func(features, labels)
 
 
 def binarize(x):
