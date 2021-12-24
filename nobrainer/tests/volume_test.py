@@ -97,7 +97,6 @@ def test_apply_random_transform(shape, scalar_labels):
         assert "moved" in str(w[-1].message)
 
 
-
 def test_binarize():
     x = [
         0.49671415,
