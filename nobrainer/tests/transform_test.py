@@ -2,8 +2,8 @@ import itertools
 
 import numpy as np
 from numpy.testing import assert_array_equal
-import tensorflow as tf
 import pytest
+import tensorflow as tf
 
 from .. import transform
 
@@ -77,7 +77,8 @@ def test_get_voxels_errors():
     coords = np.zeros((8, 2))
     with pytest.raises(ValueError):
         transform._get_voxels(volume=volume, coords=coords)
-        
+
+
 @pytest.mark.parametrize("shape", [(10, 10, 10), (10, 10, 10, 3)])
 @pytest.mark.parametrize("scalar_labels", [True, False])
 def test_apply_random_transform(shape, scalar_labels):

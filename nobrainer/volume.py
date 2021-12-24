@@ -1,10 +1,10 @@
 """Volume processing methods."""
 
 import itertools
+import warnings
 
 import numpy as np
 import tensorflow as tf
-import warnings
 
 from nobrainer.transform import get_affine, warp_features_labels
 
@@ -17,12 +17,15 @@ def apply_random_transform(features, labels):
     neighbors.
     """
     warnings.simplefilter("default")
-    warnings.warn("`apply_random_transform` function will be moved to the transform module"
-                  " in the next release of nobrainer."
-                  " Please use `nobrainer.transform.apply_random_transform`"
-                  " instead of `nobrainer.volume.apply_random_transform.",
-                  PendingDeprecationWarning, stacklevel=2)
-    
+    warnings.warn(
+        "`apply_random_transform` function will be moved to the transform module"
+        " in the next release of nobrainer."
+        " Please use `nobrainer.transform.apply_random_transform`"
+        " instead of `nobrainer.volume.apply_random_transform.",
+        PendingDeprecationWarning,
+        stacklevel=2,
+    )
+
     if len(features.shape) < 3 or len(labels.shape) < 3:
         raise ValueError("features and labels must be at least rank 3")
     if features.shape != labels.shape:
@@ -53,12 +56,15 @@ def apply_random_transform_scalar_labels(features, labels):
     scalars.
     """
     warnings.simplefilter("default")
-    warnings.warn("apply_random_transform_scalar_labels function will be moved to the transform module"
-                  " in the next release of nobrainer."
-                  " Please use `nobrainer.transform.apply_random_transform_scalar_labels`"
-                  " instead of `nobrainer.volume.apply_random_transform_scalar_labels`.",
-                  PendingDeprecationWarning, stacklevel=2)
-    
+    warnings.warn(
+        "apply_random_transform_scalar_labels function will be moved to the transform module"
+        " in the next release of nobrainer."
+        " Please use `nobrainer.transform.apply_random_transform_scalar_labels`"
+        " instead of `nobrainer.volume.apply_random_transform_scalar_labels`.",
+        PendingDeprecationWarning,
+        stacklevel=2,
+    )
+
     if len(features.shape) < 3:
         raise ValueError("features must be at least rank 3")
     if len(labels.shape) != 1:

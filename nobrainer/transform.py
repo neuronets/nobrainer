@@ -1,7 +1,7 @@
 """Volumetric affine transformations implemented in TensorFlow."""
 
-import tensorflow as tf
 import numpy as np
+import tensorflow as tf
 
 
 def warp_features_labels(features, labels, matrix, scalar_label=False):
@@ -340,6 +340,7 @@ def _get_voxels(volume, coords):
 
     return xflat
 
+
 def apply_random_transform(features, labels):
     """Apply a random rigid transformation to `features` and `labels`.
 
@@ -368,6 +369,7 @@ def apply_random_transform(features, labels):
         volume_shape=volume_shape, rotation=rotation, translation=translation
     )
     return warp_features_labels(features=features, labels=labels, matrix=matrix)
+
 
 def apply_random_transform_scalar_labels(features, labels):
     """Apply a random rigid transformation to `features`.

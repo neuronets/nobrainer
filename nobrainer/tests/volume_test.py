@@ -1,8 +1,9 @@
+import warnings
+
 import numpy as np
 from numpy.testing import assert_array_equal
 import pytest
 import tensorflow as tf
-import warnings
 
 from .. import volume
 
@@ -84,17 +85,19 @@ def test_apply_random_transform(shape, scalar_labels):
     # Naive test that features were interpolated without nearest neighbor.
     assert np.any(x0 % 1)
     assert np.any(x1 % 1)
-    
+
     # Depreacation warning test
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
         x = np.ones(shape).astype(np.float32)
         transform_func(x, y_in)
-        
+
         assert len(w) == 1
         assert issubclass(w[-1].category, PendingDeprecationWarning)
         assert "moved" in str(w[-1].message)
-        
+
+
+
 def test_binarize():
     x = [
         0.49671415,

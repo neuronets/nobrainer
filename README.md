@@ -287,7 +287,7 @@ right is more accurate and more robust than the one on the left.
 - `nobrainer.volume`: `tf.data.Dataset` creation and data augmentation utilities
 -
 ## Citation
-If you use this package, please [cite](https://github.com/neuronets/nobrainer/CITATION) it.
+If you use this package, please [cite](https://github.com/neuronets/nobrainer/blob/master/CITATION) it.
 
 ## Questions or issues
 
