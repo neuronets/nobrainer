@@ -88,14 +88,13 @@ def test_apply_random_transform(shape, scalar_labels):
     # Depreacation warning test
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
+        x = np.ones(shape).astype(np.float32)
         transform_func(x, y_in)
         
         assert len(w) == 1
         assert issubclass(w[-1].category, PendingDeprecationWarning)
         assert "moved" in str(w[-1].message)
         
-
-
 def test_binarize():
     x = [
         0.49671415,
