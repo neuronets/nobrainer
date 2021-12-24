@@ -9,13 +9,14 @@ import tensorflow as tf
 
 def apply_random_transform(features, labels):
     """Apply a random rigid transformation to `features` and `labels`.
-    
+
     The same transformation is applied to features and labels. Features are
     interpolated trilinearly, and labels are interpolated with nearest
     neighbors.
     """
 
     from .transform import apply_random_transform as deprecated_transform_func
+
     warnings.simplefilter("default")
     warnings.warn(
         "`apply_random_transform` will be moved to the transform module"
@@ -33,7 +34,10 @@ def apply_random_transform_scalar_labels(features, labels):
     Features are interpolated trilinearly, and labels are unchanged because they are
     scalars.
     """
-    from .transform import apply_random_transform_scalar_labels as deprecated_transform_func
+    from .transform import (
+        apply_random_transform_scalar_labels as deprecated_transform_func,
+    )
+
     warnings.simplefilter("default")
     warnings.warn(
         "`apply_random_transform_scalar_labels` will be moved to the"
@@ -44,7 +48,7 @@ def apply_random_transform_scalar_labels(features, labels):
     )
     return deprecated_transform_func(features, labels)
 
-    
+
 def binarize(x):
     """Converts all values greater than 0 to 1 and all others to 0.
 
