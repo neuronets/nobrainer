@@ -25,7 +25,7 @@ def apply_random_transform(features, labels):
         PendingDeprecationWarning,
         stacklevel=2,
     )
-    return deprecated_deprecated_transform_func(features, labels)
+    return deprecated_transform_func(features, labels)
 
 
 def apply_random_transform_scalar_labels(features, labels):
