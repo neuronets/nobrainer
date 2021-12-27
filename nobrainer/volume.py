@@ -1,11 +1,10 @@
 """Volume processing methods."""
 
 import itertools
+import warnings
 
 import numpy as np
 import tensorflow as tf
-
-from nobrainer.transform import get_affine, warp_features_labels
 
 
 def apply_random_transform(features, labels):
@@ -15,27 +14,18 @@ def apply_random_transform(features, labels):
     interpolated trilinearly, and labels are interpolated with nearest
     neighbors.
     """
-    if len(features.shape) != 3 or len(labels.shape) != 3:
-        raise ValueError("features and labels must be rank 3")
-    if features.shape != labels.shape:
-        raise ValueError("shape of features and labels must be the same.")
-    # Rotate -180 degrees to 180 degrees in three dimensions.
-    rotation = tf.random.uniform(
-        shape=[3], minval=-np.pi, maxval=np.pi, dtype=tf.float32
-    )
 
-    # Translate at most 5% in any direction, so there's less chance of
-    # important data going out of view.
-    maxval = 0.05 * features.shape[0]
-    translation = tf.random.uniform(
-        shape=[3], minval=-maxval, maxval=maxval, dtype=tf.float32
-    )
+    from .transform import apply_random_transform as deprecated_transform_func
 
-    volume_shape = np.asarray(features.shape)
-    matrix = get_affine(
-        volume_shape=volume_shape, rotation=rotation, translation=translation
+    warnings.simplefilter("default")
+    warnings.warn(
+        "`apply_random_transform` will be moved to the transform module"
+        " in the next release of nobrainer. Please import from"
+        " `nobrainer.transform`.",
+        PendingDeprecationWarning,
+        stacklevel=2,
     )
-    return warp_features_labels(features=features, labels=labels, matrix=matrix)
+    return deprecated_transform_func(features, labels)
 
 
 def apply_random_transform_scalar_labels(features, labels):
@@ -44,29 +34,19 @@ def apply_random_transform_scalar_labels(features, labels):
     Features are interpolated trilinearly, and labels are unchanged because they are
     scalars.
     """
-    if len(features.shape) != 3:
-        raise ValueError("features must be rank 3")
-    if len(labels.shape) != 1:
-        raise ValueError("labels must be rank 1")
-    # Rotate -180 degrees to 180 degrees in three dimensions.
-    rotation = tf.random.uniform(
-        shape=[3], minval=-np.pi, maxval=np.pi, dtype=tf.float32
+    from .transform import (
+        apply_random_transform_scalar_labels as deprecated_transform_func,
     )
 
-    # Translate at most 5% in any direction, so there's less chance of
-    # important data going out of view.
-    maxval = 0.05 * features.shape[0]
-    translation = tf.random.uniform(
-        shape=[3], minval=-maxval, maxval=maxval, dtype=tf.float32
+    warnings.simplefilter("default")
+    warnings.warn(
+        "`apply_random_transform_scalar_labels` will be moved to the"
+        " transform module in the next release of nobrainer. Please import from"
+        " `nobrainer.transform`.",
+        PendingDeprecationWarning,
+        stacklevel=2,
     )
-
-    volume_shape = np.asarray(features.shape)
-    matrix = get_affine(
-        volume_shape=volume_shape, rotation=rotation, translation=translation
-    )
-    return warp_features_labels(
-        features=features, labels=labels, matrix=matrix, scalar_label=True
-    )
+    return deprecated_transform_func(features, labels)
 
 
 def binarize(x):
@@ -113,14 +93,10 @@ def replace(x, mapping, zero=True):
     # Zero values that are equal to len(vs).
     idx = tf.multiply(idx, tf.cast(tf.not_equal(idx, vs.shape[0]), tf.int32))
     mask = tf.equal(tf.gather(ks, idx), x)
-    out = tf.where(mask, tf.gather(vs, idx), x)
-
     if zero:
-        # Zero values in the data array that are not in the mapping values.
-        mask = tf.reduce_any(
-            tf.equal(tf.expand_dims(out, -1), tf.expand_dims(vals, 0)), -1
-        )
-        out = tf.multiply(out, tf.cast(mask, tf.int32))
+        out = tf.where(mask, tf.gather(vs, idx), 0)
+    else:
+        out = tf.where(mask, tf.gather(vs, idx), x)
 
     return out
 
@@ -146,6 +122,52 @@ def standardize(x):
     return (x - mean) / std
 
 
+def _to_blocks_perm(ndims):
+    """Build permutation vector to go from volume to blocks.
+
+    For 3D input, perm will be (0, 2, 4, 1, 3, 5). For 4D input (i.e. 3D volume
+    with channels), perm will be (0, 2, 4, 6, 1, 3, 5, 7). Higher dimensional
+    input is possible here.
+
+    Parameters
+    ----------
+    ndims : int
+        Number of dimensions in blocks and volumes.
+
+    Returns
+    -------
+    perm : tuple
+        The permutation vector
+    """
+    perm = np.empty(2 * ndims, dtype=int)
+    perm[:ndims] = np.arange(0, ndims * 2, 2)
+    perm[ndims:] = np.arange(1, ndims * 2, 2)
+    return tuple(perm)
+
+
+def _from_blocks_perm(ndims):
+    """Build permutation vector to go from blocks to volume.
+
+    For 3D input, perm will be (0, 3, 1, 4, 2, 5). For 4D input (i.e. 3D volume
+    with channels), perm will be (0, 4, 1, 5, 2, 6, 3, 7). Higher dimensional
+    input is possible here.
+
+    Parameters
+    ----------
+    ndims : int
+        Number of dimensions in blocks and volumes.
+
+    Returns
+    -------
+    perm : tuple
+        The permutation vector
+    """
+    perm = np.empty(2 * ndims, dtype=int)
+    perm[::2] = np.arange(ndims)
+    perm[1::2] = np.arange(ndims, 2 * ndims)
+    return tuple(perm)
+
+
 def to_blocks(x, block_shape):
     """Split tensor into non-overlapping blocks of shape `block_shape`.
 
@@ -163,17 +185,18 @@ def to_blocks(x, block_shape):
     x = tf.convert_to_tensor(x)
     volume_shape = np.array(x.shape)
 
-    if isinstance(block_shape, int) == 1:
-        block_shape = list(block_shape) * 3
-    elif len(block_shape) != 3:
-        raise ValueError("expected block_shape to be 1 or 3 values.")
+    if isinstance(block_shape, int):
+        block_shape = list([block_shape]) * 3
+    elif len(block_shape) < 3:
+        raise ValueError("expected block_shape to be 1 or >= 3 values.")
 
     block_shape = np.asarray(block_shape)
     blocks = volume_shape // block_shape
 
     inter_shape = list(itertools.chain(*zip(blocks, block_shape)))
     new_shape = (-1, *block_shape)
-    perm = (0, 2, 4, 1, 3, 5)  # 3D only
+    perm = _to_blocks_perm(ndims=len(block_shape))
+
     return tf.reshape(
         tf.transpose(tf.reshape(x, shape=inter_shape), perm=perm), shape=new_shape
     )
@@ -202,8 +225,11 @@ def from_blocks(x, output_shape):
     if not ncbrt.is_integer():
         raise ValueError("Cubed root of number of blocks is not an integer")
     ncbrt = int(ncbrt)
+    perm = _from_blocks_perm(ndims=len(block_shape))
     intershape = (ncbrt, ncbrt, ncbrt, *block_shape)
-    perm = (0, 3, 1, 4, 2, 5)  # 3D only
+    # Allow channels (i.e. 4D)
+    if len(block_shape) == 4:
+        intershape = (ncbrt, ncbrt, ncbrt, 1, *block_shape)
 
     return tf.reshape(
         tf.transpose(tf.reshape(x, shape=intershape), perm=perm), shape=output_shape
@@ -278,9 +304,9 @@ def from_blocks_numpy(a, output_shape):
 
     Parameters
     ----------
-    a: array-like, 4D array of blocks with shape (N, *block_shape), where N is
-        the number of blocks.
-    output_shape: tuple of len 3, shape of the combined array.
+    a: array-like, 4D or 5D array of blocks with shape (N, *block_shape), where
+        N is the number of blocks.
+    output_shape: tuple of len 3 or 4, shape of the combined array.
 
     Returns
     -------
@@ -288,10 +314,10 @@ def from_blocks_numpy(a, output_shape):
     """
     a = np.asarray(a)
 
-    if a.ndim != 4:
-        raise ValueError("This function only works for 4D arrays.")
-    if len(output_shape) != 3:
-        raise ValueError("output_shape must have three values.")
+    if a.ndim not in [4, 5]:
+        raise ValueError("This function only works for 4D or 5D arrays.")
+    if len(output_shape) not in [3, 4]:
+        raise ValueError("output_shape must have three or four values.")
 
     n_blocks = a.shape[0]
     block_shape = a.shape[1:]
@@ -299,9 +325,13 @@ def from_blocks_numpy(a, output_shape):
     if not ncbrt.is_integer():
         raise ValueError("Cubed root of number of blocks is not an integer")
     ncbrt = int(ncbrt)
+    perm = _from_blocks_perm(ndims=len(block_shape))
     intershape = (ncbrt, ncbrt, ncbrt, *block_shape)
+    # Allow channels (i.e. 4D)
+    if len(block_shape) == 4:
+        intershape = (ncbrt, ncbrt, ncbrt, 1, *block_shape)
 
-    return a.reshape(intershape).transpose((0, 3, 1, 4, 2, 5)).reshape(output_shape)
+    return a.reshape(intershape).transpose(perm).reshape(output_shape)
 
 
 def to_blocks_numpy(a, block_shape):
@@ -312,26 +342,31 @@ def to_blocks_numpy(a, block_shape):
 
     Parameters
     ----------
-    a: array-like, 3D array to block
-    block_shape: tuple of len 3, shape of non-overlapping blocks.
+    a: array-like, 3D or 4D array to block
+    block_shape: tuple of len 3 or 4, shape of non-overlapping blocks.
 
     Returns
     -------
-    Rank 4 array with shape `(N, *block_shape)`, where N is the number of
+    Rank 4 or 5 array with shape `(N, *block_shape)`, where N is the number of
     blocks.
     """
     a = np.asarray(a)
     orig_shape = np.asarray(a.shape)
 
-    if a.ndim != 3:
-        raise ValueError("This function only supports 3D arrays.")
-    if len(block_shape) != 3:
+    if a.ndim not in [3, 4]:
+        raise ValueError("This function only supports 3D or 4D arrays.")
+
+    if isinstance(block_shape, int):
+        block_shape = tuple(list([block_shape]) * 3)
+
+    if len(block_shape) not in [3, 4]:
         raise ValueError("block_shape must have three values.")
 
     blocks = orig_shape // block_shape
     inter_shape = tuple(e for tup in zip(blocks, block_shape) for e in tup)
     new_shape = (-1,) + block_shape
-    perm = (0, 2, 4, 1, 3, 5)
+    perm = _to_blocks_perm(ndims=len(block_shape))
+
     return a.reshape(inter_shape).transpose(perm).reshape(new_shape)
 
 
@@ -351,12 +386,13 @@ def replace_in_numpy(x, mapping, zero=True):
     vs = v[sidx]
     idx = np.searchsorted(ks, x)
 
+    idx[idx == len(vs)] = 0
+    mask = ks[idx] == x
+
     if not zero:
-        idx[idx == len(vs)] = 0
-        mask = ks[idx] == x
         return np.where(mask, vs[idx], x)
     else:
-        return vs[idx]
+        return np.where(mask, vs[idx], 0)
 
 
 def adjust_dynamic_range_numpy(a, drange_in, drange_out):

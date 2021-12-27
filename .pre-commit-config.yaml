@@ -12,15 +12,15 @@ repos:
     -   id: end-of-file-fixer
     -   id: trailing-whitespace
 -   repo: https://github.com/psf/black
-    rev: 21.6b0
+    rev: 21.12b0
     hooks:
     -   id: black
 -   repo: https://github.com/PyCQA/flake8
-    rev: 3.9.2
+    rev: 4.0.1
     hooks:
     - id: flake8
 -   repo: https://github.com/PyCQA/isort
-    rev: 5.8.0
+    rev: 5.10.1
     hooks:
     -   id: isort
         exclude: ^(nobrainer/_version\.py|versioneer\.py)$

@@ -1,0 +1,58 @@
+{
+  "creators": [
+    {
+      "affiliation": "Stony Brook University",
+      "name": "Kaczmarzyk, Jakub",
+      "orcid": "0000-0002-5544-7577"
+    },
+    {
+      "affiliation": "NIMH",
+      "name": "McClure, Patrick"
+    },
+    {
+      "affiliation": "MIT",
+      "name": "Zulfikar, Wazeer"
+    },
+    {
+      "affiliation": "MIT",
+      "name": "Rana, Aakanksha",
+      "orcid": "0000-0002-8350-7602"
+    },
+    {
+      "affiliation": "MIT",
+      "name": "Rajaei, Hoda",
+      "orcid": "0000-0002-0754-5586"
+    },
+    {
+      "affiliation": "University of Washington",
+      "name": "Richie-Halford, Adam",
+      "orcid": "0000-0001-9276-9084"
+    },
+    {
+      "affiliation": "Department of Psychology, Stanford University",
+      "name": "Bansal, Shashank",
+      "orcid": "0000-0002-1252-8772"
+    },
+    {
+      "affiliation": "MIT",
+      "name": "Jarecka, Dorota",
+      "orcid": "0000-0001-8282-2988"
+    },
+    {
+      "affiliation": "NIMH",
+      "name": "Lee, John"
+    },
+    {
+      "affiliation": "MIT, HMS",
+      "name": "Ghosh, Satrajit",
+      "orcid": "0000-0002-5312-6729"
+    }
+  ],
+  "keywords": [
+    "neuroimaging",
+    "deep learning",
+    "bayesian neural network"
+  ],
+  "license": "Apache-2.0",
+  "upload_type": "software"
+}

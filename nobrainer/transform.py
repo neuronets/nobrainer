@@ -1,5 +1,6 @@
 """Volumetric affine transformations implemented in TensorFlow."""
 
+import numpy as np
 import tensorflow as tf
 
 
@@ -93,8 +94,8 @@ def get_affine(volume_shape, rotation=[0, 0, 0], translation=[0, 0, 0]):
     volume_shape = tf.cast(volume_shape, tf.float32)
     rotation = tf.cast(rotation, tf.float32)
     translation = tf.cast(translation, tf.float32)
-    if volume_shape.shape[0] != 3:
-        raise ValueError("`volume_shape` must have three values")
+    if volume_shape.shape[0] < 3:
+        raise ValueError("`volume_shape` must have at least three values")
     if rotation.shape[0] != 3:
         raise ValueError("`rotation` must have three values")
     if translation.shape[0] != 3:
@@ -137,7 +138,7 @@ def get_affine(volume_shape, rotation=[0, 0, 0], translation=[0, 0, 0]):
     # Rotation around origin.
     transform = rz @ ry @ rx
 
-    center = tf.convert_to_tensor(volume_shape / 2 - 0.5, dtype=tf.float32)
+    center = tf.convert_to_tensor(volume_shape[:3] / 2 - 0.5, dtype=tf.float32)
     neg_center = tf.math.negative(center)
     center_to_origin = tf.convert_to_tensor(
         [
@@ -196,10 +197,10 @@ def _get_coordinates(volume_shape):
     -------
     Tensor of coordinates with shape `(prod(volume_shape), 3)`.
     """
-    if len(volume_shape) != 3:
-        raise ValueError("shape must have 3 items.")
+    if len(volume_shape) < 3:
+        raise ValueError("shape must have at least 3 items.")
     dtype = tf.float32
-    rows, cols, depth = volume_shape
+    rows, cols, depth = volume_shape[:3]
 
     out = tf.meshgrid(
         tf.range(rows, dtype=dtype),
@@ -260,7 +261,11 @@ def _trilinear_interpolation(volume, coords):
     i111 = x1 * ylen * zlen + y1 * zlen + z1
 
     # Get volume values at corners of cube.
-    volume_flat = tf.reshape(volume, [-1])
+    if len(volume.shape) == 3:
+        volume_flat = tf.reshape(volume, [-1])
+    else:
+        volume_flat = tf.reshape(volume, [-1, volume.shape[-1]])
+
     c000 = tf.gather(volume_flat, i000)
     c001 = tf.gather(volume_flat, i001)
     c010 = tf.gather(volume_flat, i010)
@@ -273,6 +278,12 @@ def _trilinear_interpolation(volume, coords):
     xd = coords[:, 0] - tf.cast(x0, tf.float32)
     yd = coords[:, 1] - tf.cast(y0, tf.float32)
     zd = coords[:, 2] - tf.cast(z0, tf.float32)
+
+    if len(volume.shape) == 4:
+        # Add a channels axis for proper broadcasting
+        xd = xd[:, tf.newaxis]
+        yd = yd[:, tf.newaxis]
+        zd = zd[:, tf.newaxis]
 
     # Interpolate along x-axis.
     c00 = c000 * (1 - xd) + c100 * xd
@@ -295,12 +306,12 @@ def _get_voxels(volume, coords):
     x = tf.cast(volume, tf.float32)
     coords = tf.cast(coords, tf.float32)
 
-    if len(x.shape) != 3:
-        raise ValueError("`volume` must be rank 3")
+    if len(x.shape) < 3:
+        raise ValueError("`volume` must be at least rank 3")
     if len(coords.shape) != 2 or coords.shape[1] != 3:
         raise ValueError("`coords` must have shape `(N, 3)`.")
 
-    rows, cols, depth = x.shape
+    rows, cols, depth, *n_channels = x.shape
 
     # Points in flattened array representation.
     fcoords = coords[:, 0] * cols * depth + coords[:, 1] * depth + coords[:, 2]
@@ -309,7 +320,7 @@ def _get_voxels(volume, coords):
     # Zero those so we don't get errors. These points in the volume are filled later.
     fcoords_size = tf.size(fcoords, out_type=fcoords.dtype)
     fcoords = tf.clip_by_value(fcoords, 0, fcoords_size - 1)
-    xflat = tf.reshape(x, [-1])
+    xflat = tf.squeeze(tf.reshape(x, [tf.math.reduce_prod(x.shape[:3]), -1]))
 
     # Reorder image data to transformed space.
     xflat = tf.gather(params=xflat, indices=tf.cast(fcoords, tf.int32))
@@ -321,6 +332,71 @@ def _get_voxels(volume, coords):
         | (coords[:, 1] > cols)
         | (coords[:, 2] > depth)
     )
+
+    if n_channels:
+        outofframe = tf.stack([outofframe for _ in range(n_channels[0])], axis=-1)
+
     xflat = tf.multiply(xflat, tf.cast(tf.logical_not(outofframe), xflat.dtype))
 
     return xflat
+
+
+def apply_random_transform(features, labels):
+    """Apply a random rigid transformation to `features` and `labels`.
+
+    The same transformation is applied to features and labels. Features are
+    interpolated trilinearly, and labels are interpolated with nearest
+    neighbors.
+    """
+    if len(features.shape) < 3 or len(labels.shape) < 3:
+        raise ValueError("features and labels must be at least rank 3")
+    if features.shape != labels.shape:
+        raise ValueError("shape of features and labels must be the same.")
+    # Rotate -180 degrees to 180 degrees in three dimensions.
+    rotation = tf.random.uniform(
+        shape=[3], minval=-np.pi, maxval=np.pi, dtype=tf.float32
+    )
+
+    # Translate at most 5% in any direction, so there's less chance of
+    # important data going out of view.
+    maxval = 0.05 * features.shape[0]
+    translation = tf.random.uniform(
+        shape=[3], minval=-maxval, maxval=maxval, dtype=tf.float32
+    )
+
+    volume_shape = np.asarray(features.shape)
+    matrix = get_affine(
+        volume_shape=volume_shape, rotation=rotation, translation=translation
+    )
+    return warp_features_labels(features=features, labels=labels, matrix=matrix)
+
+
+def apply_random_transform_scalar_labels(features, labels):
+    """Apply a random rigid transformation to `features`.
+
+    Features are interpolated trilinearly, and labels are unchanged because they are
+    scalars.
+    """
+    if len(features.shape) < 3:
+        raise ValueError("features must be at least rank 3")
+    if len(labels.shape) != 1:
+        raise ValueError("labels must be rank 1")
+    # Rotate -180 degrees to 180 degrees in three dimensions.
+    rotation = tf.random.uniform(
+        shape=[3], minval=-np.pi, maxval=np.pi, dtype=tf.float32
+    )
+
+    # Translate at most 5% in any direction, so there's less chance of
+    # important data going out of view.
+    maxval = 0.05 * features.shape[0]
+    translation = tf.random.uniform(
+        shape=[3], minval=-maxval, maxval=maxval, dtype=tf.float32
+    )
+
+    volume_shape = np.asarray(features.shape)
+    matrix = get_affine(
+        volume_shape=volume_shape, rotation=rotation, translation=translation
+    )
+    return warp_features_labels(
+        features=features, labels=labels, matrix=matrix, scalar_label=True
+    )

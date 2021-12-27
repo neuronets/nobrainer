@@ -1,8 +1,8 @@
 """Methods for creating `tf.data.Dataset` objects."""
 
-import glob
 import math
 
+import fsspec
 import numpy as np
 import tensorflow as tf
 
@@ -13,6 +13,7 @@ from .volume import (
     apply_random_transform_scalar_labels,
     binarize,
     replace,
+    standardize,
     to_blocks,
 )
 
@@ -33,14 +34,33 @@ def tfrecord_dataset(
     # Assume all files have same compression type as the first file.
     compression_type = "GZIP" if compressed else None
     cycle_length = 1 if num_parallel_calls is None else num_parallel_calls
+    parse_fn = parse_example_fn(volume_shape=volume_shape, scalar_label=scalar_label)
+
+    if not shuffle:
+        # Determine examples_per_shard from the first TFRecord shard
+        # Then set block_length to equal the number of examples per shard
+        # so that the interleave method does not inadvertently shuffle data.
+        first_shard = (
+            dataset.take(1)
+            .flat_map(
+                lambda x: tf.data.TFRecordDataset(x, compression_type=compression_type)
+            )
+            .map(map_func=parse_fn, num_parallel_calls=num_parallel_calls)
+        )
+        block_length = len([0 for _ in first_shard])
+    else:
+        # If the dataset is being shuffled, then we don't care if interleave
+        # further shuffles that data even further
+        block_length = None
+
     dataset = dataset.interleave(
         map_func=lambda x: tf.data.TFRecordDataset(
             x, compression_type=compression_type
         ),
         cycle_length=cycle_length,
+        block_length=block_length,
         num_parallel_calls=num_parallel_calls,
     )
-    parse_fn = parse_example_fn(volume_shape=volume_shape, scalar_label=scalar_label)
     dataset = dataset.map(map_func=parse_fn, num_parallel_calls=num_parallel_calls)
     return dataset
 
@@ -55,7 +75,7 @@ def get_dataset(
     n_epochs=None,
     mapping=None,
     augment=False,
-    standardize=True,
+    normalizer=standardize,
     shuffle_buffer_size=None,
     num_parallel_calls=AUTOTUNE,
 ):
@@ -72,10 +92,10 @@ def get_dataset(
         binary segmentation (foreground vs background), and values greater than
         2 indicate multiclass segmentation.
     batch_size: int, number of elements per batch.
-    volume_shape: tuple of length 3, the shape of every volume in the TFRecords
+    volume_shape: tuple of at least length 3, the shape of every volume in the TFRecords
         files. Every volume must have the same shape.
     scalar_label: boolean, if `True`, labels are scalars.
-    block_shape: tuple of length 3, the shape of the non-overlapping sub-volumes
+    block_shape: tuple of at least length 3, the shape of the non-overlapping sub-volumes
         to take from the full volumes. If None, do not separate the full volumes
         into sub-volumes. Separating into non-overlapping sub-volumes is useful
         (sometimes even necessary) to overcome memory limitations depending on
@@ -88,6 +108,9 @@ def get_dataset(
     augment: boolean, if true, apply random rigid transformations to the
         features and labels. The rigid transformations are applied to the full
         volumes.
+    normalizer: callable, applies this normalization function when creating the
+        dataset. to maintain compatibility with prior nobrainer release, this is
+        set to standardize by default.
     shuffle_buffer_size: int, buffer of full volumes to shuffle. If this is not
         None, then the list of files found by 'file_pattern' is also shuffled
         at every iteration.
@@ -103,15 +126,15 @@ def get_dataset(
     labels is `(batch_size, *volume_shape, n_classes)`. If `scalar_label` is `True,
     the shape of labels is always `(batch_size,)`.
     """
-
-    files = glob.glob(file_pattern)
+    fs, _, _ = fsspec.get_fs_token_paths(file_pattern)
+    files = fs.glob(file_pattern)
     if not files:
         raise ValueError("no files found for pattern '{}'".format(file_pattern))
 
     # Create dataset of all TFRecord files. After this point, the dataset will have
     # two value per iteration: (feature, label).
     shuffle = bool(shuffle_buffer_size)
-    compressed = _is_gzipped(files[0])
+    compressed = _is_gzipped(files[0], filesys=fs)
     dataset = tfrecord_dataset(
         file_pattern=file_pattern,
         volume_shape=volume_shape,
@@ -121,9 +144,9 @@ def get_dataset(
         num_parallel_calls=num_parallel_calls,
     )
 
-    if standardize:
+    if normalizer is not None:
         # Standard-score the features.
-        dataset = dataset.map(lambda x, y: (standardize(x), y))
+        dataset = dataset.map(lambda x, y: (normalizer(x), y))
 
     # Augment examples if requested.
     if augment:
@@ -166,6 +189,9 @@ def get_dataset(
             dataset = dataset.map(_f, num_parallel_calls=num_parallel_calls)
             # This step is necessary because separating into blocks adds a dimension.
             dataset = dataset.unbatch()
+    else:
+        if scalar_label:
+            dataset = dataset.map(lambda x, y: (x, tf.squeeze(y)))
 
     # Binarize or replace labels according to mapping.
     if not scalar_label:
@@ -180,9 +206,10 @@ def get_dataset(
                 dataset = dataset.map(lambda x, y: (x, replace(y, mapping=mapping)))
             dataset = dataset.map(lambda x, y: (x, tf.one_hot(y, n_classes)))
 
-    # Add grayscale channel to features.
-    # TODO: in the future, multi-channel features should be supported.
-    dataset = dataset.map(lambda x, y: (tf.expand_dims(x, -1), y))
+    # If volume_shape is only three dims, add grayscale channel to features.
+    # Otherwise, assume that the channels are already in the features.
+    if len(volume_shape) == 3:
+        dataset = dataset.map(lambda x, y: (tf.expand_dims(x, -1), y))
 
     # Prefetch data to overlap data production with data consumption. The
     # TensorFlow documentation suggests prefetching `batch_size` elements.
