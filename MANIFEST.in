@@ -6,3 +6,4 @@ include CHANGELOG.md tox.ini
 graft nobrainer
 
 global-exclude *.py[cod]
+include nobrainer/_version.py
