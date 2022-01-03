@@ -1,3 +1,66 @@
+# 0.2.1 (Fri Dec 24 2021)
+
+#### 🐛 Bug Fix
+
+- fix: update docker files and citation pointer [#194](https://github.com/neuronets/nobrainer/pull/194) ([@satra](https://github.com/satra) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+
+#### Authors: 2
+
+- [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot])
+- Satrajit Ghosh ([@satra](https://github.com/satra))
+
+---
+
+# 0.2.0 (Fri Dec 24 2021)
+
+#### 🚀 Enhancement
+
+- Update README.md and move transforms [#187](https://github.com/neuronets/nobrainer/pull/187) ([@Hoda1394](https://github.com/Hoda1394) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@satra](https://github.com/satra))
+
+#### 🐛 Bug Fix
+
+- Documentation update [#184](https://github.com/neuronets/nobrainer/pull/184) ([@Aakanksha-Rana](https://github.com/Aakanksha-Rana) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@satra](https://github.com/satra))
+- Correction of G_dice and multi_class dice_calculation [#164](https://github.com/neuronets/nobrainer/pull/164) ([@kaczmarj](https://github.com/kaczmarj) [@Aakanksha-Rana](https://github.com/Aakanksha-Rana) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@satra](https://github.com/satra))
+- DOC: Update link to CITATION file [#190](https://github.com/neuronets/nobrainer/pull/190) ([@arokem](https://github.com/arokem))
+- Bayesian: 3D bayes_by_backprop_layer + Distributed Weight Consolidation [#185](https://github.com/neuronets/nobrainer/pull/185) ([@Aakanksha-Rana](https://github.com/Aakanksha-Rana) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@satra](https://github.com/satra))
+- [pre-commit.ci] pre-commit autoupdate [#188](https://github.com/neuronets/nobrainer/pull/188) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- Fix tf & tfp compatibility with python version [#186](https://github.com/neuronets/nobrainer/pull/186) ([@Hoda1394](https://github.com/Hoda1394) [@satra](https://github.com/satra))
+- [pre-commit.ci] pre-commit autoupdate [#183](https://github.com/neuronets/nobrainer/pull/183) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- Added Clipping constraint and KLD loss with CD [#180](https://github.com/neuronets/nobrainer/pull/180) ([@Aakanksha-Rana](https://github.com/Aakanksha-Rana) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@satra](https://github.com/satra))
+- ENH: Allow multichannel input [#177](https://github.com/neuronets/nobrainer/pull/177) ([@richford](https://github.com/richford) [@satra](https://github.com/satra))
+- Add citation [#181](https://github.com/neuronets/nobrainer/pull/181) ([@Aakanksha-Rana](https://github.com/Aakanksha-Rana) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@satra](https://github.com/satra))
+- [pre-commit.ci] pre-commit autoupdate [#182](https://github.com/neuronets/nobrainer/pull/182) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- adding brain siamese network models and test cases [#172](https://github.com/neuronets/nobrainer/pull/172) ([@dhritimandas](https://github.com/dhritimandas) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@satra](https://github.com/satra))
+- Added dcgan architecture with tests [#66](https://github.com/neuronets/nobrainer/pull/66) ([@wazeerzulfikar](https://github.com/wazeerzulfikar) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@satra](https://github.com/satra))
+- BF: Add block_length param to dataset.interleave [#175](https://github.com/neuronets/nobrainer/pull/175) ([@richford](https://github.com/richford) [@satra](https://github.com/satra))
+- Weightnorm feature for Variational layer [#166](https://github.com/neuronets/nobrainer/pull/166) ([@Aakanksha-Rana](https://github.com/Aakanksha-Rana) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@satra](https://github.com/satra))
+- [pre-commit.ci] pre-commit autoupdate [#179](https://github.com/neuronets/nobrainer/pull/179) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- [pre-commit.ci] pre-commit autoupdate [#178](https://github.com/neuronets/nobrainer/pull/178) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- [pre-commit.ci] pre-commit autoupdate [#173](https://github.com/neuronets/nobrainer/pull/173) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- [pre-commit.ci] pre-commit autoupdate [#170](https://github.com/neuronets/nobrainer/pull/170) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- [pre-commit.ci] pre-commit autoupdate [#165](https://github.com/neuronets/nobrainer/pull/165) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- [pre-commit.ci] pre-commit autoupdate [#163](https://github.com/neuronets/nobrainer/pull/163) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- fix: readme to remove qualified install [#162](https://github.com/neuronets/nobrainer/pull/162) ([@satra](https://github.com/satra) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- fix: remove unnecessary step in release action [#158](https://github.com/neuronets/nobrainer/pull/158) ([@satra](https://github.com/satra))
+
+#### ⚠️ Pushed to `master`
+
+- Update .zenodo.json ([@satra](https://github.com/satra))
+
+#### Authors: 9
+
+- [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot])
+- Aakanksha Rana ([@Aakanksha-Rana](https://github.com/Aakanksha-Rana))
+- Adam Richie-Halford ([@richford](https://github.com/richford))
+- Ariel Rokem ([@arokem](https://github.com/arokem))
+- Dhritiman Das ([@dhritimandas](https://github.com/dhritimandas))
+- Hoda Rajaei ([@Hoda1394](https://github.com/Hoda1394))
+- Jakub Kaczmarzyk ([@kaczmarj](https://github.com/kaczmarj))
+- Satrajit Ghosh ([@satra](https://github.com/satra))
+- Wazeer Zulfikar ([@wazeerzulfikar](https://github.com/wazeerzulfikar))
+
+---
+
 # 0.1.1 (Tue Jun 22 2021)
 
 #### 🐛 Bug Fix
