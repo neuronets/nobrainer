@@ -1,11 +1,11 @@
 """Methods for creating `tf.data.Dataset` objects."""
 
 import math
+import warnings
 
 import fsspec
 import numpy as np
 import tensorflow as tf
-import warnings
 
 from .io import _is_gzipped
 from .tfrecord import parse_example_fn
@@ -122,11 +122,12 @@ def get_dataset(
     """
     warnings.simplefilter("default")
     warnings.warn(
-            "Default value for argument 'augment' will be None in next release"
-            "of nobrainer. Please use None for no augmentation or give a list"
-            " of required augmentations as:"
-            "[ (augmentation_name, {'param': value}), ... ]",
-            DeprecationWarning,)
+        "Default value for argument 'augment' will be None in next release"
+        "of nobrainer. Please use None for no augmentation or give a list"
+        " of required augmentations as:"
+        "[ (augmentation_name, {'param': value}), ... ]",
+        DeprecationWarning,
+    )
     fs, _, _ = fsspec.get_fs_token_paths(file_pattern)
     files = fs.glob(file_pattern)
     if not files:
