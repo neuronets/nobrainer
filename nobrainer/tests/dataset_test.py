@@ -9,7 +9,7 @@ from numpy.testing import assert_array_equal
 import pytest
 
 from .. import dataset, io, tfrecord, utils
-
+from .. import intensity_transforms, spatial_transforms
 
 @pytest.fixture(scope="session")
 def tmp_data_filepaths():
@@ -109,6 +109,19 @@ def test_get_dataset_shapes(
     assert all([_shape == output_volume_shape for _shape in shapes])
     shutil.rmtree(temp_dir)
 
+def test_get_dataset_errors_augmentation():
+    temp_dir = tempfile.mkdtemp()
+    file_pattern = op.join(temp_dir, "does_not_exist-*.tfrec")
+    with pytest.raises(ValueError):
+       dataset.get_dataset(
+           file_pattern=file_pattern,
+           n_classes=1,
+           batch_size=1,
+           volume_shape=(256, 256, 256),
+           augment = [(intensity_transforms.addGaussianNoise, 
+                       {'noise_mean':0.1,'noise_std':0.5}), 
+                        (spatial_transforms.randomflip_leftright)]
+       )   
 
 # TODO: need to implement this soon.
 @pytest.mark.xfail
