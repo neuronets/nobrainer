@@ -2,6 +2,7 @@ from .autoencoder import autoencoder
 from .dcgan import dcgan
 from .highresnet import highresnet
 from .meshnet import meshnet
+from .progressiveae import progressiveae
 from .progressivegan import progressivegan
 from .unet import unet
 
@@ -26,6 +27,7 @@ def get(name):
         "unet": unet,
         "autoencoder": autoencoder,
         "progressivegan": progressivegan,
+        "progressiveae": progressiveae,
         "dcgan": dcgan,
     }
 
