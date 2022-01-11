@@ -2,10 +2,11 @@
 
 import os
 
-from losses import gradient_penalty
 import tensorflow as tf
 from tensorflow.python.keras.engine import compile_utils
-from volume import adjust_dynamic_range as _adjust_dynamic_range
+
+from .losses import gradient_penalty
+from .volume import adjust_dynamic_range as _adjust_dynamic_range
 
 
 class ProgressiveGANTrainer(tf.keras.Model):
@@ -190,7 +191,7 @@ class ProgressiveAETrainer(tf.keras.Model):
         self.train_step_counter = tf.Variable(0.0)
         self.phase = tf.Variable("resolution")
 
-    def compile(self, optimizer, loss_fn):  # only one for two models
+    def compile(self, optimizer, loss_fn):
         super(ProgressiveAETrainer, self).compile()
 
         self.optimizer = optimizer
