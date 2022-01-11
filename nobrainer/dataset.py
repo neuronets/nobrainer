@@ -120,14 +120,7 @@ def get_dataset(
     labels is `(batch_size, *volume_shape, n_classes)`. If `scalar_label` is `True,
     the shape of labels is always `(batch_size,)`.
     """
-    warnings.simplefilter("default")
-    warnings.warn(
-        "Default value for argument 'augment' will be None in next release"
-        "of nobrainer. Please use None for no augmentation or give a list"
-        " of required augmentations as:"
-        "[ (augmentation_name, {'param': value}), ... ]",
-        DeprecationWarning,
-    )
+
     fs, _, _ = fsspec.get_fs_token_paths(file_pattern)
     files = fs.glob(file_pattern)
     if not files:
@@ -151,10 +144,35 @@ def get_dataset(
         dataset = dataset.map(lambda x, y: (normalizer(x), y))
 
     # Augment examples if requested.
-    if type(augment) is bool:
-        raise ValueError("Augment must be None or list of augmentations.")
-
-    if augment is not None:
+    if isinstance(augment) is bool:
+        warnings.simplefilter("default")
+        warnings.warn(
+        "Default value for argument 'augment' will be None in next release "
+        "of nobrainer. Please use None for no augmentation or give a list"
+        " of required augmentations as:"
+        "[ (augmentation_name, {'param': value}), ... ]",
+        DeprecationWarning,)
+        if augment:
+            if not scalar_label:
+                dataset = dataset.map(
+                lambda x, y: tf.cond(
+                    tf.random.uniform((1,)) > 0.5,
+                    true_fn=lambda: apply_random_transform(x, y),
+                    false_fn=lambda: (x, y),
+                ),
+                num_parallel_calls=num_parallel_calls,
+                )
+            else:
+                dataset = dataset.map(
+                lambda x, y: tf.cond(
+                    tf.random.uniform((1,)) > 0.5,
+                    true_fn=lambda: apply_random_transform_scalar_labels(x, y),
+                    false_fn=lambda: (x, y),
+                ),
+                num_parallel_calls=num_parallel_calls,
+                )
+     
+    if isinstance(augment, list):
         if not scalar_label:
             for transform, kwargs in augment:
                 dataset = dataset.map(
