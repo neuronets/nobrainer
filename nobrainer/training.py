@@ -248,17 +248,15 @@ class ProgressiveAETrainer(tf.keras.Model):
 
 class GANTrainer(tf.keras.Model):
     """Generative Adversarial Network Trainer.
+    
     Trains discriminator and generator alternatively in an adversarial manner for generation of
     brain MRI images.
+    
     Parameters
     ----------
     discriminator : tf.keras.Model, Instantiated using nobrainer.models
     generator : tf.keras.Model, Instantiated using nobrainer.models
     gradient_penalty : boolean, Use gradient penalty on discriminator for smooth training.
-    References
-    ----------
-    Links
-    -----
     """
 
     def __init__(self, discriminator, generator, gradient_penalty=False):
