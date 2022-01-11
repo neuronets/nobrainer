@@ -9,7 +9,14 @@ import tensorflow as tf
 
 from .io import _is_gzipped
 from .tfrecord import parse_example_fn
-from .volume import binarize, replace, standardize, to_blocks
+from .volume import (
+    apply_random_transform,
+    apply_random_transform_scalar_labels,
+    binarize,
+    replace,
+    standardize,
+    to_blocks,
+)
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
