@@ -88,8 +88,9 @@ on [DockerHub](https://hub.docker.com/r/neuronets/nobrainer)
 
 #### GPU support
 
-The _Nobrainer_ containers with GPU support use CUDA 10, which requires Linux
-NVIDIA drivers `>=410.48`. These drivers are not included in the container.
+The _Nobrainer_ containers with GPU support use the Tensorflow jupyter GPU containers. Please
+check the containers for the version of CUDA installed. Nvidia drivers are not included in 
+the container.
 
 ```
 $ docker pull neuronets/nobrainer:latest-gpu
