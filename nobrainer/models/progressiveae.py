@@ -31,7 +31,6 @@ def progressiveae(
     -------
     Encoder and Decoder
     """
-
     encoder = Encoder(
         latent_size,
         label_size=label_size,
@@ -50,7 +49,7 @@ def progressiveae(
         fmap_max=d_fmap_max,
     )
 
-    return (encoder, decoder)
+    return encoder, decoder
 
 
 class Encoder(tf.keras.Model):
@@ -64,6 +63,7 @@ class Encoder(tf.keras.Model):
         dimensionality=3,
     ):
         super(Encoder, self).__init__()
+
         self.latent_size = latent_size
         self.label_size = label_size
 
@@ -90,13 +90,14 @@ class Encoder(tf.keras.Model):
 
         self.Base_Dense = layers.Dense(self.latent_size)
         self.Head_Conv = self.Conv(
-            (self._nf(self.current_resolution)), kernel_size=1, padding="same", name=""
+            (self._nf(self.current_resolution)),
+            kernel_size=1,
+            padding="same",
         )
         self.Base_Conv = self.Conv(
             (self._nf(self.current_resolution - 1)),
             kernel_size=1,
             padding="same",
-            name="",
         )
 
         images_shape = (
@@ -124,14 +125,14 @@ class Encoder(tf.keras.Model):
         Weighted interpolation helper for fading in new layers as its progressively added
         """
         return layers.Lambda(
-            lambda inputs: (1 - inputs[2]) * inputs[0] + inputs[2] * inputs[1]
+            lambda inputs: (1 - inputs[2]) * inputs[0] + (inputs[2]) * inputs[1]
         )
 
     def _nf(self, stage):
         """
         Computes number of filters for a conv layer
         """
-        return min(int(self.fmap_base / 2.0 ** stage), self.fmap_max)
+        return min(int(self.fmap_base / (2.0 ** (stage))), self.fmap_max)
 
     def update_res(self):
         """
@@ -146,6 +147,7 @@ class Encoder(tf.keras.Model):
         """
         x = layers.Flatten()(x)
         x = self.Base_Dense(x)
+
         return x
 
     def make_Eblock(self, nf, kernel_size=4, name="eblock", input_shape=None):
@@ -181,18 +183,17 @@ class Encoder(tf.keras.Model):
 
         self.resolution_blocks.append(self.highest_resolution_block)
         self.highest_resolution_block = self.make_Eblock(
-            (self._nf(self.current_resolution - 1)),
-            name=("eblock{}".format(self.current_resolution)),
+            self._nf(self.current_resolution - 1),
+            name="eblock{}".format(self.current_resolution),
         )
 
         self.Base_Conv = self.Conv(
-            (self._nf(self.current_resolution - 1)),
+            filters=self._nf(self.current_resolution - 1),
             kernel_size=1,
             padding="same",
-            name="",
         )
         self.Head_Conv = self.Conv(
-            (self._nf(self.current_resolution)), kernel_size=1, padding="same", name=""
+            filters=self._nf(self.current_resolution), kernel_size=1, padding="same"
         )
 
         images_shape = (
@@ -246,14 +247,16 @@ class Decoder(tf.keras.Model):
         self.current_width = 2 ** self.current_resolution
 
         self.highest_resolution_block = self.make_Dblock(
-            (self._nf(self.current_resolution)),
-            name=("d_block_{}".format(self.current_resolution)),
+            self._nf(self.current_resolution),
+            name="d_block_{}".format(self.current_resolution),
         )
         self.resolution_blocks = []
 
         self.Head_Conv1 = self.Conv(filters=(self.num_channels), kernel_size=1)
         self.Head_Conv2 = self.Conv(filters=(self.num_channels), kernel_size=1)
-        self.Base_Dense = layers.Dense(self._nf(1) * 2 ** self.dimensionality)
+        self.Base_Dense = tf.keras.layers.Dense(
+            units=self._nf(1) * 2 ** self.dimensionality
+        )
 
         self.build([(None, latent_size), (1,)])
 
@@ -269,7 +272,7 @@ class Decoder(tf.keras.Model):
         return layers.Lambda(
             lambda x: x
             * tf.math.rsqrt(
-                tf.reduce_mean((tf.square(x)), axis=(-1), keepdims=True) + epsilon
+                tf.reduce_mean(tf.square(x), axis=-1, keepdims=True) + epsilon
             )
         )
 
@@ -278,14 +281,14 @@ class Decoder(tf.keras.Model):
         Weighted interpolation helper for fading in new layers as its progressively added
         """
         return layers.Lambda(
-            lambda inputs: (1 - inputs[2]) * inputs[0] + inputs[2] * inputs[1]
+            lambda inputs: (1 - inputs[2]) * inputs[0] + (inputs[2]) * inputs[1]
         )
 
     def _nf(self, stage):
         """
         Computes number of filters for a conv layer
         """
-        return min(int(self.fmap_base / 2.0 ** stage), self.fmap_max)
+        return min(int(self.fmap_base / (2.0 ** (stage))), self.fmap_max)
 
     def make_Dbase(self, latents):
         """
@@ -350,8 +353,8 @@ class Decoder(tf.keras.Model):
 
         self.resolution_blocks.append(self.highest_resolution_block)
         self.highest_resolution_block = self.make_Dblock(
-            (self._nf(self.current_resolution)),
-            name=("d_block_{}".format(self.current_resolution)),
+            self._nf(self.current_resolution),
+            name="d_block_{}".format(self.current_resolution),
         )
 
         self.Head_Conv1 = self.Conv(filters=(self.num_channels), kernel_size=1)
