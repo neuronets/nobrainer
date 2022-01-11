@@ -153,7 +153,7 @@ def get_dataset(
     # Augment examples if requested.
     if type(augment) is bool:
         raise ValueError("Augment must be None or list of augmentations.")
-        
+
     if augment is not None:
         if not scalar_label:
             for transform, kwargs in augment:
