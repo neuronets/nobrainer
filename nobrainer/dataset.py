@@ -147,31 +147,32 @@ def get_dataset(
     if isinstance(augment) is bool:
         warnings.simplefilter("default")
         warnings.warn(
-        "Default value for argument 'augment' will be None in next release "
-        "of nobrainer. Please use None for no augmentation or give a list"
-        " of required augmentations as:"
-        "[ (augmentation_name, {'param': value}), ... ]",
-        DeprecationWarning,)
+            "Default value for argument 'augment' will be None in next release "
+            "of nobrainer. Please use None for no augmentation or give a list"
+            " of required augmentations as:"
+            "[ (augmentation_name, {'param': value}), ... ]",
+            DeprecationWarning,
+        )
         if augment:
             if not scalar_label:
                 dataset = dataset.map(
-                lambda x, y: tf.cond(
-                    tf.random.uniform((1,)) > 0.5,
-                    true_fn=lambda: apply_random_transform(x, y),
-                    false_fn=lambda: (x, y),
-                ),
-                num_parallel_calls=num_parallel_calls,
+                    lambda x, y: tf.cond(
+                        tf.random.uniform((1,)) > 0.5,
+                        true_fn=lambda: apply_random_transform(x, y),
+                        false_fn=lambda: (x, y),
+                    ),
+                    num_parallel_calls=num_parallel_calls,
                 )
             else:
                 dataset = dataset.map(
-                lambda x, y: tf.cond(
-                    tf.random.uniform((1,)) > 0.5,
-                    true_fn=lambda: apply_random_transform_scalar_labels(x, y),
-                    false_fn=lambda: (x, y),
-                ),
-                num_parallel_calls=num_parallel_calls,
+                    lambda x, y: tf.cond(
+                        tf.random.uniform((1,)) > 0.5,
+                        true_fn=lambda: apply_random_transform_scalar_labels(x, y),
+                        false_fn=lambda: (x, y),
+                    ),
+                    num_parallel_calls=num_parallel_calls,
                 )
-     
+
     if isinstance(augment, list):
         if not scalar_label:
             for transform, kwargs in augment:
