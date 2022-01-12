@@ -163,7 +163,7 @@ def get_dataset(
         else:
             augment = None
 
-    if augment is not None
+    if augment is not None:
         for transform, kwargs in augment:
             dataset = dataset.map(
                 lambda x, y: tf.cond(
