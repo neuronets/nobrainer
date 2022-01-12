@@ -151,7 +151,7 @@ def get_dataset(
         dataset = dataset.map(lambda x, y: (normalizer(x), y))
 
     # Augment examples if requested.
-    if isinstance(augment) is bool:
+    if isinstance(augment, bool):
         warnings.simplefilter("default")
         warnings.warn(
             "Default value for argument 'augment' will be None in next release "
