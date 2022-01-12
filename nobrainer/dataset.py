@@ -156,10 +156,12 @@ def get_dataset(
         if augment:
             if scalar_label:
                 from .transform import apply_random_transform_scalar_labels
-                augment = [ (apply_random_transform_scalar_labels, {}) ]
+
+                augment = [(apply_random_transform_scalar_labels, {})]
             else:
                 from .transform import apply_random_transform
-                augment = [ (apply_random_transform, {}) ]
+
+                augment = [(apply_random_transform, {})]
         else:
             augment = None
 
@@ -171,7 +173,7 @@ def get_dataset(
                     true_fn=lambda: transform(x, y, **kwargs),
                     false_fn=lambda: (x, y),
                 ),
-                num_parallel_calls=num_parallel_calls
+                num_parallel_calls=num_parallel_calls,
             )
 
     # Separate into blocks, if requested.
