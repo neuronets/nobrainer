@@ -10,8 +10,6 @@ import tensorflow as tf
 from .io import _is_gzipped
 from .tfrecord import parse_example_fn
 from .volume import (
-    apply_random_transform,
-    apply_random_transform_scalar_labels,
     binarize,
     replace,
     standardize,
@@ -161,44 +159,25 @@ def get_dataset(
             DeprecationWarning,
         )
         if augment:
-            if not scalar_label:
-                dataset = dataset.map(
-                    lambda x, y: tf.cond(
-                        tf.random.uniform((1,)) > 0.5,
-                        true_fn=lambda: apply_random_transform(x, y),
-                        false_fn=lambda: (x, y),
-                    ),
-                    num_parallel_calls=num_parallel_calls,
-                )
+            if scalar_label:
+                from .transform import apply_random_transform_scalar_labels
+                augment = [ (apply_random_transform_scalar_labels, {}) ]
             else:
-                dataset = dataset.map(
-                    lambda x, y: tf.cond(
-                        tf.random.uniform((1,)) > 0.5,
-                        true_fn=lambda: apply_random_transform_scalar_labels(x, y),
-                        false_fn=lambda: (x, y),
-                    ),
-                    num_parallel_calls=num_parallel_calls,
-                )
-
-    if isinstance(augment, list):
-        if not scalar_label:
-            for transform, kwargs in augment:
-                dataset = dataset.map(
-                    lambda x, y: tf.cond(
-                        tf.random.uniform((1,)) > 0.5,
-                        true_fn=lambda: (transform(x, **kwargs), y),
-                        false_fn=lambda: (x, y),
-                    ),
-                )
+                from .transform import apply_random_transform
+                augment = [ (apply_random_transform, {}) ]
         else:
-            for transform, kwargs in augment:
-                dataset = dataset.map(
-                    lambda x, y: tf.cond(
-                        tf.random.uniform((1,)) > 0.5,
-                        true_fn=lambda: transform(x, y, **kwargs),
-                        false_fn=lambda: (x, y),
-                    ),
-                )
+            augment = None
+
+    if augment is not None
+        for transform, kwargs in augment:
+            dataset = dataset.map(
+                lambda x, y: tf.cond(
+                    tf.random.uniform((1,)) > 0.5,
+                    true_fn=lambda: transform(x, y, **kwargs),
+                    false_fn=lambda: (x, y),
+                ),
+                num_parallel_calls=num_parallel_calls
+            )
 
     # Separate into blocks, if requested.
     if block_shape is not None:
