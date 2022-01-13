@@ -363,6 +363,15 @@ def apply_random_transform(features, labels, trans_xy=True):
     """
     if len(features.shape) < 3:
         raise ValueError("features must be at least rank 3")
+    if trans_xy:
+        if len(labels.shape) < 3:
+            raise ValueError("labels must be at least rank 3")
+        if features.shape != labels.shape:
+            raise ValueError("shape of features and labels must be the same.")
+    else:
+        if len(labels.shape) != 1:
+            raise ValueError("labels must be rank 1")
+ 
     # Rotate -180 degrees to 180 degrees in three dimensions.
     rotation = tf.random.uniform(
         shape=[3], minval=-np.pi, maxval=np.pi, dtype=tf.float32
@@ -379,10 +388,6 @@ def apply_random_transform(features, labels, trans_xy=True):
         volume_shape=volume_shape, rotation=rotation, translation=translation
     )
     if trans_xy:
-        if len(labels.shape) < 3:
-            raise ValueError("labels must be at least rank 3")
-        if features.shape != labels.shape:
-            raise ValueError("shape of features and labels must be the same.")
         return warp_features_labels(features=features, labels=labels, matrix=matrix)
     else:
         return warp_features_labels(
