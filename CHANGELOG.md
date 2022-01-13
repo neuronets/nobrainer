@@ -1,3 +1,26 @@
+# 0.3.0 (Tue Jan 11 2022)
+
+#### 🚀 Enhancement
+
+- Update README.md [#203](https://github.com/neuronets/nobrainer/pull/203) ([@satra](https://github.com/satra))
+
+#### 🐛 Bug Fix
+
+- Progressive auto encoder [#196](https://github.com/neuronets/nobrainer/pull/196) (alice.bizeul@inf.ethz.ch [@satra](https://github.com/satra) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- [pre-commit.ci] pre-commit autoupdate [#197](https://github.com/neuronets/nobrainer/pull/197) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+
+#### ⚠️ Pushed to `master`
+
+- Update README.md ([@satra](https://github.com/satra))
+
+#### Authors: 3
+
+- [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot])
+- Alice Elsa Marie Bizeul (alice.bizeul@inf.ethz.ch)
+- Satrajit Ghosh ([@satra](https://github.com/satra))
+
+---
+
 # 0.2.1 (Fri Dec 24 2021)
 
 #### 🐛 Bug Fix

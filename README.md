@@ -52,6 +52,7 @@ the Apache 2.0 license. It was started under the support of NIH R01 EB020470.
 |[**DCGAN**](https://github.com/neuronets/nobrainer/blob/master/nobrainer/models/dcgan.py) | self supervised | generative model |
 |[**Progressive GAN**](https://github.com/neuronets/nobrainer/blob/master/nobrainer/models/progressivegan.py) | self supervised | generative model |
 |[**3D Autoencoder**](https://github.com/neuronets/nobrainer/blob/master/nobrainer/models/autoencoder.py) | self supervised | knowledge representation/dimensionality reduction |
+|[**3D Progressive Autoencoder**](https://github.com/neuronets/nobrainer/blob/master/nobrainer/models/progressiveae.py) | self supervised | knowledge representation/dimensionality reduction |
 |[**3D SimSiam**](https://github.com/neuronets/nobrainer/blob/master/nobrainer/models/brainsiam.py) [(source)](https://arxiv.org/abs/2011.10566)| self supervised | Siamese Representation Learning |
 
 ### Dropout and regularization layers
@@ -88,8 +89,9 @@ on [DockerHub](https://hub.docker.com/r/neuronets/nobrainer)
 
 #### GPU support
 
-The _Nobrainer_ containers with GPU support use CUDA 10, which requires Linux
-NVIDIA drivers `>=410.48`. These drivers are not included in the container.
+The _Nobrainer_ containers with GPU support use the Tensorflow jupyter GPU containers. Please
+check the containers for the version of CUDA installed. Nvidia drivers are not included in
+the container.
 
 ```
 $ docker pull neuronets/nobrainer:latest-gpu
