@@ -16,8 +16,8 @@ def Guided_GradCAM_3D(Grad_model, ct_io, Class_index):
     grads = tape.gradient(loss, conv_outputs)[0]
 
     ##--Guided Gradient Part
-    gate_f = tf.cast(output > 0, "float32")
-    gate_r = tf.cast(grads > 0, "float32")
+    #gate_f = tf.cast(output > 0, "float32")
+    #gate_r = tf.cast(grads > 0, "float32")
     guided_grads = (
         tf.cast(output > 0, "float32") * tf.cast(grads > 0, "float32") * grads
     )
