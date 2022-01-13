@@ -1,8 +1,10 @@
 """Volumetric affine transformations implemented in TensorFlow."""
 
+import warnings
+
 import numpy as np
 import tensorflow as tf
-import warnings
+
 
 def warp_features_labels(features, labels, matrix, scalar_label=False):
     """Warp features and labels tensors according to affine matrix.
@@ -347,25 +349,25 @@ def apply_random_transform(features, labels, trans_xy=True):
     The same transformation is applied to features and labels. Features are
     interpolated trilinearly, and labels are interpolated with nearest
     neighbors.
-    
+
     Parameters
     ----------
         features: input is a tensor or numpy to have rank 3,
         labels: label is a tensor or numpy to have rank 3,
         trans_xy: Boolean, transforms both features and labels. If set True, function
         will transform both features and labels.
-        
+
     Returns
     ----------
         Input and/or label tensor with added Gaussian noise.
     """
     if len(features.shape) < 3:
         raise ValueError("features must be at least rank 3")
-    # Rotate -180 degrees to 180 degrees in three dimensions.    
+    # Rotate -180 degrees to 180 degrees in three dimensions.
     rotation = tf.random.uniform(
         shape=[3], minval=-np.pi, maxval=np.pi, dtype=tf.float32
     )
-    
+
     # Translate at most 5% in any direction, so there's less chance of
     # important data going out of view.
     maxval = 0.05 * features.shape[0]
@@ -375,15 +377,17 @@ def apply_random_transform(features, labels, trans_xy=True):
     volume_shape = np.asarray(features.shape)
     matrix = get_affine(
         vodlume_shape=volume_shape, rotation=rotation, translation=translation
-    )    
-    if trans_xy:  
+    )
+    if trans_xy:
         if len(labels.shape) < 3:
             raise ValueError("labels must be at least rank 3")
         if features.shape != labels.shape:
             raise ValueError("shape of features and labels must be the same.")
         return warp_features_labels(features=features, labels=labels, matrix=matrix)
-    else:     
-        return warp_features_labels(features=features, labels=labels, matrix=matrix, scalar_label=True)
+    else:
+        return warp_features_labels(
+            features=features, labels=labels, matrix=matrix, scalar_label=True
+        )
 
 
 def apply_random_transform_scalar_labels(features, labels):
