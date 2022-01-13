@@ -376,7 +376,7 @@ def apply_random_transform(features, labels, trans_xy=True):
     )
     volume_shape = np.asarray(features.shape)
     matrix = get_affine(
-        vodlume_shape=volume_shape, rotation=rotation, translation=translation
+        volume_shape=volume_shape, rotation=rotation, translation=translation
     )
     if trans_xy:
         if len(labels.shape) < 3:
