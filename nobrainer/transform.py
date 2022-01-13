@@ -371,7 +371,7 @@ def apply_random_transform(features, labels, trans_xy=True):
     else:
         if len(labels.shape) != 1:
             raise ValueError("labels must be rank 1")
- 
+
     # Rotate -180 degrees to 180 degrees in three dimensions.
     rotation = tf.random.uniform(
         shape=[3], minval=-np.pi, maxval=np.pi, dtype=tf.float32
