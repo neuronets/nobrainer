@@ -221,7 +221,7 @@ def test_vox2vox():
     # testing descriminator
     x = 10 * np.random.random(input_shape)
     y = np.random.choice([True, False], input_shape)
-    pred_shape = (1,2,2,2,1)
+    pred_shape = (1, 2, 2, 2, 1)
     model = Vox_discriminator(input_shape=input_shape[1:])
-    out = model(inputs=[y,x]) 
+    out = model(inputs=[y, x])
     assert out.shape == pred_shape
