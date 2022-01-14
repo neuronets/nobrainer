@@ -1,14 +1,14 @@
 import numpy as np
+from tensorflow.keras import layers
 from tensorflow.keras.models import Model
-from tensorflow.keras import layers 
 from tensorflow_addons.layers import InstanceNormalization
-   
-def Generator(n_classes, input_shape, n_filters=64,
-              kernel_size=4, norm='instance'):
+
+
+def Generator(n_classes, input_shape, n_filters=64, kernel_size=4, norm="instance"):
     """Instantiate Generator.
-    
+
     Adapted from https://arxiv.org/abs/2003.13653
-    
+
     Parameters
     ----------
     n_classes: int, number of classes to classify. For binary applications, use
@@ -17,56 +17,75 @@ def Generator(n_classes, input_shape, n_filters=64,
         the batch dimension, and include the number of channels.
     kernal_size: int, size of the kernal of conv layers. Default kernal size
         is set to be 4.
-    n_filters: int, number of filters. default is set 64.     
+    n_filters: int, number of filters. default is set 64.
     norm: str, to set batch or instance norm.
-        
+
     Returns
     ----------
     Model object.
-    
+
     """
-    def encoder_step(inputs, filters, kernel_size=3, norm='instance'):
-        x = layers.Conv3D(filters, kernel_size=kernel_size, strides=2, 
-                   kernel_initializer='he_normal', padding='same')(inputs)
-        if norm == 'instance':
+
+    def encoder_step(inputs, filters, kernel_size=3, norm="instance"):
+        x = layers.Conv3D(
+            filters,
+            kernel_size=kernel_size,
+            strides=2,
+            kernel_initializer="he_normal",
+            padding="same",
+        )(inputs)
+        if norm == "instance":
             x = InstanceNormalization()(x)
-        if norm == 'batch':
+        if norm == "batch":
             x = layers.BatchNormalization()(x)
         x = layers.LeakyReLU()(x)
         x = layers.Dropout(0.2)(x)
 
         return x
 
-    def bottleneck(inputs, filters, kernel_size, norm='instance'):
-        x = layers.Conv3D(filters, kernel_size=kernel_size, strides=2, 
-                          kernel_initializer='he_normal', 
-                          padding='same')(inputs)
-        if norm == 'instance':
+    def bottleneck(inputs, filters, kernel_size, norm="instance"):
+        x = layers.Conv3D(
+            filters,
+            kernel_size=kernel_size,
+            strides=2,
+            kernel_initializer="he_normal",
+            padding="same",
+        )(inputs)
+        if norm == "instance":
             x = InstanceNormalization()(x)
-        if norm == 'batch':
+        if norm == "batch":
             x = layers.BatchNormalization()(x)
         x = layers.LeakyReLU()(x)
         for i in range(4):
-            y = layers.Conv3D(filters, kernel_size=kernel_size, 
-                       strides=1, 
-                       kernel_initializer='he_normal', padding='same')(x)
-            if norm == 'instance':
+            y = layers.Conv3D(
+                filters,
+                kernel_size=kernel_size,
+                strides=1,
+                kernel_initializer="he_normal",
+                padding="same",
+            )(x)
+            if norm == "instance":
                 x = InstanceNormalization()(y)
-            if norm == 'batch':
+            if norm == "batch":
                 x = layers.BatchNormalization()(y)
             x = layers.LeakyReLU()(x)
             x = layers.Concatenate()([x, y])
 
         return x
 
-    def decoder_step(inputs, layer_to_concatenate,  filters,
-                     kernel_size, norm='instance'):
-        x = layers.Conv3DTranspose(filters, kernel_size, 
-                            strides=2, padding='same', 
-                            kernel_initializer='he_normal')(inputs)
-        if norm == 'instance':
+    def decoder_step(
+        inputs, layer_to_concatenate, filters, kernel_size, norm="instance"
+    ):
+        x = layers.Conv3DTranspose(
+            filters,
+            kernel_size,
+            strides=2,
+            padding="same",
+            kernel_initializer="he_normal",
+        )(inputs)
+        if norm == "instance":
             x = InstanceNormalization()(x)
-        if norm == 'batch':
+        if norm == "batch":
             x = layers.BatchNormalization()(x)
         x = layers.LeakyReLU()(x)
         x = layers.Concatenate()([x, layer_to_concatenate])
@@ -74,107 +93,121 @@ def Generator(n_classes, input_shape, n_filters=64,
         return x
 
     layers_to_concatenate = []
-    inputs = layers.Input(input_shape, name='input_image')
+    inputs = layers.Input(input_shape, name="input_image")
     Nfilter_start = n_filters
-    depth = 4  
+    depth = 4
     x = inputs
- 
+
     # encoder
-    for d in range(depth-1):
-        if d==0:
-            x = encoder_step(x, Nfilter_start*np.power(2,d), 
-                             kernel_size,norm=norm)
+    for d in range(depth - 1):
+        if d == 0:
+            x = encoder_step(x, Nfilter_start * np.power(2, d), kernel_size, norm=norm)
         else:
-            x = encoder_step(x, Nfilter_start*np.power(2,d), 
-                             kernel_size, norm=norm )
+            x = encoder_step(x, Nfilter_start * np.power(2, d), kernel_size, norm=norm)
         layers_to_concatenate.append(x)
 
     # bottlenek
-    x = bottleneck(x, Nfilter_start*np.power(2,depth-1), 
-                   kernel_size, norm=norm)
+    x = bottleneck(x, Nfilter_start * np.power(2, depth - 1), kernel_size, norm=norm)
 
     # decoder
-    for d in range(depth-2, -1, -1): 
-        x = decoder_step(x, layers_to_concatenate.pop(), 
-                         Nfilter_start*np.power(2,d), kernel_size)
+    for d in range(depth - 2, -1, -1):
+        x = decoder_step(
+            x, layers_to_concatenate.pop(), Nfilter_start * np.power(2, d), kernel_size
+        )
 
     # classifier
-    last = layers.Conv3DTranspose(n_classes, kernel_size=kernel_size, 
-                                  strides=2, padding='same',
-                                  kernel_initializer='he_normal', 
-                                  activation='softmax',
-                                  name='output_generator')(x)
-   
-    return Model(inputs=inputs, outputs=last, name='Generator')
+    last = layers.Conv3DTranspose(
+        n_classes,
+        kernel_size=kernel_size,
+        strides=2,
+        padding="same",
+        kernel_initializer="he_normal",
+        activation="softmax",
+        name="output_generator",
+    )(x)
 
-def Discriminator(input_shape, n_filters = 64, 
-              kernel_size = 4, norm='instance'):
+    return Model(inputs=inputs, outputs=last, name="Generator")
+
+
+def Discriminator(input_shape, n_filters=64, kernel_size=4, norm="instance"):
     """Instantiate Discriminator.
-    
+
     Adapted from https://arxiv.org/abs/2003.13653
-    
+
     Parameters
     ----------
     input_shape: list or tuple of four ints, the shape of the input data. Omit
         the batch dimension, and include the number of channels.
-    n_filters: int, number of filters. default is set 64.    
+    n_filters: int, number of filters. default is set 64.
     kernal_size: int, size of the kernal of conv layers. Default kernal size
         is set to be 4.
     norm: str, to set batch or instance norm.
-        
+
     Returns
     ----------
     Model object.
-    
+
     """
 
-    inputs = layers.Input(input_shape, name='input_image')
-    targets = layers.Input(input_shape, name='target_image')
+    inputs = layers.Input(input_shape, name="input_image")
+    targets = layers.Input(input_shape, name="target_image")
     Nfilter_start = n_filters
     depth = 3
 
-    def encoder_step(inputs, n_filters, kernel_size, norm='instance'):
-        x = layers.Conv3D(n_filters, kernel_size, 
-                          strides=2, 
-                          kernel_initializer='he_normal', 
-                          padding='same')(inputs)
-        if norm == 'instance':
+    def encoder_step(inputs, n_filters, kernel_size, norm="instance"):
+        x = layers.Conv3D(
+            n_filters,
+            kernel_size,
+            strides=2,
+            kernel_initializer="he_normal",
+            padding="same",
+        )(inputs)
+        if norm == "instance":
             x = InstanceNormalization()(x)
-        if norm == 'batch':
+        if norm == "batch":
             x = layers.BatchNormalization()(x)
         x = layers.LeakyReLU()(x)
         x = layers.Dropout(0.2)(x)
-        
+
         return x
 
     x = layers.Concatenate()([inputs, targets])
 
     for d in range(depth):
-        if d==0:
-            x = encoder_step(x, Nfilter_start*np.power(2,d),
-                             kernel_size, norm = None)
+        if d == 0:
+            x = encoder_step(x, Nfilter_start * np.power(2, d), kernel_size, norm=None)
         else:
-            x = encoder_step(x, Nfilter_start*np.power(2,d),
-                             kernel_size, norm = norm)
-            
+            x = encoder_step(x, Nfilter_start * np.power(2, d), kernel_size, norm=norm)
+
     x = layers.ZeroPadding3D()(x)
-    x = layers.Conv3D(Nfilter_start*(2**depth), kernel_size, strides=1, 
-                      padding='valid', kernel_initializer='he_normal')(x) 
+    x = layers.Conv3D(
+        Nfilter_start * (2 ** depth),
+        kernel_size,
+        strides=1,
+        padding="valid",
+        kernel_initializer="he_normal",
+    )(x)
     x = layers.InstanceNormalization()(x)
     x = layers.LeakyReLU()(x)
-      
+
     x = layers.ZeroPadding3D()(x)
-    last = layers.Conv3D(1,kernel_size, strides=1, padding='valid', 
-                         kernel_initializer='he_normal', 
-                         name='output_discriminator')(x) 
+    last = layers.Conv3D(
+        1,
+        kernel_size,
+        strides=1,
+        padding="valid",
+        kernel_initializer="he_normal",
+        name="output_discriminator",
+    )(x)
 
-    return Model(inputs=[targets, inputs], outputs=last, name='Discriminator')
+    return Model(inputs=[targets, inputs], outputs=last, name="Discriminator")
 
-def ensembler(n_classes, input_shape , kernel_size = 3, **kwargs):
+
+def ensembler(n_classes, input_shape, kernel_size=3, **kwargs):
     """Instantiate Ensembler.
-    
+
     Adapted from https://arxiv.org/abs/2003.13653
-    
+
     Parameters
     ----------
     n_classes: int, number of classes to classify. For binary applications, use
@@ -183,14 +216,18 @@ def ensembler(n_classes, input_shape , kernel_size = 3, **kwargs):
         the batch dimension, and include the number of channels.
     kernal_size: int, size of the kernal of conv layers. Default kernal size
         is set to be 3.
-        
+
     Returns
     ----------
     Model object.
     """
     start = layers.Input(input_shape)
-    fin = layers.Conv3D(n_classes, kernel_size=kernel_size, 
-                 kernel_initializer='he_normal', 
-                 padding='same', activation='softmax')(start)
+    fin = layers.Conv3D(
+        n_classes,
+        kernel_size=kernel_size,
+        kernel_initializer="he_normal",
+        padding="same",
+        activation="softmax",
+    )(start)
 
-    return Model(inputs=start, outputs=fin, name='Ensembler')
+    return Model(inputs=start, outputs=fin, name="Ensembler")
