@@ -4,7 +4,7 @@ from tensorflow.keras.models import Model
 from tensorflow_addons.layers import InstanceNormalization
 
 
-def Generator(n_classes, input_shape, n_filters=64, kernel_size=4, norm="instance"):
+def Vox_generator(n_classes, input_shape, n_filters=64, kernel_size=4, norm="instance"):
     """Instantiate Generator.
 
     Adapted from https://arxiv.org/abs/2003.13653
@@ -101,7 +101,7 @@ def Generator(n_classes, input_shape, n_filters=64, kernel_size=4, norm="instanc
     # encoder
     for d in range(depth - 1):
         if d == 0:
-            x = encoder_step(x, Nfilter_start * np.power(2, d), kernel_size, norm=norm)
+            x = encoder_step(x, Nfilter_start * np.power(2, d), kernel_size, norm=None)
         else:
             x = encoder_step(x, Nfilter_start * np.power(2, d), kernel_size, norm=norm)
         layers_to_concatenate.append(x)
@@ -129,7 +129,7 @@ def Generator(n_classes, input_shape, n_filters=64, kernel_size=4, norm="instanc
     return Model(inputs=inputs, outputs=last, name="Generator")
 
 
-def Discriminator(input_shape, n_filters=64, kernel_size=4, norm="instance"):
+def Vox_discriminator(input_shape, n_filters=64, kernel_size=4, norm="instance"):
     """Instantiate Discriminator.
 
     Adapted from https://arxiv.org/abs/2003.13653
@@ -187,7 +187,7 @@ def Discriminator(input_shape, n_filters=64, kernel_size=4, norm="instance"):
         padding="valid",
         kernel_initializer="he_normal",
     )(x)
-    x = layers.InstanceNormalization()(x)
+    x = InstanceNormalization()(x)
     x = layers.LeakyReLU()(x)
 
     x = layers.ZeroPadding3D()(x)
@@ -203,7 +203,7 @@ def Discriminator(input_shape, n_filters=64, kernel_size=4, norm="instance"):
     return Model(inputs=[targets, inputs], outputs=last, name="Discriminator")
 
 
-def ensembler(n_classes, input_shape, kernel_size=3, **kwargs):
+def Vox_ensembler(n_classes, input_shape, kernel_size=3, **kwargs):
     """Instantiate Ensembler.
 
     Adapted from https://arxiv.org/abs/2003.13653
