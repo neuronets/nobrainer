@@ -14,7 +14,7 @@ from ..meshnet import meshnet
 from ..progressivegan import progressivegan
 from ..unet import unet
 from ..vnet import vnet
-from ..vox2vox import Vox_descriminator, Vox_ensembler, Vox_generator
+from ..vox2vox import Vox_discriminator, Vox_ensembler, Vox_generator
 
 
 def model_test(model_cls, n_classes, input_shape, kwds={}):
