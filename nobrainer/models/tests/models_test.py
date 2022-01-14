@@ -14,7 +14,7 @@ from ..meshnet import meshnet
 from ..progressivegan import progressivegan
 from ..unet import unet
 from ..vnet import vnet
-from ..vox2vox import Vox_discriminator, Vox_ensembler, Vox_generator
+from ..vox2vox import *
 
 
 def model_test(model_cls, n_classes, input_shape, kwds={}):
@@ -219,4 +219,9 @@ def test_vox2vox():
     model_test(Vox_generator, n_classes, input_shape)
 
     # testing descriminator
+    x = 10 * np.random.random(input_shape)
+    y = np.random.choice([True, False], input_shape)
+    pred_shape = (1,2,2,2,1)
     model = Vox_discriminator(input_shape=input_shape[1:])
+    out = model(inputs=[y,x]) 
+    assert out.shape == pred_shape
