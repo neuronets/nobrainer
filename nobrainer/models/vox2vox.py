@@ -102,7 +102,9 @@ def Vox_generator(n_classes, input_shape, n_filters=64, kernel_size=4, norm="bat
     # encoder
     for d in range(depth - 1):
         if d == 0:
-            x = encoder_step(x, Nfilter_start * np.power(2, d), kernel_size, norm='None')
+            x = encoder_step(
+                x, Nfilter_start * np.power(2, d), kernel_size, norm="None"
+            )
         else:
             x = encoder_step(x, Nfilter_start * np.power(2, d), kernel_size, norm=norm)
         layers_to_concatenate.append(x)
@@ -176,7 +178,9 @@ def Vox_discriminator(input_shape, n_filters=64, kernel_size=4, norm="batch"):
 
     for d in range(depth):
         if d == 0:
-            x = encoder_step(x, Nfilter_start * np.power(2, d), kernel_size, norm='None')
+            x = encoder_step(
+                x, Nfilter_start * np.power(2, d), kernel_size, norm="None"
+            )
         else:
             x = encoder_step(x, Nfilter_start * np.power(2, d), kernel_size, norm=norm)
 
