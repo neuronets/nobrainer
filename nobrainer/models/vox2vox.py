@@ -1,7 +1,7 @@
 import numpy as np
 from tensorflow.keras import layers
 from tensorflow.keras.models import Model
-from tensorflow_addons.layers import InstanceNormalization
+from ..layers.InstanceNorm import InstanceNormalization
 
 
 def Vox_generator(n_classes, input_shape, n_filters=64, kernel_size=4, norm="instance"):
