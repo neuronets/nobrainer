@@ -5,7 +5,7 @@ from tensorflow.keras.models import Model
 from ..layers.InstanceNorm import InstanceNormalization
 
 
-def Vox_generator(n_classes, input_shape, n_filters=64, kernel_size=4, norm="instance"):
+def Vox_generator(n_classes, input_shape, n_filters=64, kernel_size=4, norm="batch"):
     """Instantiate Generator.
 
     Adapted from https://arxiv.org/abs/2003.13653
@@ -102,7 +102,7 @@ def Vox_generator(n_classes, input_shape, n_filters=64, kernel_size=4, norm="ins
     # encoder
     for d in range(depth - 1):
         if d == 0:
-            x = encoder_step(x, Nfilter_start * np.power(2, d), kernel_size, norm=None)
+            x = encoder_step(x, Nfilter_start * np.power(2, d), kernel_size, norm='None')
         else:
             x = encoder_step(x, Nfilter_start * np.power(2, d), kernel_size, norm=norm)
         layers_to_concatenate.append(x)
@@ -130,7 +130,7 @@ def Vox_generator(n_classes, input_shape, n_filters=64, kernel_size=4, norm="ins
     return Model(inputs=inputs, outputs=last, name="Generator")
 
 
-def Vox_discriminator(input_shape, n_filters=64, kernel_size=4, norm="instance"):
+def Vox_discriminator(input_shape, n_filters=64, kernel_size=4, norm="batch"):
     """Instantiate Discriminator.
 
     Adapted from https://arxiv.org/abs/2003.13653
@@ -176,7 +176,7 @@ def Vox_discriminator(input_shape, n_filters=64, kernel_size=4, norm="instance")
 
     for d in range(depth):
         if d == 0:
-            x = encoder_step(x, Nfilter_start * np.power(2, d), kernel_size, norm=None)
+            x = encoder_step(x, Nfilter_start * np.power(2, d), kernel_size, norm='None')
         else:
             x = encoder_step(x, Nfilter_start * np.power(2, d), kernel_size, norm=norm)
 
@@ -188,7 +188,10 @@ def Vox_discriminator(input_shape, n_filters=64, kernel_size=4, norm="instance")
         padding="valid",
         kernel_initializer="he_normal",
     )(x)
-    x = InstanceNormalization()(x)
+    if norm == "instance":
+        x = InstanceNormalization()(x)
+    if norm == "batch":
+        x = layers.BatchNormalization()(x)
     x = layers.LeakyReLU()(x)
 
     x = layers.ZeroPadding3D()(x)
