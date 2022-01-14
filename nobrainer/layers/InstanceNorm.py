@@ -1,5 +1,6 @@
 from ..layers.groupnorm import GroupNormalization
 
+
 class InstanceNormalization(GroupNormalization):
     """Instance normalization layer.
     Instance Normalization is an specific case of ```GroupNormalization```since
