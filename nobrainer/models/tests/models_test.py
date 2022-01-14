@@ -14,6 +14,7 @@ from ..meshnet import meshnet
 from ..progressivegan import progressivegan
 from ..unet import unet
 from ..vnet import vnet
+from ..vox2vox import Vox_generator, Vox_descriminator, Vox_ensembler
 
 
 def model_test(model_cls, n_classes, input_shape, kwds={}):
@@ -205,3 +206,17 @@ def test_bayesian_vnet():
         input_shape=(1, 32, 32, 32, 1),
         kernel_posterior_fn=default_mean_field_normal_fn(weightnorm=True),
     )
+    
+def test_vox2vox():
+    input_shape = (1,32,32,32,1)
+    n_classes = 1 
+    
+    #testing ensembler
+    model_test(Vox_ensembler, n_classes, input_shape)     
+    
+    # testing generator 
+    model_test(Vox_generator, n_classes, input_shape)  
+    
+    #testing descriminator 
+    model = Vox_discriminator(input_shape=input_shape[1:])
+    
