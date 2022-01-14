@@ -115,7 +115,8 @@ def Vox_generator(n_classes, input_shape, n_filters=64, kernel_size=4, norm="bat
     # decoder
     for d in range(depth - 2, -1, -1):
         x = decoder_step(
-            x, layers_to_concatenate.pop(), Nfilter_start * np.power(2, d), kernel_size
+            x, layers_to_concatenate.pop(), Nfilter_start * np.power(2, d), kernel_size, 
+            norm=norm
         )
 
     # classifier
