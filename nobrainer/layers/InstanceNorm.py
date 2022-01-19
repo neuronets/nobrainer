@@ -1,6 +1,6 @@
 import logging
 
-from ..layers.groupnorm import GroupNormalization
+from tensorflow_addons.layers import GroupNormalization
 
 
 class InstanceNormalization(GroupNormalization):
