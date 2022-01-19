@@ -2,8 +2,52 @@ import numpy as np
 from tensorflow.keras import layers
 from tensorflow.keras.models import Model
 
-from ..layers.InstanceNorm import InstanceNormalization
+from tensorflow_addons.layers import InstanceNormalization
 
+
+def vox_gan(n_classes, 
+            input_shape, 
+            g_filters=64, 
+            g_kernel_size=4,
+            g_norm="batch", 
+            d_filters=64,
+            d_kernel_size=4,
+            d_norm="batch"):
+    """Instantiate Vox2VoxGAN.
+
+    Adapted from https://arxiv.org/abs/2003.13653
+
+    Parameters
+    ----------
+    n_classes: int, number of classes to classify. For binary applications, use
+        a value of 1.
+    input_shape: list or tuple of four ints, the shape of the input data. Omit
+        the batch dimension, and include the number of channels.
+    g_kernal_size: int, size of the kernal for generator. Default kernal size
+        is set to be 4.
+    g_filters: int, number of filters for generator. default is set 64.
+    g_norm: str, to set batch or instance norm.
+    d_kernal_size: int, size of the kernal for discriminator. Default kernal size
+        is set to be 4.
+    d_filters: int, number of filters for discriminator. default is set 64.
+    d_norm: str, to set batch or instance norm.
+    
+    Returns
+    ----------
+    Model object.
+
+    """
+    generator = Vox_generator(n_classes, 
+                              input_shape, 
+                              n_filters=g_filters, 
+                              kernel_size=g_kernel_size, 
+                              norm=g_norm)
+    
+    discriminator = Vox_discriminator(input_shape, 
+                              n_filters=d_filters, 
+                              kernel_size=d_kernel_size, 
+                              norm=d_norm)
+    return generator, discriminator
 
 def Vox_generator(n_classes, input_shape, n_filters=64, kernel_size=4, norm="batch"):
     """Instantiate Generator.
