@@ -35,7 +35,7 @@ def unet_lstm(
     if batch_norm:
         x_layer = layers.BatchNormalization(axis=concat_axis)(x_layer)
 
-    conv1 = layers.ConvLSTM2D(
+    conv1 = layers.ConvLSTM3D(
         filters,
         (3, 3),
         activation=activation,
@@ -51,7 +51,7 @@ def unet_lstm(
         x_layer = layers.BatchNormalization(axis=concat_axis)(conv1)
 
     x_layer = layers.MaxPooling3D(pool_size=(1, 2, 2))(conv1)
-    x_layer = layers.ConvLSTM2D(
+    x_layer = layers.ConvLSTM3D(
         2 * filters,
         (3, 3),
         activation=activation,
@@ -66,7 +66,7 @@ def unet_lstm(
     if batch_norm:
         x_layer = layers.BatchNormalization(axis=concat_axis)(x_layer)
 
-    conv2 = layers.ConvLSTM2D(
+    conv2 = layers.ConvLSTM3D(
         2 * filters,
         (3, 3),
         activation=activation,
@@ -82,7 +82,7 @@ def unet_lstm(
         x_layer = layers.BatchNormalization(axis=concat_axis)(conv2)
 
     x_layer = layers.MaxPooling3D(pool_size=(1, 2, 2))(conv2)
-    x_layer = layers.ConvLSTM2D(
+    x_layer = layers.ConvLSTM3D(
         4 * filters,
         (3, 3),
         activation=activation,
@@ -97,7 +97,7 @@ def unet_lstm(
     if batch_norm:
         x_layer = layers.BatchNormalization(axis=concat_axis)(x_layer)
 
-    conv3 = layers.ConvLSTM2D(
+    conv3 = layers.ConvLSTM3D(
         4 * filters,
         (3, 3),
         activation=activation,
@@ -113,7 +113,7 @@ def unet_lstm(
         x_layer = layers.BatchNormalization(axis=concat_axis)(conv3)
 
     x_layer = layers.MaxPooling3D(pool_size=(1, 2, 2))(conv3)
-    x_layer = layers.ConvLSTM2D(
+    x_layer = layers.ConvLSTM3D(
         8 * filters,
         (3, 3),
         activation=activation,
@@ -128,7 +128,7 @@ def unet_lstm(
     if batch_norm:
         x_layer = layers.BatchNormalization(axis=concat_axis)(x_layer)
 
-    conv4 = layers.ConvLSTM2D(
+    conv4 = layers.ConvLSTM3D(
         8 * filters,
         (3, 3),
         activation=activation,
@@ -144,7 +144,7 @@ def unet_lstm(
         x_layer = layers.BatchNormalization(axis=concat_axis)(conv4)
 
     x_layer = layers.MaxPooling3D(pool_size=(1, 2, 2))(conv4)
-    x_layer = layers.ConvLSTM2D(
+    x_layer = layers.ConvLSTM3D(
         16 * filters,
         (3, 3),
         activation=activation,
@@ -159,7 +159,7 @@ def unet_lstm(
     if batch_norm:
         x_layer = layers.BatchNormalization(axis=concat_axis)(x_layer)
 
-    conv5 = layers.ConvLSTM2D(
+    conv5 = layers.ConvLSTM3D(
         16 * filters,
         (3, 3),
         activation=activation,
@@ -177,7 +177,7 @@ def unet_lstm(
     x_layer = layers.UpSampling3D(size=(1, 2, 2))(conv5)
     x_layer = layers.concatenate([x_layer, conv4], axis=concat_axis)
 
-    x_layer = layers.ConvLSTM2D(
+    x_layer = layers.ConvLSTM3D(
         8 * filters,
         (3, 3),
         activation=activation,
@@ -192,7 +192,7 @@ def unet_lstm(
     if batch_norm:
         x_layer = layers.BatchNormalization(axis=concat_axis)(x_layer)
 
-    x_layer = layers.ConvLSTM2D(
+    x_layer = layers.ConvLSTM3D(
         8 * filters,
         (3, 3),
         activation=activation,
@@ -210,7 +210,7 @@ def unet_lstm(
     x_layer = layers.UpSampling3D(size=(1, 2, 2))(x_layer)
     x_layer = layers.concatenate([x_layer, conv3], axis=concat_axis)
 
-    x_layer = layers.ConvLSTM2D(
+    x_layer = layers.ConvLSTM3D(
         4 * filters,
         (3, 3),
         activation=activation,
@@ -225,7 +225,7 @@ def unet_lstm(
     if batch_norm:
         x_layer = layers.BatchNormalization(axis=concat_axis)(x_layer)
 
-    x_layer = layers.ConvLSTM2D(
+    x_layer = layers.ConvLSTM3D(
         4 * filters,
         (3, 3),
         activation=activation,
@@ -243,7 +243,7 @@ def unet_lstm(
     x_layer = layers.UpSampling3D(size=(1, 2, 2))(x_layer)
     x_layer = layers.concatenate([x_layer, conv2], axis=concat_axis)
 
-    x_layer = layers.ConvLSTM2D(
+    x_layer = layers.ConvLSTM3D(
         2 * filters,
         (3, 3),
         activation=activation,
@@ -258,7 +258,7 @@ def unet_lstm(
     if batch_norm:
         x_layer = layers.BatchNormalization(axis=concat_axis)(x_layer)
 
-    x_layer = layers.ConvLSTM2D(
+    x_layer = layers.ConvLSTM3D(
         2 * filters,
         (3, 3),
         activation=activation,
@@ -276,7 +276,7 @@ def unet_lstm(
     x_layer = layers.UpSampling3D(size=(1, 2, 2))(x_layer)
     x_layer = layers.concatenate([x_layer, conv1], axis=concat_axis)
 
-    x_layer = layers.ConvLSTM2D(
+    x_layer = layers.ConvLSTM3D(
         filters,
         (3, 3),
         activation=activation,
@@ -291,7 +291,7 @@ def unet_lstm(
     if batch_norm:
         x_layer = layers.BatchNormalization(axis=concat_axis)(x_layer)
 
-    x_layer = layers.ConvLSTM2D(
+    x_layer = layers.ConvLSTM3D(
         filters,
         (3, 3),
         activation=activation,
@@ -306,7 +306,7 @@ def unet_lstm(
     if batch_norm:
         x_layer = layers.BatchNormalization(axis=concat_axis)(x_layer)
 
-    outputs = layers.ConvLSTM2D(
+    outputs = layers.ConvLSTM3D(
         n_classes, (1, 1), activation="linear", padding="same", return_sequences=False
     )(x_layer)
 
