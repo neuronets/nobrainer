@@ -214,10 +214,10 @@ def test_vox2vox():
 
     # testing ensembler
     model_test(Vox_ensembler, n_classes, input_shape)
-    
+
     # testing Vox2VoxGan
     vox_generator, vox_discriminator = vox_gan(n_classes, input_shape)
-    
+
     # testing generator
     model_test(vox_generator, n_classes, input_shape)
 
