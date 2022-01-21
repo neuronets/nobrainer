@@ -1,6 +1,7 @@
 import numpy as np
 from tensorflow.keras import layers
 from tensorflow.keras.models import Model
+
 from ..layers.InstanceNorm import InstanceNormalization
 
 
