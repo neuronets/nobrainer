@@ -18,6 +18,7 @@ def vox_gan(
     """Instantiate Vox2VoxGAN.
 
     Adapted from https://arxiv.org/abs/2003.13653
+    Code: https://github.com/mdciri/Vox2Vox
 
     Parameters
     ----------
