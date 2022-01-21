@@ -1,7 +1,7 @@
 import numpy as np
 from tensorflow.keras import layers
 from tensorflow.keras.models import Model
-from tensorflow_addons.layers import InstanceNormalization
+from ..layers.InstanceNorm import InstanceNormalization
 
 
 def vox_gan(
