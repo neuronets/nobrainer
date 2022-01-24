@@ -213,7 +213,7 @@ def test_vox2vox():
     n_classes = 1
     x = 10 * np.random.random(input_shape)
     y = np.random.choice([True, False], input_shape)
-    
+
     # testing ensembler
     model_test(Vox_ensembler, n_classes, input_shape)
 
@@ -225,7 +225,7 @@ def test_vox2vox():
     vox_generator.fit(x, y)
     actual_output = vox_generator.predict(x)
     assert actual_output.shape == x.shape[:-1] + (n_classes,)
-    
+
     # testing descriminator
     pred_shape = (1, 2, 2, 2, 1)
     out = vox_discriminator(inputs=[y, x])
