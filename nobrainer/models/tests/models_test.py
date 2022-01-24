@@ -211,20 +211,22 @@ def test_bayesian_vnet():
 def test_vox2vox():
     input_shape = (1, 32, 32, 32, 1)
     n_classes = 1
-
+    x = 10 * np.random.random(input_shape)
+    y = np.random.choice([True, False], input_shape)
+    
     # testing ensembler
     model_test(Vox_ensembler, n_classes, input_shape)
 
     # testing Vox2VoxGan
-    vox_generator, vox_discriminator = vox_gan(n_classes, input_shape)
+    vox_generator, vox_discriminator = vox_gan(n_classes, input_shape[1:])
 
     # testing generator
-    model_test(vox_generator, n_classes, input_shape)
-
+    vox_generator.compile(tf.optimizers.Adam(), "binary_crossentropy")
+    vox_generator.fit(x, y)
+    actual_output = vox_generator.predict(x)
+    assert actual_output.shape == x.shape[:-1] + (n_classes,)
+    
     # testing descriminator
-    x = 10 * np.random.random(input_shape)
-    y = np.random.choice([True, False], input_shape)
     pred_shape = (1, 2, 2, 2, 1)
-    model = vox_discriminator(input_shape=input_shape[1:])
-    out = model(inputs=[y, x])
+    out = vox_discriminator(inputs=[y, x])
     assert out.shape == pred_shape
