@@ -63,8 +63,6 @@ class ProgressiveGANTrainer(tf.keras.Model):
         # get batch size dynamically
         batch_size = tf.shape(reals)[0]
 
-        # normalize the real images using minmax to [-1, 1]
-        reals = _adjust_dynamic_range(reals, [0.0, 255.0], [-1.0, 1.0])
 
         # calculate alpha differently for transition and resolution phase
         self.train_step_counter.assign_add(1.0)
@@ -202,8 +200,6 @@ class ProgressiveAETrainer(tf.keras.Model):
         if isinstance(images, tuple):
             images = images[0]
 
-        images = _adjust_dynamic_range(images, [0.0, 255.0], [-1.0, 1.0])
-
         self.train_step_counter.assign_add(1.0)
 
         alpha = tf.cond(
@@ -283,9 +279,6 @@ class GANTrainer(tf.keras.Model):
 
         # get batch size dynamically
         batch_size = tf.shape(reals)[0]
-
-        # normalize the real images using minmax to [-1, 1]
-        reals = _adjust_dynamic_range(reals, [0.0, 255.0], [-1.0, 1.0])
 
         # train discriminator
         latents = tf.random.normal((batch_size, self.latent_size))
