@@ -6,7 +6,8 @@ import tensorflow as tf
 from tensorflow.python.keras.engine import compile_utils
 
 from .losses import gradient_penalty
-#from .volume import adjust_dynamic_range as _adjust_dynamic_range
+
+# from .volume import adjust_dynamic_range as _adjust_dynamic_range
 
 
 class ProgressiveGANTrainer(tf.keras.Model):
