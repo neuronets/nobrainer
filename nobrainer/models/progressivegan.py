@@ -199,7 +199,7 @@ class Generator(tf.keras.Model):
     def generate(self, latents):
         alpha = tf.constant([1.0], tf.float32)
         image = self.call([latents, alpha])
-        #image = _adjust_dynamic_range(image, [-1, 1], [0, 255])
+        # image = _adjust_dynamic_range(image, [-1, 1], [0, 255])
         return {"generated": image}
 
     def save(self, filepath, **kwargs):

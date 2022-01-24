@@ -63,7 +63,6 @@ class ProgressiveGANTrainer(tf.keras.Model):
         # get batch size dynamically
         batch_size = tf.shape(reals)[0]
 
-
         # calculate alpha differently for transition and resolution phase
         self.train_step_counter.assign_add(1.0)
         alpha = tf.cond(
