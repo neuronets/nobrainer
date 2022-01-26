@@ -1,6 +1,10 @@
 
 
 import numpy as np
+import tensorflow as tf
+from. import dataset
+from . import losses
+from . import metrics
 from .models.all_models import model_from_name
 '''
 eg.
@@ -39,23 +43,37 @@ class Segmentation(base_class):
     self.model_name= model_name
     self.multi_gpu= multi_gpu
     self.learning_rate=learning_rate
-  
-  def fit(self, x, y, **kwds): 
-    #estimate or train a model
     
-   model = model_from_name[model_name](self.n_classes, 
+  def _fit(self):
+    model = model_from_name[self.model_name](self.n_classes, 
                                       (*self.input_shape,1),
                                       activation = self.activation
                                       batchnorm= self.batchnorm)
-   model.compile(
-    optimizer=optimizer,
-    loss=nobrainer.losses.dice,
-    metrics=[nobrainer.metrics.dice, nobrainer.metrics.jaccard])
-  
-   
+    model.compile(tf.keras.optimizers.Adam(self.learning_rate),
+      loss=losses.dice,
+      metrics=[metrics.dice, metrics.jaccard])
+    return model
     
-    
-    
+  def fit(self,
+          data, 
+          train_epochs=1,
+          train_epoch_steps=1,
+          val_epoch_steps=1, 
+          **kwds): 
+    #estimate or train a model
+   if self.multi_gpu:
+    strategy = tf.distribute.MirroredStrategy()
+    with strategy.scope():
+      model = _fit(self)
+   else:
+    model = _fit(self)
+   #model.fit would confuse with the segmentation.fit ? 
+   model.fit(
+    data[0],
+    epochs,
+    steps_per_epoch=steps_per_epoch, 
+    validation_data=data[1], 
+    validation_steps=validation_steps)
     
   def fit_transform():
     #train and apply estimates to input
