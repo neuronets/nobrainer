@@ -36,7 +36,7 @@ class Block(Layer):
     """ConvNeXt Block. There are two equivalent implementations:
     (1) DwConv -> LayerNorm (channels_first)
     -> 1x1x1 Conv -> GELU -> 1x1x1 Conv; all in (N, C, H, W, D)
-    (2) DwConv -> Permute to (N, H, W, D, C); 
+    (2) DwConv -> Permute to (N, H, W, D, C);
     LayerNorm (channels_last) -> Linear -> GELU -> Linear; Permute back
     We use (2) as we find it slightly faster in PyTorch
     Args:
@@ -91,11 +91,11 @@ class ConvNeXt(tf.keras.Model):
         num_classes (int): Number of classes for classification head. Default: 1
         depths (tuple(int)): Number of blocks at each stage. Default: [3, 3, 9, 3]
         dims (int): Feature dimension at each stage. Default: [96, 192, 384, 768]
-        include_top (bool): whether to add head or 
+        include_top (bool): whether to add head or
         just use it as feature extractor. Default: True
         drop_path_rate (float): Stochastic depth rate. Default: 0.
         layer_scale_init_value (float): Init value for Layer Scale. Default: 1e-6.
-        head_init_scale (float): Init scaling value for 
+        head_init_scale (float): Init scaling value for
         classifier weights and biases. Default: 1.
     """
 
