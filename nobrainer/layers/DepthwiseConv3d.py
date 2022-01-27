@@ -8,14 +8,14 @@ Depthwise Separable Convolution layer.
 from __future__ import absolute_import
 
 from keras import backend as K
-from keras import constraints, initializers, layers, regularizers
+from keras import constraints, initializers, regularizers
 from keras.backend.tensorflow_backend import (
     _preprocess_conv3d_input,
     _preprocess_padding,
 )
 from keras.engine import InputSpec
 from keras.layers import Conv3D
-from keras.legacy.interfaces import conv3d_args_preprocessor, generate_legacy_interface
+from keras.legacy.interfaces import conv3d_args_preprocessor
 from keras.utils import conv_utils
 import tensorflow as tf
 
@@ -31,26 +31,27 @@ def depthwise_conv3d_args_preprocessor(args, kwargs):
     args, kwargs, _converted = conv3d_args_preprocessor(args, kwargs)
     return args, kwargs, converted + _converted
 
-    legacy_depthwise_conv3d_support = generate_legacy_interface(
-        allowed_positional_args=["filters", "kernel_size"],
-        conversions=[
-            ("nb_filter", "filters"),
-            ("subsample", "strides"),
-            ("border_mode", "padding"),
-            ("dim_ordering", "data_format"),
-            ("b_regularizer", "bias_regularizer"),
-            ("b_constraint", "bias_constraint"),
-            ("bias", "use_bias"),
-        ],
-        value_conversions={
-            "dim_ordering": {
-                "tf": "channels_last",
-                "th": "channels_first",
-                "default": None,
-            }
-        },
-        preprocessor=depthwise_conv3d_args_preprocessor,
-    )
+#    legacy_depthwise_conv3d_support = generate_legacy_interface(
+#        allowed_positional_args=["filters", "kernel_size"],
+#        conversions=[
+#            ("nb_filter", "filters"),
+#            ("subsample", "strides"),
+#            ("border_mode", "padding"),
+#            ("dim_ordering", "data_format"),
+#            ("b_regularizer", "bias_regularizer"),
+#            ("b_constraint", "bias_constraint"),
+#            ("bias", "use_bias"),
+#        ],
+#        value_conversions={
+#            "dim_ordering": {
+#                "tf": "channels_last",
+#                "th": "channels_first",
+#                "default": None,
+#            }
+#        },
+#        preprocessor=depthwise_conv3d_args_preprocessor,
+#    )
+
 
 
 class DepthwiseConv3D(Conv3D):
