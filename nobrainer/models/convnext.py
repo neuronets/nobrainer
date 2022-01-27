@@ -32,7 +32,7 @@ class DropPath(tf.keras.layers.Layer):
         return drop_path(x, self.drop_prob, training)
 
 
-class Block(Layer):
+class Block(layers.Layer):
     """ConvNeXt Block. There are two equivalent implementations:
     (1) DwConv -> LayerNorm (channels_first)
     -> 1x1x1 Conv -> GELU -> 1x1x1 Conv; all in (N, C, H, W, D)
