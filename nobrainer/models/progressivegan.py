@@ -4,6 +4,7 @@
 import tensorflow as tf
 from tensorflow.keras import layers, models
 
+
 def progressivegan(
     latent_size,
     label_size=0,
