@@ -68,7 +68,7 @@ class BernoulliDropout(tfkl.Layer):
         return config
 
 
-def divergence_fn(pl, pr):
+def divergence_fn(pl, pr, scale_factor):
     """Divergence computation for concrete dropout"""
     return tf.reduce_sum(
         tf.add(
@@ -198,7 +198,7 @@ class ConcreteDropout(tfkl.Layer):
             return inference * self.p_post if use_expectation else inference
 
     def _apply_divergence_concrete(self, scale_factor, name):
-        divergence = tf.identity(divergence_fn(self.p_post, self.p_prior), name=name)
+        divergence = tf.identity(divergence_fn(self.p_post, self.p_prior, scale_factor), name=name)
         self.add_loss(divergence)
 
 
