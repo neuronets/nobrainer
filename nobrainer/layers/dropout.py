@@ -198,7 +198,9 @@ class ConcreteDropout(tfkl.Layer):
             return inference * self.p_post if use_expectation else inference
 
     def _apply_divergence_concrete(self, scale_factor, name):
-        divergence = tf.identity(divergence_fn(self.p_post, self.p_prior, scale_factor), name=name)
+        divergence = tf.identity(
+            divergence_fn(self.p_post, self.p_prior, scale_factor), name=name
+        )
         self.add_loss(divergence)
 
 
