@@ -178,7 +178,7 @@ def convert(
         start_resolution_log = np.log2(start_resolution).astype(np.int32)
         target_resolution_log = np.log2(volume_shape[0]).astype(np.int32)
         resolutions = [
-            2 ** res for res in range(start_resolution_log, target_resolution_log + 1)
+            2**res for res in range(start_resolution_log, target_resolution_log + 1)
         ]
     else:
         resolutions = None
