@@ -74,7 +74,7 @@ class Encoder(tf.keras.Model):
         self.dimensionality = dimensionality
 
         self.current_resolution = 2
-        self.current_width = 2 ** self.current_resolution
+        self.current_width = 2**self.current_resolution
 
         self.Conv = getattr(layers, "Conv{}D".format(self.dimensionality))
         self.Upsampling = getattr(layers, "UpSampling{}D".format(self.dimensionality))
@@ -102,7 +102,7 @@ class Encoder(tf.keras.Model):
 
         images_shape = (
             (None,)
-            + (int(2.0 ** self.current_resolution),) * self.dimensionality
+            + (int(2.0**self.current_resolution),) * self.dimensionality
             + (self.num_channels,)
         )
         alpha_shape = (1,)
@@ -139,7 +139,7 @@ class Encoder(tf.keras.Model):
         Updates the current resolution of the model
         """
         self.current_resolution += 1
-        self.current_width = 2 ** self.current_resolution
+        self.current_width = 2**self.current_resolution
 
     def make_Ehead(self, x):
         """
@@ -198,7 +198,7 @@ class Encoder(tf.keras.Model):
 
         images_shape = (
             (None,)
-            + (int(2.0 ** self.current_resolution),) * self.dimensionality
+            + (int(2.0**self.current_resolution),) * self.dimensionality
             + (self.num_channels,)
         )
         alpha_shape = (1,)
@@ -244,7 +244,7 @@ class Decoder(tf.keras.Model):
         self.Upsampling = getattr(layers, "UpSampling{}D".format(self.dimensionality))
 
         self.current_resolution = 2
-        self.current_width = 2 ** self.current_resolution
+        self.current_width = 2**self.current_resolution
 
         self.highest_resolution_block = self.make_Dblock(
             self._nf(self.current_resolution),
@@ -255,7 +255,7 @@ class Decoder(tf.keras.Model):
         self.Head_Conv1 = self.Conv(filters=(self.num_channels), kernel_size=1)
         self.Head_Conv2 = self.Conv(filters=(self.num_channels), kernel_size=1)
         self.Base_Dense = tf.keras.layers.Dense(
-            units=self._nf(1) * 2 ** self.dimensionality
+            units=self._nf(1) * 2**self.dimensionality
         )
 
         self.build([(None, latent_size), (1,)])
@@ -263,7 +263,7 @@ class Decoder(tf.keras.Model):
     def update_res(self):
 
         self.current_resolution += 1
-        self.current_width = 2 ** self.current_resolution
+        self.current_width = 2**self.current_resolution
 
     def _pixel_norm(self, epsilon=1e-08):
         """

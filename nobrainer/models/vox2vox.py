@@ -239,7 +239,7 @@ def Vox_discriminator(input_shape, n_filters=64, kernel_size=4, norm="batch"):
 
     x = layers.ZeroPadding3D()(x)
     x = layers.Conv3D(
-        Nfilter_start * (2 ** depth),
+        Nfilter_start * (2**depth),
         kernel_size,
         strides=1,
         padding="valid",
