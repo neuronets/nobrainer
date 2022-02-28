@@ -91,7 +91,7 @@ class Generator(tf.keras.Model):
         self.resolution_blocks = []
 
         self.base_dense = tf.keras.layers.Dense(
-            units=self._nf(1) * (2 ** self.dimensionality)
+            units=self._nf(1) * (2**self.dimensionality)
         )
         self.HeadConv1 = self.Conv(filters=self.num_channels, kernel_size=1)
         self.HeadConv2 = self.Conv(filters=self.num_channels, kernel_size=1)
@@ -262,7 +262,7 @@ class Discriminator(tf.keras.Model):
 
         images_shape = (
             (None,)
-            + (int(2.0 ** self.current_resolution),) * self.dimensionality
+            + (int(2.0**self.current_resolution),) * self.dimensionality
             + (self.num_channels,)
         )
         alpha_shape = (1,)
@@ -352,7 +352,7 @@ class Discriminator(tf.keras.Model):
 
         images_shape = (
             (None,)
-            + (int(2.0 ** self.current_resolution),) * self.dimensionality
+            + (int(2.0**self.current_resolution),) * self.dimensionality
             + (self.num_channels,)
         )
         alpha_shape = (1,)
