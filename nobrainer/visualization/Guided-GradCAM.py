@@ -3,14 +3,13 @@ from skimage.transform import resize
 import tensorflow as tf
 
 
-def Guided_GradCAM_3D(Grad_model, ct_io, Class_index):
+def Guided_GradCAM_3D(grad_model, ct_io, class_index):
     # First outputs target convolution and output
-    grad_model = Grad_model
     input_ct_io = tf.expand_dims(ct_io, axis=-1)
     input_ct_io = tf.expand_dims(input_ct_io, axis=0)
     with tf.GradientTape() as tape:
         conv_outputs, predictions = grad_model(input_ct_io)
-        loss = predictions[:, Class_index]
+        loss = predictions[:, class_index]
     # Extract filters and gradients
     output = conv_outputs[0]
     grads = tape.gradient(loss, conv_outputs)[0]
