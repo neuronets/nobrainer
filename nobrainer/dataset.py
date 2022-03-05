@@ -322,6 +322,7 @@ class Dataset:
                 features_labels=paths,
                 filename_template=template,
                 examples_per_shard=shard_size,
+                processes=num_parallel_calls,
             )
             labels = (y for _, y in paths)
             scalar_labels = _labels_all_scalar(labels)
