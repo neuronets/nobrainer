@@ -1,14 +1,16 @@
 """Methods for creating `tf.data.Dataset` objects."""
 
 import math
+from pathlib import Path
 import warnings
 
 import fsspec
+import nibabel as nb
 import numpy as np
 import tensorflow as tf
 
-from .io import _is_gzipped
-from .tfrecord import parse_example_fn
+from .io import _is_gzipped, verify_features_labels
+from .tfrecord import _labels_all_scalar, parse_example_fn, write
 from .volume import binarize, replace, standardize, to_blocks
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
@@ -154,13 +156,11 @@ def get_dataset(
             DeprecationWarning,
         )
         if augment:
+            from .transform import apply_random_transform
+
             if scalar_label:
-                from .transform import apply_random_transform_scalar_labels
-
-                augment = [(apply_random_transform_scalar_labels, {})]
+                augment = [(apply_random_transform, {"trans_xy": False})]
             else:
-                from .transform import apply_random_transform
-
                 augment = [(apply_random_transform, {})]
         else:
             augment = None
@@ -258,3 +258,93 @@ def get_steps_per_epoch(n_volumes, volume_shape, block_shape, batch_size):
     steps = n_blocks_per_volume * n_volumes / batch_size
     steps = math.ceil(steps)
     return steps
+
+
+class Dataset:
+    """Represent datasets for training, validation, and testing"""
+
+    def __init__(
+        self, n_classes, batch_size, block_shape, volume_shape=None, n_epochs: int = 1
+    ):
+        self.n_classes = n_classes
+        self.volume_shape = volume_shape
+        self.block_shape = block_shape
+        self.batch_size = batch_size
+        self.n_epochs = n_epochs
+
+    def to_nbd(
+        self,
+        paths,
+        template="data/data-train_shard-{shard:03d}.tfrec",
+        shard_size=3,
+        augment=False,
+        shuffle_buffer_size=None,
+        num_parallel_calls=1,
+        check_shape=True,
+        check_labels_int=False,
+        check_labels_gte_zero=False,
+    ):
+        """
+        template: str, the path to which TFRecord files should be written. A string
+            formatting key `shard` should be included to indicate the unique TFRecord file
+            when writing to multiple TFRecord files. For example,
+            `data_shard-{shard:03d}.tfrec`.
+        shard_size: int, number of pairs of `(feature, label)` per TFRecord file.
+        check_shape: boolean, if true, validate that the shape of both volumes is
+            equal to 'volume_shape'.
+        check_labels_int: boolean, if true, validate that every labels volume is an
+            integer type or can be safely converted to an integer type.
+        check_labels_gte_zero: boolean, if true, validate that every labels volume
+            has values greater than or equal to zero.
+        num_parallel_calls: int, number of processes to use for multiprocessing. If
+            None, will use all available processes.
+        """
+        # Test that the `filename_template` has a `shard` formatting key.
+        try:
+            template.format(shard=0)
+        except Exception:
+            raise ValueError(
+                "`template` must include a string formatting key 'shard' that"
+                " accepts an integer."
+            )
+        verify_result = verify_features_labels(
+            paths,
+            check_shape=check_shape,
+            check_labels_int=check_labels_int,
+            check_labels_gte_zero=check_labels_gte_zero,
+        )
+        if len(verify_result) == 0:
+            if self.volume_shape is None:
+                self.volume_shape = nb.load(paths[0][0]).shape
+            basedir = Path(template).parent
+            basedir.mkdir(exist_ok=True)
+            write(
+                features_labels=paths,
+                filename_template=template,
+                examples_per_shard=shard_size,
+            )
+            labels = (y for _, y in paths)
+            scalar_labels = _labels_all_scalar(labels)
+            # replace shard formatting code with * for globbing
+            template = template.split("{")[0] + "*" + template.split("}")[1]
+            dataset = get_dataset(
+                file_pattern=template,
+                n_classes=self.n_classes,
+                batch_size=self.batch_size,
+                volume_shape=self.volume_shape,
+                block_shape=self.block_shape,
+                n_epochs=self.n_epochs,
+                augment=augment,
+                shuffle_buffer_size=shuffle_buffer_size,
+                num_parallel_calls=num_parallel_calls,
+            )
+            # Add nobrainer specific attributes
+            dataset.scalar_labels = scalar_labels
+            dataset.n_volumes = len(paths)
+            dataset.volume_shape = self.volume_shape
+            return dataset
+        raise ValueError(
+            "Provided paths did not pass validation. Please "
+            "check that they have the same shape, and the "
+            "targets have appropriate labels"
+        )
