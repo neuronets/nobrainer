@@ -2,7 +2,6 @@
 
 import math
 from pathlib import Path
-import warnings
 
 import fsspec
 import nibabel as nb
@@ -147,23 +146,7 @@ def get_dataset(
 
     # Augment examples if requested.
     if isinstance(augment, bool):
-        warnings.simplefilter("default")
-        warnings.warn(
-            "Default value for argument 'augment' will be None in next release "
-            "of nobrainer. Please use None for no augmentation or give a list"
-            " of required augmentations as:"
-            "[ (augmentation_name, {'param': value}), ... ]",
-            DeprecationWarning,
-        )
-        if augment:
-            from .transform import apply_random_transform
-
-            if scalar_label:
-                augment = [(apply_random_transform, {"trans_xy": False})]
-            else:
-                augment = [(apply_random_transform, {})]
-        else:
-            augment = None
+        raise ValueError("Augment no longer supports a boolean expression")
 
     if augment is not None:
         for transform, kwargs in augment:
@@ -322,7 +305,6 @@ class Dataset:
                 features_labels=paths,
                 filename_template=template,
                 examples_per_shard=shard_size,
-                processes=num_parallel_calls,
             )
             labels = (y for _, y in paths)
             scalar_labels = _labels_all_scalar(labels)

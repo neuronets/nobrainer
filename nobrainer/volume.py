@@ -1,52 +1,9 @@
 """Volume processing methods."""
 
 import itertools
-import warnings
 
 import numpy as np
 import tensorflow as tf
-
-
-def apply_random_transform(features, labels):
-    """Apply a random rigid transformation to `features` and `labels`.
-
-    The same transformation is applied to features and labels. Features are
-    interpolated trilinearly, and labels are interpolated with nearest
-    neighbors.
-    """
-
-    from .transform import apply_random_transform as deprecated_transform_func
-
-    warnings.simplefilter("default")
-    warnings.warn(
-        "`apply_random_transform` will be moved to the transform module"
-        " in the next release of nobrainer. Please import from"
-        " `nobrainer.transform`.",
-        PendingDeprecationWarning,
-        stacklevel=2,
-    )
-    return deprecated_transform_func(features, labels)
-
-
-def apply_random_transform_scalar_labels(features, labels):
-    """Apply a random rigid transformation to `features`.
-
-    Features are interpolated trilinearly, and labels are unchanged because they are
-    scalars.
-    """
-    from .transform import (
-        apply_random_transform_scalar_labels as deprecated_transform_func,
-    )
-
-    warnings.simplefilter("default")
-    warnings.warn(
-        "`apply_random_transform_scalar_labels` will be moved to the"
-        " transform module in the next release of nobrainer. Please import from"
-        " `nobrainer.transform`.",
-        PendingDeprecationWarning,
-        stacklevel=2,
-    )
-    return deprecated_transform_func(features, labels)
 
 
 def binarize(x):

@@ -98,15 +98,18 @@ def write(
         iterator, filename = iterator_filename
         map_fn(protobuf_iterator=iterator, filename=filename)
 
-    progbar = tf.keras.utils.Progbar(target=len(iterable), verbose=verbose)
-    progbar.update(0)
     if processes is None:
         processes = get_num_parallel()
+    print(f"Writing with {processes} processes")
+    progbar = tf.keras.utils.Progbar(target=len(iterable), verbose=verbose)
+    progbar.update(0)
     with mp.get_context("fork").Pool(processes) as p:
         for _ in p.imap_unordered(
             __writer_func, iterable=iterable, chunksize=chunksize
         ):
             progbar.add(1)
+        p.close()
+        p.terminate()
 
 
 def parse_example_fn(volume_shape, scalar_label=False):
