@@ -255,12 +255,48 @@ class Dataset:
         self.batch_size = batch_size
         self.n_epochs = n_epochs
 
+    def nbd_from_tfrec(
+        self,
+        volume_shape,
+        scalar_labels,
+        n_volumes,
+        template="data/data-train_shard-*.tfrec",
+        augment=None,
+        shuffle_buffer_size=None,
+        num_parallel_calls=1,
+    ):
+        """Function to retrieve a saved tf record
+
+        template: str, the path to which TFRecord files should be written.
+        num_parallel_calls: int, number of processes to use for multiprocessing. If
+            None, will use all available processes.
+        """
+        self.volume_shape = volume_shape
+
+        # replace shard formatting code with * for globbing
+        dataset = get_dataset(
+            file_pattern=template,
+            n_classes=self.n_classes,
+            batch_size=self.batch_size,
+            volume_shape=self.volume_shape,
+            block_shape=self.block_shape,
+            n_epochs=self.n_epochs,
+            augment=augment,
+            shuffle_buffer_size=shuffle_buffer_size,
+            num_parallel_calls=num_parallel_calls,
+        )
+        # Add nobrainer specific attributes
+        dataset.scalar_labels = scalar_labels
+        dataset.n_volumes = n_volumes
+        dataset.volume_shape = self.volume_shape
+        return dataset
+
     def to_nbd(
         self,
         paths,
         template="data/data-train_shard-{shard:03d}.tfrec",
         shard_size=3,
-        augment=False,
+        augment=None,
         shuffle_buffer_size=None,
         num_parallel_calls=1,
         check_shape=True,
@@ -310,22 +346,15 @@ class Dataset:
             scalar_labels = _labels_all_scalar(labels)
             # replace shard formatting code with * for globbing
             template = template.split("{")[0] + "*" + template.split("}")[1]
-            dataset = get_dataset(
-                file_pattern=template,
-                n_classes=self.n_classes,
-                batch_size=self.batch_size,
-                volume_shape=self.volume_shape,
-                block_shape=self.block_shape,
-                n_epochs=self.n_epochs,
+            return self.nbd_from_tfrec(
+                self.volume_shape,
+                scalar_labels,
+                len(paths),
+                template=template,
                 augment=augment,
                 shuffle_buffer_size=shuffle_buffer_size,
                 num_parallel_calls=num_parallel_calls,
             )
-            # Add nobrainer specific attributes
-            dataset.scalar_labels = scalar_labels
-            dataset.n_volumes = len(paths)
-            dataset.volume_shape = self.volume_shape
-            return dataset
         raise ValueError(
             "Provided paths did not pass validation. Please "
             "check that they have the same shape, and the "

@@ -100,7 +100,7 @@ def write(
 
     if processes is None:
         processes = get_num_parallel()
-    print(f"Writing with {processes} processes")
+
     progbar = tf.keras.utils.Progbar(target=len(iterable), verbose=verbose)
     progbar.update(0)
     with mp.get_context("fork").Pool(processes) as p:
@@ -108,8 +108,7 @@ def write(
             __writer_func, iterable=iterable, chunksize=chunksize
         ):
             progbar.add(1)
-        p.close()
-        p.terminate()
+    __writer_func = None
 
 
 def parse_example_fn(volume_shape, scalar_label=False):
