@@ -144,7 +144,7 @@ def test_apply_random_transform(shape, scalar_labels):
     assert_array_equal(y0, y1)
     # Need to reset the seed, because it is set in other tests.
     tf.random.set_seed(None)
-    dataset = dataset.map(transform_func, **kwargs)
+    dataset = dataset.map(lambda x_l, y_l: transform_func(x_l, y_l, **kwargs))
     x0, y0 = next(iter(dataset))
     x1, y1 = next(iter(dataset))
     assert not np.array_equal(x0, x1)
