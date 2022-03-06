@@ -13,12 +13,13 @@ class Segmentation(BaseEstimator):
 
     state_variables = ["block_shape_", "volume_shape_", "scalar_labels_"]
 
-    def __init__(self, base_model):
+    def __init__(self, base_model, model_args=None):
         if not isinstance(base_model, str):
             self.base_model = base_model.__name__
         else:
             self.base_model = base_model
         self.model_ = None
+        self.model_args = model_args or {}
         self.block_shape_ = None
         self.volume_shape_ = None
         self.scalar_labels_ = None
@@ -31,9 +32,7 @@ class Segmentation(BaseEstimator):
         checkpoint_dir=os.getcwd(),
         multi_gpu=False,
         warm_start=False,
-        # TODO: figure out whether model and optimizer args should be
-        # flattened
-        model_args=None,
+        # TODO: figure out whether optimizer args should be flattened
         optimizer=None,
         opt_args=None,
         loss=losses.dice,
@@ -63,8 +62,7 @@ class Segmentation(BaseEstimator):
             model = base_model(
                 n_classes=n_classes,
                 input_shape=(*self.block_shape_, 1),
-                batch_size=batch_size,
-                **(model_args or {})
+                **self.model_args
             )
             model.compile(
                 optimizer(**opt_args),

@@ -108,7 +108,6 @@ def write(
             __writer_func, iterable=iterable, chunksize=chunksize
         ):
             progbar.add(1)
-    __writer_func = None
 
 
 def parse_example_fn(volume_shape, scalar_label=False):

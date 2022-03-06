@@ -1,8 +1,9 @@
 """Base classes for all estimators."""
 
 import inspect
-import json
+import os
 from pathlib import Path
+import pickle as pk
 
 import tensorflow as tf
 
@@ -17,40 +18,45 @@ class BaseEstimator:
     def model(self):
         return self.model_
 
-    def save(self, file_path):
+    def save(self, save_dir):
         """Saves a trained model"""
         if self.model_ is None:
             raise ValueError("Model is undefined. Please train or load a model")
-        self.model_.save(file_path)
-        # TODO: also save any other parameters
-        model_file = Path(file_path) / "model_params.json"
+        self.model_.save(save_dir)
         model_info = {"classname": self.__class__.__name__, "__init__": {}}
         for key in inspect.signature(self.__init__).parameters:
             model_info["__init__"][key] = getattr(self, key)
         for val in self.state_variables:
             model_info[val] = getattr(self, val)
-        with open(model_file, "wt") as fp:
-            json.dump(model_info, fp)
+        model_file = Path(save_dir) / "model_params.pkl"
+        with open(model_file, "wb") as fp:
+            pk.dump(model_info, fp)
 
-    @staticmethod
-    def load(cls, file_path, multi_gpu=False):
+    @classmethod
+    def load(cls, model_dir, multi_gpu=False, custom_objects=None):
         """Saves a trained model"""
-        model_file = Path(file_path) / "model_params.json"
-        with open(model_file, "wt") as fp:
-            model_info = json.load(fp)
-        if model_info["classname"] != cls.__class__.__name__:
-            raise ValueError(f"Model class does not match {cls.__class__.__name__}")
+        model_dir = Path(str(model_dir).rstrip(os.pathsep))
+        assert model_dir.exists() and model_dir.is_dir()
+        model_file = model_dir / "model_params.pkl"
+        with open(model_file, "rb") as fp:
+            model_info = pk.load(fp)
+        if model_info["classname"] != cls.__name__:
+            raise ValueError(f"Model class does not match {cls.__name__}")
         del model_info["classname"]
         klass = cls(**model_info["__init__"])
         del model_info["__init__"]
-        for key, value in model_info:
+        for key, value in model_info.items():
             setattr(klass, key, value)
         if multi_gpu:
             strategy = tf.distribute.MirroredStrategy()
+            with strategy.scope():
+                klass.model_ = tf.keras.models.load_model(
+                    model_dir, custom_objects=custom_objects
+                )
         else:
-            strategy = tf.distribute.Strategy()
-        with strategy.scope():
-            klass.model_ = tf.keras.models.load_model(file_path)
+            klass.model_ = tf.keras.models.load_model(
+                model_dir, custom_objects=custom_objects
+            )
         return klass
 
 

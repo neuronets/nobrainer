@@ -1,6 +1,7 @@
 """Methods for creating `tf.data.Dataset` objects."""
 
 import math
+import os
 from pathlib import Path
 
 import fsspec
@@ -244,7 +245,7 @@ def get_steps_per_epoch(n_volumes, volume_shape, block_shape, batch_size):
 
 
 class Dataset:
-    """Represent datasets for training, validation, and testing"""
+    """Represent datasets for training, and validation"""
 
     def __init__(
         self, n_classes, batch_size, block_shape, volume_shape=None, n_epochs: int = 1
@@ -294,7 +295,8 @@ class Dataset:
     def to_nbd(
         self,
         paths,
-        template="data/data-train_shard-{shard:03d}.tfrec",
+        eval_size=0.1,
+        tfrecdir=Path(os.getcwd()) / "data",
         shard_size=3,
         augment=None,
         shuffle_buffer_size=None,
@@ -319,13 +321,12 @@ class Dataset:
             None, will use all available processes.
         """
         # Test that the `filename_template` has a `shard` formatting key.
-        try:
-            template.format(shard=0)
-        except Exception:
-            raise ValueError(
-                "`template` must include a string formatting key 'shard' that"
-                " accepts an integer."
-            )
+        template = str(Path(tfrecdir) / "data-{intent}")
+        shard_ext = "shard-{shard:03d}.tfrec"
+
+        Neval = np.ceil(len(paths) * eval_size).astype(int)
+        Ntrain = len(paths) - Neval
+
         verify_result = verify_features_labels(
             paths,
             check_shape=check_shape,
@@ -333,28 +334,46 @@ class Dataset:
             check_labels_gte_zero=check_labels_gte_zero,
         )
         if len(verify_result) == 0:
+            Path(tfrecdir).mkdir(exist_ok=True)
             if self.volume_shape is None:
                 self.volume_shape = nb.load(paths[0][0]).shape
-            basedir = Path(template).parent
-            basedir.mkdir(exist_ok=True)
             write(
-                features_labels=paths,
-                filename_template=template,
+                features_labels=paths[:Ntrain],
+                filename_template=template.format(intent=f"train_{shard_ext}"),
                 examples_per_shard=shard_size,
             )
+            if Neval > 0:
+                write(
+                    features_labels=paths[Ntrain:],
+                    filename_template=template.format(intent=f"eval_{shard_ext}"),
+                    examples_per_shard=shard_size,
+                )
             labels = (y for _, y in paths)
             scalar_labels = _labels_all_scalar(labels)
             # replace shard formatting code with * for globbing
-            template = template.split("{")[0] + "*" + template.split("}")[1]
-            return self.nbd_from_tfrec(
+            template_train = template.format(intent="train_*.tfrec")
+            ds_train = self.nbd_from_tfrec(
                 self.volume_shape,
                 scalar_labels,
-                len(paths),
-                template=template,
+                len(paths[:Ntrain]),
+                template=template_train,
                 augment=augment,
                 shuffle_buffer_size=shuffle_buffer_size,
                 num_parallel_calls=num_parallel_calls,
             )
+            ds_eval = None
+            if Neval > 0:
+                template_eval = template.format(intent="eval_*.tfrec")
+                ds_eval = self.nbd_from_tfrec(
+                    self.volume_shape,
+                    scalar_labels,
+                    len(paths[Ntrain:]),
+                    template=template_eval,
+                    augment=None,
+                    shuffle_buffer_size=None,
+                    num_parallel_calls=num_parallel_calls,
+                )
+                return ds_train, ds_eval
         raise ValueError(
             "Provided paths did not pass validation. Please "
             "check that they have the same shape, and the "
