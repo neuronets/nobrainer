@@ -57,32 +57,41 @@ class Segmentation(BaseEstimator):
             opt_args_tmp.update(**opt_args)
             opt_args = opt_args_tmp
 
-        def _compile(base_model):
+        def _create(base_model):
             # Instantiate and compile the model
-            model = base_model(
+            self.model_ = base_model(
                 n_classes=n_classes,
                 input_shape=(*self.block_shape_, 1),
                 **self.model_args
             )
-            model.compile(
+
+        def _compile():
+            self.model_.compile(
                 optimizer(**opt_args),
                 loss=loss,
                 metrics=metrics,
             )
-            return model
 
         if warm_start:
             if self.model is None:
                 raise ValueError("warm_start requested, but model is undefined")
+            if multi_gpu:
+                strategy = tf.distribute.MirroredStrategy()
+                with strategy.scope():
+                    _compile()
+            else:
+                _compile()
         else:
             mod = importlib.import_module("..models", "nobrainer.processing")
             base_model = getattr(mod, self.base_model)
             if multi_gpu:
                 strategy = tf.distribute.MirroredStrategy()
                 with strategy.scope():
-                    self.model_ = _compile(base_model)
+                    _create(base_model)
+                    _compile()
             else:
-                self.model_ = _compile(base_model)
+                _create(base_model)
+                _compile()
         print(self.model_.summary())
 
         train_steps = get_steps_per_epoch(

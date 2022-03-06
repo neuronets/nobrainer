@@ -33,7 +33,7 @@ class BaseEstimator:
             pk.dump(model_info, fp)
 
     @classmethod
-    def load(cls, model_dir, multi_gpu=False, custom_objects=None):
+    def load(cls, model_dir, multi_gpu=False, custom_objects=None, compile=False):
         """Saves a trained model"""
         model_dir = Path(str(model_dir).rstrip(os.pathsep))
         assert model_dir.exists() and model_dir.is_dir()
@@ -51,11 +51,11 @@ class BaseEstimator:
             strategy = tf.distribute.MirroredStrategy()
             with strategy.scope():
                 klass.model_ = tf.keras.models.load_model(
-                    model_dir, custom_objects=custom_objects
+                    model_dir, custom_objects=custom_objects, compile=compile
                 )
         else:
             klass.model_ = tf.keras.models.load_model(
-                model_dir, custom_objects=custom_objects
+                model_dir, custom_objects=custom_objects, compile=compile
             )
         return klass
 
