@@ -122,16 +122,20 @@ class ProgressiveGeneration(BaseEstimator):
             )
 
             self.pgan_trainer.compile(
-                g_optimizer=self.g_optimizer(**self.g_opt_args),
-                d_optimizer=self.d_optimizer(**self.d_opt_args),
-                g_loss_fn=self.g_loss,
-                d_loss_fn=self.d_loss,
+                g_optimizer=g_optimizer(**g_opt_args),
+                d_optimizer=d_optimizer(**d_opt_args),
+                g_loss_fn=g_loss,
+                d_loss_fn=d_loss,
             )
 
-        # without warmstart and multi gpu for now
-        # mod = importlib.import_module("..models", "nobrainer.processing")
-        # base_model = getattr(mod, self.base_model)
-        _create()
+        if warm_start:
+            if (self.generator_ is None) or (self.discriminator_ is None):
+                raise ValueError("warm_start requested, but generator or discriminator are undefined")
+        else:
+            # mod = importlib.import_module("..models", "nobrainer.processing")
+            # base_model = getattr(mod, self.base_model)
+            _create()
+            
         print(self.generator_.summary())
         print(self.discriminator_.summary())
 
@@ -139,7 +143,7 @@ class ProgressiveGeneration(BaseEstimator):
 
             # create a train dataset with features for resolution
             dataset_train = get_dataset(
-                file_pattern=self.file_pattern % (resolution),
+                file_pattern=input_file_pattern % (resolution),
                 batch_size=self.resolution_batch_size_map_[resolution],
                 num_parallel_calls=num_parallel_calls,
                 volume_shape=(resolution, resolution, resolution),
@@ -147,15 +151,18 @@ class ProgressiveGeneration(BaseEstimator):
                 scalar_label=True,
                 normalizer=None,
             )
-
+            
             # grow the networks by one (2^x) resolution
             self.generator_.add_resolution()
             self.discriminator_.add_resolution()
 
-            # Note: multigpu should be added here
-            # compile the trainers
-            _compile()
-
+            if multi_gpu:
+                strategy = tf.distribute.MirroredStrategy()
+                with strategy.scope():
+                    _compile()
+            else:
+                _compile()
+                
             steps_per_epoch = epochs // self.resolution_batch_size_map_[resolution]
             # save_best_only is set to False as it is an adversarial loss
             model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
@@ -195,15 +202,15 @@ class ProgressiveGeneration(BaseEstimator):
 
     def generate(
         self,
-        x,
     ):
         """generate a synthetic image using the trained model"""
-        if self.model_ is None:
+        if self.generator_ is None:
             raise ValueError("Model is undefined. Please train or load a model")
         import nibabel as nib
         import numpy as np
 
         latents = tf.random.normal((1, self.latent_size))
+        #img = self.generator_(latents)
         generate = self.generator_.signatures["serving_default"]
         img = generate(latents)["generated"]
         img = np.squeeze(img)
