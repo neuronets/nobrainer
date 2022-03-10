@@ -33,7 +33,7 @@ class ProgressiveGeneration(BaseEstimator):
         # resolution_batch_size_map= None,
         # input_file_pattern="*res-%03d*.tfrec"
     ):
-        self.model_ = progressivegan
+        #self.model_ = progressivegan
         self.latent_size = latent_size
         self.label_size = label_size
         self.g_fmap_base = g_fmap_base
@@ -107,7 +107,7 @@ class ProgressiveGeneration(BaseEstimator):
 
         def _create():
             # Instantiate the generator and discriminator
-            self.generator_, self.discriminator_ = self.model_(
+            self.model_, self.discriminator_ = progressivegan(
                 latent_size=self.latent_size,
                 g_fmap_base=self.g_fmap_base,
                 d_fmap_base=self.d_fmap_base,
@@ -116,7 +116,7 @@ class ProgressiveGeneration(BaseEstimator):
         def _compile():
             # instantiate a progressive training helper and compile with loss and optimizer
             self.pgan_trainer = ProgressiveGANTrainer(
-                generator=self.generator_,
+                generator=self.model_,
                 discriminator=self.discriminator_,
                 gradient_penalty=True,
             )
@@ -129,16 +129,14 @@ class ProgressiveGeneration(BaseEstimator):
             )
 
         if warm_start:
-            if (self.generator_ is None) or (self.discriminator_ is None):
-                raise ValueError(
-                    "warm_start requested, but generator or discriminator are undefined"
-                )
+            if (self.model_ is None) or (self.discriminator_ is None):
+                raise ValueError("warm_start requested, but generator or discriminator are undefined")
         else:
             # mod = importlib.import_module("..models", "nobrainer.processing")
             # base_model = getattr(mod, self.base_model)
             _create()
-
-        print(self.generator_.summary())
+   
+        print(self.model_.summary())
         print(self.discriminator_.summary())
 
         for resolution in self.resolutions_:
@@ -155,7 +153,7 @@ class ProgressiveGeneration(BaseEstimator):
             )
 
             # grow the networks by one (2^x) resolution
-            self.generator_.add_resolution()
+            self.model_.add_resolution()
             self.discriminator_.add_resolution()
 
             if multi_gpu:
@@ -196,7 +194,7 @@ class ProgressiveGeneration(BaseEstimator):
             )
 
             # save the final weights
-            self.generator_.save(
+            self.model_.save(
                 str(model_dir.joinpath("generator_res_{}".format(resolution)))
             )
 
@@ -206,14 +204,14 @@ class ProgressiveGeneration(BaseEstimator):
         self,
     ):
         """generate a synthetic image using the trained model"""
-        if self.generator_ is None:
+        if self.model_ is None:
             raise ValueError("Model is undefined. Please train or load a model")
         import nibabel as nib
         import numpy as np
 
         latents = tf.random.normal((1, self.latent_size))
-        # img = self.generator_(latents)
-        generate = self.generator_.signatures["serving_default"]
+        #img = self.model_(latents)
+        generate = self.model_.signatures["serving_default"]
         img = generate(latents)["generated"]
         img = np.squeeze(img)
         img = nib.Nifti1Image(img.astype(np.uint16), np.eye(4))
