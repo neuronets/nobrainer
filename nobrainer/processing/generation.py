@@ -49,7 +49,7 @@ class ProgressiveGeneration(BaseEstimator):
         # self.d_loss = d_loss
         # self.file_pattern = input_file_pattern
         # self.resolution_batch_size_map_ = resolution_batch_size_map or {}
-        # self.reolutions_ = sorted(list(self.resolution_batch_size_map_.keys()))
+        # self.resolutions_ = sorted(list(self.resolution_batch_size_map_.keys()))
 
     def fit(
         self,
@@ -73,7 +73,7 @@ class ProgressiveGeneration(BaseEstimator):
 
         n_classes = 1  # dummy labels as this is unsupervised training
         self.resolution_batch_size_map_ = resolution_batch_size_map or {}
-        self.reolutions_ = sorted(list(self.resolution_batch_size_map_.keys()))
+        self.resolutions_ = sorted(list(self.resolution_batch_size_map_.keys()))
 
         # create checkpoint sub-dirs
         checkpoint_dir = Path(checkpoint_dir)
