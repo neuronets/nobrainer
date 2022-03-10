@@ -189,5 +189,5 @@ class Generation(BaseEstimator):
         generate = self.generator_.signatures["serving_default"]
         img = generate(latents)["generated"]
         img = np.squeeze(img)
-        img = nib.Nifti1Image(img.astype(np.uint8), np.eye(4))
+        img = nib.Nifti1Image(img.astype(np.uint16), np.eye(4))
         return img
