@@ -10,7 +10,7 @@ from ..dataset import get_dataset
 from ..training import ProgressiveGANTrainer
 
 
-class Generation(BaseEstimator):
+class ProgressiveGeneration(BaseEstimator):
     """Perform generation type operations"""
 
     # state_variables = ["block_shape_", "volume_shape_", "scalar_labels_"]
