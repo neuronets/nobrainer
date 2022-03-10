@@ -16,21 +16,22 @@ class ProgressiveGeneration(BaseEstimator):
 
     state_variables = ["resolution_batch_size_map_"]
 
-    def __init__(self,
-                 latent_size=256,
-                 label_size=0,
-                 num_channels=1,
-                 dimensionality=3,
-                 g_fmap_base=1024,
-                 d_fmap_base=1024,
-                 #g_optimizer=None,
-                 #g_opt_args=None,
-                 #d_optimizer=None,
-                 #d_opt_args=None,
-                 #g_loss=losses.wasserstein,
-                 #d_loss=losses.wasserstein,
-                 #resolution_batch_size_map= None,
-                 #input_file_pattern="*res-%03d*.tfrec"
+    def __init__(
+        self,
+        latent_size=256,
+        label_size=0,
+        num_channels=1,
+        dimensionality=3,
+        g_fmap_base=1024,
+        d_fmap_base=1024,
+        # g_optimizer=None,
+        # g_opt_args=None,
+        # d_optimizer=None,
+        # d_opt_args=None,
+        # g_loss=losses.wasserstein,
+        # d_loss=losses.wasserstein,
+        # resolution_batch_size_map= None,
+        # input_file_pattern="*res-%03d*.tfrec"
     ):
         self.model_ = progressivegan
         self.latent_size = latent_size
@@ -39,29 +40,29 @@ class ProgressiveGeneration(BaseEstimator):
         self.d_fmap_base = d_fmap_base
         self.num_channels = num_channels
         self.dimensionality = dimensionality
-        
-        #self.g_optimizer = g_optimizer
-        #self.g_opt_args = g_opt_args or {}
-        #self.d_optimizer = d_optimizer
-        #self.d_opt_args = d_opt_args or {}
-        #self.g_loss = g_loss
-        #self.d_loss = d_loss
-        #self.file_pattern = input_file_pattern
-        #self.resolution_batch_size_map_ = resolution_batch_size_map or {}
-        #self.reolutions_ = sorted(list(self.resolution_batch_size_map_.keys()))       
+
+        # self.g_optimizer = g_optimizer
+        # self.g_opt_args = g_opt_args or {}
+        # self.d_optimizer = d_optimizer
+        # self.d_opt_args = d_opt_args or {}
+        # self.g_loss = g_loss
+        # self.d_loss = d_loss
+        # self.file_pattern = input_file_pattern
+        # self.resolution_batch_size_map_ = resolution_batch_size_map or {}
+        # self.reolutions_ = sorted(list(self.resolution_batch_size_map_.keys()))
 
     def fit(
         self,
         epochs=2,
         checkpoint_dir=os.getcwd(),
         # TODO: figure out whether optimizer args should be flattened
-        g_optimizer = None,
-        g_opt_args = None,
-        d_optimizer = None,
-        d_opt_args = None,
-        g_loss = losses.wasserstein,
-        d_loss = losses.wasserstein,
-        resolution_batch_size_map= None,
+        g_optimizer=None,
+        g_opt_args=None,
+        d_optimizer=None,
+        d_opt_args=None,
+        g_loss=losses.wasserstein,
+        d_loss=losses.wasserstein,
+        resolution_batch_size_map=None,
         input_file_pattern="*res-%03d*.tfrec",
         warm_start=False,
         multi_gpu=False,
@@ -128,8 +129,8 @@ class ProgressiveGeneration(BaseEstimator):
             )
 
         # without warmstart and multi gpu for now
-        #mod = importlib.import_module("..models", "nobrainer.processing")
-        #base_model = getattr(mod, self.base_model)
+        # mod = importlib.import_module("..models", "nobrainer.processing")
+        # base_model = getattr(mod, self.base_model)
         _create()
         print(self.generator_.summary())
         print(self.discriminator_.summary())
@@ -207,4 +208,4 @@ class ProgressiveGeneration(BaseEstimator):
         img = generate(latents)["generated"]
         img = np.squeeze(img)
         img = nib.Nifti1Image(img.astype(np.uint16), np.eye(4))
-        return img,latents
+        return img, latents
