@@ -33,7 +33,7 @@ class ProgressiveGeneration(BaseEstimator):
         # resolution_batch_size_map= None,
         # input_file_pattern="*res-%03d*.tfrec"
     ):
-        #self.model_ = progressivegan
+        # self.model_ = progressivegan
         self.latent_size = latent_size
         self.label_size = label_size
         self.g_fmap_base = g_fmap_base
@@ -130,12 +130,14 @@ class ProgressiveGeneration(BaseEstimator):
 
         if warm_start:
             if (self.model_ is None) or (self.discriminator_ is None):
-                raise ValueError("warm_start requested, but generator or discriminator are undefined")
+                raise ValueError(
+                    "warm_start requested, but generator or discriminator are undefined"
+                )
         else:
             # mod = importlib.import_module("..models", "nobrainer.processing")
             # base_model = getattr(mod, self.base_model)
             _create()
-   
+
         print(self.model_.summary())
         print(self.discriminator_.summary())
 
@@ -210,7 +212,7 @@ class ProgressiveGeneration(BaseEstimator):
         import numpy as np
 
         latents = tf.random.normal((1, self.latent_size))
-        #img = self.model_(latents)
+        # img = self.model_(latents)
         generate = self.model_.signatures["serving_default"]
         img = generate(latents)["generated"]
         img = np.squeeze(img)
