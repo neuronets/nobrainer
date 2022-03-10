@@ -54,10 +54,11 @@ class Generation(BaseEstimator):
         n_classes = 1  # dummy labels as this is unsupervised training
 
         # create checkpoint sub-dirs
-        checkpoint_dir = importlib.Path(checkpoint_dir)
-        generated_dir = checkpoint_dir.joinpath("generated")
-        model_dir = checkpoint_dir.joinpath("saved_models")
-        log_dir = checkpoint_dir.joinpath("logs")
+        checkpoint_dir = Path(checkpoint_dir)
+        checkpoint_dir.mkdir(exist_ok=True)
+        generated_dir = checkpoint_dir / "generated"
+        model_dir = checkpoint_dir / "saved_models"
+        log_dir = checkpoint_dir / "logs"
 
         checkpoint_dir.mkdir(exist_ok=True)
         generated_dir.mkdir(exist_ok=True)
