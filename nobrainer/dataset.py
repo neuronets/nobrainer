@@ -244,6 +244,36 @@ def get_steps_per_epoch(n_volumes, volume_shape, block_shape, batch_size):
     return steps
 
 
+def write_multi_resolution(
+    paths,
+    tfrecdir=Path(os.getcwd()) / "data",
+    resolutions=None,
+    shard_size=3,
+    num_parallel_calls=1,
+):
+    resolutions = resolutions or [8, 16, 32, 64, 128, 256]
+    tfrecdir = Path(tfrecdir)
+    tfrecdir.mkdir(exist_ok=True)
+    template = tfrecdir / "data-train_shard-{shard:03d}.tfrec"
+
+    write(
+        features_labels=paths,
+        filename_template=str(template),
+        examples_per_shard=shard_size,  # change for larger dataset
+        multi_resolution=True,
+        resolutions=resolutions,
+    )
+
+    datasets = {}
+    for resolution in resolutions:
+        datasets[resolution] = dict(
+            file_pattern=str(tfrecdir / f"*res-{resolution:03d}.tfrec"),
+            batch_size=1,
+            normalizer=None,
+        )
+    return datasets
+
+
 class Dataset:
     """Represent datasets for training, and validation"""
 

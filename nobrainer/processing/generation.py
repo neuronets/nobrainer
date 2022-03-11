@@ -14,7 +14,7 @@ from ..training import ProgressiveGANTrainer
 class ProgressiveGeneration(BaseEstimator):
     """Perform generation type operations"""
 
-    state_variables = ["resolution_batch_size_map_"]
+    state_variables = ["current_resolution_"]
 
     def __init__(
         self,
@@ -24,35 +24,19 @@ class ProgressiveGeneration(BaseEstimator):
         dimensionality=3,
         g_fmap_base=1024,
         d_fmap_base=1024,
-        # g_optimizer=None,
-        # g_opt_args=None,
-        # d_optimizer=None,
-        # d_opt_args=None,
-        # g_loss=losses.wasserstein,
-        # d_loss=losses.wasserstein,
-        # resolution_batch_size_map= None,
-        # input_file_pattern="*res-%03d*.tfrec"
     ):
-        # self.model_ = progressivegan
+        self.model_ = None
         self.latent_size = latent_size
         self.label_size = label_size
         self.g_fmap_base = g_fmap_base
         self.d_fmap_base = d_fmap_base
         self.num_channels = num_channels
         self.dimensionality = dimensionality
-
-        # self.g_optimizer = g_optimizer
-        # self.g_opt_args = g_opt_args or {}
-        # self.d_optimizer = d_optimizer
-        # self.d_opt_args = d_opt_args or {}
-        # self.g_loss = g_loss
-        # self.d_loss = d_loss
-        # self.file_pattern = input_file_pattern
-        # self.resolution_batch_size_map_ = resolution_batch_size_map or {}
-        # self.resolutions_ = sorted(list(self.resolution_batch_size_map_.keys()))
+        self.current_resolution_ = 0
 
     def fit(
         self,
+        dataset_train,
         epochs=2,
         checkpoint_dir=os.getcwd(),
         # TODO: figure out whether optimizer args should be flattened
@@ -62,18 +46,12 @@ class ProgressiveGeneration(BaseEstimator):
         d_opt_args=None,
         g_loss=losses.wasserstein,
         d_loss=losses.wasserstein,
-        resolution_batch_size_map=None,
-        input_file_pattern="*res-%03d*.tfrec",
         warm_start=False,
         multi_gpu=False,
         num_parallel_calls=None,
     ):
         """Train a progressive gan model"""
         # TODO: check validity of datasets
-
-        n_classes = 1  # dummy labels as this is unsupervised training
-        self.resolution_batch_size_map_ = resolution_batch_size_map or {}
-        self.resolutions_ = sorted(list(self.resolution_batch_size_map_.keys()))
 
         # create checkpoint sub-dirs
         checkpoint_dir = Path(checkpoint_dir)
@@ -90,73 +68,70 @@ class ProgressiveGeneration(BaseEstimator):
         g_opt_args = g_opt_args or {}
         if g_optimizer is None:
             g_optimizer = tf.keras.optimizers.Adam
-            g_opt_args_tmp = dict(
-                learning_rate=1e-04, beta_1=0.0, beta_2=0.99, epsilon=1e-8
-            )
-            g_opt_args_tmp.update(**g_opt_args)
-            g_opt_args = g_opt_args_tmp
+        g_opt_args_tmp = dict(
+            learning_rate=1e-04, beta_1=0.0, beta_2=0.99, epsilon=1e-8
+        )
+        g_opt_args_tmp.update(**g_opt_args)
+        g_opt_args = g_opt_args_tmp
 
         d_opt_args = d_opt_args or {}
         if d_optimizer is None:
             d_optimizer = tf.keras.optimizers.Adam
-            d_opt_args_tmp = dict(
-                learning_rate=1e-04, beta_1=0.0, beta_2=0.99, epsilon=1e-8
-            )
-            d_opt_args_tmp.update(**d_opt_args)
-            d_opt_args = d_opt_args_tmp
+        d_opt_args_tmp = dict(
+            learning_rate=1e-04, beta_1=0.0, beta_2=0.99, epsilon=1e-8
+        )
+        d_opt_args_tmp.update(**d_opt_args)
+        d_opt_args = d_opt_args_tmp
 
-        def _create():
+        if warm_start:
+            if self.model_ is None:
+                raise ValueError("warm_start requested, but model is undefined")
+        else:
             # Instantiate the generator and discriminator
-            self.model_, self.discriminator_ = progressivegan(
+            generator, discriminator = progressivegan(
                 latent_size=self.latent_size,
                 g_fmap_base=self.g_fmap_base,
                 d_fmap_base=self.d_fmap_base,
+                num_channels=self.num_channels,
+                dimensionality=self.dimensionality,
             )
-
-        def _compile():
-            # instantiate a progressive training helper and compile with loss and optimizer
-            self.pgan_trainer = ProgressiveGANTrainer(
-                generator=self.model_,
-                discriminator=self.discriminator_,
+            self.model_ = ProgressiveGANTrainer(
+                generator=generator,
+                discriminator=discriminator,
                 gradient_penalty=True,
             )
+            self.current_resolution_ = 0
 
-            self.pgan_trainer.compile(
+        # instantiate a progressive training helper and compile with loss and optimizer
+        def _compile():
+            self.model_.compile(
                 g_optimizer=g_optimizer(**g_opt_args),
                 d_optimizer=d_optimizer(**d_opt_args),
                 g_loss_fn=g_loss,
                 d_loss_fn=d_loss,
             )
 
-        if warm_start:
-            if (self.model_ is None) or (self.discriminator_ is None):
-                raise ValueError(
-                    "warm_start requested, but generator or discriminator are undefined"
-                )
-        else:
-            # mod = importlib.import_module("..models", "nobrainer.processing")
-            # base_model = getattr(mod, self.base_model)
-            _create()
+        print(self.model_.generator_.summary())
+        print(self.model_.discriminator_.summary())
 
-        print(self.model_.summary())
-        print(self.discriminator_.summary())
-
-        for resolution in self.resolutions_:
-
+        for resolution, info in dataset_train.items():
+            if resolution < self.current_resolution_:
+                continue
             # create a train dataset with features for resolution
-            dataset_train = get_dataset(
-                file_pattern=input_file_pattern % (resolution),
-                batch_size=self.resolution_batch_size_map_[resolution],
+            dataset = get_dataset(
+                file_pattern=info.get("file_pattern"),
+                batch_size=info.get("batch_size"),
                 num_parallel_calls=num_parallel_calls,
                 volume_shape=(resolution, resolution, resolution),
-                n_classes=n_classes,
+                n_classes=1,
                 scalar_label=True,
-                normalizer=None,
+                normalizer=info.get("normalizer"),
             )
 
             # grow the networks by one (2^x) resolution
-            self.model_.add_resolution()
-            self.discriminator_.add_resolution()
+            if resolution > self.current_resolution_:
+                self.model_.generator_.add_resolution()
+                self.model_.discriminator_.add_resolution()
 
             if multi_gpu:
                 strategy = tf.distribute.MirroredStrategy()
@@ -165,7 +140,7 @@ class ProgressiveGeneration(BaseEstimator):
             else:
                 _compile()
 
-            steps_per_epoch = epochs // self.resolution_batch_size_map_[resolution]
+            steps_per_epoch = epochs // info.get("batch_size")
             # save_best_only is set to False as it is an adversarial loss
             model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
                 str(model_dir),
@@ -178,8 +153,8 @@ class ProgressiveGeneration(BaseEstimator):
             print("Resolution : {}".format(resolution))
 
             print("Transition phase")
-            self.pgan_trainer.fit(
-                dataset_train,
+            self.model_.fit(
+                dataset,
                 phase="transition",
                 resolution=resolution,
                 steps_per_epoch=steps_per_epoch,  # necessary for repeat dataset
@@ -187,24 +162,19 @@ class ProgressiveGeneration(BaseEstimator):
             )
 
             print("Resolution phase")
-            self.pgan_trainer.fit(
-                dataset_train,
+            self.model_.fit(
+                dataset,
                 phase="resolution",
                 resolution=resolution,
                 steps_per_epoch=steps_per_epoch,
                 callbacks=[model_checkpoint_callback],
             )
-
+            self.current_resolution_ = resolution
             # save the final weights
-            self.model_.save(
-                str(model_dir.joinpath("generator_res_{}".format(resolution)))
-            )
-
+            self.model_.save_weights(model_dir)
         return self
 
-    def generate(
-        self,
-    ):
+    def generate(self, return_latents=False):
         """generate a synthetic image using the trained model"""
         if self.model_ is None:
             raise ValueError("Model is undefined. Please train or load a model")
@@ -212,9 +182,11 @@ class ProgressiveGeneration(BaseEstimator):
         import numpy as np
 
         latents = tf.random.normal((1, self.latent_size))
-        # img = self.model_(latents)
-        generate = self.model_.signatures["serving_default"]
+        generate = self.model_.generator_.signatures["serving_default"]
         img = generate(latents)["generated"]
         img = np.squeeze(img)
         img = nib.Nifti1Image(img.astype(np.uint16), np.eye(4))
-        return img, latents
+        if return_latents:
+            return img, latents
+        else:
+            return img
