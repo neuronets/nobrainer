@@ -100,6 +100,9 @@ def write(
     Parallel(n_jobs=processes, verbose=10)(
         delayed(__writer_func)(val, map_fn) for val in iterable
     )
+    from joblib.externals.loky import get_reusable_executor
+
+    get_reusable_executor().shutdown(wait=True)
 
 
 def parse_example_fn(volume_shape, scalar_label=False):
