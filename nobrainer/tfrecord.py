@@ -1,9 +1,9 @@
 import functools
 import math
-from joblib import Parallel, delayed
 import os
 from pathlib import Path
 
+from joblib import Parallel, delayed
 import numpy as np
 import skimage.transform
 import tensorflow as tf
@@ -97,7 +97,9 @@ def write(
 
     if processes is None:
         processes = get_num_parallel()
-    Parallel(n_jobs=processes, verbose=10)(delayed(__writer_func)(val, map_fn) for val in iterable)
+    Parallel(n_jobs=processes, verbose=10)(
+        delayed(__writer_func)(val, map_fn) for val in iterable
+    )
 
 
 def parse_example_fn(volume_shape, scalar_label=False):
