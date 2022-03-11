@@ -1,6 +1,6 @@
 import functools
 import math
-import multiprocessing as mp
+from joblib import Parallel, delayed
 import os
 from pathlib import Path
 
@@ -12,6 +12,11 @@ from .io import read_volume
 from .utils import get_num_parallel
 
 _TFRECORDS_DTYPE = "float32"
+
+
+def __writer_func(iterator_filename, map_fn):
+    iterator, filename = iterator_filename
+    map_fn(protobuf_iterator=iterator, filename=filename)
 
 
 def write(
@@ -90,24 +95,9 @@ def write(
         resolutions=resolutions,
     )
 
-    # This is a hack to allow multiprocessing to pickle
-    # the __writer_func object. Pickles don't like local functions.
-    global __writer_func
-
-    def __writer_func(iterator_filename):
-        iterator, filename = iterator_filename
-        map_fn(protobuf_iterator=iterator, filename=filename)
-
     if processes is None:
         processes = get_num_parallel()
-
-    progbar = tf.keras.utils.Progbar(target=len(iterable), verbose=verbose)
-    progbar.update(0)
-    with mp.get_context("fork").Pool(processes) as p:
-        for _ in p.imap_unordered(
-            __writer_func, iterable=iterable, chunksize=chunksize
-        ):
-            progbar.add(1)
+    Parallel(n_jobs=processes, verbose=10)(delayed(__writer_func)(val, map_fn) for val in iterable)
 
 
 def parse_example_fn(volume_shape, scalar_label=False):
