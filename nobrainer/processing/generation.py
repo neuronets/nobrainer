@@ -7,8 +7,6 @@ import tensorflow as tf
 from .base import BaseEstimator
 from .. import losses
 from ..dataset import get_dataset
-from ..models.progressivegan import progressivegan
-from ..training import ProgressiveGANTrainer
 
 
 class ProgressiveGeneration(BaseEstimator):
@@ -38,7 +36,7 @@ class ProgressiveGeneration(BaseEstimator):
         self,
         dataset_train,
         epochs=2,
-        checkpoint_dir=os.getcwd(),
+        checkpoint_dir=Path(os.getcwd()) / "temp",
         # TODO: figure out whether optimizer args should be flattened
         g_optimizer=None,
         g_opt_args=None,
@@ -87,6 +85,9 @@ class ProgressiveGeneration(BaseEstimator):
             if self.model_ is None:
                 raise ValueError("warm_start requested, but model is undefined")
         else:
+            from ..models.progressivegan import progressivegan
+            from ..training import ProgressiveGANTrainer
+
             # Instantiate the generator and discriminator
             generator, discriminator = progressivegan(
                 latent_size=self.latent_size,
@@ -111,8 +112,8 @@ class ProgressiveGeneration(BaseEstimator):
                 d_loss_fn=d_loss,
             )
 
-        print(self.model_.generator_.summary())
-        print(self.model_.discriminator_.summary())
+        print(self.model_.generator.summary())
+        print(self.model_.discriminator.summary())
 
         for resolution, info in dataset_train.items():
             if resolution < self.current_resolution_:
@@ -130,8 +131,8 @@ class ProgressiveGeneration(BaseEstimator):
 
             # grow the networks by one (2^x) resolution
             if resolution > self.current_resolution_:
-                self.model_.generator_.add_resolution()
-                self.model_.discriminator_.add_resolution()
+                self.model_.generator.add_resolution()
+                self.model_.discriminator.add_resolution()
 
             if multi_gpu:
                 strategy = tf.distribute.MirroredStrategy()
@@ -182,8 +183,7 @@ class ProgressiveGeneration(BaseEstimator):
         import numpy as np
 
         latents = tf.random.normal((1, self.latent_size))
-        generate = self.model_.generator_.signatures["serving_default"]
-        img = generate(latents)["generated"]
+        img = self.model_.generator.generate(latents)["generated"]
         img = np.squeeze(img)
         img = nib.Nifti1Image(img.astype(np.uint16), np.eye(4))
         if return_latents:

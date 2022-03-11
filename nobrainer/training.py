@@ -139,17 +139,24 @@ class ProgressiveGANTrainer(tf.keras.Model):
         """
         Override base class function to save the weights of the constituent models
         """
+        from pathlib import Path
+
+        Path(filepath).mkdir(exist_ok=True)
         self.generator.save_weights(
-            os.path.join(filepath, "g_weights_res_{}.h5".format(self.resolution)),
-            **kwargs
+            filepath / f"g_weights_res_{self.resolution}.h5", **kwargs
         )
         self.discriminator.save_weights(
-            os.path.join(filepath, "d_weights_res_{}.h5".format(self.resolution)),
-            **kwargs
+            filepath / f"d_weights_res_{self.resolution}.h5", **kwargs
         )
-        self.generator.save(
-            os.path.join(filepath, "generator_res_{}".format(self.resolution))
-        )
+        self.generator.save(filepath / f"generator_res_{self.resolution}")
+
+    def save(self, filepath):
+        self.save_weights(filepath)
+
+    @classmethod
+    def load(cls, filepath):
+        klass = cls()
+        return klass
 
 
 class ProgressiveAETrainer(tf.keras.Model):
@@ -344,11 +351,11 @@ class GANTrainer(tf.keras.Model):
         """
         self.generator.save_weights(
             os.path.join(filepath, "g_weights_res_{}.h5".format(self.resolution)),
-            **kwargs
+            **kwargs,
         )
         self.discriminator.save_weights(
             os.path.join(filepath, "d_weights_res_{}.h5".format(self.resolution)),
-            **kwargs
+            **kwargs,
         )
 
 

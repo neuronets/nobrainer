@@ -249,7 +249,7 @@ def write_multi_resolution(
     tfrecdir=Path(os.getcwd()) / "data",
     resolutions=None,
     shard_size=3,
-    num_parallel_calls=1,
+    n_processes=1,
 ):
     resolutions = resolutions or [8, 16, 32, 64, 128, 256]
     tfrecdir = Path(tfrecdir)
@@ -262,6 +262,7 @@ def write_multi_resolution(
         examples_per_shard=shard_size,  # change for larger dataset
         multi_resolution=True,
         resolutions=resolutions,
+        processes=n_processes,
     )
 
     datasets = {}
