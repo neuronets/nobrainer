@@ -253,7 +253,7 @@ def write_multi_resolution(
 ):
     resolutions = resolutions or [8, 16, 32, 64, 128, 256]
     tfrecdir = Path(tfrecdir)
-    tfrecdir.mkdir(exist_ok=True)
+    tfrecdir.mkdir(exist_ok=True, parents=True)
     template = tfrecdir / "data-train_shard-{shard:03d}.tfrec"
 
     write(
@@ -365,19 +365,21 @@ class Dataset:
             check_labels_gte_zero=check_labels_gte_zero,
         )
         if len(verify_result) == 0:
-            Path(tfrecdir).mkdir(exist_ok=True)
+            Path(tfrecdir).mkdir(exist_ok=True, parents=True)
             if self.volume_shape is None:
                 self.volume_shape = nb.load(paths[0][0]).shape
             write(
                 features_labels=paths[:Ntrain],
                 filename_template=template.format(intent=f"train_{shard_ext}"),
                 examples_per_shard=shard_size,
+                processes=num_parallel_calls,
             )
             if Neval > 0:
                 write(
                     features_labels=paths[Ntrain:],
                     filename_template=template.format(intent=f"eval_{shard_ext}"),
                     examples_per_shard=shard_size,
+                    processes=num_parallel_calls,
                 )
             labels = (y for _, y in paths)
             scalar_labels = _labels_all_scalar(labels)
