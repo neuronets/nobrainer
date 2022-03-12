@@ -79,6 +79,27 @@ def standardize(x):
     return (x - mean) / std
 
 
+def normalize(x):
+    """Normalize the input to 0 and 1.
+
+    Implements `(x - min(x)) / (max(x) - min(x))`.
+
+    Parameters
+    ----------
+    x: tensor, values to normalize.
+
+    Returns
+    -------
+    Tensor of normalized values. Output has min 0 and max 1.
+    """
+    x = tf.convert_to_tensor(x)
+    if x.dtype != tf.float32:
+        x = tf.cast(x, tf.float32)
+    min_x = tf.reduce_min(x)
+    max_x = tf.reduce_max(x)
+    return (x - min_x) / (max_x - min_x)
+
+
 def _to_blocks_perm(ndims):
     """Build permutation vector to go from volume to blocks.
 

@@ -37,6 +37,7 @@ class ProgressiveGeneration(BaseEstimator):
         dataset_train,
         epochs=2,
         checkpoint_dir=Path(os.getcwd()) / "temp",
+        normalizer=None,
         # TODO: figure out whether optimizer args should be flattened
         g_optimizer=None,
         g_opt_args=None,
@@ -126,7 +127,7 @@ class ProgressiveGeneration(BaseEstimator):
                 volume_shape=(resolution, resolution, resolution),
                 n_classes=1,
                 scalar_label=True,
-                normalizer=info.get("normalizer"),
+                normalizer=info.get("normalizer") or normalizer,
             )
 
             # grow the networks by one (2^x) resolution
@@ -141,13 +142,14 @@ class ProgressiveGeneration(BaseEstimator):
             else:
                 _compile()
 
-            steps_per_epoch = epochs // info.get("batch_size")
+            steps_per_epoch = (info.get("epochs") or epochs) // info.get("batch_size")
             # save_best_only is set to False as it is an adversarial loss
             model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
                 str(model_dir),
                 save_weights_only=True,
                 save_best_only=False,
-                save_freq=10,
+                save_freq=500,
+                verbose=False,
             )
 
             # Train at resolution
@@ -175,18 +177,29 @@ class ProgressiveGeneration(BaseEstimator):
             self.model_.save_weights(model_dir)
         return self
 
-    def generate(self, return_latents=False):
+    def generate(self, n_images=1, return_latents=False, data_type=None):
         """generate a synthetic image using the trained model"""
         if self.model_ is None:
             raise ValueError("Model is undefined. Please train or load a model")
         import nibabel as nib
         import numpy as np
 
-        latents = tf.random.normal((1, self.latent_size))
-        img = self.model_.generator.generate(latents)["generated"]
-        img = np.squeeze(img)
-        img = nib.Nifti1Image(img.astype(np.uint16), np.eye(4))
+        latents_all = []
+        img_all = []
+        for i in range(n_images):
+            latents = tf.random.normal((1, self.latent_size))
+            img = self.model_.generator.generate(latents)["generated"]
+            img = np.squeeze(img)
+            if data_type is not None:
+                img = np.round(
+                    np.iinfo(data_type).max
+                    * (img - img.min())
+                    / (img.max() - img.min())
+                ).astype(data_type)
+            img = nib.Nifti1Image(img, np.eye(4))
+            latents_all.append(latents)
+            img_all.append(img)
         if return_latents:
-            return img, latents
+            return img_all, latents_all
         else:
-            return img
+            return img_all

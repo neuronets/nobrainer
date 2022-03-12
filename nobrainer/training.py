@@ -139,7 +139,8 @@ class ProgressiveGANTrainer(tf.keras.Model):
         """
         from pathlib import Path
 
-        Path(filepath).mkdir(exist_ok=True)
+        filepath = Path(filepath)
+        filepath.mkdir(exist_ok=True, parents=True)
         self.generator.save_weights(
             filepath / f"g_weights_res_{self.resolution}.h5", **kwargs
         )
@@ -147,6 +148,8 @@ class ProgressiveGANTrainer(tf.keras.Model):
             filepath / f"d_weights_res_{self.resolution}.h5", **kwargs
         )
         self.generator.save(filepath / f"generator_res_{self.resolution}")
+        # TODO: Figure out how to save the discriminator
+        # self.discriminator.save(filepath / f"discriminator_res_{self.resolution}")
 
     def save(self, filepath):
         self.save_weights(filepath)

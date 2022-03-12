@@ -78,6 +78,19 @@ def test_standardize(std_func):
         assert outputs.dtype == np.float32
 
 
+@pytest.mark.parametrize("norm_func", [volume.normalize, volume.normalize_numpy])
+def test_normalize(norm_func):
+    x = np.random.randn(10, 10, 10).astype(np.float32)
+    outputs = np.array(norm_func(x))
+    assert np.allclose(outputs.min(), 0, atol=1e-07)
+    assert np.allclose(outputs.max(), 1, atol=1e-07)
+
+    if norm_func == volume.normalize:
+        x = np.random.randn(10, 10, 10).astype(np.float64)
+        outputs = np.array(norm_func(x))
+        assert outputs.dtype == np.float32
+
+
 def _stack_channels(_in):
     return np.stack([_in, 2 * _in, 3 * _in], axis=-1)
 
