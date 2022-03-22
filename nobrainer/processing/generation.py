@@ -48,6 +48,7 @@ class ProgressiveGeneration(BaseEstimator):
         warm_start=False,
         multi_gpu=False,
         num_parallel_calls=None,
+        save_freq=500,
     ):
         """Train a progressive gan model"""
         # TODO: check validity of datasets
@@ -148,7 +149,7 @@ class ProgressiveGeneration(BaseEstimator):
                 str(model_dir),
                 save_weights_only=True,
                 save_best_only=False,
-                save_freq=500,
+                save_freq=save_freq,
                 verbose=False,
             )
 
