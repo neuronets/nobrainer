@@ -15,6 +15,7 @@ from ..progressivegan import progressivegan
 from ..unet import unet
 from ..vnet import vnet
 from ..vox2vox import Vox_ensembler, vox_gan
+from ..unet_lstm import unet_lstm
 
 
 def model_test(model_cls, n_classes, input_shape, kwds={}):
@@ -207,7 +208,16 @@ def test_bayesian_vnet():
         kernel_posterior_fn=default_mean_field_normal_fn(weightnorm=True),
     )
 
-
+def test_unet_lstm():
+    input_shape = (1, 32, 32, 32, 32)
+    n_classes = 1
+    x = 10 * np.random.random(input_shape)
+    y = 10 * np.random.random(input_shape)
+    model = unet_lstm(input_shape = (32, 32, 32, 32,  1), n_classes = 1)
+    actual_output = model.predict(x)
+    assert actual_output.shape == y.shape[:-1] + (n_classes,)
+    
+    
 def test_vox2vox():
     input_shape = (1, 32, 32, 32, 1)
     n_classes = 1
