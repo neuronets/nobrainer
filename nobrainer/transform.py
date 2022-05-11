@@ -1,7 +1,5 @@
 """Volumetric affine transformations implemented in TensorFlow."""
 
-import warnings
-
 import numpy as np
 import tensorflow as tf
 
@@ -393,20 +391,3 @@ def apply_random_transform(features, labels, trans_xy=True):
         return warp_features_labels(
             features=features, labels=labels, matrix=matrix, scalar_label=True
         )
-
-
-def apply_random_transform_scalar_labels(features, labels):
-    """Apply a random rigid transformation to `features`.
-
-    Features are interpolated trilinearly, and labels are unchanged because they are
-    scalars.
-    """
-    warnings.simplefilter("default")
-    warnings.warn(
-        "`apply_random_transform_scalar_labels` will be removed"
-        " in the next release of nobrainer. Please use apply_random_transform as"
-        " `apply_random_transform(features, labels, trans_xy=False)"
-        " for scalar labels",
-        DeprecationWarning,
-    )
-    return apply_random_transform(features, labels, trans_xy=False)

@@ -1,52 +1,9 @@
 """Volume processing methods."""
 
 import itertools
-import warnings
 
 import numpy as np
 import tensorflow as tf
-
-
-def apply_random_transform(features, labels):
-    """Apply a random rigid transformation to `features` and `labels`.
-
-    The same transformation is applied to features and labels. Features are
-    interpolated trilinearly, and labels are interpolated with nearest
-    neighbors.
-    """
-
-    from .transform import apply_random_transform as deprecated_transform_func
-
-    warnings.simplefilter("default")
-    warnings.warn(
-        "`apply_random_transform` will be moved to the transform module"
-        " in the next release of nobrainer. Please import from"
-        " `nobrainer.transform`.",
-        PendingDeprecationWarning,
-        stacklevel=2,
-    )
-    return deprecated_transform_func(features, labels)
-
-
-def apply_random_transform_scalar_labels(features, labels):
-    """Apply a random rigid transformation to `features`.
-
-    Features are interpolated trilinearly, and labels are unchanged because they are
-    scalars.
-    """
-    from .transform import (
-        apply_random_transform_scalar_labels as deprecated_transform_func,
-    )
-
-    warnings.simplefilter("default")
-    warnings.warn(
-        "`apply_random_transform_scalar_labels` will be moved to the"
-        " transform module in the next release of nobrainer. Please import from"
-        " `nobrainer.transform`.",
-        PendingDeprecationWarning,
-        stacklevel=2,
-    )
-    return deprecated_transform_func(features, labels)
 
 
 def binarize(x):
@@ -120,6 +77,27 @@ def standardize(x):
     mean, var = tf.nn.moments(x, axes=None)
     std = tf.sqrt(var)
     return (x - mean) / std
+
+
+def normalize(x):
+    """Normalize the input to 0 and 1.
+
+    Implements `(x - min(x)) / (max(x) - min(x))`.
+
+    Parameters
+    ----------
+    x: tensor, values to normalize.
+
+    Returns
+    -------
+    Tensor of normalized values. Output has min 0 and max 1.
+    """
+    x = tf.convert_to_tensor(x)
+    if x.dtype != tf.float32:
+        x = tf.cast(x, tf.float32)
+    min_x = tf.reduce_min(x)
+    max_x = tf.reduce_max(x)
+    return (x - min_x) / (max_x - min_x)
 
 
 def _to_blocks_perm(ndims):
