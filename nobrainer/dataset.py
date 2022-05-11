@@ -1,14 +1,16 @@
 """Methods for creating `tf.data.Dataset` objects."""
 
 import math
-import warnings
+import os
+from pathlib import Path
 
 import fsspec
+import nibabel as nb
 import numpy as np
 import tensorflow as tf
 
-from .io import _is_gzipped
-from .tfrecord import parse_example_fn
+from .io import _is_gzipped, verify_features_labels
+from .tfrecord import _labels_all_scalar, parse_example_fn, write
 from .volume import binarize, replace, standardize, to_blocks
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
@@ -145,25 +147,7 @@ def get_dataset(
 
     # Augment examples if requested.
     if isinstance(augment, bool):
-        warnings.simplefilter("default")
-        warnings.warn(
-            "Default value for argument 'augment' will be None in next release "
-            "of nobrainer. Please use None for no augmentation or give a list"
-            " of required augmentations as:"
-            "[ (augmentation_name, {'param': value}), ... ]",
-            DeprecationWarning,
-        )
-        if augment:
-            if scalar_label:
-                from .transform import apply_random_transform_scalar_labels
-
-                augment = [(apply_random_transform_scalar_labels, {})]
-            else:
-                from .transform import apply_random_transform
-
-                augment = [(apply_random_transform, {})]
-        else:
-            augment = None
+        raise ValueError("Augment no longer supports a boolean expression")
 
     if augment is not None:
         for transform, kwargs in augment:
@@ -258,3 +242,173 @@ def get_steps_per_epoch(n_volumes, volume_shape, block_shape, batch_size):
     steps = n_blocks_per_volume * n_volumes / batch_size
     steps = math.ceil(steps)
     return steps
+
+
+def write_multi_resolution(
+    paths,
+    tfrecdir=Path(os.getcwd()) / "data",
+    resolutions=None,
+    shard_size=3,
+    n_processes=1,
+):
+    resolutions = resolutions or [8, 16, 32, 64, 128, 256]
+    tfrecdir = Path(tfrecdir)
+    tfrecdir.mkdir(exist_ok=True, parents=True)
+    template = tfrecdir / "data-train_shard-{shard:03d}.tfrec"
+
+    write(
+        features_labels=paths,
+        filename_template=str(template),
+        examples_per_shard=shard_size,  # change for larger dataset
+        multi_resolution=True,
+        resolutions=resolutions,
+        processes=n_processes,
+    )
+
+    datasets = {}
+    for resolution in resolutions:
+        datasets[resolution] = dict(
+            file_pattern=str(tfrecdir / f"*res-{resolution:03d}.tfrec"),
+            batch_size=1,
+            normalizer=None,
+        )
+    return datasets
+
+
+class Dataset:
+    """Represent datasets for training, and validation"""
+
+    def __init__(
+        self, n_classes, batch_size, block_shape, volume_shape=None, n_epochs: int = 1
+    ):
+        self.n_classes = n_classes
+        self.volume_shape = volume_shape
+        self.block_shape = block_shape
+        self.batch_size = batch_size
+        self.n_epochs = n_epochs
+
+    def nbd_from_tfrec(
+        self,
+        volume_shape,
+        scalar_labels,
+        n_volumes,
+        template="data/data-train_shard-*.tfrec",
+        augment=None,
+        shuffle_buffer_size=None,
+        num_parallel_calls=1,
+    ):
+        """Function to retrieve a saved tf record
+
+        template: str, the path to which TFRecord files should be written.
+        num_parallel_calls: int, number of processes to use for multiprocessing. If
+            None, will use all available processes.
+        """
+        self.volume_shape = volume_shape
+
+        # replace shard formatting code with * for globbing
+        dataset = get_dataset(
+            file_pattern=template,
+            n_classes=self.n_classes,
+            batch_size=self.batch_size,
+            volume_shape=self.volume_shape,
+            block_shape=self.block_shape,
+            n_epochs=self.n_epochs,
+            augment=augment,
+            shuffle_buffer_size=shuffle_buffer_size,
+            num_parallel_calls=num_parallel_calls,
+        )
+        # Add nobrainer specific attributes
+        dataset.scalar_labels = scalar_labels
+        dataset.n_volumes = n_volumes
+        dataset.volume_shape = self.volume_shape
+        return dataset
+
+    def to_nbd(
+        self,
+        paths,
+        eval_size=0.1,
+        tfrecdir=Path(os.getcwd()) / "data",
+        shard_size=3,
+        augment=None,
+        shuffle_buffer_size=None,
+        num_parallel_calls=1,
+        check_shape=True,
+        check_labels_int=False,
+        check_labels_gte_zero=False,
+    ):
+        """
+        template: str, the path to which TFRecord files should be written. A string
+            formatting key `shard` should be included to indicate the unique TFRecord file
+            when writing to multiple TFRecord files. For example,
+            `data_shard-{shard:03d}.tfrec`.
+        shard_size: int, number of pairs of `(feature, label)` per TFRecord file.
+        check_shape: boolean, if true, validate that the shape of both volumes is
+            equal to 'volume_shape'.
+        check_labels_int: boolean, if true, validate that every labels volume is an
+            integer type or can be safely converted to an integer type.
+        check_labels_gte_zero: boolean, if true, validate that every labels volume
+            has values greater than or equal to zero.
+        num_parallel_calls: int, number of processes to use for multiprocessing. If
+            None, will use all available processes.
+        """
+        # Test that the `filename_template` has a `shard` formatting key.
+        template = str(Path(tfrecdir) / "data-{intent}")
+        shard_ext = "shard-{shard:03d}.tfrec"
+
+        Neval = np.ceil(len(paths) * eval_size).astype(int)
+        Ntrain = len(paths) - Neval
+
+        verify_result = verify_features_labels(
+            paths,
+            check_shape=check_shape,
+            check_labels_int=check_labels_int,
+            check_labels_gte_zero=check_labels_gte_zero,
+        )
+        if len(verify_result) == 0:
+            Path(tfrecdir).mkdir(exist_ok=True, parents=True)
+            if self.volume_shape is None:
+                self.volume_shape = nb.load(paths[0][0]).shape
+            write(
+                features_labels=paths[:Ntrain],
+                filename_template=template.format(intent=f"train_{shard_ext}"),
+                examples_per_shard=shard_size,
+                processes=num_parallel_calls,
+            )
+            if Neval > 0:
+                write(
+                    features_labels=paths[Ntrain:],
+                    filename_template=template.format(intent=f"eval_{shard_ext}"),
+                    examples_per_shard=shard_size,
+                    processes=num_parallel_calls,
+                )
+            labels = (y for _, y in paths)
+            scalar_labels = _labels_all_scalar(labels)
+            # replace shard formatting code with * for globbing
+            template_train = template.format(intent="train_*.tfrec")
+            ds_train = self.nbd_from_tfrec(
+                self.volume_shape,
+                scalar_labels,
+                len(paths[:Ntrain]),
+                template=template_train,
+                augment=augment,
+                shuffle_buffer_size=shuffle_buffer_size,
+                num_parallel_calls=num_parallel_calls,
+            )
+            ds_eval = None
+            if Neval > 0:
+                template_eval = template.format(intent="eval_*.tfrec")
+                ds_eval = self.nbd_from_tfrec(
+                    self.volume_shape,
+                    scalar_labels,
+                    len(paths[Ntrain:]),
+                    template=template_eval,
+                    augment=None,
+                    shuffle_buffer_size=None,
+                    num_parallel_calls=num_parallel_calls,
+                )
+                return ds_train, ds_eval
+        raise ValueError(
+            "Provided paths did not pass validation. Please "
+            "check that they have the same shape, and the "
+            "targets have appropriate labels"
+        )
