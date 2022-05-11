@@ -22,7 +22,7 @@ def unet_lstm(
 
     x_layer = layers.ConvLSTM3D(
         filters,
-        (3, 3),
+        3,
         activation=activation,
         padding="same",
         kernel_regularizer=l2(reg_val),
@@ -37,7 +37,7 @@ def unet_lstm(
 
     conv1 = layers.ConvLSTM3D(
         filters,
-        (3, 3),
+        3,
         activation=activation,
         padding="same",
         kernel_regularizer=l2(reg_val),
@@ -53,7 +53,7 @@ def unet_lstm(
     # x_layer = layers.MaxPooling4D(pool_size=(1, 2, 2 , 2))(conv1) ToDo
     x_layer = layers.ConvLSTM3D(
         2 * filters,
-        (3, 3),
+        3,
         activation=activation,
         padding="same",
         kernel_regularizer=l2(reg_val),
@@ -68,7 +68,7 @@ def unet_lstm(
 
     conv2 = layers.ConvLSTM3D(
         2 * filters,
-        (3, 3),
+        3,
         activation=activation,
         padding="same",
         kernel_regularizer=l2(reg_val),
@@ -84,7 +84,7 @@ def unet_lstm(
     # x_layer = layers.MaxPooling4D(pool_size=(1, 2, 2, 2))(conv2) ToDo
     x_layer = layers.ConvLSTM3D(
         4 * filters,
-        (3, 3),
+        3,
         activation=activation,
         padding="same",
         kernel_regularizer=l2(reg_val),
@@ -99,7 +99,7 @@ def unet_lstm(
 
     conv3 = layers.ConvLSTM3D(
         4 * filters,
-        (3, 3),
+        3,
         activation=activation,
         padding="same",
         kernel_regularizer=l2(reg_val),
@@ -115,7 +115,7 @@ def unet_lstm(
     # x_layer = layers.MaxPooling4D(pool_size=(1, 2, 2, 2))(conv3)
     x_layer = layers.ConvLSTM3D(
         8 * filters,
-        (3, 3),
+        3,
         activation=activation,
         padding="same",
         kernel_regularizer=l2(reg_val),
@@ -130,7 +130,7 @@ def unet_lstm(
 
     conv4 = layers.ConvLSTM3D(
         8 * filters,
-        (3, 3),
+        3,
         activation=activation,
         padding="same",
         kernel_regularizer=l2(reg_val),
@@ -146,7 +146,7 @@ def unet_lstm(
     # x_layer = layers.MaxPooling4D(pool_size=(1, 2, 2 , 2))(conv4) ToDo
     x_layer = layers.ConvLSTM3D(
         16 * filters,
-        (3, 3),
+        3,
         activation=activation,
         padding="same",
         kernel_regularizer=l2(reg_val),
@@ -161,7 +161,7 @@ def unet_lstm(
 
     conv5 = layers.ConvLSTM3D(
         16 * filters,
-        (3, 3),
+        3,
         activation=activation,
         padding="same",
         kernel_regularizer=l2(reg_val),
@@ -179,7 +179,7 @@ def unet_lstm(
 
     x_layer = layers.ConvLSTM3D(
         8 * filters,
-        (3, 3),
+        3,
         activation=activation,
         padding="same",
         kernel_regularizer=l2(reg_val),
@@ -194,7 +194,7 @@ def unet_lstm(
 
     x_layer = layers.ConvLSTM3D(
         8 * filters,
-        (3, 3),
+        3,
         activation=activation,
         padding="same",
         kernel_regularizer=l2(reg_val),
@@ -212,7 +212,7 @@ def unet_lstm(
 
     x_layer = layers.ConvLSTM3D(
         4 * filters,
-        (3, 3),
+        3,
         activation=activation,
         padding="same",
         kernel_regularizer=l2(reg_val),
@@ -227,7 +227,7 @@ def unet_lstm(
 
     x_layer = layers.ConvLSTM3D(
         4 * filters,
-        (3, 3),
+        3,
         activation=activation,
         padding="same",
         kernel_regularizer=l2(reg_val),
@@ -245,7 +245,7 @@ def unet_lstm(
 
     x_layer = layers.ConvLSTM3D(
         2 * filters,
-        (3, 3),
+        3,
         activation=activation,
         padding="same",
         kernel_regularizer=l2(reg_val),
@@ -260,7 +260,7 @@ def unet_lstm(
 
     x_layer = layers.ConvLSTM3D(
         2 * filters,
-        (3, 3),
+        3,
         activation=activation,
         padding="same",
         kernel_regularizer=l2(reg_val),
@@ -278,7 +278,7 @@ def unet_lstm(
 
     x_layer = layers.ConvLSTM3D(
         filters,
-        (3, 3),
+        3,
         activation=activation,
         padding="same",
         kernel_regularizer=l2(reg_val),
@@ -293,7 +293,7 @@ def unet_lstm(
 
     x_layer = layers.ConvLSTM3D(
         filters,
-        (3, 3),
+        3,
         activation=activation,
         padding="same",
         kernel_regularizer=l2(reg_val),
@@ -307,7 +307,7 @@ def unet_lstm(
         x_layer = layers.BatchNormalization(axis=concat_axis)(x_layer)
 
     outputs = layers.ConvLSTM3D(
-        n_classes, (1, 1), activation="linear", padding="same", return_sequences=False
+        n_classes, 1, activation="linear", padding="same", return_sequences=False
     )(x_layer)
 
     return tf.keras.Model(inputs=inputs, outputs=outputs)
