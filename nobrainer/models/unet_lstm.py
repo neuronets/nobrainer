@@ -14,7 +14,7 @@ def unet_lstm(
     name="unet_lstm",
 ):
     """unet_lstm -  A model for the spatial and temporal evolution of 3D fields.
-    
+
     Parameters
     ----------
     n_classes: int, number of classes to classify. For binary applications, use
@@ -25,10 +25,10 @@ def unet_lstm(
         is set to be 8.
     activation: str or optimizer object, the non-linearity to use. All
         tf.activations are allowed to use. default "tanh".
-    reg_val: float, regularization value. 
+    reg_val: float, regularization value.
     drop_val: float, dropout value. [0,1]
     drop_val_recur: float, recurrent dropout value [0,1].
-    
+
     Returns
     ----------
     Model object.
