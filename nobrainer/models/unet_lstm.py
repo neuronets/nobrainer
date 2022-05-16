@@ -5,7 +5,7 @@ from tensorflow.keras.regularizers import l2
 
 def unet_lstm(
     n_classes=1,
-    input_shape=(32, 32, 32, 8, 1),
+    input_shape=(32, 32, 32, 32, 1),
     filters=8,
     activation="tanh",
     reg_val=1e-08,
@@ -13,7 +13,26 @@ def unet_lstm(
     drop_val_recur=0.0,
     name="unet_lstm",
 ):
-    """unet_lstm -  A model for the spatial and temporal evolution of 3D fields."""
+    """unet_lstm -  A model for the spatial and temporal evolution of 3D fields.
+    
+    Parameters
+    ----------
+    n_classes: int, number of classes to classify. For binary applications, use
+        a value of 1.
+    input_shape: list or tuple of five ints, the shape of the input data. Omit
+        the batch dimension, and include the number of channels.
+    filter: int, size of the filter for the model. Default filter size
+        is set to be 8.
+    activation: str or optimizer object, the non-linearity to use. All
+        tf.activations are allowed to use. default "tanh".
+    reg_val: float, regularization value. 
+    drop_val: float, dropout value. [0,1]
+    drop_val_recur: float, recurrent dropout value [0,1].
+    
+    Returns
+    ----------
+    Model object.
+    """
 
     batch_norm = False
     concat_axis = -1
