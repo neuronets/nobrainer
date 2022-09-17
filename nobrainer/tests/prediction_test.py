@@ -7,7 +7,7 @@ import pytest
 import tensorflow as tf
 
 from .. import prediction
-from ..models.bayesian import variational_meshnet
+from ..models.bayesian_meshnet import variational_meshnet
 from ..models.meshnet import meshnet
 
 
