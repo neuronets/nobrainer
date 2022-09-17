@@ -251,6 +251,13 @@ def write_multi_resolution(
     shard_size=3,
     n_processes=1,
 ):
+    """Create a multiresolution dataset.
+
+    This returns a dictionary of information that is used by the generative model
+    processing class.
+
+    TODO: This function needs to be aligned with the Dataset class
+    """
     resolutions = resolutions or [8, 16, 32, 64, 128, 256]
     tfrecdir = Path(tfrecdir)
     tfrecdir.mkdir(exist_ok=True, parents=True)
@@ -276,7 +283,7 @@ def write_multi_resolution(
 
 
 class Dataset:
-    """Represent datasets for training, and validation"""
+    """Datasets for training, and validation"""
 
     def __init__(
         self, n_classes, batch_size, block_shape, volume_shape=None, n_epochs: int = 1
@@ -287,7 +294,7 @@ class Dataset:
         self.batch_size = batch_size
         self.n_epochs = n_epochs
 
-    def nbd_from_tfrec(
+    def from_tfrecords(
         self,
         volume_shape,
         scalar_labels,
@@ -297,7 +304,7 @@ class Dataset:
         shuffle_buffer_size=None,
         num_parallel_calls=1,
     ):
-        """Function to retrieve a saved tf record
+        """Function to retrieve a saved tf record as a Dataset
 
         template: str, the path to which TFRecord files should be written.
         num_parallel_calls: int, number of processes to use for multiprocessing. If
@@ -323,7 +330,7 @@ class Dataset:
         dataset.volume_shape = self.volume_shape
         return dataset
 
-    def to_nbd(
+    def from_files(
         self,
         paths,
         eval_size=0.1,
@@ -336,7 +343,8 @@ class Dataset:
         check_labels_int=False,
         check_labels_gte_zero=False,
     ):
-        """
+        """Create Nobrainer datasets from data
+
         template: str, the path to which TFRecord files should be written. A string
             formatting key `shard` should be included to indicate the unique TFRecord file
             when writing to multiple TFRecord files. For example,
@@ -385,7 +393,7 @@ class Dataset:
             scalar_labels = _labels_all_scalar(labels)
             # replace shard formatting code with * for globbing
             template_train = template.format(intent="train_*.tfrec")
-            ds_train = self.nbd_from_tfrec(
+            ds_train = self.from_tfrecords(
                 self.volume_shape,
                 scalar_labels,
                 len(paths[:Ntrain]),
@@ -397,7 +405,7 @@ class Dataset:
             ds_eval = None
             if Neval > 0:
                 template_eval = template.format(intent="eval_*.tfrec")
-                ds_eval = self.nbd_from_tfrec(
+                ds_eval = self.from_tfrecords(
                     self.volume_shape,
                     scalar_labels,
                     len(paths[Ntrain:]),
@@ -406,7 +414,7 @@ class Dataset:
                     shuffle_buffer_size=None,
                     num_parallel_calls=num_parallel_calls,
                 )
-                return ds_train, ds_eval
+            return ds_train, ds_eval
         raise ValueError(
             "Provided paths did not pass validation. Please "
             "check that they have the same shape, and the "
