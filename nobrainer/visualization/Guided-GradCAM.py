@@ -25,7 +25,6 @@ def Guided_GradCAM_3D(grad_model, ct_io, class_index):
         cam += w * output[:, :, :, index]
 
     capi = resize(cam, (ct_io.shape))
-    print(capi.shape)
     capi = np.maximum(capi, 0)
     heatmap = (capi - capi.min()) / (capi.max() - capi.min())
     return heatmap
