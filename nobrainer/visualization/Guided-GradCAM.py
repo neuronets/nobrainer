@@ -10,12 +10,12 @@ def Guided_GradCAM_3D(grad_model, ct_io, class_index):
     with tf.GradientTape() as tape:
         conv_outputs, predictions = grad_model(input_ct_io)
         loss = predictions[:, class_index]
-    # Extract filters and gradients
-    output = conv_outputs[0]
-    grads = tape.gradient(loss, conv_outputs)[0]
-    guided_grads = (
-        tf.cast(output > 0, "float32") * tf.cast(grads > 0, "float32") * grads
-    )
+        # Extract filters and gradients
+        output = conv_outputs[0]
+        grads = tape.gradient(loss, conv_outputs)[0]
+        guided_grads = (
+            tf.cast(output > 0, "float32") * tf.cast(grads > 0, "float32") * grads
+        )
 
     # Average gradients spatially
     weights = tf.reduce_mean(guided_grads, axis=(0, 1, 2))
