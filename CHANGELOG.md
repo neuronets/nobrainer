@@ -1,3 +1,44 @@
+# 0.4.0 (Tue Oct 18 2022)
+
+#### 🚀 Enhancement
+
+- update actions [#230](https://github.com/neuronets/nobrainer/pull/230) ([@satra](https://github.com/satra))
+- [pre-commit.ci] pre-commit autoupdate [#229](https://github.com/neuronets/nobrainer/pull/229) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+
+#### 🐛 Bug Fix
+
+- Enh/api [#228](https://github.com/neuronets/nobrainer/pull/228) ([@satra](https://github.com/satra) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- [pre-commit.ci] pre-commit autoupdate [#227](https://github.com/neuronets/nobrainer/pull/227) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- Create unet_lstm.py [#207](https://github.com/neuronets/nobrainer/pull/207) ([@Aakanksha-Rana](https://github.com/Aakanksha-Rana) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@satra](https://github.com/satra) [@Hoda1394](https://github.com/Hoda1394))
+- [pre-commit.ci] pre-commit autoupdate [#226](https://github.com/neuronets/nobrainer/pull/226) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- [pre-commit.ci] pre-commit autoupdate [#225](https://github.com/neuronets/nobrainer/pull/225) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- [pre-commit.ci] pre-commit autoupdate [#224](https://github.com/neuronets/nobrainer/pull/224) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- [pre-commit.ci] pre-commit autoupdate [#223](https://github.com/neuronets/nobrainer/pull/223) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- [WIP] Updating and simplifying the end-user API of Nobrainer [#215](https://github.com/neuronets/nobrainer/pull/215) ([@Aakanksha-Rana](https://github.com/Aakanksha-Rana) [@Hoda1394](https://github.com/Hoda1394) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@satra](https://github.com/satra))
+- [pre-commit.ci] pre-commit autoupdate [#220](https://github.com/neuronets/nobrainer/pull/220) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- [pre-commit.ci] pre-commit autoupdate [#218](https://github.com/neuronets/nobrainer/pull/218) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- Hard-Coded Scaling is removed for ProgressiveGANs, GanTrainer and ProgressiveAE Training and Model files [#209](https://github.com/neuronets/nobrainer/pull/209) ([@Aakanksha-Rana](https://github.com/Aakanksha-Rana) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@satra](https://github.com/satra))
+- generation api [#216](https://github.com/neuronets/nobrainer/pull/216) ([@Hoda1394](https://github.com/Hoda1394) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- [WIP] segmentation api [#213](https://github.com/neuronets/nobrainer/pull/213) ([@Aakanksha-Rana](https://github.com/Aakanksha-Rana) [@Hoda1394](https://github.com/Hoda1394) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- file name corrected for bayesian_meshnet.py [#211](https://github.com/neuronets/nobrainer/pull/211) ([@Hoda1394](https://github.com/Hoda1394) [@satra](https://github.com/satra))
+- [pre-commit.ci] pre-commit autoupdate [#212](https://github.com/neuronets/nobrainer/pull/212) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@satra](https://github.com/satra))
+- Adding vox2vox model [#205](https://github.com/neuronets/nobrainer/pull/205) ([@Aakanksha-Rana](https://github.com/Aakanksha-Rana) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@Hoda1394](https://github.com/Hoda1394))
+- added tensorflow-addons as install dependency [#206](https://github.com/neuronets/nobrainer/pull/206) ([@Hoda1394](https://github.com/Hoda1394))
+- Composable Data Augmentations [#189](https://github.com/neuronets/nobrainer/pull/189) ([@Aakanksha-Rana](https://github.com/Aakanksha-Rana) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@satra](https://github.com/satra))
+
+#### ⚠️ Pushed to `master`
+
+- update dockerfiles ([@satra](https://github.com/satra))
+
+#### Authors: 4
+
+- [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot])
+- Aakanksha Rana ([@Aakanksha-Rana](https://github.com/Aakanksha-Rana))
+- Hoda Rajaei ([@Hoda1394](https://github.com/Hoda1394))
+- Satrajit Ghosh ([@satra](https://github.com/satra))
+
+---
+
 # 0.3.0 (Tue Jan 11 2022)
 
 #### 🚀 Enhancement
