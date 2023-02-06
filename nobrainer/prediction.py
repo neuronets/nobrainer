@@ -186,7 +186,6 @@ def predict_from_array(
         progbar = tf.keras.utils.Progbar(n_batches)
         progbar.update(0)
         for j in range(0, n_blocks, batch_size):
-
             this_x = features[j : j + batch_size]
             s = StreamingStats()
             for n in range(n_samples):

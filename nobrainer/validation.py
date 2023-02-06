@@ -132,7 +132,6 @@ def validate_from_filepaths(
         None
     """
     for filepath in filepaths:
-
         outputs, dice = validate_from_filepath(
             filepath=filepath,
             predictor=predictor,

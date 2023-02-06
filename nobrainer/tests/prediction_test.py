@@ -12,7 +12,6 @@ from ..models.meshnet import meshnet
 
 
 def test_predict(tmp_path):
-
     x = np.ones((4, 4, 4))
     img = nib.Nifti1Image(x, affine=np.eye(4))
     path = str(tmp_path / "features.nii.gz")

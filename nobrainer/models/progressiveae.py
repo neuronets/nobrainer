@@ -206,7 +206,6 @@ class Encoder(tf.keras.Model):
         self.build([images_shape, alpha_shape])
 
     def call(self, inputs):
-
         images, alpha = inputs
 
         x = self.Head_Conv(images)
@@ -261,7 +260,6 @@ class Decoder(tf.keras.Model):
         self.build([(None, latent_size), (1,)])
 
     def update_res(self):
-
         self.current_resolution += 1
         self.current_width = 2**self.current_resolution
 
@@ -363,7 +361,6 @@ class Decoder(tf.keras.Model):
         self.build([(None, self.latent_size), (1,)])
 
     def call(self, inputs):
-
         latents, alpha = inputs
 
         x = self.make_Dbase(latents)
