@@ -7,8 +7,7 @@ on:
       - master
 
 env:
-  # Pin to v10.28.0, which (as of 2021-05-25) is the latest version with assets
-  AUTO_VERSION: v10.29.3
+  AUTO_VERSION: v10.38.5
 
 jobs:
   auto-release:
@@ -29,7 +28,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.7
+          python-version: 3.9
 
       - name: Download auto
         run: |
