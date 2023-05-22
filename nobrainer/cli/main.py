@@ -512,7 +512,7 @@ def generate(
 
         else:
             output_resolution = int(output_shape[0])
-            model = os.path.join(model, "generator_res_{}".format(output_resolution))
+            model = os.path.join(model, "generator_res_{}".format(output_resolution), "weights")
             generator = tf.saved_model.load(model)
             generate = generator.signatures["serving_default"]
             img = generate(latents)["generated"]
