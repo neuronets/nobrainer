@@ -1,4 +1,3 @@
-# import importlib
 import os
 from pathlib import Path
 
@@ -7,6 +6,7 @@ import tensorflow as tf
 from .base import BaseEstimator
 from .. import losses
 from ..dataset import get_dataset
+from ..utils import NoDistributedStrategy
 
 
 class ProgressiveGeneration(BaseEstimator):
@@ -43,8 +43,8 @@ class ProgressiveGeneration(BaseEstimator):
         g_opt_args=None,
         d_optimizer=None,
         d_opt_args=None,
-        g_loss=losses.wasserstein,
-        d_loss=losses.wasserstein,
+        g_loss=losses.Wasserstein,
+        d_loss=losses.Wasserstein,
         warm_start=False,
         multi_gpu=False,
         num_parallel_calls=None,
@@ -83,6 +83,12 @@ class ProgressiveGeneration(BaseEstimator):
         d_opt_args_tmp.update(**d_opt_args)
         d_opt_args = d_opt_args_tmp
 
+        # for multi gpu training
+        if multi_gpu:
+            strategy = tf.distribute.MirroredStrategy()
+        else:
+            strategy = NoDistributedStrategy()
+
         if warm_start:
             if self.model_ is None:
                 raise ValueError("warm_start requested, but model is undefined")
@@ -91,18 +97,19 @@ class ProgressiveGeneration(BaseEstimator):
             from ..training import ProgressiveGANTrainer
 
             # Instantiate the generator and discriminator
-            generator, discriminator = progressivegan(
-                latent_size=self.latent_size,
-                g_fmap_base=self.g_fmap_base,
-                d_fmap_base=self.d_fmap_base,
-                num_channels=self.num_channels,
-                dimensionality=self.dimensionality,
-            )
-            self.model_ = ProgressiveGANTrainer(
-                generator=generator,
-                discriminator=discriminator,
-                gradient_penalty=True,
-            )
+            with strategy.scope():
+                generator, discriminator = progressivegan(
+                    latent_size=self.latent_size,
+                    g_fmap_base=self.g_fmap_base,
+                    d_fmap_base=self.d_fmap_base,
+                    num_channels=self.num_channels,
+                    dimensionality=self.dimensionality,
+                )
+                self.model_ = ProgressiveGANTrainer(
+                    generator=generator,
+                    discriminator=discriminator,
+                    gradient_penalty=True,
+                )
             self.current_resolution_ = 0
 
         # instantiate a progressive training helper and compile with loss and optimizer
@@ -121,9 +128,13 @@ class ProgressiveGeneration(BaseEstimator):
             if resolution < self.current_resolution_:
                 continue
             # create a train dataset with features for resolution
+            batch_size = info.get("batch_size")
+            if batch_size % strategy.num_replicas_in_sync:
+                raise ValueError("batch size must be a multiple of the number of GPUs")
+
             dataset = get_dataset(
                 file_pattern=info.get("file_pattern"),
-                batch_size=info.get("batch_size"),
+                batch_size=batch_size,
                 num_parallel_calls=num_parallel_calls,
                 volume_shape=(resolution, resolution, resolution),
                 n_classes=1,
@@ -131,27 +142,39 @@ class ProgressiveGeneration(BaseEstimator):
                 normalizer=info.get("normalizer") or normalizer,
             )
 
-            # grow the networks by one (2^x) resolution
-            if resolution > self.current_resolution_:
-                self.model_.generator.add_resolution()
-                self.model_.discriminator.add_resolution()
+            with strategy.scope():
+                # grow the networks by one (2^x) resolution
+                if resolution > self.current_resolution_:
+                    self.model_.generator.add_resolution()
+                    self.model_.discriminator.add_resolution()
 
-            if multi_gpu:
-                strategy = tf.distribute.MirroredStrategy()
-                with strategy.scope():
-                    _compile()
-            else:
+                d_loss_object = d_loss(reduction=tf.keras.losses.Reduction.NONE)
+                def compute_d_loss(labels, predictions):
+                    per_example_loss = d_loss_object(labels, predictions)
+                    return tf.nn.compute_average_loss(per_example_loss,
+                                                      global_batch_size=batch_size)
+
+                g_loss_object = g_loss(reduction=tf.keras.losses.Reduction.NONE)
+                def compute_g_loss(labels, predictions):
+                    per_example_loss = g_loss_object(labels, predictions)
+                    return tf.nn.compute_average_loss(per_example_loss,
+                                                      global_batch_size=batch_size)
+
+                d_loss = compute_d_loss
+                g_loss = compute_g_loss
+
                 _compile()
 
             steps_per_epoch = (info.get("epochs") or epochs) // info.get("batch_size")
             # save_best_only is set to False as it is an adversarial loss
-            model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-                str(model_dir),
-                save_weights_only=True,
-                save_best_only=False,
-                save_freq=save_freq,
-                verbose=False,
-            )
+            with strategy.scope():
+                model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+                    str(model_dir),
+                    save_weights_only=True,
+                    save_best_only=False,
+                    save_freq=save_freq,
+                    verbose=False,
+                )
 
             # Train at resolution
             print("Resolution : {}".format(resolution))

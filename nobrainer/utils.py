@@ -196,3 +196,15 @@ def get_num_parallel():
     except AttributeError:
         num_parallel_calls = psutil.cpu_count()
     return num_parallel_calls
+
+
+
+class NoDistributedStrategy:
+    def __init__(self):
+        class NoScope:
+            def __enter__(self):
+                pass
+            def __exit__(self, *args):
+                pass
+        self.scope = NoScope
+        self.num_replicas_in_sync = 1
