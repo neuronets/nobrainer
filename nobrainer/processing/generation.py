@@ -6,7 +6,6 @@ import tensorflow as tf
 from .base import BaseEstimator
 from .. import losses
 from ..dataset import get_dataset
-from ..utils import NoDistributedStrategy
 
 
 class ProgressiveGeneration(BaseEstimator):
@@ -87,7 +86,7 @@ class ProgressiveGeneration(BaseEstimator):
         if multi_gpu:
             strategy = tf.distribute.MirroredStrategy()
         else:
-            strategy = NoDistributedStrategy()
+            strategy = tf.distribute.get_strategy()
 
         if warm_start:
             if self.model_ is None:
@@ -111,6 +110,22 @@ class ProgressiveGeneration(BaseEstimator):
                     gradient_penalty=True,
                 )
             self.current_resolution_ = 0
+
+        # wrap the losses to work on multiple GPUs
+        d_loss_object = d_loss(reduction=tf.keras.losses.Reduction.NONE)
+        def compute_d_loss(labels, predictions):
+            per_example_loss = d_loss_object(labels, predictions)
+            return tf.nn.compute_average_loss(per_example_loss,
+                                              global_batch_size=batch_size)
+
+        g_loss_object = g_loss(reduction=tf.keras.losses.Reduction.NONE)
+        def compute_g_loss(labels, predictions):
+            per_example_loss = g_loss_object(labels, predictions)
+            return tf.nn.compute_average_loss(per_example_loss,
+                                              global_batch_size=batch_size)
+
+        d_loss = compute_d_loss
+        g_loss = compute_g_loss
 
         # instantiate a progressive training helper and compile with loss and optimizer
         def _compile():
@@ -147,22 +162,6 @@ class ProgressiveGeneration(BaseEstimator):
                 if resolution > self.current_resolution_:
                     self.model_.generator.add_resolution()
                     self.model_.discriminator.add_resolution()
-
-                d_loss_object = d_loss(reduction=tf.keras.losses.Reduction.NONE)
-                def compute_d_loss(labels, predictions):
-                    per_example_loss = d_loss_object(labels, predictions)
-                    return tf.nn.compute_average_loss(per_example_loss,
-                                                      global_batch_size=batch_size)
-
-                g_loss_object = g_loss(reduction=tf.keras.losses.Reduction.NONE)
-                def compute_g_loss(labels, predictions):
-                    per_example_loss = g_loss_object(labels, predictions)
-                    return tf.nn.compute_average_loss(per_example_loss,
-                                                      global_batch_size=batch_size)
-
-                d_loss = compute_d_loss
-                g_loss = compute_g_loss
-
                 _compile()
 
             steps_per_epoch = (info.get("epochs") or epochs) // info.get("batch_size")
