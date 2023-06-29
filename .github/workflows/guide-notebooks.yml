@@ -13,6 +13,7 @@ jobs:
         run: |
           cd ${{ github.workspace }}
           pip install --upgrade pip
+          pip install jupyter
           pip install -e .
           nobrainer info
       - name: run
