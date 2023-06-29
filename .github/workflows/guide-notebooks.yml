@@ -1,0 +1,15 @@
+name: Guide Notebooks Regression
+run-name: ${{ github.actor }}
+on: [push]
+jobs:
+  Explore-GitHub-Actions:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "automatically triggered by a ${{ github.event_name }} event"
+      - run: echo "running on a ${{ runner.os }} server hosted by github"
+      - run: echo "branch: ${{ github.ref }}"
+      - name: clone
+        uses: actions/checkout@v3
+      - name: install
+        run: |
+          ls ${{ github.workspace }}
