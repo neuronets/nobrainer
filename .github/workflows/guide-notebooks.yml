@@ -3,7 +3,7 @@ run-name: ${{ github.actor }}
 on: [push]
 jobs:
   guide-notebooks-regression:
-    runs-on: tensorflow-latest
+    runs-on: ubuntu-latest
     steps:
       - run: echo "automatically triggered by a ${{ github.event_name }} event"
       - run: echo "running on a ${{ runner.os }} server hosted by github"
