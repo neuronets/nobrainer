@@ -3,7 +3,7 @@ run-name: ${{ github.actor }}
 on: [push]
 jobs:
   guide-notebooks-regression:
-    runs-on: ubuntu-latest
+    runs-on: tensorflow-latest
     steps:
       - run: echo "automatically triggered by a ${{ github.event_name }} event"
       - run: echo "running on a ${{ runner.os }} server hosted by github"
@@ -13,5 +13,5 @@ jobs:
         run: |
           cd ${{ github.workspace }}
           pip install --upgrade pip
-          pip install -e nobrainer
+          pip install -e .
           nobrainer info
