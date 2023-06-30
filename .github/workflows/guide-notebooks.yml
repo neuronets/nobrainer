@@ -12,6 +12,8 @@ jobs:
       - name: install
         run: |
           cd ${{ github.workspace }}
+          python -m venv env
+          source env/bin/activate
           pip install --upgrade pip
           pip install jupyter
           pip install -e .
