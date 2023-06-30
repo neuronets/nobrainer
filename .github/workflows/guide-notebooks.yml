@@ -1,9 +1,9 @@
 name: Guide Notebooks Regression
-run-name: ${{ github.actor }}
+run-name: Guide Notebooks Regression
 on: [push]
 jobs:
   guide-notebooks-regression:
-    runs-on: ubuntu-latest
+    runs-on: nobrainer-self-hosted-ci
     steps:
       - run: echo "automatically triggered by a ${{ github.event_name }} event"
       - run: echo "running on a ${{ runner.os }} server hosted by github"
@@ -19,5 +19,5 @@ jobs:
       - name: run
         run: |
           for notebook in $(ls guide/[0-9][0-9]-*.ipynb); do
-            jupyter nbconvert --execute ${notebook} --to html --stdout
+            srun -p gablab --mem=16G -t 10 jupyter nbconvert --execute ${notebook} --to markdown --stdout
           done
