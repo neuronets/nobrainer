@@ -3,7 +3,7 @@ run-name: Guide Notebooks Regression
 on: [push]
 jobs:
   guide-notebooks-regression:
-    runs-on: nobrainer-self-hosted-ci
+    runs-on: self-hosted
     steps:
       - run: echo "automatically triggered by a ${{ github.event_name }} event"
       - run: echo "running on a ${{ runner.os }} server hosted by github"
