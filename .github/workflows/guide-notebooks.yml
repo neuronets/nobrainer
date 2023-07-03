@@ -21,10 +21,10 @@ jobs:
       - name: run
         run: |
           cat<<EOF > run.sh
-#!/bin/bash
-source /home/ohinds/projects/nobrainer/env/bin/activate
-$@
-EOF
+            #!/bin/bash
+            source env/bin/activate
+            $@
+            EOF
 
           for notebook in $(ls guide/[0-9][0-9]-*.ipynb); do
             srun \
