@@ -2,7 +2,7 @@ name: Guide Notebooks Regression
 run-name: Guide Notebooks Regression
 on: [push]
 jobs:
-  start-node-runner:
+  start_node_runner:
     runs-on: [self-hosted, nobrainer-self-hosted-ci]
     outputs:
       jobid: ${{ steps.sbatch.jobid }}
@@ -29,8 +29,8 @@ jobs:
           done
           echo "jobid=${jobid}" >> "$GITHUB_OUTPUT"
 
-  guide-notebooks-regression:
-    needs: start-node-runner
+  guide_notebooks_regression:
+    needs: start_node_runner
     runs-on: [self-hosted, nobrainer-ci-self-hosted-runner]
     steps:
       - name: clone
@@ -52,21 +52,21 @@ jobs:
             singularity exec \
               --nv -B /om \
               ${HOME}/img/tensorflow_latest-gpu.sif \
-                ./run-in-env.sh \
+                ${PWD}/run-in-env.sh \
                   jupyter nbconvert \
-                    --execute ${notebook} \
+                    --execute ${PWD}/${notebook} \
                     --to markdown \
                     --stdout
           done
 
-  shutdown-node-runner:
+  shutdown_node_runner:
     if: always()
-    needs: [start-node-runner, guide-notebooks-regression]
+    needs: [start_node_runner, guide_notebooks_regression]
     runs-on: [self-hosted, nobrainer-self-hosted-ci]
     steps:
       - name: cleanup
         env:
-          jobid: ${{needs.start-node-runner.outputs.jobid}}
+          jobid: ${{ needs.start_node_runner.outputs.jobid }}
         run: |
           echo "jobid is ${jobid}"
           scancel ${jobid}
