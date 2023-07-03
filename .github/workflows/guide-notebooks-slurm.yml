@@ -48,7 +48,7 @@ jobs:
             singularity exec \
               --nv -B /om \
               ${HOME}/img/tensorflow_latest-gpu.sif \
-                ./run.sh \
+                ./run-in-env.sh \
                   jupyter nbconvert \
                     --execute ${notebook} \
                     --to markdown \
