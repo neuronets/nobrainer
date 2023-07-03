@@ -59,7 +59,8 @@ jobs:
           done
 
   shutdown-node-runner:
-    needs: start-node-runner
+    if: always()
+    needs: [start-node-runner, guide-notebooks-regression]
     runs-on: [self-hosted, nobrainer-self-hosted-ci]
     steps:
       - name: cleanup
