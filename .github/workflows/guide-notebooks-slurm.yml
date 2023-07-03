@@ -48,6 +48,7 @@ jobs:
         run: |
           cd ${{ github.workspace }}
           for notebook in $(ls guide/[0-9][0-9]-*.ipynb); do
+            echo "running ${notebook} from ${PWD}"
             singularity exec \
               --nv -B /om \
               ${HOME}/img/tensorflow_latest-gpu.sif \
@@ -67,4 +68,5 @@ jobs:
         env:
           jobid: ${{needs.start-node-runner.outputs.jobid}}
         run: |
+          echo "jobid is ${jobid}"
           scancel ${jobid}
