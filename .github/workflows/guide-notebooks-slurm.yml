@@ -4,13 +4,11 @@ on: [push]
 jobs:
   start-node-runner:
     runs-on: [self-hosted, nobrainer-self-hosted-ci]
-    outputs:
-      label: ${{ steps.srun.node_name }}
     steps:
       - name: sbatch
         run: |
           jobid=$(sbatch \
-                    -t 10 \
+                    -t 100 \
                     --mem 16G \
                     -p gablab \
                     -D ${HOME}/actions-runner \
@@ -29,7 +27,7 @@ jobs:
 
   guide-notebooks-regression:
     needs: start-node-runner
-    runs-on: [self-hosted, nobrainer-self-hosted-ci-runner]
+    runs-on: [self-hosted, nobrainer-ci-self-hosted-runner]
     steps:
       - run: echo "automatically triggered by a ${{ github.event_name }} event"
       - run: echo "running on a ${{ runner.os }} server hosted by github"
