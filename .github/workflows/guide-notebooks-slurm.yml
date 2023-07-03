@@ -10,15 +10,12 @@ jobs:
       - name: sbatch
         run: |
           cat<<EOF > start_node_runner.sh
-#!/bin/bash
-#SBATCH -t 10
-#SBATCH --mem=16G
-#SBATCH -p gablab
-set -ex
-cd ${HOME}/actions-runner
-./run.sh
-EOF
-          jobid=$(sbatch start_node_runner.sh | cut -d ' ' -f 4)
+            #!/bin/bash
+            set -ex
+            cd ${HOME}/actions-runner
+            ./run.sh
+            EOF
+          jobid=$(sbatch -t 10 --mem 16G -p gablab start_node_runner.sh | cut -d ' ' -f 4)
           while [ 1 ]; do
             node=$(squeue --noheader -j ${jobid} -o "%N")
             if [ -z ${node} ]; then
