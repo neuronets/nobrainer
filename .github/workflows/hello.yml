@@ -1,0 +1,8 @@
+name: Hello world
+run-name: Test how long local runner needs
+on: [push]
+jobs:
+  hello:
+    runs-on: self-hosted
+    steps:
+      - run: echo "Hello!"
