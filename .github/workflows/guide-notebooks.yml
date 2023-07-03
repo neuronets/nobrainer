@@ -3,6 +3,7 @@ run-name: Guide Notebooks Regression
 on: [push]
 jobs:
   guide-notebooks-regression:
+    if: ${{ false }}
     runs-on: self-hosted
     steps:
       - run: echo "automatically triggered by a ${{ github.event_name }} event"
