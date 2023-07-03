@@ -4,8 +4,11 @@ on: [push]
 jobs:
   start-node-runner:
     runs-on: [self-hosted, nobrainer-self-hosted-ci]
+    outputs:
+      jobid: ${{ steps.sbatch.jobid }}
     steps:
       - name: sbatch
+        id: sbatch
         run: |
           jobid=$(sbatch \
                     -t 100 \
@@ -24,13 +27,12 @@ jobs:
               break;
             fi
           done
+          echo "jobid=${jobid}" >> "$GITHUB_OUTPUT"
 
   guide-notebooks-regression:
     needs: start-node-runner
     runs-on: [self-hosted, nobrainer-ci-self-hosted-runner]
     steps:
-      - run: echo "automatically triggered by a ${{ github.event_name }} event"
-      - run: echo "running on a ${{ runner.os }} server hosted by github"
       - name: clone
         uses: actions/checkout@v3
       - name: install
@@ -54,3 +56,13 @@ jobs:
                     --to markdown \
                     --stdout
           done
+
+  shutdown-node-runner:
+    needs: start-node-runner
+    runs-on: [self-hosted, nobrainer-self-hosted-ci]
+    steps:
+      - name: cleanup
+        env:
+          jobid: ${{needs.start-node-runner.outputs.jobid}}
+        run: |
+          scancel ${jobid}
