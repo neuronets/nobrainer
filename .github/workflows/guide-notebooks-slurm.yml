@@ -15,8 +15,11 @@ jobs:
                     -p gablab \
                     -D ${HOME}/actions-runner \
                     run.sh | cut -d ' ' -f 4)
+          echo "Submitted batch job with id ${jobid}"
+          echo "Waiting for job to start"
           while [ 1 ]; do
             node=$(squeue --noheader -j ${jobid} -o "%N")
+            echo "Found node ${node}"
             if [ -z ${node} ]; then
               sleep 1;
             else
