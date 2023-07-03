@@ -3,7 +3,7 @@ run-name: Guide Notebooks Regression
 on: [push]
 jobs:
   start-node-runner:
-    runs-on: self-hosted, nobrainer-self-hosted-ci
+    runs-on: [self-hosted, nobrainer-self-hosted-ci]
     outputs:
       label: ${{ steps.srun.node_name }}
     steps:
@@ -27,7 +27,7 @@ jobs:
 
   guide-notebooks-regression:
     needs: start-node-runner
-    runs-on: self-hosted, nobrainer-self-hosted-ci-runner
+    runs-on: [self-hosted, nobrainer-self-hosted-ci-runner]
     steps:
       - run: echo "automatically triggered by a ${{ github.event_name }} event"
       - run: echo "running on a ${{ runner.os }} server hosted by github"
