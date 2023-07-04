@@ -49,10 +49,13 @@ jobs:
           cd ${{ github.workspace }}
           for notebook in $(ls guide/[0-9][0-9]-*.ipynb); do
             echo "running ${notebook} from ${PWD}"
+            echo $(ls {$PWD})
             singularity exec \
-              --nv -B /om \
+              --nv \
+              -B /om \
+              -B /rdma \
               ${HOME}/img/tensorflow_latest-gpu.sif \
-                ${PWD}/run-in-env.sh \
+                bash ${PWD}/run-in-env.sh \
                   jupyter nbconvert \
                     --execute ${PWD}/${notebook} \
                     --to markdown \
@@ -66,7 +69,7 @@ jobs:
     steps:
       - name: cleanup
         env:
-          jobid: ${{ needs.start_node_runner.outputs.jobid }}
+          JOBID: ${{ needs.start_node_runner.outputs.jobid }}
         run: |
-          echo "jobid is ${jobid}"
-          scancel ${jobid}
+          echo "jobid is ${JOBID}"
+          scancel ${JOBID}
