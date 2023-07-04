@@ -6,28 +6,32 @@ jobs:
     runs-on: [self-hosted, nobrainer-self-hosted-ci]
     outputs:
       jobid: ${{ steps.sbatch.outputs.jobid }}
+      rundir: ${{ steps.sbatch.outputs.rundir }}
     steps:
       - name: sbatch
         id: sbatch
+        env:
+          rundir: /om/weka/gablab/ohinds/sw/actions-runner/
         run: |
           jobid=$(sbatch \
                     -t 100 \
                     --mem 16G \
                     -p gablab \
-                    -D ${HOME}/sw/actions-runner \
+                    -D ${rundir} \
                     run.sh | cut -d ' ' -f 4)
           echo "Submitted batch job with id ${jobid}"
           echo "Waiting for job to start"
           while [ 1 ]; do
             node=$(squeue --noheader -j ${jobid} -o "%N")
-            echo "Found node ${node}"
             if [ -z ${node} ]; then
               sleep 1;
             else
+              echo "Found node ${node}"
               break;
             fi
           done
           echo "jobid=${jobid}" >> "$GITHUB_OUTPUT"
+          echo "rundir=${rundir}" >> "$GITHUB_OUTPUT"
 
   guide_notebooks_regression:
     needs: start_node_runner
@@ -37,6 +41,7 @@ jobs:
         uses: actions/checkout@v3
       - name: install
         run: |
+          echo "change dir to github workspace: ${{ github.workspace }}"
           cd ${{ github.workspace }}
           python -m venv env
           source env/bin/activate
@@ -46,6 +51,7 @@ jobs:
           nobrainer info
       - name: run
         run: |
+          echo "change dir to github workspace: ${{ github.workspace }}"
           cd ${{ github.workspace }}
           for notebook in $(ls guide/[0-9][0-9]-*.ipynb); do
             echo "running ${notebook} from ${PWD}"
