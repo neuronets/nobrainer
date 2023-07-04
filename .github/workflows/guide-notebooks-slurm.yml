@@ -14,7 +14,7 @@ jobs:
                     -t 100 \
                     --mem 16G \
                     -p gablab \
-                    -D ${HOME}/actions-runner \
+                    -D ${HOME}/sw/actions-runner \
                     run.sh | cut -d ' ' -f 4)
           echo "Submitted batch job with id ${jobid}"
           echo "Waiting for job to start"
