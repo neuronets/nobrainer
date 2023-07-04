@@ -5,7 +5,7 @@ jobs:
   start_node_runner:
     runs-on: [self-hosted, nobrainer-self-hosted-ci]
     outputs:
-      jobid: ${{ steps.sbatch.jobid }}
+      jobid: ${{ steps.sbatch.outputs.jobid }}
     steps:
       - name: sbatch
         id: sbatch
@@ -53,7 +53,6 @@ jobs:
             singularity exec \
               --nv \
               -B /om \
-              -B /rdma \
               ${HOME}/img/tensorflow_latest-gpu.sif \
                 bash ${PWD}/run-in-env.sh \
                   jupyter nbconvert \
@@ -69,7 +68,7 @@ jobs:
     steps:
       - name: cleanup
         env:
-          JOBID: ${{ needs.start_node_runner.outputs.jobid }}
+          jobid: ${{ needs.start_node_runner.outputs.jobid }}
         run: |
-          echo "jobid is ${JOBID}"
-          scancel ${JOBID}
+          echo "jobid is ${jobid}"
+          scancel ${jobid}
