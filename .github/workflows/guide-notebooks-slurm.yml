@@ -2,8 +2,8 @@ name: Guide Notebooks Regression
 run-name: Guide Notebooks Regression
 on: [push]
 env:
-  SINGULARITY_IMAGE: ${HOME}/img/tensorflow_latest-gpu.sif
-  ACTION_RUNNER_DIR: ${HOME}/sw/actions-runner
+  SINGULARITY_IMAGE: /om/weka/gablab/ohinds/img/tensorflow_latest-gpu.sif
+  ACTION_RUNNER_DIR: /om/weka/gablab/ohinds/sw/actions-runner
 jobs:
   start_node_runner:
     runs-on: [self-hosted, nobrainer-self-hosted-ci]
