@@ -1,28 +1,28 @@
 name: Guide Notebooks Regression
 run-name: Guide Notebooks Regression
 on: [push]
+env:
+  SINGULARITY_IMAGE: ${HOME}/img/tensorflow_latest-gpu.sif
+  ACTION_RUNNER_DIR: ${HOME}/sw/actions-runner
 jobs:
   start_node_runner:
     runs-on: [self-hosted, nobrainer-self-hosted-ci]
     outputs:
-      jobid: ${{ steps.sbatch.outputs.jobid }}
-      rundir: ${{ steps.sbatch.outputs.rundir }}
+      JOBID: ${{ steps.sbatch.outputs.JOBID }}
     steps:
       - name: sbatch
         id: sbatch
-        env:
-          rundir: /om/weka/gablab/ohinds/sw/actions-runner/
         run: |
-          jobid=$(sbatch \
+          JOBID=$(sbatch \
                     -t 100 \
                     --mem 16G \
                     -p gablab \
-                    -D ${rundir} \
+                    -D ${ACTION_RUNNER_DIR} \
                     run.sh | cut -d ' ' -f 4)
-          echo "Submitted batch job with id ${jobid}"
+          echo "Submitted batch job with id ${JOBID}"
           echo "Waiting for job to start"
           while [ 1 ]; do
-            node=$(squeue --noheader -j ${jobid} -o "%N")
+            node=$(squeue --noheader -j ${JOBID} -o "%N")
             if [ -z ${node} ]; then
               sleep 1;
             else
@@ -30,8 +30,7 @@ jobs:
               break;
             fi
           done
-          echo "jobid=${jobid}" >> "$GITHUB_OUTPUT"
-          echo "rundir=${rundir}" >> "$GITHUB_OUTPUT"
+          echo "JOBID=${JOBID}" >> "$GITHUB_OUTPUT"
 
   guide_notebooks_regression:
     needs: start_node_runner
@@ -43,28 +42,22 @@ jobs:
         run: |
           echo "change dir to github workspace: ${{ github.workspace }}"
           cd ${{ github.workspace }}
-          python -m venv env
-          source env/bin/activate
-          pip install --upgrade pip
-          pip install jupyter
-          pip install -e .
-          nobrainer info
+          singularity exec python -m venv env
+          util/singularity-exec-in-env.sh pip install --upgrade pip
+          util/singularity-exec-in-env.sh pip install jupyter
+          util/singularity-exec-in-env.sh pip install -e .
+          util/singularity-exec-in-env.sh nobrainer info
       - name: run
         run: |
           echo "change dir to github workspace: ${{ github.workspace }}"
           cd ${{ github.workspace }}
           for notebook in $(ls guide/[0-9][0-9]-*.ipynb); do
             echo "running ${notebook} from ${PWD}"
-            echo $(ls {$PWD})
-            singularity exec \
-              --nv \
-              -B /om \
-              ${HOME}/img/tensorflow_latest-gpu.sif \
-                bash ${PWD}/run-in-env.sh \
-                  jupyter nbconvert \
-                    --execute ${PWD}/${notebook} \
-                    --to markdown \
-                    --stdout
+            util/singularity-exec-in-env.sh
+              jupyter nbconvert \
+                --execute ${PWD}/${notebook} \
+                --to markdown \
+                --stdout
           done
 
   shutdown_node_runner:
@@ -74,7 +67,7 @@ jobs:
     steps:
       - name: cleanup
         env:
-          jobid: ${{ needs.start_node_runner.outputs.jobid }}
+          JOBID: ${{ needs.start_node_runner.outputs.JOBID }}
         run: |
-          echo "jobid is ${jobid}"
-          scancel ${jobid}
+          echo "jobid is ${JOBID}"
+          scancel ${JOBID}
