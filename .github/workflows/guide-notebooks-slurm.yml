@@ -42,7 +42,7 @@ jobs:
         run: |
           echo "change dir to github workspace: ${{ github.workspace }}"
           cd ${{ github.workspace }}
-          singularity exec python -m venv env
+          singularity exec ${SINGULARITY_IMAGE} python -m venv env
           util/singularity-exec-in-env.sh pip install --upgrade pip
           util/singularity-exec-in-env.sh pip install jupyter
           util/singularity-exec-in-env.sh pip install -e .
