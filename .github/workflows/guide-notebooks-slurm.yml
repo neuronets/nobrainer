@@ -41,6 +41,7 @@ jobs:
       - name: install
         run: |
           echo "change dir to github workspace: ${{ github.workspace }}"
+          set -xe
           cd ${{ github.workspace }}
           singularity exec ${SINGULARITY_IMAGE} python -m venv env
           util/singularity-exec-in-env.sh pip install --upgrade pip
@@ -49,6 +50,7 @@ jobs:
           util/singularity-exec-in-env.sh nobrainer info
       - name: run
         run: |
+          set -xe
           echo "change dir to github workspace: ${{ github.workspace }}"
           cd ${{ github.workspace }}
           for notebook in $(ls guide/[0-9][0-9]-*.ipynb); do
