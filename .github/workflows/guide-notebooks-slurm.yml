@@ -14,10 +14,10 @@ jobs:
         id: sbatch
         run: |
           JOBID=$(sbatch \
-                    -t 100 \
-                    --mem 16G \
-                    -p gablab \
-                    -D ${ACTION_RUNNER_DIR} \
+                    --time=100 \
+                    --mem=16G \
+                    --partiion=gablab \
+                    --chdir=${ACTION_RUNNER_DIR} \
                     run.sh | cut -d ' ' -f 4)
           echo "Submitted batch job with id ${JOBID}"
           echo "Waiting for job to start"
