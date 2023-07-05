@@ -1,4 +1,4 @@
 #!/bin/bash
 
-source env/bin/activate
+source ${PWD}/env/bin/activate
 $@
