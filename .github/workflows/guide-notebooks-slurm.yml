@@ -16,7 +16,7 @@ jobs:
           JOBID=$(sbatch \
                     --time=100 \
                     --mem=16G \
-                    --partiion=gablab \
+                    --partition=gablab \
                     --chdir=${ACTION_RUNNER_DIR} \
                     run.sh | cut -d ' ' -f 4)
           echo "Submitted batch job with id ${JOBID}"
