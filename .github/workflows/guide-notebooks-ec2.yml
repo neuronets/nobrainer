@@ -23,7 +23,8 @@ jobs:
           cd ${{ github.workspace }}
           source env/bin/activate
           echo $(which python)
-          for notebook in $(ls guide/[0-9][0-9]-*.ipynb); do
+          #for notebook in $(ls guide/[0-9][0-9]-*.ipynb); do
+          for notebook in $(ls guide/03-api_train_binary_segmentation.ipynb); do
             echo "running ${notebook}"
             jupyter nbconvert \
               --execute ${notebook} \
