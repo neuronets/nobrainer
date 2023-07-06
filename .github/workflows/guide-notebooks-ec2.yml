@@ -22,6 +22,7 @@ jobs:
           set -xe
           cd ${{ github.workspace }}
           source env/bin/activate
+          echo $(which python)
           for notebook in $(ls guide/[0-9][0-9]-*.ipynb); do
             echo "running ${notebook}"
             jupyter nbconvert \
