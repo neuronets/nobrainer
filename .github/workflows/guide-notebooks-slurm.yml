@@ -3,7 +3,7 @@ run-name: Guide Notebooks Regression
 on: [push]
 env:
   BASE_DIR: /om/weka/gablab/ohinds
-  ACTION_RUNNER_DIR: ${BASE_DIR}/sw/actions-runner
+  ACTION_RUNNER_DIR: /om/weka/gablab/ohinds/sw/actions-runner
 jobs:
   start_node_runner:
     runs-on: [self-hosted, nobrainer-self-hosted-ci]
