@@ -36,8 +36,8 @@ jobs:
   guide_notebooks_regression:
     needs: start_node_runner
     env:
-      SINGULARITY_IMAGE: ${BASE_DIR}/img/tensorflow_latest-gpu.sif
-      WORKDIR: ${BASE_DIR}/${ACTION_RUNNER_DIR}/_work/nobrainer/nobrainer
+      SINGULARITY_IMAGE: /om/weka/gablab/ohinds/img/tensorflow_latest-gpu.sif
+      WORKDIR: /om/weka/gablab/ohinds/sw/actions-runner/_work/nobrainer/nobrainer
     runs-on: [self-hosted, nobrainer-ci-self-hosted-runner]
     steps:
       - name: clone
