@@ -1,5 +1,5 @@
 #!/bin/bash
 
 set -xe
-source ${PWD}/env/bin/activate
+source ${WORKDIR}/env/bin/activate
 $@

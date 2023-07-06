@@ -34,16 +34,17 @@ jobs:
 
   guide_notebooks_regression:
     needs: start_node_runner
+    env:
+      WORKDIR: ${{ github.workspace }}
     runs-on: [self-hosted, nobrainer-ci-self-hosted-runner]
     steps:
       - name: clone
         uses: actions/checkout@v3
       - name: install
         run: |
-          echo "change dir to github workspace: ${{ github.workspace }}"
           set -xe
-          cd ${{ github.workspace }}
-          singularity exec ${SINGULARITY_IMAGE} python -m venv env
+          cd ${WORKDIR}
+          singularity exec ${SINGULARITY_IMAGE} python -m venv ${WORKDIR}/env
           util/singularity-exec-in-env.sh pip install --upgrade pip
           util/singularity-exec-in-env.sh pip install jupyter
           util/singularity-exec-in-env.sh pip install -e .
@@ -51,13 +52,12 @@ jobs:
       - name: run
         run: |
           set -xe
-          echo "change dir to github workspace: ${{ github.workspace }}"
-          cd ${{ github.workspace }}
-          for notebook in $(ls guide/[0-9][0-9]-*.ipynb); do
+          cd ${WORKDIR}
+          for notebook in $(ls ${WORKDIR}/guide/[0-9][0-9]-*.ipynb); do
             echo "running ${notebook} from ${PWD}"
-            util/singularity-exec-in-env.sh
+            ${WORKDIR}/util/singularity-exec-in-env.sh
               jupyter nbconvert \
-                --execute ${PWD}/${notebook} \
+                --execute ${notebook} \
                 --to markdown \
                 --stdout
           done
