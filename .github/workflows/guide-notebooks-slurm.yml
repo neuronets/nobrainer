@@ -44,7 +44,7 @@ jobs:
         run: |
           set -xe
           cd ${WORKDIR}
-          singularity exec ${SINGULARITY_IMAGE} python -m venv ${WORKDIR}/env
+          singularity exec -B /om ${SINGULARITY_IMAGE} python -m venv ${WORKDIR}/env
           util/singularity-exec-in-env.sh pip install --upgrade pip
           util/singularity-exec-in-env.sh pip install jupyter
           util/singularity-exec-in-env.sh pip install -e .
