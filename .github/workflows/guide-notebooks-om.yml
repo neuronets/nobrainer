@@ -1,9 +1,9 @@
-name: Guide Notebooks Regression - EC2
-run-name: Guide Notebooks Regression - EC2
+name: Guide Notebooks Regression - OM
+run-name: Guide Notebooks Regression - OM
 on: [push]
 jobs:
-  guide_notebooks_regression_ec2:
-    runs-on: [self-hosted, nobrainer-ci-ec2]
+  guide_notebooks_regression_om:
+    runs-on: [self-hosted, nobrainer-ci-om]
     steps:
       - name: clone
         uses: actions/checkout@v3
