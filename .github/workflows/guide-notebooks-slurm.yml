@@ -2,8 +2,8 @@ name: Guide Notebooks Regression
 run-name: Guide Notebooks Regression
 on: [push]
 env:
-  SINGULARITY_IMAGE: /om/weka/gablab/ohinds/img/tensorflow_latest-gpu.sif
-  ACTION_RUNNER_DIR: /om/weka/gablab/ohinds/sw/actions-runner
+  BASE_DIR: /om/weka/gablab/ohinds
+  ACTION_RUNNER_DIR: ${BASE_DIR}/sw/actions-runner
 jobs:
   start_node_runner:
     runs-on: [self-hosted, nobrainer-self-hosted-ci]
@@ -13,6 +13,7 @@ jobs:
       - name: sbatch
         id: sbatch
         run: |
+          set -xe
           JOBID=$(sbatch \
                     --time=100 \
                     --mem=16G \
@@ -35,7 +36,8 @@ jobs:
   guide_notebooks_regression:
     needs: start_node_runner
     env:
-      WORKDIR: ${{ github.workspace }}
+      SINGULARITY_IMAGE: ${BASE_DIR}/img/tensorflow_latest-gpu.sif
+      WORKDIR: ${BASE_DIR}/${ACTION_RUNNER_DIR}/_work/nobrainer/nobrainer
     runs-on: [self-hosted, nobrainer-ci-self-hosted-runner]
     steps:
       - name: clone
