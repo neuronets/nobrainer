@@ -52,8 +52,7 @@ jobs:
         run: |
           set -xe
           cd ${{ github.workspace }}
-          #for notebook in $(ls guide/[0-9][0-9]-*.ipynb); do
-          for notebook in $(ls guide/01-getting_started.ipynb); do
+          for notebook in $(ls guide/[0-9][0-9]-*.ipynb); do
             echo "running ${notebook}"
             ${HOME}/ci.sif \
               jupyter nbconvert \
