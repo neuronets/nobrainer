@@ -46,8 +46,12 @@ jobs:
         run: |
           set -xe
           cd ${{ github.workspace }}
-          ${HOME}/ci.sif pip install -e .
-          ${HOME}/ci.sif nobrainer info
+          python -m venv env
+          source env/bin/activate
+          pip install --upgrade pip
+          pip install jupyter matplotlib
+          pip install -e .
+          nobrainer info
       - name: run
         run: |
           set -xe
@@ -55,11 +59,10 @@ jobs:
           #for notebook in $(ls guide/[0-9][0-9]-*.ipynb); do
           for notebook in $(ls guide/03-api_train_binary_segmentation.ipynb); do
             echo "running ${notebook}"
-            ${HOME}/ci.sif \
-              jupyter nbconvert \
-                --execute ${notebook} \
-                --to markdown \
-                --stdout
+            jupyter nbconvert \
+              --execute ${notebook} \
+              --to markdown \
+              --stdout
           done
 
   stop_ec2_runner:
