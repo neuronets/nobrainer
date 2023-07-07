@@ -27,13 +27,11 @@ jobs:
       - name: start_runner
         run: |
           set -xe
-          aws ec2 describe-instances
           output=$(aws ec2 run-instances \
             --instance-type ${AWS_INSTANCE_TYPE} \
             --image-id ${AWS_IMAGE_ID} \
             --security-group-ids ${AWS_SECURITY_GROUP} \
             --count 1)
-          echo ${output}
           EC2_INSTANCE_ID=$(echo ${output} | jq -r ".Instances[0].InstanceId")
           echo "EC2_INSTANCE_ID=${EC2_INSTANCE_ID}" >> "$GITHUB_OUTPUT"
 
@@ -60,7 +58,7 @@ jobs:
           source env/bin/activate
           echo $(which python)
           #for notebook in $(ls guide/[0-9][0-9]-*.ipynb); do
-          for notebook in $(ls guide/03-api_train_binary_segmentation.ipynb); do
+          for notebook in $(ls guide/01-getting_started.ipynb); do
             echo "running ${notebook}"
             jupyter nbconvert \
               --execute ${notebook} \
@@ -69,6 +67,7 @@ jobs:
           done
 
   stop_ec2_runner:
+    if: always()
     runs-on: ubuntu-latest
     needs: [start_ec2_runner, guide_notebooks_regression_ec2]
     env:
