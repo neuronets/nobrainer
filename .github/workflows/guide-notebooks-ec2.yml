@@ -17,7 +17,7 @@ jobs:
         run: |
           set -xe
           sudo apt update
-          sudo apt install -y aws jq
+          sudo apt install -y awscli jq
           mkdir ${HOME}/.aws
           echo "[default]\naws_access_key_id = ${AWS_KEY_ID}\naws_secret_access_key = ${AWS_KEY_SECRET}\nregion = us-east-1" > ${HOME}/.aws/config
       - name: start_runner
@@ -73,7 +73,7 @@ jobs:
         run: |
           set -xe
           sudo apt update
-          sudo apt install -y aws
+          sudo apt install -y awscli
           mkdir ${HOME}/.aws
           echo "[default]\naws_access_key_id = ${AWS_KEY_ID}\naws_secret_access_key = ${AWS_KEY_SECRET}\nregion = us-east-1" > ${HOME}/.aws/config
       - name: stop_runner
