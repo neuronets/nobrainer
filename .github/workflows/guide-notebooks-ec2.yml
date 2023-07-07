@@ -28,6 +28,7 @@ jobs:
             --image-id ${AWS_IMAGE_ID} \
             --security-group-ids ${AWS_SECURITY_GROUP} \
             --count 1)
+          echo ${output}
           EC2_INSTANCE_ID=$(echo ${output} | jq -r ".Instances[0].InstanceId")
           echo "EC2_INSTANCE_ID=${EC2_INSTANCE_ID}" >> "$GITHUB_OUTPUT"
 
