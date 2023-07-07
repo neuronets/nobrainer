@@ -46,25 +46,20 @@ jobs:
         run: |
           set -xe
           cd ${{ github.workspace }}
-          python3 -m venv env
-          source env/bin/activate
-          pip install --upgrade pip
-          pip install jupyter matplotlib
-          pip install -e .
-          nobrainer info
+          ${HOME}/ci.sif pip install -e .
+          ${HOME}/ci.sif nobrainer info
       - name: run
         run: |
           set -xe
           cd ${{ github.workspace }}
-          source env/bin/activate
-          echo $(which python)
           #for notebook in $(ls guide/[0-9][0-9]-*.ipynb); do
           for notebook in $(ls guide/01-getting_started.ipynb); do
             echo "running ${notebook}"
-            jupyter nbconvert \
-              --execute ${notebook} \
-              --to markdown \
-              --stdout
+            ${HOME}/ci.sif \
+              jupyter nbconvert \
+                --execute ${notebook} \
+                --to markdown \
+                --stdout
           done
 
   stop_ec2_runner:
