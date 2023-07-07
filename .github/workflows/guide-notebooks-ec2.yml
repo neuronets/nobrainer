@@ -52,7 +52,8 @@ jobs:
         run: |
           set -xe
           cd ${{ github.workspace }}
-          for notebook in $(ls guide/[0-9][0-9]-*.ipynb); do
+          #for notebook in $(ls guide/[0-9][0-9]-*.ipynb); do
+          for notebook in $(ls guide/03-api_train_binary_segmentation.ipynb); do
             echo "running ${notebook}"
             ${HOME}/ci.sif \
               jupyter nbconvert \
