@@ -25,6 +25,7 @@ jobs:
           echo "region = us-east-1" >> ${HOME}/.aws/credentials
           cat ${HOME}/.aws/credentials
       - name: start_runner
+        id: start_runner
         run: |
           set -xe
           output=$(aws ec2 run-instances \
