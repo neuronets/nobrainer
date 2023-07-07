@@ -11,7 +11,7 @@ jobs:
       AWS_IMAGE_ID: ${{ vars.AWS_IMAGE_ID }}
       AWS_SECURITY_GROUP: ${{ vars.AWS_SECURITY_GROUP }}
     outputs:
-      EC2_INSTANCE_ID: ${{ steps.start_runner.outputs.EC2_INSTANCE_ID
+      EC2_INSTANCE_ID: ${{ steps.start_runner.outputs.EC2_INSTANCE_ID }}
     steps:
       - name: configure_aws
         run: |
