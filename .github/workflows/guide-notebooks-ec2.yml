@@ -23,6 +23,7 @@ jobs:
       - name: start_runner
         run: |
           set -xe
+          aws ec2 describe-instances
           output=$(aws ec2 run-instances \
             --instance-type ${AWS_INSTANCE_TYPE} \
             --image-id ${AWS_IMAGE_ID} \
