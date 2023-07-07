@@ -19,7 +19,10 @@ jobs:
           sudo apt update
           sudo apt install -y awscli jq
           mkdir ${HOME}/.aws
-          echo "[default]\naws_access_key_id = ${AWS_KEY_ID}\naws_secret_access_key = ${AWS_KEY_SECRET}\nregion = us-east-1" > ${HOME}/.aws/credentials
+          echo "[default]" > ${HOME}/.aws/credentials
+          echo "aws_access_key_id = ${AWS_KEY_ID}" >> ${HOME}/.aws/credentials
+          echo "aws_secret_access_key = ${AWS_KEY_SECRET}" >> ${HOME}/.aws/credentials
+          echo "region = us-east-1" >> ${HOME}/.aws/credentials
           cat ${HOME}/.aws/credentials
       - name: start_runner
         run: |
@@ -78,7 +81,11 @@ jobs:
           sudo apt update
           sudo apt install -y awscli
           mkdir ${HOME}/.aws
-          echo "[default]\naws_access_key_id = ${AWS_KEY_ID}\naws_secret_access_key = ${AWS_KEY_SECRET}\nregion = us-east-1" > ${HOME}/.aws/credentials
+          echo "[default]" > ${HOME}/.aws/credentials
+          echo "aws_access_key_id = ${AWS_KEY_ID}" >> ${HOME}/.aws/credentials
+          echo "aws_secret_access_key = ${AWS_KEY_SECRET}" >> ${HOME}/.aws/credentials
+          echo "region = us-east-1" >> ${HOME}/.aws/credentials
+          cat ${HOME}/.aws/credentials
       - name: stop_runner
         env:
           EC2_INSTANCE_ID: ${{ needs.start_ec2_runner.outputs.EC2_INSTANCE_ID }}
