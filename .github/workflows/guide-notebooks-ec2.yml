@@ -37,7 +37,7 @@ jobs:
           echo "EC2_INSTANCE_ID=${EC2_INSTANCE_ID}" >> "$GITHUB_OUTPUT"
 
   guide_notebooks_regression_ec2:
-    runs-on: [self-hosted, nobrainer-ci-ec2]
+    runs-on: [self-hosted, nobrainer-ci-ec2-gpu]
     needs: start_ec2_runner
     steps:
       - name: clone
