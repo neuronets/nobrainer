@@ -74,10 +74,10 @@ the Apache 2.0 license. It was started under the support of NIH R01 EB020470.
 #### Affine Transform
 Afifine transformation including rotation, translation, reflection.
 
-## Guide Jupyter Notebooks [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/neuronets/nobrainer-book)
+## Guide Jupyter Notebooks [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/neuronets/nobrainer)
 
-Please refer to the Jupyter notebooks in the [book](https://github.com/neuronets/nobrainer-book) directory to get
-started with _Nobrainer_. [Try them out](https://colab.research.google.com/github/neuronets/nobrainer-book) in Google Colaboratory!
+Please refer to the Jupyter notebooks in the [guide](/guide) directory to get
+started with _Nobrainer_. [Try them out](https://colab.research.google.com/github/neuronets/nobrainer) in Google Colaboratory!
 
 ## Installation
 
@@ -94,8 +94,8 @@ check the containers for the version of CUDA installed. Nvidia drivers are not i
 the container.
 
 ```
-  docker pull neuronets/nobrainer:latest-gpu
-  singularity pull docker://neuronets/nobrainer:latest-gpu
+$ docker pull neuronets/nobrainer:latest-gpu
+$ singularity pull docker://neuronets/nobrainer:latest-gpu
 ```
 
 #### CPU only
@@ -105,8 +105,8 @@ does not require special hardware. This container, however, should not be used
 for model training (it will be very slow).
 
 ```
-  docker pull neuronets/nobrainer:latest-cpu
-  singularity pull docker://neuronets/nobrainer:latest-cpu
+$ docker pull neuronets/nobrainer:latest-cpu
+$ singularity pull docker://neuronets/nobrainer:latest-cpu
 ```
 
 ### pip
@@ -114,7 +114,7 @@ for model training (it will be very slow).
 _Nobrainer_ can also be installed with pip.
 
 ```
-  pip install nobrainer
+$ pip install nobrainer
 ```
 
 ## Using pre-trained networks
@@ -279,17 +279,15 @@ right is more accurate and more robust than the one on the left.
 
 ## Package layout
 
-- `nobrainer.dataset`: `tf.data.Dataset` creation utilities
 - `nobrainer.io`: input/output methods
 - `nobrainer.layers`: custom layers, which conform to the Keras API
 - `nobrainer.losses`: loss functions for volumetric segmentation
 - `nobrainer.metrics`: metrics for volumetric segmentation
 - `nobrainer.models`: pre-defined Keras models
-- `nobrainer.processing`: API for training and applying estimators
 - `nobrainer.training`: training utilities (supports training on single and multiple GPUs)
 - `nobrainer.transform`: random rigid transformations for data augmentation
-- `nobrainer.volume`: utilities for manipulating and data augmentating volumetric data
-
+- `nobrainer.volume`: `tf.data.Dataset` creation and data augmentation utilities
+-
 ## Citation
 If you use this package, please [cite](https://github.com/neuronets/nobrainer/blob/master/CITATION) it.
 
