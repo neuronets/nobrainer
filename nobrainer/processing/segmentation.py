@@ -87,7 +87,9 @@ class Segmentation(BaseEstimator):
             if multi_gpu:
                 strategy = tf.distribute.MirroredStrategy()
                 if batch_size % strategy.num_replicas_in_sync:
-                    raise ValueError("batch size must be a multiple of the number of GPUs")
+                    raise ValueError(
+                        "batch size must be a multiple of the number of GPUs"
+                    )
 
                 with strategy.scope():
                     _create(base_model)
