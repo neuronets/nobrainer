@@ -56,8 +56,8 @@ jobs:
         run: |
           set -xe
           cd ${{ github.workspace }}
-          #for notebook in $(ls guide/[0-9][0-9]-*.ipynb); do
-          for notebook in $(ls guide/03-api_train_binary_segmentation.ipynb); do
+          git clone https://github.com/neuronets/nobrainer-book.git
+          for notebook in $(ls nobrainer-book/docs/nobrainer-guides/[0-9][0-9]-*.ipynb); do
             echo "running ${notebook}"
             jupyter nbconvert \
               --execute ${notebook} \
