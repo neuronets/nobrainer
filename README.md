@@ -74,10 +74,10 @@ the Apache 2.0 license. It was started under the support of NIH R01 EB020470.
 #### Affine Transform
 Afifine transformation including rotation, translation, reflection.
 
-## Guide Jupyter Notebooks [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/neuronets/nobrainer)
+## Guide Jupyter Notebooks [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/neuronets/nobrainer-book)
 
 Please refer to the Jupyter notebooks in the [guide](https://github.com/neuronets/nobrainer-book/docs/nobrainer-guides) directory to get
-started with _Nobrainer_. [Try them out](https://colab.research.google.com/github/neuronets/nobrainer-book/docs/nobrainer-guides) in Google Colaboratory!
+started with _Nobrainer_. [Try them out](https://colab.research.google.com/github/neuronets/nobrainer-book) in Google Colaboratory!
 
 ## Installation
 
