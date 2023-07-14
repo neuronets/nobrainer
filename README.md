@@ -76,7 +76,7 @@ Afifine transformation including rotation, translation, reflection.
 
 ## Guide Jupyter Notebooks [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/neuronets/nobrainer-book/blob/ohinds-guide-api/)
 
-Please refer to the Jupyter notebooks in the [guide](https://github.com/neuronets/nobrainer-book/docs/nobrainer-guides) directory to get
+Please refer to the Jupyter notebooks in the [guide](https://github.com/neuronets/nobrainer-book/blob/ohinds-guide-api/docs/nobrainer-guides) directory to get
 started with _Nobrainer_. [Try them out](https://colab.research.google.com/github/neuronets/nobrainer-book/blob/ohinds-guide-api/) in Google Colaboratory!
 
 ## Installation
