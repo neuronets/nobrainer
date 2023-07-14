@@ -57,6 +57,7 @@ jobs:
           set -xe
           cd ${{ github.workspace }}
           git clone -b ohinds-guide-api https://github.com/neuronets/nobrainer-book.git
+          source env/bin/activate
           for notebook_script in $(ls nobrainer-book/docs/nobrainer-guides/scripts/*.py); do
             echo "running ${notebook_script}"
             python ${notebook_script}
