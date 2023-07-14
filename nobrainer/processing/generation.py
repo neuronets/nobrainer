@@ -114,16 +114,20 @@ class ProgressiveGeneration(BaseEstimator):
         # wrap the losses to work on multiple GPUs
         with strategy.scope():
             d_loss_object = d_loss(reduction=tf.keras.losses.Reduction.NONE)
+
             def compute_d_loss(labels, predictions):
                 per_example_loss = d_loss_object(labels, predictions)
-                return tf.nn.compute_average_loss(per_example_loss,
-                                                  global_batch_size=batch_size)
+                return tf.nn.compute_average_loss(
+                    per_example_loss, global_batch_size=batch_size
+                )
 
             g_loss_object = g_loss(reduction=tf.keras.losses.Reduction.NONE)
+
             def compute_g_loss(labels, predictions):
                 per_example_loss = g_loss_object(labels, predictions)
-                return tf.nn.compute_average_loss(per_example_loss,
-                                                  global_batch_size=batch_size)
+                return tf.nn.compute_average_loss(
+                    per_example_loss, global_batch_size=batch_size
+                )
 
             d_loss = compute_d_loss
             g_loss = compute_g_loss
@@ -165,7 +169,9 @@ class ProgressiveGeneration(BaseEstimator):
                     self.model_.discriminator.add_resolution()
                 _compile()
 
-                steps_per_epoch = (info.get("epochs") or epochs) // info.get("batch_size")
+                steps_per_epoch = (info.get("epochs") or epochs) // info.get(
+                    "batch_size"
+                )
 
                 # save_best_only is set to False as it is an adversarial loss
                 model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
