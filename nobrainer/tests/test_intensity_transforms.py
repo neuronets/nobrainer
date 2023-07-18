@@ -1,11 +1,9 @@
 import numpy as np
-import pytest
 import tensorflow as tf
 
 from nobrainer import intensity_transforms
 
 
-@pytest.fixture(scope="session")
 def test_addGaussianNoise():
     shape = (10, 10, 10)
     x = np.ones(shape).astype(np.float32)
@@ -27,31 +25,55 @@ def test_addGaussianNoise():
     assert y_out.shape == y.shape
     assert np.sum(noise_x - noise_y) < 1e-5
 
+    # test sending y, but not transforming it
+    x_out, y_out = intensity_transforms.addGaussianNoise(
+        x, y, trans_xy=False, noise_mean=0.0, noise_std=1
+    )
+    x_out = x_out.numpy()
+    assert x_out.shape == x.shape
+    assert np.sum(x_out - x) != 0
+    assert y_out.shape == y.shape
+    np.testing.assert_array_equal(y_out, y)
+
 
 def test_minmaxIntensityScaling():
     x = np.random.rand(10, 10, 10).astype(np.float32)
     y = np.random.randint(0, 2, size=(10, 10, 10)).astype(np.float32)
-    x, y = intensity_transforms.minmaxIntensityScaling(x, y, trans_xy=True)
-    x_out = x.numpy()
-    y_out = y.numpy()
+    x_out, y_out = intensity_transforms.minmaxIntensityScaling(x, y, trans_xy=True)
+    x_out = x_out.numpy()
+    y_out = y_out.numpy()
     assert x_out.min() - 0.0 < 1e-5
     assert y_out.min() - 0.0 < 1e-5
     assert 1 - x_out.max() < 1e-5
     assert 1 - y_out.max() < 1e-5
 
+    x_out, y_out = intensity_transforms.minmaxIntensityScaling(x, y, trans_xy=False)
+    x_out = x_out.numpy()
+    assert x_out.min() - 0.0 < 1e-5
+    assert 1 - x_out.max() < 1e-5
+    np.testing.assert_array_equal(y_out, y)
+
 
 def test_customIntensityScaling():
     x = np.random.rand(10, 10, 10).astype(np.float32)
     y = np.random.randint(0, 2, size=(10, 10, 10)).astype(np.float32)
-    x, y = intensity_transforms.customIntensityScaling(
+    x_out, y_out = intensity_transforms.customIntensityScaling(
         x, y, trans_xy=True, scale_x=[0, 100], scale_y=[0, 3]
     )
-    x_out = x.numpy()
-    y_out = y.numpy()
+    x_out = x_out.numpy()
+    y_out = y_out.numpy()
     assert x_out.min() - 0.0 < 1e-5
     assert y_out.min() - 0.0 < 1e-5
     assert 100 - x_out.max() < 1e-5
     assert 3 - y_out.max() < 1e-5
+
+    x_out, y_out = intensity_transforms.customIntensityScaling(
+        x, y, trans_xy=False, scale_x=[0, 100], scale_y=[0, 3]
+    )
+    x_out = x_out.numpy()
+    assert x_out.min() - 0.0 < 1e-5
+    assert 100 - x_out.max() < 1e-5
+    np.testing.assert_array_equal(y_out, y)
 
 
 def test_intensityMasking():
@@ -64,6 +86,14 @@ def test_intensityMasking():
     results = tf.squeeze(results)
     np.testing.assert_allclose(results.numpy(), expected)
 
+    y = np.random.rand(*x.shape)
+    results, y_out = intensity_transforms.intensityMasking(
+        x, mask_x=mask_x, y=y, trans_xy=False
+    )
+    results = tf.squeeze(results)
+    np.testing.assert_allclose(results.numpy(), expected)
+    np.testing.assert_array_equal(y_out, y)
+
 
 def test_contrastAdjust():
     gamma = 1.5
@@ -75,3 +105,10 @@ def test_contrastAdjust():
     )
     results = intensity_transforms.contrastAdjust(x, gamma=1.5)
     np.testing.assert_allclose(expected, results.numpy(), rtol=1e-05)
+
+    y = np.random.rand(*x.shape)
+    results, y_out = intensity_transforms.contrastAdjust(
+        x, y, trans_xy=False, gamma=1.5
+    )
+    np.testing.assert_allclose(expected, results.numpy(), rtol=1e-05)
+    np.testing.assert_array_equal(y_out, y)
