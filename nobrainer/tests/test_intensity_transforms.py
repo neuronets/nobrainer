@@ -89,7 +89,8 @@ def test_intensityMasking():
 
     y = np.random.rand(*x.shape)
     results, y_out = intensity_transforms.intensityMasking(
-        x, mask_x=mask_x, y=y, trans_xy=False)
+        x, mask_x=mask_x, y=y, trans_xy=False
+    )
     results = tf.squeeze(results)
     np.testing.assert_allclose(results.numpy(), expected)
     np.testing.assert_array_equal(y_out, y)
@@ -107,6 +108,8 @@ def test_contrastAdjust():
     np.testing.assert_allclose(expected, results.numpy(), rtol=1e-05)
 
     y = np.random.rand(*x.shape)
-    results, y_out = intensity_transforms.contrastAdjust(x, y, trans_xy=False, gamma=1.5)
+    results, y_out = intensity_transforms.contrastAdjust(
+        x, y, trans_xy=False, gamma=1.5
+    )
     np.testing.assert_allclose(expected, results.numpy(), rtol=1e-05)
     np.testing.assert_array_equal(y_out, y)
