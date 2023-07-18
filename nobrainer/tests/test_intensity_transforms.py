@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 import tensorflow as tf
 
 from nobrainer import intensity_transforms
