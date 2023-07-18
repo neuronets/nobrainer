@@ -43,8 +43,9 @@ def addGaussianNoise(x, y=None, trans_xy=False, noise_mean=0.0, noise_std=0.1):
 
         y = tf.cast(y, tf.float32)
         return tf.math.add(x, noise), tf.math.add(y, noise)
-    else:
+    if y is None:
         return tf.math.add(x, noise)
+    return tf.math.add(x, noise), y
 
 
 def minmaxIntensityScaling(x, y=None, trans_xy=False):
@@ -90,6 +91,8 @@ def minmaxIntensityScaling(x, y=None, trans_xy=False):
         ymin = tf.cast(tf.reduce_min(y), tf.float32)
         ymax = tf.cast(tf.reduce_max(y), tf.float32)
         y = tf.divide(tf.subtract(y, ymin), tf.add(tf.subtract(ymax, ymin), ep))
+    if y is None:
+        return x
     return x, y
 
 
@@ -151,9 +154,9 @@ def customIntensityScaling(x, y=None, trans_xy=False, scale_x=[0.0, 1.0], scale_
         )
         diff_y = tf.subtract(maxy, miny)
         y = tf.add(tf.multiply(y_norm, diff_y), miny)
-        return x, y
-    else:
+    if y is None:
         return x
+    return x, y
 
 
 def intensityMasking(x, mask_x, y=None, trans_xy=False, mask_y=None):
@@ -206,8 +209,9 @@ def intensityMasking(x, mask_x, y=None, trans_xy=False, mask_y=None):
         if mask_y.shape[0] != y.shape[0] and mask_x.shape[1] != x.shape[1]:
             raise ValueError("Label Masks shape should be same as Label")
         return x, tf.multiply(y, mask_y)
-    else:
+    if y is None:
         return x
+    return x, y
 
 
 def contrastAdjust(x, y=None, trans_xy=False, gamma=1.0):
@@ -265,5 +269,6 @@ def contrastAdjust(x, y=None, trans_xy=False, gamma=1.0):
         y = tf.pow(tf.divide(tf.subtract(y, ymin), tf.add(y_range, ep)), gamma)
         y = tf.add(tf.multiply(y, y_range), ymin)
         return x, y
-    else:
+    if y is None:
         return x
+    return x, y

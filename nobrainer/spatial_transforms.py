@@ -46,9 +46,9 @@ def centercrop(x, y=None, finesize=64, trans_xy=False):
             y = tf.convert_to_tensor(y)
         y = tf.cast(y, tf.float32)
         y = y[y1 : y1 + th, x1 : x1 + tw, :]
-        return x, y
-    else:
+    if y is None:
         return x
+    return x, y
 
 
 def spatialConstantPadding(x, y=None, trans_xy=False, padding_zyx=[1, 1, 1]):
@@ -98,9 +98,9 @@ def spatialConstantPadding(x, y=None, trans_xy=False, padding_zyx=[1, 1, 1]):
             y = tf.convert_to_tensor(y)
         y = tf.cast(y, tf.float32)
         y = tf.pad(y, padding, "CONSTANT")
-        return x, y
-    else:
+    if y is None:
         return x
+    return x, y
 
 
 def randomCrop(x, y=None, trans_xy=False, cropsize=16):
@@ -142,8 +142,9 @@ def randomCrop(x, y=None, trans_xy=False, cropsize=16):
         stacked = tf.stack([x, y], axis=0)
         cropped = tf.image.random_crop(stacked, [2, cropsize, cropsize, x.shape[2]])
         return cropped[0], cropped[1]
-    else:
+    if y is None:
         return tf.image.random_crop(x, [cropsize, cropsize, x.shape[2]])
+    return tf.image.random_crop(x, [cropsize, cropsize, x.shape[2]]), y
 
 
 def resize(x, y=None, trans_xy=False, size=[32, 32], mode="bicubic"):
@@ -189,9 +190,9 @@ def resize(x, y=None, trans_xy=False, size=[32, 32], mode="bicubic"):
             y = tf.convert_to_tensor(y)
         y = tf.cast(y, tf.float32)
         y = tf.image.resize(y, size, method=mode)
-        return x, y
-    else:
+    if y is None:
         return x
+    return x, y
 
 
 def randomflip_leftright(x, y=None, trans_xy=False):
@@ -234,5 +235,6 @@ def randomflip_leftright(x, y=None, trans_xy=False):
         c = tf.image.random_flip_left_right(c, seed=None)
         split_channel = int(c.shape[0] / 2)
         return c[0:split_channel, :, :], c[split_channel : c.shape[0], :, :]
-    else:
+    if y is None:
         return tf.image.random_flip_left_right(x, seed=None)
+    return tf.image.random_flip_left_right(x, seed=None), y

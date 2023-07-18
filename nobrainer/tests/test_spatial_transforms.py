@@ -17,6 +17,17 @@ def test_centercrop():
     assert x.shape[1] == fine & x.shape[0] == fine & x.shape[2] == shape[2]
     assert y.shape[1] == fine & y.shape[0] == fine & y.shape[2] == shape[2]
 
+    # Test for passing y but not transoforming it
+    shape = (10, 10, 10)
+    x = np.ones(shape).astype(np.float32)
+    y = np.random.randint(0, 2, size=shape).astype(np.float32)
+    fine = int(x.shape[1])
+    x, y_out = transformations.centercrop(x, y, trans_xy=False, finesize=fine)
+    x = x.numpy()
+    # Test for output shapes
+    assert x.shape[1] == fine & x.shape[0] == fine & x.shape[2] == shape[2]
+    np.testing.assert_array_equal(y_out, y)
+
     # test for both x and y
     shape = (10, 10, 10)
     x = np.ones(shape).astype(np.float32)
@@ -119,6 +130,12 @@ def test_spatialConstantPadding():
     np.testing.assert_allclose(x_expected, resultx.numpy())
     np.testing.assert_allclose(y_expected, resulty.numpy())
 
+    resultx, resulty = transformations.spatialConstantPadding(
+        x, y, trans_xy=False, padding_zyx=[0, 2, 2]
+    )
+    np.testing.assert_allclose(x_expected, resultx.numpy())
+    np.testing.assert_array_equal(resulty, y)
+
 
 def test_randomCrop():
     x = np.random.rand(10, 10, 10).astype(np.float32)
@@ -129,6 +146,11 @@ def test_randomCrop():
     assert np.shape(res_y.numpy()) == expected_shape
     assert np.all(np.in1d(np.ravel(res_x), np.ravel(x)))
     assert np.all(np.in1d(np.ravel(res_y), np.ravel(y)))
+
+    res_x, res_y = transformations.randomCrop(x, y, trans_xy=False, cropsize=3)
+    assert np.shape(res_x.numpy()) == expected_shape
+    assert np.all(np.in1d(np.ravel(res_x), np.ravel(x)))
+    np.testing.assert_array_equal(res_y, y)
 
 
 def test_resize():
@@ -141,6 +163,12 @@ def test_resize():
     assert np.shape(results_x.numpy()) == expected_shape
     assert np.shape(results_y.numpy()) == expected_shape
 
+    results_x, results_y = transformations.resize(
+        x, y, trans_xy=False, size=[5, 5], mode="bicubic"
+    )
+    assert np.shape(results_x.numpy()) == expected_shape
+    np.testing.assert_array_equal(results_y, y)
+
 
 def test_randomflip_leftright():
     x = np.random.rand(3, 3, 3).astype(np.float32)
@@ -149,3 +177,8 @@ def test_randomflip_leftright():
     expected_shape = (3, 3, 3)
     assert np.shape(res_x.numpy()) == expected_shape
     assert np.shape(res_y.numpy()) == expected_shape
+
+    res_x, res_y = transformations.randomflip_leftright(x, y, trans_xy=False)
+    expected_shape = (3, 3, 3)
+    assert np.shape(res_x.numpy()) == expected_shape
+    np.testing.assert_array_equal(res_y, y)
