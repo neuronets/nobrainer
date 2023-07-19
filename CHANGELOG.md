@@ -1,3 +1,37 @@
+# 0.5.0 (Wed Jul 19 2023)
+
+#### 🚀 Enhancement
+
+- Remove guide [#243](https://github.com/neuronets/nobrainer/pull/243) ([@ohinds](https://github.com/ohinds) [@satra](https://github.com/satra))
+
+#### 🐛 Bug Fix
+
+- [pre-commit.ci] pre-commit autoupdate [#247](https://github.com/neuronets/nobrainer/pull/247) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@satra](https://github.com/satra))
+- Fix #246: Transforms now return labels if passed [#250](https://github.com/neuronets/nobrainer/pull/250) ([@ohinds](https://github.com/ohinds) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- Check out the master branch of the book repo on CI [#249](https://github.com/neuronets/nobrainer/pull/249) ([@ohinds](https://github.com/ohinds))
+- Nobrainer book guide examples run on AWS EC2 as a form of regression testing [#248](https://github.com/neuronets/nobrainer/pull/248) ([@ohinds](https://github.com/ohinds))
+- [pre-commit.ci] pre-commit autoupdate [#236](https://github.com/neuronets/nobrainer/pull/236) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@satra](https://github.com/satra))
+- Multi-GPU support [#242](https://github.com/neuronets/nobrainer/pull/242) ([@ohinds](https://github.com/ohinds) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- [pre-commit.ci] pre-commit autoupdate [#234](https://github.com/neuronets/nobrainer/pull/234) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- [pre-commit.ci] pre-commit autoupdate [#232](https://github.com/neuronets/nobrainer/pull/232) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- [pre-commit.ci] pre-commit autoupdate [#231](https://github.com/neuronets/nobrainer/pull/231) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+
+#### ⚠️ Pushed to `master`
+
+- Update setup.cfg ([@satra](https://github.com/satra))
+- Update ci.yml ([@satra](https://github.com/satra))
+- update python and tensorflow versions ([@satra](https://github.com/satra))
+- [CI] update python and auto versions ([@satra](https://github.com/satra))
+- replace special branch ([@satra](https://github.com/satra))
+
+#### Authors: 3
+
+- [@ohinds](https://github.com/ohinds)
+- [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot])
+- Satrajit Ghosh ([@satra](https://github.com/satra))
+
+---
+
 # 0.4.0 (Tue Oct 18 2022)
 
 #### 🚀 Enhancement
