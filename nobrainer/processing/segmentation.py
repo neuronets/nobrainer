@@ -13,7 +13,9 @@ class Segmentation(BaseEstimator):
 
     state_variables = ["block_shape_", "volume_shape_", "scalar_labels_"]
 
-    def __init__(self, base_model, model_args=None):
+    def __init__(self, base_model, model_args=None, multi_gpu=False):
+        super().__init__(self, multi_gpu=multi_gpu)
+
         if not isinstance(base_model, str):
             self.base_model = base_model.__name__
         else:
@@ -30,7 +32,6 @@ class Segmentation(BaseEstimator):
         dataset_validate=None,
         epochs=1,
         checkpoint_dir=os.getcwd(),
-        multi_gpu=False,
         warm_start=False,
         # TODO: figure out whether optimizer args should be flattened
         optimizer=None,
@@ -75,27 +76,19 @@ class Segmentation(BaseEstimator):
         if warm_start:
             if self.model is None:
                 raise ValueError("warm_start requested, but model is undefined")
-            if multi_gpu:
-                strategy = tf.distribute.MirroredStrategy()
-                with strategy.scope():
-                    _compile()
-            else:
+            with self.strategy.scope():
                 _compile()
         else:
             mod = importlib.import_module("..models", "nobrainer.processing")
             base_model = getattr(mod, self.base_model)
-            if multi_gpu:
-                strategy = tf.distribute.MirroredStrategy()
-                if batch_size % strategy.num_replicas_in_sync:
-                    raise ValueError(
-                        "batch size must be a multiple of the number of GPUs"
-                    )
+            if batch_size % self.strategy.num_replicas_in_sync:
+                raise ValueError(
+                    "batch size must be a multiple of the number of GPUs"
+                )
 
-                with strategy.scope():
-                    _create(base_model)
-                    _compile()
-            else:
+            with self.strategy.scope():
                 _create(base_model)
+                _compile()
                 _compile()
         print(self.model_.summary())
 

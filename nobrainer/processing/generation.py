@@ -21,7 +21,9 @@ class ProgressiveGeneration(BaseEstimator):
         dimensionality=3,
         g_fmap_base=1024,
         d_fmap_base=1024,
+        multi_gpu=False,
     ):
+        super().__init__(self, multi_gpu=multi_gpu)
         self.model_ = None
         self.latent_size = latent_size
         self.label_size = label_size
@@ -45,7 +47,6 @@ class ProgressiveGeneration(BaseEstimator):
         g_loss=losses.Wasserstein,
         d_loss=losses.Wasserstein,
         warm_start=False,
-        multi_gpu=False,
         num_parallel_calls=None,
         save_freq=500,
     ):
@@ -82,12 +83,6 @@ class ProgressiveGeneration(BaseEstimator):
         d_opt_args_tmp.update(**d_opt_args)
         d_opt_args = d_opt_args_tmp
 
-        # for multi gpu training
-        if multi_gpu:
-            strategy = tf.distribute.MirroredStrategy()
-        else:
-            strategy = tf.distribute.get_strategy()
-
         if warm_start:
             if self.model_ is None:
                 raise ValueError("warm_start requested, but model is undefined")
@@ -96,7 +91,7 @@ class ProgressiveGeneration(BaseEstimator):
             from ..training import ProgressiveGANTrainer
 
             # Instantiate the generator and discriminator
-            with strategy.scope():
+            with self.strategy.scope():
                 generator, discriminator = progressivegan(
                     latent_size=self.latent_size,
                     g_fmap_base=self.g_fmap_base,
@@ -112,7 +107,7 @@ class ProgressiveGeneration(BaseEstimator):
             self.current_resolution_ = 0
 
         # wrap the losses to work on multiple GPUs
-        with strategy.scope():
+        with self.strategy.scope():
             d_loss_object = d_loss(reduction=tf.keras.losses.Reduction.NONE)
 
             def compute_d_loss(labels, predictions):
@@ -149,7 +144,7 @@ class ProgressiveGeneration(BaseEstimator):
                 continue
             # create a train dataset with features for resolution
             batch_size = info.get("batch_size")
-            if batch_size % strategy.num_replicas_in_sync:
+            if batch_size % self.strategy.num_replicas_in_sync:
                 raise ValueError("batch size must be a multiple of the number of GPUs")
 
             dataset = get_dataset(
@@ -162,7 +157,7 @@ class ProgressiveGeneration(BaseEstimator):
                 normalizer=info.get("normalizer") or normalizer,
             )
 
-            with strategy.scope():
+            with self.strategy.scope():
                 # grow the networks by one (2^x) resolution
                 if resolution > self.current_resolution_:
                     self.model_.generator.add_resolution()
