@@ -60,11 +60,14 @@ jobs:
           cd nobrainer-book
 
           # if there is a matching book branch, switch to it
-          if [ $(git ls-remote --heads https://github.com/neuronets/nobrainer-book.git ${{ github.refname }} | wc -l -ne 0) ]; then
+          if [ $(git ls-remote --heads https://github.com/neuronets/nobrainer-book.git ${{ github.refname }} | wc -l) -ne 0 ]; then
             echo "Checking out branch ${{ github.refname }}"
             git checkout ${{ github.refname }};
+          else
+            echo "No matching branch found, sticking with the default"
           fi
 
+          cd ${{ github.workspace }}
           source env/bin/activate
           for notebook_script in $(ls docs/nobrainer-guides/scripts/*.py); do
             echo "running ${notebook_script}"
