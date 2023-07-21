@@ -34,6 +34,12 @@ class BaseEstimator:
         self.model_.save(save_dir)
         model_info = {"classname": self.__class__.__name__, "__init__": {}}
         for key in inspect.signature(self.__init__).parameters:
+            # TODO this assumes that all parameters passed to __init__
+            # are stored as members, which doesn't leave room for
+            # parameters that are specific to the runtime context.
+            # (e.g. multi_gpu).
+            if key == 'multi_gpu':
+                continue
             model_info["__init__"][key] = getattr(self, key)
         for val in self.state_variables:
             model_info[val] = getattr(self, val)
