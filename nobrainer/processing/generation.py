@@ -23,7 +23,7 @@ class ProgressiveGeneration(BaseEstimator):
         d_fmap_base=1024,
         multi_gpu=False,
     ):
-        super().__init__(self, multi_gpu=multi_gpu)
+        super().__init__(multi_gpu=multi_gpu)
         self.model_ = None
         self.latent_size = latent_size
         self.label_size = label_size

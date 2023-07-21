@@ -14,7 +14,7 @@ class Segmentation(BaseEstimator):
     state_variables = ["block_shape_", "volume_shape_", "scalar_labels_"]
 
     def __init__(self, base_model, model_args=None, multi_gpu=False):
-        super().__init__(self, multi_gpu=multi_gpu)
+        super().__init__(multi_gpu=multi_gpu)
 
         if not isinstance(base_model, str):
             self.base_model = base_model.__name__
