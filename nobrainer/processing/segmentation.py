@@ -89,7 +89,6 @@ class Segmentation(BaseEstimator):
             with self.strategy.scope():
                 _create(base_model)
                 _compile()
-                _compile()
         print(self.model_.summary())
 
         train_steps = get_steps_per_epoch(
