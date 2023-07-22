@@ -82,9 +82,7 @@ class Segmentation(BaseEstimator):
             mod = importlib.import_module("..models", "nobrainer.processing")
             base_model = getattr(mod, self.base_model)
             if batch_size % self.strategy.num_replicas_in_sync:
-                raise ValueError(
-                    "batch size must be a multiple of the number of GPUs"
-                )
+                raise ValueError("batch size must be a multiple of the number of GPUs")
 
             with self.strategy.scope():
                 _create(base_model)
