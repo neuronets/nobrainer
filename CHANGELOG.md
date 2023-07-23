@@ -6,7 +6,7 @@
 
 #### 🐛 Bug Fix
 
-- Fix: Update Dockerfiles to download models from the `osf-storage` datalad data source [#252](https://github.com/neuronets/nobrainer/pull/252) ([@kabilar](https://github.com/kabilar))
+- Fix: Update Dockerfiles to download models from the `osf-storage` DataLad data source [#252](https://github.com/neuronets/nobrainer/pull/252) ([@kabilar](https://github.com/kabilar))
 
 # 0.5.0 (Wed Jul 19 2023)
 
