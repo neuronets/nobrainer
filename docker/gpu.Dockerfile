@@ -15,7 +15,7 @@ RUN git config --global user.email "neuronets@example.com" \
     && git config --global user.name "Neuronets maintainers"
 RUN datalad clone https://github.com/neuronets/trained-models /models \
   && cd /models && git-annex enableremote osf-storage \
-  && datalad get -r .
+  && datalad get -s osf-storage .
 ENV LC_ALL=C.UTF-8 \
     LANG=C.UTF-8
 WORKDIR "/work"
