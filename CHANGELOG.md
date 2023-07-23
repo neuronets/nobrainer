@@ -1,5 +1,9 @@
 # Upcoming
 
+#### 🚀 Enhancement
+
+- Update: Add Actions for Docker image build [#252](https://github.com/neuronets/nobrainer/pull/252) ([@kabilar](https://github.com/kabilar))
+
 #### 🐛 Bug Fix
 
 - Fix: Update Dockerfiles to download models from the `osf-storage` datalad data source [#252](https://github.com/neuronets/nobrainer/pull/252) ([@kabilar](https://github.com/kabilar))
