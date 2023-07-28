@@ -1,4 +1,4 @@
-FROM tensorflow/tensorflow:2.10.0-gpu-jupyter
+FROM tensorflow/tensorflow:2.13.0-gpu-jupyter
 RUN curl -sSL http://neuro.debian.net/lists/focal.us-nh.full | tee /etc/apt/sources.list.d/neurodebian.sources.list \
   && export GNUPGHOME="$(mktemp -d)" \
   && echo "disable-ipv6" >> ${GNUPGHOME}/dirmngr.conf \
@@ -8,8 +8,7 @@ RUN curl -sSL http://neuro.debian.net/lists/focal.us-nh.full | tee /etc/apt/sour
   && apt-get install -y git-annex-standalone git \
   && rm -rf /tmp/*
 COPY [".", "/opt/nobrainer"]
-RUN cd /opt/nobrainer \
-    && sed -i 's/tensorflow >=/tensorflow-gpu >=/g' setup.cfg
+RUN cd /opt/nobrainer
 RUN python3 -m pip install --no-cache-dir /opt/nobrainer datalad datalad-osf
 RUN git config --global user.email "neuronets@example.com" \
     && git config --global user.name "Neuronets maintainers"
