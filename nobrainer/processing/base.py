@@ -8,11 +8,20 @@ import pickle as pk
 import tensorflow as tf
 
 
+def get_strategy(multi_gpu):
+    if multi_gpu:
+        return tf.distribute.MirroredStrategy()
+    return tf.distribute.get_strategy()
+
+
 class BaseEstimator:
     """Base class for all high-level models in Nobrainer."""
 
     state_variables = []
     model_ = None
+
+    def __init__(self, multi_gpu=False):
+        self.strategy = get_strategy(multi_gpu)
 
     @property
     def model(self):
@@ -25,6 +34,12 @@ class BaseEstimator:
         self.model_.save(save_dir)
         model_info = {"classname": self.__class__.__name__, "__init__": {}}
         for key in inspect.signature(self.__init__).parameters:
+            # TODO this assumes that all parameters passed to __init__
+            # are stored as members, which doesn't leave room for
+            # parameters that are specific to the runtime context.
+            # (e.g. multi_gpu).
+            if key == "multi_gpu":
+                continue
             model_info["__init__"][key] = getattr(self, key)
         for val in self.state_variables:
             model_info[val] = getattr(self, val)
@@ -47,13 +62,9 @@ class BaseEstimator:
         del model_info["__init__"]
         for key, value in model_info.items():
             setattr(klass, key, value)
-        if multi_gpu:
-            strategy = tf.distribute.MirroredStrategy()
-            with strategy.scope():
-                klass.model_ = tf.keras.models.load_model(
-                    model_dir, custom_objects=custom_objects, compile=compile
-                )
-        else:
+        klass.strategy = get_strategy(multi_gpu)
+
+        with klass.strategy.scope():
             klass.model_ = tf.keras.models.load_model(
                 model_dir, custom_objects=custom_objects, compile=compile
             )
