@@ -36,7 +36,7 @@ class Segmentation(BaseEstimator):
         dataset_train,
         dataset_validate=None,
         epochs=1,
-        checkpoint_dir=None,
+        checkpoint_file_path=None,
         warm_start=False,
         # TODO: figure out whether optimizer args should be flattened
         optimizer=None,
@@ -64,8 +64,8 @@ class Segmentation(BaseEstimator):
             opt_args = opt_args_tmp
 
         checkpoint_tracker = None
-        if checkpoint_dir:
-            checkpoint_tracker = CheckpointTracker(self, checkpoint_dir)
+        if checkpoint_file_path:
+            checkpoint_tracker = CheckpointTracker(self, checkpoint_file_path)
 
         def _create(base_model):
             # Instantiate and compile the model
