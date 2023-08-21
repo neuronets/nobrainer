@@ -1,4 +1,5 @@
 import importlib
+import logging
 import os
 
 import tensorflow as tf
@@ -6,6 +7,9 @@ import tensorflow as tf
 from .base import BaseEstimator
 from .. import losses, metrics
 from ..dataset import get_steps_per_epoch
+
+
+logging.getLogger().setLevel(logging.INFO)
 
 
 class Segmentation(BaseEstimator):
@@ -32,6 +36,7 @@ class Segmentation(BaseEstimator):
         dataset_validate=None,
         epochs=1,
         checkpoint_dir=None,
+        model_checkpoint=None,
         warm_start=False,
         # TODO: figure out whether optimizer args should be flattened
         optimizer=None,
@@ -78,7 +83,7 @@ class Segmentation(BaseEstimator):
                 model_file = max(glob.glob(os.path.join(checkpoint_dir, 'checkpoint-epoch*')),
                                  key=os.path.getctime())
                 if model_file:
-                    logging.error("Found checkpoint {model_file}. Loading for warm start.")
+                    logging.info("Found checkpoint {model_file}. Loading for warm start.")
                     self.model = tf.keras.models.load_model(model_file)
 
             if self.model is None:
@@ -94,7 +99,7 @@ class Segmentation(BaseEstimator):
             with self.strategy.scope():
                 _create(base_model)
                 _compile()
-        print(self.model_.summary())
+        self.model_.summary()
 
         train_steps = get_steps_per_epoch(
             n_volumes=dataset_train.n_volumes,
