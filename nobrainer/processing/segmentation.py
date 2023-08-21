@@ -9,7 +9,6 @@ from .checkpoint import CheckpointTracker
 from .. import losses, metrics
 from ..dataset import get_steps_per_epoch
 
-
 logging.getLogger().setLevel(logging.INFO)
 
 
@@ -87,7 +86,9 @@ class Segmentation(BaseEstimator):
                 self = checkpoint_tracker.load()
 
             if self.model is None:
-                raise ValueError("warm_start requested, but model is undefined and no checkpoints were found")
+                raise ValueError(
+                    "warm_start requested, but model is undefined and no checkpoints were found"
+                )
             with self.strategy.scope():
                 _compile()
         else:
