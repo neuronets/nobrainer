@@ -31,7 +31,7 @@ class Segmentation(BaseEstimator):
         dataset_train,
         dataset_validate=None,
         epochs=1,
-        checkpoint_dir=os.getcwd(),
+        checkpoint_dir=None,
         warm_start=False,
         # TODO: figure out whether optimizer args should be flattened
         optimizer=None,
@@ -74,8 +74,15 @@ class Segmentation(BaseEstimator):
             )
 
         if warm_start:
+            if checkpoint_dir:
+                model_file = max(glob.glob(os.path.join(checkpoint_dir, 'checkpoint-epoch*')),
+                                 key=os.path.getctime())
+                if model_file:
+                    logging.error("Found checkpoint {model_file}. Loading for warm start.")
+                    self.model = tf.keras.models.load_model(model_file)
+
             if self.model is None:
-                raise ValueError("warm_start requested, but model is undefined")
+                raise ValueError("warm_start requested, but model is undefined and no checkpoints were found")
             with self.strategy.scope():
                 _compile()
         else:
@@ -105,13 +112,21 @@ class Segmentation(BaseEstimator):
                 batch_size=batch_size,
             )
 
-        # TODO add checkpoint
+        callbacks = []
+        if checkpoint_dir:
+            if not model_checkpoint:
+                model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
+                    filepath=os.path.join(checkpoint_dir, 'checkpoint-epoch_{epoch:03d}')
+                )
+            callbacks.append(model_checkpoint)
+
         self.model_.fit(
             dataset_train,
             epochs=epochs,
             steps_per_epoch=train_steps,
             validation_data=dataset_validate,
             validation_steps=evaluate_steps,
+            callbacks=callbacks,
         )
 
         return self
