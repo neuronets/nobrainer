@@ -5,6 +5,7 @@ import os
 import tensorflow as tf
 
 from .base import BaseEstimator
+from .checkpoint import CheckpointTracker
 from .. import losses, metrics
 from ..dataset import get_steps_per_epoch
 
@@ -36,7 +37,6 @@ class Segmentation(BaseEstimator):
         dataset_validate=None,
         epochs=1,
         checkpoint_dir=None,
-        model_checkpoint=None,
         warm_start=False,
         # TODO: figure out whether optimizer args should be flattened
         optimizer=None,
@@ -63,6 +63,10 @@ class Segmentation(BaseEstimator):
             opt_args_tmp.update(**opt_args)
             opt_args = opt_args_tmp
 
+        checkpoint_tracker = None
+        if checkpoint_dir:
+            checkpoint_tracker = CheckpointTracker(self, checkpoint_dir)
+
         def _create(base_model):
             # Instantiate and compile the model
             self.model_ = base_model(
@@ -79,12 +83,8 @@ class Segmentation(BaseEstimator):
             )
 
         if warm_start:
-            if checkpoint_dir:
-                model_file = max(glob.glob(os.path.join(checkpoint_dir, 'checkpoint-epoch*')),
-                                 key=os.path.getctime())
-                if model_file:
-                    logging.info("Found checkpoint {model_file}. Loading for warm start.")
-                    self.model = tf.keras.models.load_model(model_file)
+            if checkpoint_tracker:
+                self = checkpoint_tracker.load()
 
             if self.model is None:
                 raise ValueError("warm_start requested, but model is undefined and no checkpoints were found")
@@ -118,12 +118,8 @@ class Segmentation(BaseEstimator):
             )
 
         callbacks = []
-        if checkpoint_dir:
-            if not model_checkpoint:
-                model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
-                    filepath=os.path.join(checkpoint_dir, 'checkpoint-epoch_{epoch:03d}')
-                )
-            callbacks.append(model_checkpoint)
+        if checkpoint_tracker:
+            callbacks.append(checkpoint_tracker)
 
         self.model_.fit(
             dataset_train,
