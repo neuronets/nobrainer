@@ -20,7 +20,12 @@ class BaseEstimator:
     state_variables = []
     model_ = None
 
-    def __init__(self, multi_gpu=False):
+    def __init__(self, checkpoint_filepath=None, multi_gpu=False):
+        self.checkpoint_tracker = None
+        if checkpoint_filepath:
+            from .checkpoint import CheckpointTracker
+            self.checkpoint_tracker = CheckpointTracker(self, checkpoint_filepath)
+
         self.strategy = get_strategy(multi_gpu)
 
     @property
@@ -38,7 +43,7 @@ class BaseEstimator:
             # are stored as members, which doesn't leave room for
             # parameters that are specific to the runtime context.
             # (e.g. multi_gpu).
-            if key == "multi_gpu":
+            if key == "multi_gpu" or key == "checkpoint_filepath":
                 continue
             model_info["__init__"][key] = getattr(self, key)
         for val in self.state_variables:
@@ -49,7 +54,7 @@ class BaseEstimator:
 
     @classmethod
     def load(cls, model_dir, multi_gpu=False, custom_objects=None, compile=False):
-        """Saves a trained model"""
+        """Loads a trained model from a save directory"""
         model_dir = Path(str(model_dir).rstrip(os.pathsep))
         assert model_dir.exists() and model_dir.is_dir()
         model_file = model_dir / "model_params.pkl"
@@ -69,6 +74,14 @@ class BaseEstimator:
                 model_dir, custom_objects=custom_objects, compile=compile
             )
         return klass
+
+    @classmethod
+    def load_latest(cls, checkpoint_filepath):
+        from .checkpoint import CheckpointTracker
+        checkpoint_tracker = CheckpointTracker(cls, checkpoint_filepath)
+        estimator = checkpoint_tracker.load()
+        estimator.checkpoint_tracker = checkpoint_tracker
+        return estimator
 
 
 class TransformerMixin:

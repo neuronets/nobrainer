@@ -5,7 +5,6 @@ import os
 import tensorflow as tf
 
 from .base import BaseEstimator
-from .checkpoint import CheckpointTracker
 from .. import losses, metrics
 from ..dataset import get_steps_per_epoch
 
@@ -18,8 +17,8 @@ class Segmentation(BaseEstimator):
 
     state_variables = ["block_shape_", "volume_shape_", "scalar_labels_"]
 
-    def __init__(self, base_model, model_args=None, multi_gpu=False):
-        super().__init__(multi_gpu=multi_gpu)
+    def __init__(self, base_model, model_args=None, checkpoint_filepath=None, multi_gpu=False):
+        super().__init__(checkpoint_filepath=checkpoint_filepath, multi_gpu=multi_gpu)
 
         if not isinstance(base_model, str):
             self.base_model = base_model.__name__
@@ -36,8 +35,6 @@ class Segmentation(BaseEstimator):
         dataset_train,
         dataset_validate=None,
         epochs=1,
-        checkpoint_file_path=None,
-        warm_start=False,
         # TODO: figure out whether optimizer args should be flattened
         optimizer=None,
         opt_args=None,
@@ -63,10 +60,6 @@ class Segmentation(BaseEstimator):
             opt_args_tmp.update(**opt_args)
             opt_args = opt_args_tmp
 
-        checkpoint_tracker = None
-        if checkpoint_file_path:
-            checkpoint_tracker = CheckpointTracker(self, checkpoint_file_path)
-
         def _create(base_model):
             # Instantiate and compile the model
             self.model_ = base_model(
@@ -82,15 +75,7 @@ class Segmentation(BaseEstimator):
                 metrics=metrics,
             )
 
-        if warm_start:
-            if checkpoint_tracker:
-                self = checkpoint_tracker.load()
-
-            if self.model is None:
-                raise ValueError("warm_start requested, but model is undefined and no checkpoints were found")
-            with self.strategy.scope():
-                _compile()
-        else:
+        if self.model is None:
             mod = importlib.import_module("..models", "nobrainer.processing")
             base_model = getattr(mod, self.base_model)
             if batch_size % self.strategy.num_replicas_in_sync:
@@ -98,7 +83,8 @@ class Segmentation(BaseEstimator):
 
             with self.strategy.scope():
                 _create(base_model)
-                _compile()
+        with self.strategy.scope():
+            _compile()
         self.model_.summary()
 
         train_steps = get_steps_per_epoch(
@@ -118,8 +104,8 @@ class Segmentation(BaseEstimator):
             )
 
         callbacks = []
-        if checkpoint_tracker:
-            callbacks.append(checkpoint_tracker)
+        if self.checkpoint_tracker:
+            callbacks.append(self.checkpoint_tracker)
 
         self.model_.fit(
             dataset_train,
