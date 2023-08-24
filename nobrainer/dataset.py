@@ -16,7 +16,7 @@ from .volume import binarize, replace, standardize, to_blocks
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
 
-def tfrecord_dataset(
+def _tfrecord_dataset(
     file_pattern,
     volume_shape,
     shuffle,
@@ -61,7 +61,7 @@ def tfrecord_dataset(
     return dataset
 
 
-def get_dataset(
+def _get_dataset(
     file_pattern,
     n_classes,
     batch_size,
@@ -132,7 +132,7 @@ def get_dataset(
     # two value per iteration: (feature, label).
     shuffle = bool(shuffle_buffer_size)
     compressed = _is_gzipped(files[0], filesys=fs)
-    dataset = tfrecord_dataset(
+    dataset = _tfrecord_dataset(
         file_pattern=file_pattern,
         volume_shape=volume_shape,
         shuffle=shuffle,
@@ -313,7 +313,7 @@ class Dataset:
         self.volume_shape = volume_shape
 
         # replace shard formatting code with * for globbing
-        dataset = get_dataset(
+        dataset = _get_dataset(
             file_pattern=template,
             n_classes=self.n_classes,
             batch_size=self.batch_size,
