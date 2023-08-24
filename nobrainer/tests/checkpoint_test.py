@@ -60,11 +60,19 @@ def test_warm_start_workflow(tmp_path):
     if not os.path.exists(checkpoint_dir):
         os.mkdir(checkpoint_dir)
 
-    try:
-        bem = Segmentation.load_latest(checkpoint_filepath=checkpoint_filepath)
-    except (AssertionError, ValueError):
-        bem = Segmentation(meshnet, checkpoint_filepath=checkpoint_filepath)
-    bem.fit(
-        dataset_train=train,
-        epochs=2,
-    )
+    for iteration in range(2):
+        try:
+            bem = Segmentation.load_latest(checkpoint_filepath=checkpoint_filepath)
+            assert iteration == 1
+            assert bem.model is not None
+            for layer in bem.model.layers:
+                for weight_array in layer.get_weights():
+                    assert np.count_nonzero(weight_array)
+        except (AssertionError, ValueError):
+            bem = Segmentation(meshnet, checkpoint_filepath=checkpoint_filepath)
+            assert iteration == 0
+            assert bem.model is None
+        bem.fit(
+            dataset_train=train,
+            epochs=2,
+        )
