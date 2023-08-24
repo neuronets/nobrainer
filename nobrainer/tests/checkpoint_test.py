@@ -1,12 +1,14 @@
 """Tests for `nobrainer.processing.checkpoint`."""
 
-from nobrainer.processing.segmentation import Segmentation
-from nobrainer.models import meshnet
+import os
+
 import numpy as np
 from numpy.testing import assert_allclose
-import os
 import pytest
 import tensorflow as tf
+
+from nobrainer.models import meshnet
+from nobrainer.processing.segmentation import Segmentation
 
 
 def _get_toy_dataset():
@@ -28,10 +30,11 @@ def _assert_model_weights_allclose(model1, model2):
         for index in range(len(weights1)):
             assert_allclose(weights1[index], weights2[index], rtol=1e-06, atol=1e-08)
 
+
 def test_checkpoint(tmp_path):
     train = _get_toy_dataset()
 
-    checkpoint_filepath = os.path.join(tmp_path, 'checkpoint-epoch_{epoch:03d}')
+    checkpoint_filepath = os.path.join(tmp_path, "checkpoint-epoch_{epoch:03d}")
     model1 = Segmentation(meshnet, checkpoint_filepath=checkpoint_filepath)
     model1.fit(
         dataset_train=train,

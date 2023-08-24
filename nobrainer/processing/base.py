@@ -24,6 +24,7 @@ class BaseEstimator:
         self.checkpoint_tracker = None
         if checkpoint_filepath:
             from .checkpoint import CheckpointTracker
+
             self.checkpoint_tracker = CheckpointTracker(self, checkpoint_filepath)
 
         self.strategy = get_strategy(multi_gpu)
@@ -78,6 +79,7 @@ class BaseEstimator:
     @classmethod
     def load_latest(cls, checkpoint_filepath):
         from .checkpoint import CheckpointTracker
+
         checkpoint_tracker = CheckpointTracker(cls, checkpoint_filepath)
         estimator = checkpoint_tracker.load()
         estimator.checkpoint_tracker = checkpoint_tracker
