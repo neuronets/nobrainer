@@ -20,7 +20,13 @@ class BaseEstimator:
     state_variables = []
     model_ = None
 
-    def __init__(self, multi_gpu=False):
+    def __init__(self, checkpoint_filepath=None, multi_gpu=False):
+        self.checkpoint_tracker = None
+        if checkpoint_filepath:
+            from .checkpoint import CheckpointTracker
+
+            self.checkpoint_tracker = CheckpointTracker(self, checkpoint_filepath)
+
         self.strategy = get_strategy(multi_gpu)
 
     @property
@@ -38,7 +44,7 @@ class BaseEstimator:
             # are stored as members, which doesn't leave room for
             # parameters that are specific to the runtime context.
             # (e.g. multi_gpu).
-            if key == "multi_gpu":
+            if key == "multi_gpu" or key == "checkpoint_filepath":
                 continue
             model_info["__init__"][key] = getattr(self, key)
         for val in self.state_variables:
@@ -49,7 +55,7 @@ class BaseEstimator:
 
     @classmethod
     def load(cls, model_dir, multi_gpu=False, custom_objects=None, compile=False):
-        """Saves a trained model"""
+        """Loads a trained model from a save directory"""
         model_dir = Path(str(model_dir).rstrip(os.pathsep))
         assert model_dir.exists() and model_dir.is_dir()
         model_file = model_dir / "model_params.pkl"
@@ -69,6 +75,33 @@ class BaseEstimator:
                 model_dir, custom_objects=custom_objects, compile=compile
             )
         return klass
+
+    @classmethod
+    def init_with_checkpoints(cls, model_name, checkpoint_filepath):
+        """Initialize a model for training, either from the latest
+        checkpoint found, or from scratch if no checkpoints are
+        found. This is useful for long-running model fits that may be
+        interrupted or preepmted during training and need to pick up
+        where they left off.
+
+        model_name: str or Module in nobrainer.models, the base model
+        for this estimator.
+
+        checkpoint_filepath: str, path to which checkpoints will be
+        saved and loaded. Supports the epoch and block flormating
+        parameters supported by tensorflows ModelCheckpoint,
+        e.g. <path_to_checkpoint_dir>/{epoch:03d}
+
+        """
+        from .checkpoint import CheckpointTracker
+
+        checkpoint_tracker = CheckpointTracker(cls, checkpoint_filepath)
+        estimator = checkpoint_tracker.load()
+        if not estimator:
+            estimator = cls(model_name)
+        estimator.checkpoint_tracker = checkpoint_tracker
+        checkpoint_tracker.estimator = estimator
+        return estimator
 
 
 class TransformerMixin:
