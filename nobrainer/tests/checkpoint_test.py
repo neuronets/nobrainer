@@ -4,7 +4,6 @@ import os
 
 import numpy as np
 from numpy.testing import assert_allclose
-import pytest
 import tensorflow as tf
 
 from nobrainer.models import meshnet

@@ -6,8 +6,6 @@ import os
 
 import tensorflow as tf
 
-from .base import BaseEstimator
-
 
 class CheckpointTracker(tf.keras.callbacks.ModelCheckpoint):
     """Class for saving/loading estimators at/from checkpoints."""
