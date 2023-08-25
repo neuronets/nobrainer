@@ -45,7 +45,7 @@ jobs:
           EC2_INSTANCE_ID: ${{ needs.start_ec2_runner.outputs.EC2_INSTANCE_ID }}
         run: |
           set -xe
-          if [[ "$(ec2metadata --instance-id)" -ne "${EC2_INSTANCE_ID}" ]]; then
+          if [[ $(ec2metadata --instance-id) != ${EC2_INSTANCE_ID} ]]; then
             echo "Running on the wrong instance! Bailing, but try rerunning"
             exit 1
           fi
