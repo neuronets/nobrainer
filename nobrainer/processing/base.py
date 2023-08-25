@@ -77,12 +77,30 @@ class BaseEstimator:
         return klass
 
     @classmethod
-    def load_latest(cls, checkpoint_filepath):
+    def init_with_checkpoints(cls, model_name, checkpoint_filepath):
+        """Initialize a model for training, either from the latest
+        checkpoint found, or from scratch if no checkpoints are
+        found. This is useful for long-running model fits that may be
+        interrupted or preepmted during training and need to pick up
+        where they left off.
+
+        model_name: str or Module in nobrainer.models, the base model
+        for this estimator.
+
+        checkpoint_filepath: str, path to which checkpoints will be
+        saved and loaded. Supports the epoch and block flormating
+        parameters supported by tensorflows ModelCheckpoint,
+        e.g. <path_to_checkpoint_dir>/{epoch:03d}
+
+        """
         from .checkpoint import CheckpointTracker
 
         checkpoint_tracker = CheckpointTracker(cls, checkpoint_filepath)
         estimator = checkpoint_tracker.load()
+        if not estimator:
+            estimator = cls(model_name)
         estimator.checkpoint_tracker = checkpoint_tracker
+        checkpoint_tracker.estimator = estimator
         return estimator
 
 

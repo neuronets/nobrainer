@@ -34,43 +34,52 @@ def test_checkpoint(tmp_path):
     train = _get_toy_dataset()
 
     checkpoint_filepath = os.path.join(tmp_path, "checkpoint-epoch_{epoch:03d}")
-    model1 = Segmentation(meshnet, checkpoint_filepath=checkpoint_filepath)
+    model1 = Segmentation.init_with_checkpoints(
+        meshnet,
+        checkpoint_filepath=checkpoint_filepath,
+    )
     model1.fit(
         dataset_train=train,
         epochs=2,
     )
 
-    model2 = Segmentation.load_latest(checkpoint_filepath=checkpoint_filepath)
+    model2 = Segmentation.init_with_checkpoints(
+        meshnet,
+        checkpoint_filepath=checkpoint_filepath,
+    )
     _assert_model_weights_allclose(model1, model2)
     model2.fit(
         dataset_train=train,
         epochs=3,
     )
 
-    model3 = Segmentation.load_latest(checkpoint_filepath=checkpoint_filepath)
+    model3 = Segmentation.init_with_checkpoints(
+        meshnet,
+        checkpoint_filepath=checkpoint_filepath,
+    )
     _assert_model_weights_allclose(model2, model3)
 
 
 def test_warm_start_workflow(tmp_path):
     train = _get_toy_dataset()
 
-    checkpoint_dir = os.path.join("checkpoints")
+    checkpoint_dir = os.path.join(tmp_path, "checkpoints")
     checkpoint_filepath = os.path.join(checkpoint_dir, "{epoch:03d}")
     if not os.path.exists(checkpoint_dir):
         os.mkdir(checkpoint_dir)
 
     for iteration in range(2):
-        try:
-            bem = Segmentation.load_latest(checkpoint_filepath=checkpoint_filepath)
-            assert iteration == 1
+        bem = Segmentation.init_with_checkpoints(
+            meshnet,
+            checkpoint_filepath=checkpoint_filepath,
+        )
+        if iteration == 0:
+            assert bem.model is None
+        else:
             assert bem.model is not None
             for layer in bem.model.layers:
                 for weight_array in layer.get_weights():
                     assert np.count_nonzero(weight_array)
-        except (AssertionError, ValueError):
-            bem = Segmentation(meshnet, checkpoint_filepath=checkpoint_filepath)
-            assert iteration == 0
-            assert bem.model is None
         bem.fit(
             dataset_train=train,
             epochs=2,
