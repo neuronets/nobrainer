@@ -1,5 +1,5 @@
 import importlib
-import os
+import logging
 
 import tensorflow as tf
 
@@ -7,14 +7,18 @@ from .base import BaseEstimator
 from .. import losses, metrics
 from ..dataset import get_steps_per_epoch
 
+logging.getLogger().setLevel(logging.INFO)
+
 
 class Segmentation(BaseEstimator):
     """Perform segmentation type operations"""
 
     state_variables = ["block_shape_", "volume_shape_", "scalar_labels_"]
 
-    def __init__(self, base_model, model_args=None, multi_gpu=False):
-        super().__init__(multi_gpu=multi_gpu)
+    def __init__(
+        self, base_model, model_args=None, checkpoint_filepath=None, multi_gpu=False
+    ):
+        super().__init__(checkpoint_filepath=checkpoint_filepath, multi_gpu=multi_gpu)
 
         if not isinstance(base_model, str):
             self.base_model = base_model.__name__
@@ -31,8 +35,6 @@ class Segmentation(BaseEstimator):
         dataset_train,
         dataset_validate=None,
         epochs=1,
-        checkpoint_dir=os.getcwd(),
-        warm_start=False,
         # TODO: figure out whether optimizer args should be flattened
         optimizer=None,
         opt_args=None,
@@ -69,12 +71,7 @@ class Segmentation(BaseEstimator):
                 metrics=metrics,
             )
 
-        if warm_start:
-            if self.model is None:
-                raise ValueError("warm_start requested, but model is undefined")
-            with self.strategy.scope():
-                _compile()
-        else:
+        if self.model is None:
             mod = importlib.import_module("..models", "nobrainer.processing")
             base_model = getattr(mod, self.base_model)
             if batch_size % self.strategy.num_replicas_in_sync:
@@ -82,16 +79,20 @@ class Segmentation(BaseEstimator):
 
             with self.strategy.scope():
                 _create(base_model)
-                _compile()
-        print(self.model_.summary())
+        with self.strategy.scope():
+            _compile()
+        self.model_.summary()
 
-        # TODO add checkpoint
+        callbacks = []
+        if self.checkpoint_tracker:
+            callbacks.append(self.checkpoint_tracker)
         self.model_.fit(
             dataset_train,
             epochs=epochs,
             steps_per_epoch=dataset_train.get_steps_per_epoch(batch_size),
             validation_data=dataset_validate,
             validation_steps=dataset_validate.get_steps_per_epoch(batch_size),
+            callbacks=callbacks,
         )
 
         return self
