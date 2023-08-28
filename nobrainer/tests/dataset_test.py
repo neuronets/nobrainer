@@ -41,18 +41,17 @@ def test_get_dataset_maintains_order(
         filepaths, temp_dir, examples_per_shard=examples_per_shard
     )
     volume_shape = (256, 256, 256)
-    dset = dataset.get_dataset(
+    dset = dataset.Dataset.from_tfrecords(
         file_pattern=file_pattern,
-        n_classes=1,
-        batch_size=batch_size,
+        n_volumes=10,
         volume_shape=volume_shape,
-        scalar_label=True,
-        n_epochs=1,
+        scalar_labels=True,
         num_parallel_calls=num_parallel_calls,
     )
+    #.batch(batch_size)
     y_orig = np.array([y for _, y in filepaths])
     y_from_dset = (
-        np.concatenate([y for _, y in dset.as_numpy_iterator()]).flatten().astype(int)
+        np.concatenate([y for _, y in dset.dataset.as_numpy_iterator()]).flatten().astype(int)
     )
     assert_array_equal(y_orig, y_from_dset)
     shutil.rmtree(temp_dir)
@@ -72,11 +71,10 @@ def test_get_dataset_errors():
     temp_dir = tempfile.mkdtemp()
     file_pattern = op.join(temp_dir, "does_not_exist-*.tfrec")
     with pytest.raises(ValueError):
-        dataset.get_dataset(
-            file_pattern=file_pattern,
-            n_classes=1,
-            batch_size=1,
-            volume_shape=(256, 256, 256),
+        dataset.Dataset.from_tfrecords(
+            file_pattern,
+            None,
+            (256, 256, 256),
         )
 
 
