@@ -226,7 +226,7 @@ class Dataset:
 
     @property
     def n_classes(self):
-        return 1 if self.scalar_labels else dataset_train.element_spec[1].shape[4]
+        return 1 if self.scalar_labels else self.dataset.element_spec[1].shape[4]
 
     def get_steps_per_epoch(self):
         def get_n(a, k):
