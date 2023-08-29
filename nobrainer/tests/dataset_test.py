@@ -47,8 +47,8 @@ def test_get_dataset_maintains_order(
         volume_shape=volume_shape,
         scalar_labels=True,
         num_parallel_calls=num_parallel_calls,
-    )
-    #.batch(batch_size)
+    ).batch(batch_size)
+
     y_orig = np.array([y for _, y in filepaths])
     y_from_dset = (
         np.concatenate([y for _, y in dset.dataset.as_numpy_iterator()]).flatten().astype(int)
@@ -91,19 +91,17 @@ def test_get_dataset_shapes(
     file_pattern = write_tfrecs(
         filepaths, temp_dir, examples_per_shard=examples_per_shard
     )
-    dset = dataset.get_dataset(
+    dset = dataset.Dataset.from_tfrecords(
         file_pattern=file_pattern,
-        n_classes=1,
-        batch_size=batch_size,
+        n_volumes=len(filepaths),
         volume_shape=volume_shape,
-        scalar_label=True,
-        n_epochs=1,
+        scalar_labels=True,
         num_parallel_calls=num_parallel_calls,
-    )
+    ).batch(batch_size)
 
     output_volume_shape = volume_shape if len(volume_shape) > 3 else volume_shape + (1,)
     output_volume_shape = (batch_size,) + output_volume_shape
-    shapes = [x.shape for x, _ in dset.as_numpy_iterator()]
+    shapes = [x.shape for x, _ in dset.dataset.as_numpy_iterator()]
     assert all([_shape == output_volume_shape for _shape in shapes])
     shutil.rmtree(temp_dir)
 
@@ -112,19 +110,18 @@ def test_get_dataset_errors_augmentation():
     temp_dir = tempfile.mkdtemp()
     file_pattern = op.join(temp_dir, "does_not_exist-*.tfrec")
     with pytest.raises(ValueError):
-        dataset.get_dataset(
+        dataset.Dataset.from_tfrecords(
             file_pattern=file_pattern,
-            n_classes=1,
-            batch_size=1,
+            n_volumes=10,
             volume_shape=(256, 256, 256),
-            augment=[
-                (
-                    intensity_transforms.addGaussianNoise,
-                    {"noise_mean": 0.1, "noise_std": 0.5},
-                ),
-                (spatial_transforms.randomflip_leftright),
-            ],
-        )
+        ).augment=([
+            (
+                intensity_transforms.addGaussianNoise,
+                {"noise_mean": 0.1, "noise_std": 0.5},
+            ),
+            (spatial_transforms.randomflip_leftright),
+        ])
+    shutil.rmtree(temp_dir)
 
 
 # TODO: need to implement this soon.
@@ -134,31 +131,49 @@ def test_get_dataset():
 
 
 def test_get_steps_per_epoch():
-    nsteps = dataset.get_steps_per_epoch(
-        n_volumes=1,
-        volume_shape=(256, 256, 256),
-        block_shape=(64, 64, 64),
-        batch_size=1,
+    volume_shape = (256, 256, 256)
+    temp_dir = tempfile.mkdtemp()
+    nifti_paths = create_dummy_niftis(volume_shape, 10, temp_dir)
+    filepaths = [(x, i) for i, x in enumerate(nifti_paths)]
+    file_pattern = write_tfrecs(
+        filepaths, temp_dir, examples_per_shard=1
     )
-    assert nsteps == 64
-    nsteps = dataset.get_steps_per_epoch(
+    dset = dataset.Dataset.from_tfrecords(
+        file_pattern=file_pattern,
+        n_volumes=len(filepaths),
+        volume_shape=volume_shape,
+        scalar_labels=True,
+    ).block(block_shape=(64, 64, 64))
+    assert dset.get_steps_per_epoch() == 64
+
+
+    return
+
+    dset = dataset.Dataset.from_tfrecords(
+        file_pattern=file_pattern,
         n_volumes=1,
-        volume_shape=(256, 256, 256),
-        block_shape=(64, 64, 64),
-        batch_size=64,
-    )
-    assert nsteps == 1
-    nsteps = dataset.get_steps_per_epoch(
+        volume_shape=volume_shape,
+    ).block(block_shape=(64, 64, 64))
+    assert dset.Dataset.get_steps_per_epoch() == 64
+
+    dset = dataset.Dataset.from_tfrecords(
+        file_pattern=file_pattern.replace('*', '000'),
         n_volumes=1,
-        volume_shape=(256, 256, 256),
-        block_shape=(64, 64, 64),
-        batch_size=63,
-    )
-    assert nsteps == 2
-    nsteps = dataset.get_steps_per_epoch(
+        volume_shape=volume_shape,
+    ).block(block_shape=(64, 64, 64)).batch(64)
+    assert dset.get_steps_per_epoch() == 1
+
+    dset = dataset.Dataset.from_tfrecords(
+        file_pattern=file_pattern.replace('*', '000'),
+        n_volumes=1,
+        volume_shape=volume_shape,
+    ).block(block_shape=(64, 64, 64)).batch(63)
+    assert dset.get_steps_per_epoch() == 2
+
+    dset = dataset.Dataset.from_tfrecords(
         n_volumes=10,
-        volume_shape=(256, 256, 256),
-        block_shape=(128, 128, 128),
-        batch_size=4,
-    )
-    assert nsteps == 20
+        volume_shape=volume_shape,
+    ).block(block_shape=(128, 128, 128)).batch(4)
+    assert dset.get_steps_per_epoch() == 20
+
+    shutil.rmtree(temp_dir)

@@ -57,10 +57,11 @@ def write_multi_resolution(
 class Dataset:
     """Datasets for training, and validation"""
 
-    def __init__(self,
-                 dataset,
-                 n_volumes,
-                 volume_shape,
+    def __init__(
+        self,
+        dataset,
+        n_volumes,
+        volume_shape,
     ):
         self.dataset = dataset
         self.n_volumes = n_volumes
@@ -73,6 +74,7 @@ class Dataset:
         n_volumes=None,
         volume_shape=None,
         scalar_labels=False,
+        shuffle=False,
         num_parallel_calls=1,
     ):
         """Function to retrieve a saved tf record as a nobrainer Dataset
@@ -90,15 +92,13 @@ class Dataset:
         # Create dataset of all TFRecord files. After this point, the dataset will have
         # two value per iteration: (feature, label).
         compressed = _is_gzipped(files[0], filesys=fs)
-        dataset = tf.data.Dataset.list_files(file_pattern)
+        dataset = tf.data.Dataset.list_files(file_pattern, shuffle=shuffle)
 
         # Read each of these files as a TFRecordDataset.
         # Assume all files have same compression type as the first file.
         compression_type = "GZIP" if compressed else None
         cycle_length = 1 if num_parallel_calls is None else num_parallel_calls
         parse_fn = parse_example_fn(volume_shape=volume_shape, scalar_labels=scalar_labels)
-
-        breakpoint()
 
         # Determine examples_per_shard from the first TFRecord shard
         # Then set block_length to equal the number of examples per shard
@@ -217,12 +217,12 @@ class Dataset:
         return self.dataset.element_spec[0].shape[0]
 
     @property
-    def block_size(self):
+    def block_shape(self):
         return self.dataset.element_spec[0].shape[1:4]
 
     @property
     def scalar_labels(self):
-        return len(self.dataset.element_spec[1].shape) > 1
+        return len(self.dataset.element_spec[1].shape) == 1
 
     @property
     def n_classes(self):
@@ -241,12 +241,12 @@ class Dataset:
                 )
         n_blocks_per_volume = np.prod(n_blocks).astype(int)
 
-        steps = n_blocks_per_volume * self.n_volumes / batch_size
+        steps = n_blocks_per_volume * self.n_volumes / self.batch_size
         steps = math.ceil(steps)
         return steps
 
-    def map(self, func):
-        self.dataset = self.dataset.map(func)
+    def map(self, func, num_parallel_calls=AUTOTUNE):
+        self.dataset = self.dataset.map(func, num_parallel_calls=num_parallel_calls)
         return self
 
     def normalize(self, normalizer):
@@ -265,7 +265,7 @@ class Dataset:
 
         return self
 
-    def separate_into_blocks(self, block_shape, num_parallel_calls=AUTOTUNE):
+    def block(self, block_shape, num_parallel_calls=AUTOTUNE):
         if not self.scalar_labels:
             self.map(
                 lambda x, y: (to_blocks(x, block_shape), to_blocks(y, block_shape)),
