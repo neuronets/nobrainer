@@ -139,27 +139,18 @@ def test_get_steps_per_epoch():
         filepaths, temp_dir, examples_per_shard=1
     )
     dset = dataset.Dataset.from_tfrecords(
-        file_pattern=file_pattern,
-        n_volumes=len(filepaths),
-        volume_shape=volume_shape,
-        scalar_labels=True,
-    ).block(block_shape=(64, 64, 64))
-    assert dset.get_steps_per_epoch() == 64
-
-
-    return
-
-    dset = dataset.Dataset.from_tfrecords(
-        file_pattern=file_pattern,
+        file_pattern=file_pattern.replace('*', '000'),
         n_volumes=1,
         volume_shape=volume_shape,
-    ).block(block_shape=(64, 64, 64))
-    assert dset.Dataset.get_steps_per_epoch() == 64
+        scalar_labels=True,
+    ).block(block_shape=(64, 64, 64)).batch(1)
+    assert dset.get_steps_per_epoch() == 64
 
     dset = dataset.Dataset.from_tfrecords(
         file_pattern=file_pattern.replace('*', '000'),
         n_volumes=1,
         volume_shape=volume_shape,
+        scalar_labels=True,
     ).block(block_shape=(64, 64, 64)).batch(64)
     assert dset.get_steps_per_epoch() == 1
 
@@ -167,12 +158,15 @@ def test_get_steps_per_epoch():
         file_pattern=file_pattern.replace('*', '000'),
         n_volumes=1,
         volume_shape=volume_shape,
+        scalar_labels=True,
     ).block(block_shape=(64, 64, 64)).batch(63)
     assert dset.get_steps_per_epoch() == 2
 
     dset = dataset.Dataset.from_tfrecords(
+        file_pattern=file_pattern,
         n_volumes=10,
         volume_shape=volume_shape,
+        scalar_labels=True,
     ).block(block_shape=(128, 128, 128)).batch(4)
     assert dset.get_steps_per_epoch() == 20
 
