@@ -174,18 +174,18 @@ class Dataset:
             )
 
         Path(out_tfrec_dir).mkdir(exist_ok=True, parents=True)
-        template = str(Path(out_tfrec_dir) / "data-{intent}_shard-{shard:03d}.tfrec")
+        template = str(Path(out_tfrec_dir) / "data-{intent}")
         volume_shape = nb.load(filepaths[0][0]).shape
         write(
             features_labels=filepaths[:n_train],
-            filename_template=template.format(intent="train"),
+            filename_template=template.format(intent="train") + "_shard-{shard:03d}.tfrec",
             examples_per_shard=shard_size,
             processes=num_parallel_calls,
         )
         if n_eval > 0:
             write(
                 features_labels=filepaths[n_train:],
-                filename_template=template.format(intent="eval"),
+                filename_template=template.format(intent="eval") + "_shard-{shard:03d}.tfrec",
                 examples_per_shard=shard_size,
                 processes=num_parallel_calls,
             )
