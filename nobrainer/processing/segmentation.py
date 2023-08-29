@@ -5,7 +5,6 @@ import tensorflow as tf
 
 from .base import BaseEstimator
 from .. import losses, metrics
-from ..dataset import get_steps_per_epoch
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -89,9 +88,9 @@ class Segmentation(BaseEstimator):
         self.model_.fit(
             dataset_train,
             epochs=epochs,
-            steps_per_epoch=dataset_train.get_steps_per_epoch(batch_size),
+            steps_per_epoch=dataset_train.get_steps_per_epoch(),
             validation_data=dataset_validate,
-            validation_steps=dataset_validate.get_steps_per_epoch(batch_size),
+            validation_steps=dataset_validate.get_steps_per_epoch(),
             callbacks=callbacks,
         )
 
