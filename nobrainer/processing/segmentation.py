@@ -43,7 +43,7 @@ class Segmentation(BaseEstimator):
         """Train a segmentation model"""
         # TODO: check validity of datasets
 
-        batch_size = dataset_train.element_spec[0].shape[0]
+        batch_size = dataset_train.batch_size
         self.block_shape_ = dataset_train.block_shape
         self.volume_shape_ = dataset_train.volume_shape
         self.scalar_labels_ = dataset_train.scalar_labels
