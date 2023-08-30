@@ -101,7 +101,9 @@ class Dataset:
         # Assume all files have same compression type as the first file.
         compression_type = "GZIP" if compressed else None
         cycle_length = 1 if num_parallel_calls is None else num_parallel_calls
-        parse_fn = parse_example_fn(volume_shape=volume_shape, scalar_labels=scalar_labels)
+        parse_fn = parse_example_fn(
+            volume_shape=volume_shape, scalar_labels=scalar_labels
+        )
 
         # Determine examples_per_shard from the first TFRecord shard
         # Then set block_length to equal the number of examples per shard
@@ -185,14 +187,16 @@ class Dataset:
         volume_shape = nb.load(filepaths[0][0]).shape
         write(
             features_labels=filepaths[:n_train],
-            filename_template=template.format(intent="train") + "_shard-{shard:03d}.tfrec",
+            filename_template=template.format(intent="train")
+            + "_shard-{shard:03d}.tfrec",
             examples_per_shard=shard_size,
             processes=num_parallel_calls,
         )
         if n_eval > 0:
             write(
                 features_labels=filepaths[n_train:],
-                filename_template=template.format(intent="eval") + "_shard-{shard:03d}.tfrec",
+                filename_template=template.format(intent="eval")
+                + "_shard-{shard:03d}.tfrec",
                 examples_per_shard=shard_size,
                 processes=num_parallel_calls,
             )
@@ -239,7 +243,9 @@ class Dataset:
         def get_n(a, k):
             return (a - k) / k + 1
 
-        n_blocks = tuple(get_n(aa, kk) for aa, kk in zip(self.volume_shape, self.block_shape))
+        n_blocks = tuple(
+            get_n(aa, kk) for aa, kk in zip(self.volume_shape, self.block_shape)
+        )
 
         for n in n_blocks:
             if not n.is_integer() or n < 1:
@@ -287,6 +293,7 @@ class Dataset:
                 num_parallel_calls=num_parallel_calls,
             )
         else:
+
             def _f(x, y):
                 x = to_blocks(x, block_shape)
                 n_blocks = x.shape[0]
@@ -303,8 +310,7 @@ class Dataset:
             raise ValueError("n_classes must be > 0.")
 
         if label_mapping is not None:
-            self.map(
-                lambda x, y: (x, replace(y, label_mapping=label_mapping)))
+            self.map(lambda x, y: (x, replace(y, label_mapping=label_mapping)))
 
         if self.n_classes == 1:
             self.map(lambda x, y: (x, tf.expand_dims(binarize(y), -1)))
