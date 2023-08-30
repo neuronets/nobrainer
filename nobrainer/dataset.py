@@ -229,7 +229,7 @@ class Dataset:
 
     @property
     def block_shape(self):
-        return self.dataset.element_spec[0].shape[1:4]
+        return tuple(self.dataset.element_spec[0].shape[1:4].as_list())
 
     @property
     def scalar_labels(self):
