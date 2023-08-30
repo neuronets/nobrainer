@@ -267,7 +267,7 @@ class Dataset:
 
     def augment(self, augment_steps, num_parallel_calls=AUTOTUNE):
         batch_size = None
-        if len(self.dataset.shape) > 4:
+        if len(self.dataset.element_spec[0].shape) > 4:
             batch_size = self.batch_size
             self.dataset = self.dataset.unbatch()
 
