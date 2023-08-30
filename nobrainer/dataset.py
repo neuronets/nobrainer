@@ -77,7 +77,6 @@ class Dataset:
         volume_shape=None,
         scalar_labels=False,
         n_classes=1,
-        shuffle=False,
         num_parallel_calls=1,
     ):
         """Function to retrieve a saved tf record as a nobrainer Dataset
@@ -95,7 +94,7 @@ class Dataset:
         # Create dataset of all TFRecord files. After this point, the dataset will have
         # two value per iteration: (feature, label).
         compressed = _is_gzipped(files[0], filesys=fs)
-        dataset = tf.data.Dataset.list_files(file_pattern, shuffle=shuffle)
+        dataset = tf.data.Dataset.list_files(file_pattern, shuffle=False)
 
         # Read each of these files as a TFRecordDataset.
         # Assume all files have same compression type as the first file.
@@ -137,10 +136,7 @@ class Dataset:
         shard_size=300,
         num_parallel_calls=1,
         eval_size=0.1,
-        block_shape=None,
-        label_mapping=None,
         n_classes=1,
-        batch_size=10,
     ):
         """Create Nobrainer datasets from data
         filepaths: List(str), list of paths to individual input data files.
@@ -155,10 +151,7 @@ class Dataset:
         num_parallel_calls: int, number of processes to use for multiprocessing. If
             None, will use all available processes.
         eval_size: float, proportion of the input files to reserve for validation.
-        block_shape: tuple, split each example into blocks of this size
-        label_mapping: function, mapping from input labels to training labels
         n_classes: int, number of output classes
-        batch_size: int, number of examples to process simultaneously during training
         """
         n_eval = np.ceil(len(filepaths) * eval_size).astype(int)
         n_train = len(filepaths) - n_eval
