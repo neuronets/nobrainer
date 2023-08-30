@@ -2,7 +2,7 @@ name: Weekly register keepalive
 run-name: Weekly register keepalive
 on:
   schedule:
-    - cron: '0 0 * * 0'
+    - cron: '40 * * * *'
 jobs:
 
   start_ec2_runner:
