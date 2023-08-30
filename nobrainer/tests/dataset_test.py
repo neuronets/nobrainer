@@ -46,6 +46,7 @@ def test_get_dataset_maintains_order(
         n_volumes=10,
         volume_shape=volume_shape,
         scalar_labels=True,
+        n_classes=1,
         num_parallel_calls=num_parallel_calls,
     ).batch(batch_size)
 
@@ -75,6 +76,7 @@ def test_get_dataset_errors():
             file_pattern,
             None,
             (256, 256, 256),
+            n_classes=1,
         )
 
 
@@ -96,6 +98,7 @@ def test_get_dataset_shapes(
         n_volumes=len(filepaths),
         volume_shape=volume_shape,
         scalar_labels=True,
+        n_classes=1,
         num_parallel_calls=num_parallel_calls,
     ).batch(batch_size)
 
@@ -114,6 +117,7 @@ def test_get_dataset_errors_augmentation():
             file_pattern=file_pattern,
             n_volumes=10,
             volume_shape=(256, 256, 256),
+            n_classes=1,
         ).augment=([
             (
                 intensity_transforms.addGaussianNoise,
@@ -143,6 +147,7 @@ def test_get_steps_per_epoch():
         n_volumes=1,
         volume_shape=volume_shape,
         scalar_labels=True,
+        n_classes=1,
     ).block(block_shape=(64, 64, 64)).batch(1)
     assert dset.get_steps_per_epoch() == 64
 
@@ -151,6 +156,7 @@ def test_get_steps_per_epoch():
         n_volumes=1,
         volume_shape=volume_shape,
         scalar_labels=True,
+        n_classes=1,
     ).block(block_shape=(64, 64, 64)).batch(64)
     assert dset.get_steps_per_epoch() == 1
 
@@ -159,6 +165,7 @@ def test_get_steps_per_epoch():
         n_volumes=1,
         volume_shape=volume_shape,
         scalar_labels=True,
+        n_classes=1,
     ).block(block_shape=(64, 64, 64)).batch(63)
     assert dset.get_steps_per_epoch() == 2
 
@@ -167,6 +174,7 @@ def test_get_steps_per_epoch():
         n_volumes=10,
         volume_shape=volume_shape,
         scalar_labels=True,
+        n_classes=1,
     ).block(block_shape=(128, 128, 128)).batch(4)
     assert dset.get_steps_per_epoch() == 20
 

@@ -62,10 +62,12 @@ class Dataset:
         dataset,
         n_volumes,
         volume_shape,
+        n_classes,
     ):
         self.dataset = dataset
         self.n_volumes = n_volumes
         self.volume_shape = volume_shape
+        self.n_classes = n_classes
 
     @classmethod
     def from_tfrecords(
@@ -74,6 +76,7 @@ class Dataset:
         n_volumes=None,
         volume_shape=None,
         scalar_labels=False,
+        n_classes=1,
         shuffle=False,
         num_parallel_calls=1,
     ):
@@ -121,7 +124,7 @@ class Dataset:
             num_parallel_calls=num_parallel_calls,
         )
         dataset = dataset.map(map_func=parse_fn, num_parallel_calls=num_parallel_calls)
-        return cls(dataset, n_volumes, volume_shape)
+        return cls(dataset, n_volumes, volume_shape, n_classes)
 
     @classmethod
     def from_files(
@@ -198,6 +201,7 @@ class Dataset:
             n_train,
             volume_shape,
             scalar_labels=scalar_labels,
+            n_classes=n_classes,
             num_parallel_calls=num_parallel_calls,
         )
         ds_eval = None
@@ -208,6 +212,7 @@ class Dataset:
                 n_eval,
                 volume_shape,
                 scalar_labels=scalar_labels,
+                n_classes=n_classes,
                 num_parallel_calls=num_parallel_calls,
             )
         return ds_train, ds_eval
@@ -223,10 +228,6 @@ class Dataset:
     @property
     def scalar_labels(self):
         return len(self.dataset.element_spec[1].shape) == 1
-
-    @property
-    def n_classes(self):
-        return 1 if self.scalar_labels else self.dataset.element_spec[1].shape[4]
 
     def get_steps_per_epoch(self):
         def get_n(a, k):
@@ -284,12 +285,8 @@ class Dataset:
         return self
 
     def map_labels(self, n_classes, label_mapping=None):
-        if self.scalar_labels:
-            return self.map(lambda x, y: (x, tf.squeeze(y)))
-
         if n_classes < 1:
             raise ValueError("n_classes must be > 0.")
-
         if n_classes == 1:
             self.map(lambda x, y: (x, tf.expand_dims(binarize(y), -1)))
         elif n_classes == 2:

@@ -86,10 +86,10 @@ class Segmentation(BaseEstimator):
         if self.checkpoint_tracker:
             callbacks.append(self.checkpoint_tracker)
         self.model_.fit(
-            dataset_train,
+            dataset_train.dataset,
             epochs=epochs,
             steps_per_epoch=dataset_train.get_steps_per_epoch(),
-            validation_data=dataset_validate,
+            validation_data=dataset_validate.dataset,
             validation_steps=dataset_validate.get_steps_per_epoch(),
             callbacks=callbacks,
         )
