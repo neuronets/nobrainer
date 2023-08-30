@@ -260,6 +260,11 @@ class Dataset:
         return self.map(lambda x, y: (normalizer(x), y))
 
     def augment(self, augment_steps, num_parallel_calls=AUTOTUNE):
+        batch_size = None
+        if len(self.dataset.shape) > 4:
+            batch_size = self.batch_size
+            self.dataset = self.dataset.unbatch()
+
         for transform, kwargs in augment_steps:
             self.map(
                 lambda x, y: tf.cond(
@@ -269,6 +274,9 @@ class Dataset:
                 ),
                 num_parallel_calls=num_parallel_calls,
             )
+
+        if batch_size:
+            self.batch(batch_size)
 
         return self
 
