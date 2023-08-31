@@ -89,8 +89,10 @@ class Segmentation(BaseEstimator):
             dataset_train.dataset,
             epochs=epochs,
             steps_per_epoch=dataset_train.get_steps_per_epoch(),
-            validation_data=dataset_validate.dataset,
-            validation_steps=dataset_validate.get_steps_per_epoch(),
+            validation_data=dataset_validate.dataset if dataset_validate
+            else None,
+            validation_steps=dataset_validate.get_steps_per_epoch()
+            if dataset_validate else None,
             callbacks=callbacks,
         )
 
