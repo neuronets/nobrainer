@@ -142,56 +142,44 @@ def test_get_steps_per_epoch():
     nifti_paths = create_dummy_niftis(volume_shape, 10, temp_dir)
     filepaths = [(x, i) for i, x in enumerate(nifti_paths)]
     file_pattern = write_tfrecs(filepaths, temp_dir, examples_per_shard=1)
-    dset = (
-        dataset.Dataset.from_tfrecords(
-            file_pattern=file_pattern.replace("*", "000"),
-            n_volumes=1,
-            volume_shape=volume_shape,
-            scalar_labels=True,
-            n_classes=1,
-        )
-        .block(block_shape=(64, 64, 64))
-        .batch(1)
+    dset = dataset.Dataset.from_tfrecords(
+        file_pattern=file_pattern.replace("*", "000"),
+        n_volumes=1,
+        volume_shape=volume_shape,
+        block_shape=(64, 64, 64),
+        scalar_labels=True,
+        n_classes=1,
     )
     assert dset.get_steps_per_epoch() == 64
 
-    dset = (
-        dataset.Dataset.from_tfrecords(
-            file_pattern=file_pattern.replace("*", "000"),
-            n_volumes=1,
-            volume_shape=volume_shape,
-            scalar_labels=True,
-            n_classes=1,
-        )
-        .block(block_shape=(64, 64, 64))
-        .batch(64)
-    )
+    dset = dataset.Dataset.from_tfrecords(
+        file_pattern=file_pattern.replace("*", "000"),
+        n_volumes=1,
+        volume_shape=volume_shape,
+        block_shape=(64, 64, 64),
+        scalar_labels=True,
+        n_classes=1,
+    ).batch(64)
     assert dset.get_steps_per_epoch() == 1
 
-    dset = (
-        dataset.Dataset.from_tfrecords(
-            file_pattern=file_pattern.replace("*", "000"),
-            n_volumes=1,
-            volume_shape=volume_shape,
-            scalar_labels=True,
-            n_classes=1,
-        )
-        .block(block_shape=(64, 64, 64))
-        .batch(63)
-    )
+    dset = dataset.Dataset.from_tfrecords(
+        file_pattern=file_pattern.replace("*", "000"),
+        n_volumes=1,
+        volume_shape=volume_shape,
+        block_shape=(64, 64, 64),
+        scalar_labels=True,
+        n_classes=1,
+    ).batch(63)
     assert dset.get_steps_per_epoch() == 2
 
-    dset = (
-        dataset.Dataset.from_tfrecords(
-            file_pattern=file_pattern,
-            n_volumes=10,
-            volume_shape=volume_shape,
-            scalar_labels=True,
-            n_classes=1,
-        )
-        .block(block_shape=(128, 128, 128))
-        .batch(4)
-    )
+    dset = dataset.Dataset.from_tfrecords(
+        file_pattern=file_pattern.replace("*", "000"),
+        n_volumes=1,
+        volume_shape=volume_shape,
+        block_shape=(64, 64, 64),
+        scalar_labels=True,
+        n_classes=1,
+    ).batch(4)
     assert dset.get_steps_per_epoch() == 20
 
     shutil.rmtree(temp_dir)

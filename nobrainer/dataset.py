@@ -324,7 +324,7 @@ class Dataset:
     def batch(self, batch_size):
         # If volume_shape is only three dims, add grayscale channel to features.
         # Otherwise, assume that the channels are already in the features.
-        if len(self.volume_shape) == 3:
+        if len(self.dataset.element_spec[0].shape) == 3:
             self.map(lambda x, y: (tf.expand_dims(x, -1), y))
         elif len(self.dataset.element_spec[0].shape) > 4:
             self.dataset = self.dataset.unbatch()
