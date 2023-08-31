@@ -1,4 +1,4 @@
-FROM tensorflow/tensorflow:2.10.0-jupyter
+FROM tensorflow/tensorflow:2.13.0-jupyter
 RUN curl -sSL http://neuro.debian.net/lists/focal.us-nh.full | tee /etc/apt/sources.list.d/neurodebian.sources.list \
   && export GNUPGHOME="$(mktemp -d)" \
   && echo "disable-ipv6" >> ${GNUPGHOME}/dirmngr.conf \
@@ -15,7 +15,7 @@ RUN git config --global user.email "neuronets@example.com" \
     && git config --global user.name "Neuronets maintainers"
 RUN datalad clone https://github.com/neuronets/trained-models /models \
   && cd /models && git-annex enableremote osf-storage \
-  && datalad get -r .
+  && datalad get -s osf-storage .
 ENV LC_ALL=C.UTF-8 \
     LANG=C.UTF-8
 WORKDIR "/work"
