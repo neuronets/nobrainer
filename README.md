@@ -66,7 +66,7 @@ the Apache 2.0 license. It was started under the support of NIH R01 EB020470.
 
 ### Augmentation methods
 #### Spatial Transforms
-[Center crop](), [Spacial Constant Padding](), [Random Crop](), [Resize](), [Random flip (left and right)]()
+[Center crop](), [Spatial Constant Padding](), [Random Crop](), [Resize](), [Random flip (left and right)]()
 
 #### Intensity Transforms
 [Add gaussian noise](), [Min-Max intensity scaling](), [Costom intensity scaling](), [Intensity masking](), [Contrast adjustment]()
