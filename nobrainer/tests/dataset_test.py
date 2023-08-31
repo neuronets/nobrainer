@@ -173,10 +173,10 @@ def test_get_steps_per_epoch():
     assert dset.get_steps_per_epoch() == 2
 
     dset = dataset.Dataset.from_tfrecords(
-        file_pattern=file_pattern.replace("*", "000"),
-        n_volumes=1,
+        file_pattern=file_pattern,
+        n_volumes=10,
         volume_shape=volume_shape,
-        block_shape=(64, 64, 64),
+        block_shape=(128, 128, 128),
         scalar_labels=True,
         n_classes=1,
     ).batch(4)
