@@ -130,8 +130,8 @@ class Dataset:
 
         if block_shape:
             ds_obj.block(block_shape)
-        ds_obj.map_labels()
-
+        if not scalar_labels:
+            ds_obj.map_labels()
         # TODO automatically determine batch size
         ds_obj.batch(1)
 
@@ -237,7 +237,7 @@ class Dataset:
 
     @property
     def scalar_labels(self):
-        return len(self.dataset.element_spec[1].shape) == 1
+        return _labels_all_scalar([y for _, y in self.dataset.as_numpy_iterator()])
 
     def get_steps_per_epoch(self):
         def get_n(a, k):
@@ -326,6 +326,8 @@ class Dataset:
         # Otherwise, assume that the channels are already in the features.
         if len(self.volume_shape) == 3:
             self.map(lambda x, y: (tf.expand_dims(x, -1), y))
+        elif len(self.dataset.element_spec[0].shape) > 4:
+            self.dataset = self.dataset.unbatch()
 
         # Prefetch data to overlap data production with data consumption. The
         # TensorFlow documentation suggests prefetching `batch_size` elements.
