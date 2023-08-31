@@ -105,14 +105,14 @@ def write(
     get_reusable_executor().shutdown(wait=True)
 
 
-def parse_example_fn(volume_shape, scalar_label=False):
+def parse_example_fn(volume_shape, scalar_labels=False):
     """Return function that can be used to read TFRecord file into tensors.
 
     Parameters
     ----------
-    volume_shape: sequence, the shape of the feature data. If `scalar_label` is `False`,
+    volume_shape: sequence, the shape of the feature data. If `scalar_labels` is `False`,
         this also corresponds to the shape of the label data.
-    scalar_label: boolean, if `True`, label is a scalar. If `False`, label must be the
+    scalar_labels: boolean, if `True`, label is a scalar. If `False`, label must be the
         same shape as feature data.
 
     Returns
@@ -130,7 +130,7 @@ def parse_example_fn(volume_shape, scalar_label=False):
 
         Returns
         -------
-        Tuple of two tensors. If `scalar_label` is `False`, both tensors have shape
+        Tuple of two tensors. If `scalar_labels` is `False`, both tensors have shape
         `volume_shape`. Otherwise, the first tensor has shape `volume_shape`, and the
         second is a scalar tensor.
         """
@@ -148,7 +148,7 @@ def parse_example_fn(volume_shape, scalar_label=False):
         # xshape = tf.cast(
         #     tf.io.decode_raw(e["feature/shape"], _TFRECORDS_DTYPE), tf.int32)
         x = tf.reshape(x, shape=volume_shape)
-        if not scalar_label:
+        if not scalar_labels:
             y = tf.reshape(y, shape=volume_shape)
         else:
             y = tf.reshape(y, shape=[1])
@@ -285,7 +285,7 @@ class _ProtoIterator:
         # files, though it is possible to have existing filenames that
         # are integers or floats.
         labels = [y for _, y in features_labels]
-        self.scalar_label = _labels_all_scalar(labels)
+        self.scalar_labels = _labels_all_scalar(labels)
         self._j = 0
 
         no_exist = []
@@ -295,7 +295,7 @@ class _ProtoIterator:
         if no_exist:
             raise ValueError("Some files do not exist: {}".format(", ".join(no_exist)))
 
-        if not self.scalar_label:
+        if not self.scalar_labels:
             no_exist = []
             for _, y in self.features_labels:
                 if not Path(y).exists():
@@ -325,7 +325,7 @@ class _ProtoIterator:
         )
         if self.multi_resolution:
             # only scalar label
-            if not self.scalar_label:
+            if not self.scalar_labels:
                 y = 0
             proto_dict = {}
             for resolution in self.resolutions[::-1]:
@@ -346,7 +346,7 @@ class _ProtoIterator:
             return proto_dict
         else:
             label_affine = None
-            if not self.scalar_label:
+            if not self.scalar_labels:
                 y, label_affine = read_volume(
                     y, return_affine=True, dtype=_TFRECORDS_DTYPE, to_ras=self.to_ras
                 )

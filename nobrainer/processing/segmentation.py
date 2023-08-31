@@ -5,7 +5,6 @@ import tensorflow as tf
 
 from .base import BaseEstimator
 from .. import losses, metrics
-from ..dataset import get_steps_per_epoch
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -44,15 +43,11 @@ class Segmentation(BaseEstimator):
         """Train a segmentation model"""
         # TODO: check validity of datasets
 
-        # extract dataset information
-        batch_size = dataset_train.element_spec[0].shape[0]
-        self.block_shape_ = tuple(dataset_train.element_spec[0].shape[1:4])
+        batch_size = dataset_train.batch_size
+        self.block_shape_ = dataset_train.block_shape
         self.volume_shape_ = dataset_train.volume_shape
-        self.scalar_labels_ = True
-        n_classes = 1
-        if len(dataset_train.element_spec[1].shape) > 1:
-            n_classes = dataset_train.element_spec[1].shape[4]
-            self.scalar_labels_ = False
+        self.scalar_labels_ = dataset_train.scalar_labels
+        n_classes = dataset_train.n_classes
         opt_args = opt_args or {}
         if optimizer is None:
             optimizer = tf.keras.optimizers.Adam
@@ -87,32 +82,17 @@ class Segmentation(BaseEstimator):
             _compile()
         self.model_.summary()
 
-        train_steps = get_steps_per_epoch(
-            n_volumes=dataset_train.n_volumes,
-            volume_shape=self.volume_shape_,
-            block_shape=self.block_shape_,
-            batch_size=batch_size,
-        )
-
-        evaluate_steps = None
-        if dataset_validate is not None:
-            evaluate_steps = get_steps_per_epoch(
-                n_volumes=dataset_validate.n_volumes,
-                volume_shape=self.volume_shape_,
-                block_shape=self.block_shape_,
-                batch_size=batch_size,
-            )
-
         callbacks = []
         if self.checkpoint_tracker:
             callbacks.append(self.checkpoint_tracker)
-
         self.model_.fit(
-            dataset_train,
+            dataset_train.dataset,
             epochs=epochs,
-            steps_per_epoch=train_steps,
-            validation_data=dataset_validate,
-            validation_steps=evaluate_steps,
+            steps_per_epoch=dataset_train.get_steps_per_epoch(),
+            validation_data=dataset_validate.dataset if dataset_validate else None,
+            validation_steps=dataset_validate.get_steps_per_epoch()
+            if dataset_validate
+            else None,
             callbacks=callbacks,
         )
 

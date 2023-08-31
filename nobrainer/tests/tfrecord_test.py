@@ -27,7 +27,7 @@ def test_write_read_volume_labels(csv_of_volumes, tmp_path):  # noqa: F811
 
     dset = tf.data.TFRecordDataset(list(map(str, paths)), compression_type="GZIP")
     dset = dset.map(
-        tfrecord.parse_example_fn(volume_shape=(8, 8, 8), scalar_label=False)
+        tfrecord.parse_example_fn(volume_shape=(8, 8, 8), scalar_labels=False)
     )
 
     for ref, test in zip(files, dset):
@@ -60,7 +60,7 @@ def test_write_read_volume_labels_all_processes(csv_of_volumes, tmp_path):  # no
 
     dset = tf.data.TFRecordDataset(list(map(str, paths)), compression_type="GZIP")
     dset = dset.map(
-        tfrecord.parse_example_fn(volume_shape=(8, 8, 8), scalar_label=False)
+        tfrecord.parse_example_fn(volume_shape=(8, 8, 8), scalar_labels=False)
     )
 
     for ref, test in zip(files, dset):
@@ -94,7 +94,7 @@ def test_write_read_float_labels(csv_of_volumes, tmp_path):  # noqa: F811
 
     dset = tf.data.TFRecordDataset(list(map(str, paths)), compression_type="GZIP")
     dset = dset.map(
-        tfrecord.parse_example_fn(volume_shape=(8, 8, 8), scalar_label=True)
+        tfrecord.parse_example_fn(volume_shape=(8, 8, 8), scalar_labels=True)
     )
 
     for ref, test in zip(files, dset):
@@ -123,7 +123,7 @@ def test_write_read_int_labels(csv_of_volumes, tmp_path):  # noqa: F811
 
     dset = tf.data.TFRecordDataset(list(map(str, paths)), compression_type="GZIP")
     dset = dset.map(
-        tfrecord.parse_example_fn(volume_shape=(8, 8, 8), scalar_label=True)
+        tfrecord.parse_example_fn(volume_shape=(8, 8, 8), scalar_labels=True)
     )
 
     for ref, test in zip(files, dset):
