@@ -19,7 +19,7 @@ def unet(
     https://arxiv.org/abs/1606.06650
     Args:
     n_classes(int): number of classes
-    input_shape(tuple):four ints representating the shape of 3D input
+    input_shape(tuple):four ints representing the shape of 3D input
     activation(str): all tf.keras.activations are allowed
     batch_size(int): batch size.
     """
