@@ -137,6 +137,7 @@ jobs:
           scp -o StrictHostKeyChecking=accept-new -i ${HOME}/.ssh/gh_runner destroy_runner.sh gh_token ubuntu@${EC2_PUBLIC_DNS}:
           ssh -i ${HOME}/.ssh/gh_runner bash destroy_runner.sh
       - name: stop_runner
+        if: always()
         env:
           EC2_INSTANCE_ID: ${{ needs.start_ec2_runner.outputs.EC2_INSTANCE_ID }}
         run: |
