@@ -46,7 +46,7 @@ jobs:
           done
 
           # hack to make sure sshd comes up
-          sleep 120
+          sleep 560
 
           EC2_PUBLIC_DNS=$(aws ec2 describe-instances \
             --instance-ids ${EC2_INSTANCE_ID} \
