@@ -58,8 +58,8 @@ jobs:
 
 
   guide_notebooks_regression_ec2:
-    needs: start_ec2_runner
     runs-on: [self-hosted, ${{ needs.start_ec2_runner.outputs.RUNNER_LABEL }}]
+    needs: start_ec2_runner
     steps:
       - name: verify-instance
         env:
