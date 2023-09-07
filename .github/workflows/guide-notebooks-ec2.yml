@@ -45,6 +45,9 @@ jobs:
             sleep 1
           done
 
+          # hack to make sure sshd come up
+          sleep 10
+
           EC2_PUBLIC_DNS=$(aws ec2 describe-instances \
             --instance-ids ${EC2_INSTANCE_ID} \
             | jq -r ".Reservations[0].Instances[0].PublicDnsName")
