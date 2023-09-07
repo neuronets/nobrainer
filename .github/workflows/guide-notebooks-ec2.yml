@@ -40,12 +40,12 @@ jobs:
           EC2_INSTANCE_ID=$(echo ${output} | jq -r ".Instances[0].InstanceId")
 
           EC2_INSTANCE_STATE=''
-          while [ ${EC2_INSTANCE_STATE} != "running" ]; do
-            EC2_INSTANCE_STATE=$(aws ec2 describe-instances --instance-ids i-04d22cb4e6d17b59e --profile mit | jq -r ".Reservations[0].Instances[0].State.Name")
+          while [ "${EC2_INSTANCE_STATE}" != "running" ]; do
+            EC2_INSTANCE_STATE=$(aws ec2 describe-instances --instance-ids ${EC2_INSTANCE_ID} | jq -r ".Reservations[0].Instances[0].State.Name")
             sleep 1
           done
 
-          # hack to make sure sshd come up
+          # hack to make sure sshd comes up
           sleep 10
 
           EC2_PUBLIC_DNS=$(aws ec2 describe-instances \
@@ -62,7 +62,7 @@ jobs:
           echo ${AWS_GH_RUNNER_KEY} > gh_runner_key
           chmod 600 gh_runner_key
           echo ${GH_TOKEN} > gh_token
-          scp -o StrictHostKeyChecking=accept-new -i gh_runner_key gh_token ubuntu@${EC2_PUBLIC_DNS}:gh_token
+          scp -p -o StrictHostKeyChecking=accept-new -i gh_runner_key gh_token ubuntu@${EC2_PUBLIC_DNS}:gh_token
           scp -i gh_runner_key provision_runner.sh ubuntu@${EC2_PUBLIC_DNS}:provision_runner.sh
           ssh -i gh_runner_key bash provision_runner.sh
 
