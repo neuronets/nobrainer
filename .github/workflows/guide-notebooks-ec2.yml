@@ -7,11 +7,13 @@ jobs:
     env:
       AWS_KEY_ID: ${{ secrets.AWS_KEY_ID }}
       AWS_KEY_SECRET: ${{ secrets.AWS_KEY_SECRET }}
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
       AWS_INSTANCE_TYPE: ${{ vars.AWS_INSTANCE_TYPE }}
       AWS_IMAGE_ID: ${{ vars.AWS_IMAGE_ID }}
       AWS_SECURITY_GROUP: ${{ vars.AWS_SECURITY_GROUP }}
     outputs:
-      EC2_INSTANCE_ID: ${{ steps.start_runner.outputs.EC2_INSTANCE_ID }}
+      EC2_INSTANCE_ID: ${{ steps.create_instance.outputs.EC2_INSTANCE_ID }}
+      RUNNER_LABEL: ${{ steps.create_instance.outputs.EC2_PUBLIC_DNS }}
     steps:
       - name: configure_aws
         run: |
@@ -24,8 +26,8 @@ jobs:
           echo "aws_secret_access_key = ${AWS_KEY_SECRET}" >> ${HOME}/.aws/credentials
           echo "region = us-east-1" >> ${HOME}/.aws/credentials
           cat ${HOME}/.aws/credentials
-      - name: start_runner
-        id: start_runner
+      - name: create_instance
+        id: create_instance
         run: |
           set -xe
           output=$(aws ec2 run-instances \
@@ -34,11 +36,30 @@ jobs:
             --security-group-ids ${AWS_SECURITY_GROUP} \
             --count 1)
           EC2_INSTANCE_ID=$(echo ${output} | jq -r ".Instances[0].InstanceId")
+
+          EC2_PUBLIC_DNS=''
+          while [ -z ${EC2_PUBLIC_DNS} ]; do
+            EC2_PUBLIC_DNS=$(aws ec2 describe-instances \
+              --instance-ids ${EC2_INSTANCE_ID} \
+              | jq -r ".Reservations[0].Instances[0].PublicDnsName")
+            sleep 1
+          done
           echo "EC2_INSTANCE_ID=${EC2_INSTANCE_ID}" >> "$GITHUB_OUTPUT"
+          echo "EC2_PUBLIC_DNS=${EC2_PUBLIC_DNS}" >> "$GITHUB_OUTPUT"
+      - name: register_runner
+        id: register_runner
+        run: |
+          set -xe
+          echo ${AWS_GH_RUNNER_KEY} > ${HOME}/.ssh/gh_runner
+          chmod 600 ${HOME}/.ssh/gh_runner
+          echo ${GH_TOKEN} > gh_token
+          scp -o StrictHostKeyChecking=accept-new -i ${HOME}/.ssh/gh_runner provision_runner.sh gh_token ubuntu@${EC2_PUBLIC_DNS}:
+          ssh -i ${HOME}/.ssh/gh_runner bash provision_runner.sh
+
 
   guide_notebooks_regression_ec2:
-    runs-on: [self-hosted, nobrainer-ci-ec2-gpu]
     needs: start_ec2_runner
+    runs-on: [self-hosted, ${{ needs.start_ec2_runner.outputs.RUNNER_LABEL }}]
     steps:
       - name: verify-instance
         env:
@@ -102,6 +123,17 @@ jobs:
           echo "aws_secret_access_key = ${AWS_KEY_SECRET}" >> ${HOME}/.aws/credentials
           echo "region = us-east-1" >> ${HOME}/.aws/credentials
           cat ${HOME}/.aws/credentials
+      - name: deregister_runner
+        id: deregister_runner
+        env:
+          EC2_INSTANCE_ID: ${{ needs.start_ec2_runner.outputs.RUNNER_LABEL }}
+        run: |
+          set -xe
+          echo ${AWS_GH_RUNNER_KEY} > ${HOME}/.ssh/gh_runner
+          chmod 600 ${HOME}/.ssh/gh_runner
+          echo ${GH_TOKEN} > gh_token
+          scp -o StrictHostKeyChecking=accept-new -i ${HOME}/.ssh/gh_runner destroy_runner.sh gh_token ubuntu@${EC2_PUBLIC_DNS}:
+          ssh -i ${HOME}/.ssh/gh_runner bash destroy_runner.sh
       - name: stop_runner
         env:
           EC2_INSTANCE_ID: ${{ needs.start_ec2_runner.outputs.EC2_INSTANCE_ID }}
