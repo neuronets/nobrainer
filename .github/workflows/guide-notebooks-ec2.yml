@@ -35,16 +35,20 @@ jobs:
             --instance-type ${AWS_INSTANCE_TYPE} \
             --image-id ${AWS_IMAGE_ID} \
             --security-group-ids ${AWS_SECURITY_GROUP} \
+            --key-name github_runner \
             --count 1)
           EC2_INSTANCE_ID=$(echo ${output} | jq -r ".Instances[0].InstanceId")
 
-          EC2_PUBLIC_DNS=''
-          while [ -z ${EC2_PUBLIC_DNS} ]; do
-            EC2_PUBLIC_DNS=$(aws ec2 describe-instances \
-              --instance-ids ${EC2_INSTANCE_ID} \
-              | jq -r ".Reservations[0].Instances[0].PublicDnsName")
+          EC2_INSTANCE_STATE=''
+          while [ ${EC2_INSTANCE_STATE} != "running" ]; do
+            EC2_INSTANCE_STATE=$(aws ec2 describe-instances --instance-ids i-04d22cb4e6d17b59e --profile mit | jq -r ".Reservations[0].Instances[0].State.Name")
             sleep 1
           done
+
+          EC2_PUBLIC_DNS=$(aws ec2 describe-instances \
+            --instance-ids ${EC2_INSTANCE_ID} \
+            | jq -r ".Reservations[0].Instances[0].PublicDnsName")
+
           echo "EC2_INSTANCE_ID=${EC2_INSTANCE_ID}" >> "$GITHUB_OUTPUT"
           echo "EC2_PUBLIC_DNS=${EC2_PUBLIC_DNS}" >> "$GITHUB_OUTPUT"
           echo "EC2_PUBLIC_DNS=${EC2_PUBLIC_DNS}" >> "$GITHUB_ENV"
