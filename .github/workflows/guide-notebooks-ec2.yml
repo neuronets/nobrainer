@@ -7,6 +7,7 @@ jobs:
     env:
       AWS_KEY_ID: ${{ secrets.AWS_KEY_ID }}
       AWS_KEY_SECRET: ${{ secrets.AWS_KEY_SECRET }}
+      AWS_GH_RUNNER_KEY: ${{ secrets.AWS_GH_RUNNER_KEY }}
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       AWS_INSTANCE_TYPE: ${{ vars.AWS_INSTANCE_TYPE }}
       AWS_IMAGE_ID: ${{ vars.AWS_IMAGE_ID }}
