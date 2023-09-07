@@ -53,7 +53,8 @@ jobs:
           echo ${AWS_GH_RUNNER_KEY} > ${HOME}/.ssh/gh_runner
           chmod 600 ${HOME}/.ssh/gh_runner
           echo ${GH_TOKEN} > gh_token
-          scp -o StrictHostKeyChecking=accept-new -i ${HOME}/.ssh/gh_runner provision_runner.sh gh_token ubuntu@${EC2_PUBLIC_DNS}:
+          scp -o StrictHostKeyChecking=accept-new -i ${HOME}/.ssh/gh_runner gh_token ubuntu@${EC2_PUBLIC_DNS}:gh_token
+          scp -i ${HOME}/.ssh/gh_runner provision_runner.sh ubuntu@${EC2_PUBLIC_DNS}:provision_runner.sh
           ssh -i ${HOME}/.ssh/gh_runner bash provision_runner.sh
 
 
