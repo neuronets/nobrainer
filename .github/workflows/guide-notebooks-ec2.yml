@@ -14,7 +14,8 @@ jobs:
       AWS_SECURITY_GROUP: ${{ vars.AWS_SECURITY_GROUP }}
     outputs:
       EC2_INSTANCE_ID: ${{ steps.create_instance.outputs.EC2_INSTANCE_ID }}
-      RUNNER_LABEL: ${{ steps.create_instance.outputs.EC2_PUBLIC_DNS }}
+      EC2_PUBLIC_DNS: ${{ steps.create_instance.outputs.EC2_PUBLIC_DNS }}
+      RUNS_ON: ${{ steps.create_instance.outputs.RUNS_ON }}
     steps:
       - name: configure_aws
         run: |
@@ -53,6 +54,7 @@ jobs:
             | jq -r ".Reservations[0].Instances[0].PublicDnsName")
 
           echo "EC2_INSTANCE_ID=${EC2_INSTANCE_ID}" >> "$GITHUB_OUTPUT"
+          echo RUNS_ON="[self-hosted, ${EC2_PUBLIC_DNS}]" >> "$GITHUB_OUTPUT"
           echo "EC2_PUBLIC_DNS=${EC2_PUBLIC_DNS}" >> "$GITHUB_OUTPUT"
           echo "EC2_PUBLIC_DNS=${EC2_PUBLIC_DNS}" >> "$GITHUB_ENV"
       - name: install ssh key
@@ -73,8 +75,7 @@ jobs:
 
 
   guide_notebooks_regression_ec2:
-    runs-on: self-hosted
-    runs-on: ${{ needs.start_ec2_runner.outputs.RUNNER_LABEL }}
+    runs-on: ${{ needs.start_ec2_runner.outputs.RUNS_ON }}
     needs: start_ec2_runner
     steps:
       - name: verify-instance
@@ -149,7 +150,7 @@ jobs:
       - name: deregister_runner
         id: deregister_runner
         env:
-          EC2_INSTANCE_ID: ${{ needs.start_ec2_runner.outputs.RUNNER_LABEL }}
+          EC2_PUBLIC_DNS: ${{ needs.start_ec2_runner.outputs.EC2_PUBLIC_DNS }}
         run: |
           set -xe
           echo ${GH_TOKEN} > gh_token
