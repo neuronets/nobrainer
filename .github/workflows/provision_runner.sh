@@ -18,7 +18,7 @@ reg_token=$(curl -L \
                  https://api.github.com/orgs/neuronets/actions/runners/registration-token \
                 | jq -r ".token")
 
-runner_id=$(ec2metadata --public-hostname | cut -d '.' -f 1)
+runner_id=$(ec2metadata --instance-id)
 ./config.sh \
     --url https://github.com/neuronets \
     --token ${reg_token} \
