@@ -55,16 +55,19 @@ jobs:
           echo "EC2_INSTANCE_ID=${EC2_INSTANCE_ID}" >> "$GITHUB_OUTPUT"
           echo "EC2_PUBLIC_DNS=${EC2_PUBLIC_DNS}" >> "$GITHUB_OUTPUT"
           echo "EC2_PUBLIC_DNS=${EC2_PUBLIC_DNS}" >> "$GITHUB_ENV"
+      - name: Install SSH Key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.AWS_GH_RUNNER_KEY }}
+          known_hosts: 'none'
       - name: register_runner
         id: register_runner
         run: |
           set -xe
-          echo ${AWS_GH_RUNNER_KEY} > gh_runner_key
-          chmod 600 gh_runner_key
           echo ${GH_TOKEN} > gh_token
-          scp -o StrictHostKeyChecking=accept-new -i gh_runner_key gh_token ubuntu@${EC2_PUBLIC_DNS}:gh_token
-          scp -i gh_runner_key provision_runner.sh ubuntu@${EC2_PUBLIC_DNS}:provision_runner.sh
-          ssh -i gh_runner_key bash provision_runner.sh
+          scp -o StrictHostKeyChecking=accept-new gh_token ubuntu@${EC2_PUBLIC_DNS}:gh_token
+          scp provision_runner.sh ubuntu@${EC2_PUBLIC_DNS}:provision_runner.sh
+          ssh bash provision_runner.sh
 
 
   guide_notebooks_regression_ec2:
