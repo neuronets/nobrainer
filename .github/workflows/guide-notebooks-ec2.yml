@@ -69,7 +69,7 @@ jobs:
           echo ${GH_TOKEN} > gh_token
           scp -o StrictHostKeyChecking=accept-new gh_token ubuntu@${EC2_PUBLIC_DNS}:gh_token
           scp .github/workflows/provision_runner.sh ubuntu@${EC2_PUBLIC_DNS}:provision_runner.sh
-          ssh bash provision_runner.sh
+          ssh ubuntu@${EC2_PUBLIC_DNS} bash provision_runner.sh
 
 
   guide_notebooks_regression_ec2:
@@ -154,7 +154,7 @@ jobs:
           echo ${GH_TOKEN} > gh_token
           scp -o StrictHostKeyChecking=accept-new gh_token ubuntu@${EC2_PUBLIC_DNS}:gh_token
           scp .github/workflows/provision_runner.sh ubuntu@${EC2_PUBLIC_DNS}:destroy_runner.sh
-          ssh bash destroy_runner.sh
+          ssh ubuntu@${EC2_PUBLIC_DNS} bash destroy_runner.sh
       - name: stop_runner
         if: always()
         env:
