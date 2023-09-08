@@ -66,7 +66,7 @@ jobs:
           set -xe
           echo ${GH_TOKEN} > gh_token
           scp -o StrictHostKeyChecking=accept-new gh_token ubuntu@${EC2_PUBLIC_DNS}:gh_token
-          scp provision_runner.sh ubuntu@${EC2_PUBLIC_DNS}:provision_runner.sh
+          scp .github/workflows/provision_runner.sh ubuntu@${EC2_PUBLIC_DNS}:provision_runner.sh
           ssh bash provision_runner.sh
 
 
