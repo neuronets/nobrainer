@@ -55,11 +55,13 @@ jobs:
           echo "EC2_INSTANCE_ID=${EC2_INSTANCE_ID}" >> "$GITHUB_OUTPUT"
           echo "EC2_PUBLIC_DNS=${EC2_PUBLIC_DNS}" >> "$GITHUB_OUTPUT"
           echo "EC2_PUBLIC_DNS=${EC2_PUBLIC_DNS}" >> "$GITHUB_ENV"
-      - name: Install SSH Key
+      - name: install ssh key
         uses: shimataro/ssh-key-action@v2
         with:
           key: ${{ secrets.AWS_GH_RUNNER_KEY }}
           known_hosts: 'none'
+      - name: clone
+        uses: actions/checkout@v3
       - name: register_runner
         id: register_runner
         run: |
@@ -136,18 +138,23 @@ jobs:
           echo "aws_secret_access_key = ${AWS_KEY_SECRET}" >> ${HOME}/.aws/credentials
           echo "region = us-east-1" >> ${HOME}/.aws/credentials
           cat ${HOME}/.aws/credentials
+      - name: install ssh key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.AWS_GH_RUNNER_KEY }}
+          known_hosts: 'none'
+      - name: clone
+        uses: actions/checkout@v3
       - name: deregister_runner
         id: deregister_runner
         env:
           EC2_INSTANCE_ID: ${{ needs.start_ec2_runner.outputs.RUNNER_LABEL }}
         run: |
           set -xe
-          echo ${AWS_GH_RUNNER_KEY} > gh_runner_key
-          chmod 600 gh_runner_key
           echo ${GH_TOKEN} > gh_token
-          scp -o StrictHostKeyChecking=accept-new -i gh_runner_key gh_token ubuntu@${EC2_PUBLIC_DNS}:gh_token
-          scp -i gh_runner_key destroy_runner.sh ubuntu@${EC2_PUBLIC_DNS}:destroy_runner.sh
-          ssh -i ${HOME}/.ssh/gh_runner bash destroy_runner.sh
+          scp -o StrictHostKeyChecking=accept-new gh_token ubuntu@${EC2_PUBLIC_DNS}:gh_token
+          scp .github/workflows/provision_runner.sh ubuntu@${EC2_PUBLIC_DNS}:destroy_runner.sh
+          ssh bash destroy_runner.sh
       - name: stop_runner
         if: always()
         env:
