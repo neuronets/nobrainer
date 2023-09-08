@@ -18,12 +18,12 @@ reg_token=$(curl -L \
                  https://api.github.com/orgs/neuronets/actions/runners/registration-token \
                 | jq -r ".token")
 
-public_dns=$(ec2metadata --public-hostname)
+runner_id=$(ec2metadata --public-hostname | cut -d '.' -f 1)
 ./config.sh \
     --url https://github.com/neuronets \
     --token ${reg_token} \
-    --name ${public_dns} \
-    --labels ${public_dns} \
+    --name ${runner_id} \
+    --labels ${runner_id} \
     --unattended
 
 sudo ./svc.sh install
