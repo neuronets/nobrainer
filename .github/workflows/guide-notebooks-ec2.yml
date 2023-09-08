@@ -75,7 +75,8 @@ jobs:
 
 
   guide_notebooks_regression_ec2:
-    runs-on: ${{ needs.start_ec2_runner.outputs.RUNS_ON }}
+    #runs-on: ${{ needs.start_ec2_runner.outputs.RUNS_ON }}
+    runs-on: self-hosted
     needs: start_ec2_runner
     steps:
       - name: verify-instance
