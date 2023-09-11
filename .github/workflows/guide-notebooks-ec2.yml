@@ -36,9 +36,7 @@ jobs:
         run: |
           set -xe
           cd ${{ github.workspace }}
-          apt install python3-venv -y
-          python3 -m venv env
-          source env/bin/activate
+          source /opt/tensorflow/bin/activate
           pip install --upgrade pip
           pip install matplotlib nilearn
           pip install -e .
