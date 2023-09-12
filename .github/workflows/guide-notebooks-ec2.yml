@@ -37,7 +37,7 @@ jobs:
           set -xe
           cd ${{ github.workspace }}
           source /opt/tensorflow/bin/activate
-          pip install --upgrade pip
+          echo $LD_LIBRARY_PATH
           pip install matplotlib nilearn
           pip install -e .
           nobrainer info
