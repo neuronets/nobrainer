@@ -37,6 +37,7 @@ jobs:
           set -xe
           cd ${{ github.workspace }}
           source /opt/tensorflow/bin/activate
+          export LD_LIBRARY_PATH=opt/amazon/efa/lib:/opt/amazon/openmpi/lib:/usr/local/cuda/efa/lib:/usr/local/cuda/lib:/usr/local/cuda:/usr/local/cuda/lib64:/usr/local/cuda/extras/CUPTI/lib64:/usr/local/cuda/targets/x86_64-linux/lib:/usr/local/lib:/usr/lib
           echo $LD_LIBRARY_PATH
           pip install matplotlib nilearn
           pip install -e .
@@ -57,6 +58,7 @@ jobs:
           fi
 
           cd ${{ github.workspace }}
+          export LD_LIBRARY_PATH=opt/amazon/efa/lib:/opt/amazon/openmpi/lib:/usr/local/cuda/efa/lib:/usr/local/cuda/lib:/usr/local/cuda:/usr/local/cuda/lib64:/usr/local/cuda/extras/CUPTI/lib64:/usr/local/cuda/targets/x86_64-linux/lib:/usr/local/lib:/usr/lib
           source /opt/tensorflow/bin/activate
           for notebook_script in $(ls nobrainer-book/docs/nobrainer-guides/scripts/*.py); do
             echo "running ${notebook_script}"
