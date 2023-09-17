@@ -6,6 +6,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 import tensorflow as tf
 
+from nobrainer.dataset import Dataset
 from nobrainer.models import meshnet
 from nobrainer.processing.segmentation import Segmentation
 
@@ -15,10 +16,7 @@ def _get_toy_dataset():
     train = tf.data.Dataset.from_tensors(
         (np.random.rand(*data_shape), np.random.randint(0, 1, data_shape))
     )
-    train.scalar_labels = False
-    train.n_volumes = data_shape[0]
-    train.volume_shape = data_shape[1:4]
-    return train
+    return Dataset(train, data_shape[0], data_shape[1:4], 1)
 
 
 def _assert_model_weights_allclose(model1, model2):

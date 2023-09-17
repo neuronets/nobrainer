@@ -1,3 +1,27 @@
+# 1.0.0 (Thu Aug 31 2023)
+
+#### 💥 Breaking Change
+
+- `nobrainer` dataset API rework [#261](https://github.com/neuronets/nobrainer/pull/261) ([@ohinds](https://github.com/ohinds) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@satra](https://github.com/satra))
+
+#### 🐛 Bug Fix
+
+- Fix Dockerfiles and add GitHub Actions job [#252](https://github.com/neuronets/nobrainer/pull/252) ([@kabilar](https://github.com/kabilar) [@satra](https://github.com/satra))
+- Self-hosted runner weekly keepalive [#260](https://github.com/neuronets/nobrainer/pull/260) ([@ohinds](https://github.com/ohinds))
+- [pre-commit.ci] pre-commit autoupdate [#253](https://github.com/neuronets/nobrainer/pull/253) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@satra](https://github.com/satra))
+- Processing model checkpointing [#256](https://github.com/neuronets/nobrainer/pull/256) ([@ohinds](https://github.com/ohinds) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@satra](https://github.com/satra))
+- Verify that the ec2 instance we started is where we are running. [#257](https://github.com/neuronets/nobrainer/pull/257) ([@ohinds](https://github.com/ohinds))
+- Training from warm start with multiple GPUs [#251](https://github.com/neuronets/nobrainer/pull/251) ([@ohinds](https://github.com/ohinds) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+
+#### Authors: 4
+
+- [@ohinds](https://github.com/ohinds)
+- [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot])
+- Kabilar Gunalan ([@kabilar](https://github.com/kabilar))
+- Satrajit Ghosh ([@satra](https://github.com/satra))
+
+---
+
 # 0.5.0 (Wed Jul 19 2023)
 
 #### 🚀 Enhancement
