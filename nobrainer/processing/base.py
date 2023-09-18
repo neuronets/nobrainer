@@ -74,7 +74,9 @@ class BaseEstimator:
 
         with klass.strategy.scope():
             klass.model_ = tf.keras.models.load_model(
-                model_dir, custom_objects=custom_objects, compile=compile
+                model_dir,
+                custom_objects=kwargs.get("custom_objects", None),
+                compile=kwargs.get("compile", False),
             )
         return klass
 
