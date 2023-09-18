@@ -55,7 +55,6 @@ class BaseEstimator:
 
     @classmethod
     def load(cls, model_dir, *args, **kwargs):
-        breakpoint()
         """Loads a trained model from a save directory"""
         model_dir = Path(str(model_dir).rstrip(os.pathsep))
         assert model_dir.exists() and model_dir.is_dir()
