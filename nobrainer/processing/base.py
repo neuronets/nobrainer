@@ -69,6 +69,7 @@ class BaseEstimator:
         del model_info["__init__"]
         for key, value in model_info.items():
             setattr(klass, key, value)
+        multi_gpu = kwargs.get("multi_gpu", True)
         klass.strategy = get_strategy(multi_gpu)
 
         with klass.strategy.scope():
