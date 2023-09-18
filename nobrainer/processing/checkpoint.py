@@ -35,7 +35,7 @@ class CheckpointTracker(tf.keras.callbacks.ModelCheckpoint):
         logging.info(f"Saving to dir {directory}")
         self.estimator.save(directory)
 
-    def load(self):
+    def load(self, *args, **kwargs):
         """Loads the most-recently created checkpoint from the
         checkpoint directory.
         """
@@ -44,6 +44,6 @@ class CheckpointTracker(tf.keras.callbacks.ModelCheckpoint):
             return None
 
         latest = max(checkpoints, key=os.path.getctime)
-        self.estimator = self.estimator.load(latest)
+        self.estimator = self.estimator.load(latest, *args, **kwargs)
         logging.info(f"Loaded estimator from {latest}.")
         return self.estimator
