@@ -54,7 +54,13 @@ class BaseEstimator:
             pk.dump(model_info, fp)
 
     @classmethod
-    def load(cls, model_dir, *args, **kwargs):
+    def load(
+            cls,
+            model_dir,
+            multi_gpu=True,
+            custom_objects=None,
+            compile=False,
+    ):
         """Loads a trained model from a save directory"""
         model_dir = Path(str(model_dir).rstrip(os.pathsep))
         assert model_dir.exists() and model_dir.is_dir()
@@ -64,24 +70,31 @@ class BaseEstimator:
         if model_info["classname"] != cls.__name__:
             raise ValueError(f"Model class does not match {cls.__name__}")
         del model_info["classname"]
-        model_info["__init__"].update(kwargs)
-        klass = cls(*args, **model_info["__init__"])
+
+        klass = cls(**model_info["__init__"])
         del model_info["__init__"]
         for key, value in model_info.items():
             setattr(klass, key, value)
-        multi_gpu = kwargs.get("multi_gpu", True)
-        klass.strategy = get_strategy(multi_gpu)
 
+        klass.strategy = get_strategy(multi_gpu)
         with klass.strategy.scope():
             klass.model_ = tf.keras.models.load_model(
                 model_dir,
-                custom_objects=kwargs.get("custom_objects", None),
-                compile=kwargs.get("compile", False),
+                custom_objects=custom_objects,
+                compile=compile,
             )
         return klass
 
     @classmethod
-    def init_with_checkpoints(cls, model_name, checkpoint_filepath, *args, **kwargs):
+    def init_with_checkpoints(
+            cls,
+            model_name,
+            checkpoint_filepath,
+            multi_gpu=True,
+            custom_objects=None,
+            compile=False,
+            model_args=None,
+    ):
         """Initialize a model for training, either from the latest
         checkpoint found, or from scratch if no checkpoints are
         found. This is useful for long-running model fits that may be
@@ -100,9 +113,13 @@ class BaseEstimator:
         from .checkpoint import CheckpointTracker
 
         checkpoint_tracker = CheckpointTracker(cls, checkpoint_filepath)
-        estimator = checkpoint_tracker.load(*args, **kwargs)
+        estimator = checkpoint_tracker.load(
+            multi_gpu=multi_gpu,
+            custom_objects=custom_objects,
+            compile=compile,
+        )
         if not estimator:
-            estimator = cls(model_name, *args, **kwargs)
+            estimator = cls(model_name, model_args=model_args)
         estimator.checkpoint_tracker = checkpoint_tracker
         checkpoint_tracker.estimator = estimator
         return estimator
