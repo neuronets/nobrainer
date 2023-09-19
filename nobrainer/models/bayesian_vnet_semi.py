@@ -24,7 +24,7 @@ def down_stage(inputs, filters, kernel_size=3, activation="relu", padding="SAME"
     inputs: tf.layer for encoding stage.
     filters: list or tuple of four ints, the shape of the input data. Omit
         the batch dimension, and include the number of channels.
-    kernal_size: int, size of the kernal of conv layers. Default kernal size
+    kernal_size: int, size of the kernel of conv layers. Default kernel size
         is set to be 3.
     activation: str or optimizer object, the non-linearity to use. All
         tf.activations are allowed to use
@@ -61,11 +61,11 @@ def up_stage(
     kld: a func to compute KL Divergence loss, default is set None.
         KLD can be set as (lambda q, p, ignore: kl_lib.kl_divergence(q, p))
     prior_fn: a func to initialize priors distributions
-    kernel_posterior_fn:a func to initlaize kernal posteriors
+    kernel_posterior_fn:a func to initlaize kernel posteriors
         (loc, scale and weightnorms)
     filters: list or tuple of four ints, the shape of the input data. Omit
         the batch dimension, and include the number of channels.
-    kernal_size: int, size of the kernal of conv layers. Default kernal size
+    kernal_size: int, size of the kernel of conv layers. Default kernel size
         is set to be 3.
     activation: str or optimizer object, the non-linearity to use. All
         tf.activations are allowed to use
@@ -131,17 +131,17 @@ def end_stage(
     kld: a func to compute KL Divergence loss, default is set None.
         KLD can be set as (lambda q, p, ignore: kl_lib.kl_divergence(q, p))
     prior_fn: a func to initialize priors distributions
-    kernel_posterior_fn:a func to initlaize kernal posteriors
+    kernel_posterior_fn:a func to initlaize kernel posteriors
         (loc, scale and weightnorms)
     n_classes: int, for binary class use the value 1.
-    kernal_size: int, size of the kernal of conv layers. Default kernal size
+    kernal_size: int, size of the kernel of conv layers. Default kernel size
         is set to be 3.
     activation: str or optimizer object, the non-linearity to use. All
         tf.activations are allowed to use
 
     Result
     ----------
-    prediction probablities.
+    prediction probabilities.
     """
     conv = tfp.layers.Convolution3DFlipout(
         n_classes,
@@ -195,12 +195,12 @@ def bayesian_vnet_semi(
         a value of 1.
     input_shape: list or tuple of four ints, the shape of the input data. Omit
         the batch dimension, and include the number of channels.
-    kernal_size(int): size of the kernal of conv layers
+    kernal_size(int): size of the kernel of conv layers
     activation(str): all tf.keras.activations are allowed
     kld: a func to compute KL Divergence loss, default is set None.
         KLD can be set as (lambda q, p, ignore: kl_lib.kl_divergence(q, p))
     prior_fn: a func to initialize priors distributions
-    kernel_posterior_fn:a func to initlaize kernal posteriors
+    kernel_posterior_fn:a func to initlaize kernel posteriors
         (loc, scale and weightnorms)
     See Bayesian Utils for more options for kld, prior_fn and kernal_posterior_fn
     activation: str or optimizer object, the non-linearity to use. All

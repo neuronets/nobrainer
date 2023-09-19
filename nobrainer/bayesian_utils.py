@@ -64,7 +64,7 @@ def default_loc_scale_fn(
           safe to use when doing asynchronous distributed training. The default
           (`None`) is to use the `tf.get_variable` default.
         weightnorm: An optional (boolean) to activate weightnorm for the mean
-        kernal.
+        kernel.
 
     Returns
     ----------
