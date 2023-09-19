@@ -20,7 +20,7 @@ class BaseEstimator:
     state_variables = []
     model_ = None
 
-    def __init__(self, checkpoint_filepath=None, multi_gpu=False):
+    def __init__(self, checkpoint_filepath=None, multi_gpu=True):
         self.checkpoint_tracker = None
         if checkpoint_filepath:
             from .checkpoint import CheckpointTracker
@@ -54,7 +54,13 @@ class BaseEstimator:
             pk.dump(model_info, fp)
 
     @classmethod
-    def load(cls, model_dir, multi_gpu=False, custom_objects=None, compile=False):
+    def load(
+        cls,
+        model_dir,
+        multi_gpu=True,
+        custom_objects=None,
+        compile=False,
+    ):
         """Loads a trained model from a save directory"""
         model_dir = Path(str(model_dir).rstrip(os.pathsep))
         assert model_dir.exists() and model_dir.is_dir()
@@ -64,20 +70,31 @@ class BaseEstimator:
         if model_info["classname"] != cls.__name__:
             raise ValueError(f"Model class does not match {cls.__name__}")
         del model_info["classname"]
+
         klass = cls(**model_info["__init__"])
         del model_info["__init__"]
         for key, value in model_info.items():
             setattr(klass, key, value)
-        klass.strategy = get_strategy(multi_gpu)
 
+        klass.strategy = get_strategy(multi_gpu)
         with klass.strategy.scope():
             klass.model_ = tf.keras.models.load_model(
-                model_dir, custom_objects=custom_objects, compile=compile
+                model_dir,
+                custom_objects=custom_objects,
+                compile=compile,
             )
         return klass
 
     @classmethod
-    def init_with_checkpoints(cls, model_name, checkpoint_filepath):
+    def init_with_checkpoints(
+        cls,
+        model_name,
+        checkpoint_filepath,
+        multi_gpu=True,
+        custom_objects=None,
+        compile=False,
+        model_args=None,
+    ):
         """Initialize a model for training, either from the latest
         checkpoint found, or from scratch if no checkpoints are
         found. This is useful for long-running model fits that may be
@@ -96,9 +113,13 @@ class BaseEstimator:
         from .checkpoint import CheckpointTracker
 
         checkpoint_tracker = CheckpointTracker(cls, checkpoint_filepath)
-        estimator = checkpoint_tracker.load()
+        estimator = checkpoint_tracker.load(
+            multi_gpu=multi_gpu,
+            custom_objects=custom_objects,
+            compile=compile,
+        )
         if not estimator:
-            estimator = cls(model_name)
+            estimator = cls(model_name, model_args=model_args)
         estimator.checkpoint_tracker = checkpoint_tracker
         checkpoint_tracker.estimator = estimator
         return estimator

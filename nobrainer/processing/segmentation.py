@@ -15,7 +15,7 @@ class Segmentation(BaseEstimator):
     state_variables = ["block_shape_", "volume_shape_", "scalar_labels_"]
 
     def __init__(
-        self, base_model, model_args=None, checkpoint_filepath=None, multi_gpu=False
+        self, base_model, model_args=None, checkpoint_filepath=None, multi_gpu=True
     ):
         super().__init__(checkpoint_filepath=checkpoint_filepath, multi_gpu=multi_gpu)
 

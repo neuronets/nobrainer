@@ -21,7 +21,7 @@ class ProgressiveGeneration(BaseEstimator):
         dimensionality=3,
         g_fmap_base=1024,
         d_fmap_base=1024,
-        multi_gpu=False,
+        multi_gpu=True,
     ):
         super().__init__(multi_gpu=multi_gpu)
         self.model_ = None
