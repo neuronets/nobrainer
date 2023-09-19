@@ -55,11 +55,11 @@ class BaseEstimator:
 
     @classmethod
     def load(
-            cls,
-            model_dir,
-            multi_gpu=True,
-            custom_objects=None,
-            compile=False,
+        cls,
+        model_dir,
+        multi_gpu=True,
+        custom_objects=None,
+        compile=False,
     ):
         """Loads a trained model from a save directory"""
         model_dir = Path(str(model_dir).rstrip(os.pathsep))
@@ -87,13 +87,13 @@ class BaseEstimator:
 
     @classmethod
     def init_with_checkpoints(
-            cls,
-            model_name,
-            checkpoint_filepath,
-            multi_gpu=True,
-            custom_objects=None,
-            compile=False,
-            model_args=None,
+        cls,
+        model_name,
+        checkpoint_filepath,
+        multi_gpu=True,
+        custom_objects=None,
+        compile=False,
+        model_args=None,
     ):
         """Initialize a model for training, either from the latest
         checkpoint found, or from scratch if no checkpoints are

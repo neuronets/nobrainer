@@ -36,11 +36,11 @@ class CheckpointTracker(tf.keras.callbacks.ModelCheckpoint):
         self.estimator.save(directory)
 
     def load(
-            self,
-            multi_gpu=True,
-            custom_objects=None,
-            compile=False,
-            model_args=None,
+        self,
+        multi_gpu=True,
+        custom_objects=None,
+        compile=False,
+        model_args=None,
     ):
         """Loads the most-recently created checkpoint from the
         checkpoint directory.
