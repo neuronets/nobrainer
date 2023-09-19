@@ -1,3 +1,25 @@
+# 1.1.0 (Tue Sep 19 2023)
+
+#### 🚀 Enhancement
+
+- Changes required to support the warmstart guide notebook [#266](https://github.com/neuronets/nobrainer/pull/266) ([@ohinds](https://github.com/ohinds) [@satra](https://github.com/satra) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+
+#### 🐛 Bug Fix
+
+- Fix some typos using codespell [#262](https://github.com/neuronets/nobrainer/pull/262) ([@yarikoptic](https://github.com/yarikoptic) [@satra](https://github.com/satra))
+- [pre-commit.ci] pre-commit autoupdate [#263](https://github.com/neuronets/nobrainer/pull/263) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@satra](https://github.com/satra))
+- Remove unnecessary keepalive runner [#265](https://github.com/neuronets/nobrainer/pull/265) ([@ohinds](https://github.com/ohinds))
+- Dynamically provision self-hosted runner [#264](https://github.com/neuronets/nobrainer/pull/264) ([@ohinds](https://github.com/ohinds))
+
+#### Authors: 4
+
+- [@ohinds](https://github.com/ohinds)
+- [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot])
+- Satrajit Ghosh ([@satra](https://github.com/satra))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 1.0.0 (Thu Aug 31 2023)
 
 #### 💥 Breaking Change
