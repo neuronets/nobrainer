@@ -47,7 +47,12 @@ class CheckpointTracker(tf.keras.callbacks.ModelCheckpoint):
         """
         checkpoints = glob(os.path.join(os.path.dirname(self.filepath), "*/"))
         if not checkpoints:
+            self.last_epoch = 0
             return None
+
+        # TODO, we should probably exclude non-checkpoint files here,
+        # and maybe parse the filename for the epoch number
+        self.last_epoch = len(checkpoints)
 
         latest = max(checkpoints, key=os.path.getctime)
         self.estimator = self.estimator.load(

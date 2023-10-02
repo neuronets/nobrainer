@@ -78,6 +78,7 @@ class Dataset:
         block_shape=None,
         scalar_labels=False,
         n_classes=1,
+        options=None,
         num_parallel_calls=1,
     ):
         """Function to retrieve a saved tf record as a nobrainer Dataset
@@ -96,6 +97,9 @@ class Dataset:
         # two value per iteration: (feature, label).
         compressed = _is_gzipped(files[0], filesys=fs)
         dataset = tf.data.Dataset.list_files(file_pattern, shuffle=False)
+
+        if options:
+            dataset = dataset.with_options(options)
 
         # Read each of these files as a TFRecordDataset.
         # Assume all files have same compression type as the first file.
@@ -150,6 +154,7 @@ class Dataset:
         eval_size=0.1,
         n_classes=1,
         block_shape=None,
+        options=None,
     ):
         """Create Nobrainer datasets from data
         filepaths: List(str), list of paths to individual input data files.
@@ -211,6 +216,7 @@ class Dataset:
             scalar_labels=scalar_labels,
             n_classes=n_classes,
             block_shape=block_shape,
+            options=options,
             num_parallel_calls=num_parallel_calls,
         )
         ds_eval = None
@@ -223,6 +229,7 @@ class Dataset:
                 scalar_labels=scalar_labels,
                 n_classes=n_classes,
                 block_shape=block_shape,
+                options=options,
                 num_parallel_calls=num_parallel_calls,
             )
         return ds_train, ds_eval
