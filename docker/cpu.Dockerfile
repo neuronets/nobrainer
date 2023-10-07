@@ -1,4 +1,4 @@
-FROM tensorflow/tensorflow:2.13.0-jupyter
+FROM tensorflow/tensorflow:2.14.0-jupyter
 RUN curl -sSL http://neuro.debian.net/lists/focal.us-nh.full | tee /etc/apt/sources.list.d/neurodebian.sources.list \
   && export GNUPGHOME="$(mktemp -d)" \
   && echo "disable-ipv6" >> ${GNUPGHOME}/dirmngr.conf \
