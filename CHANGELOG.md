@@ -1,3 +1,18 @@
+# 1.1.1 (Sat Oct 07 2023)
+
+#### 🐛 Bug Fix
+
+- Small changes to support long, preemptable training runs [#267](https://github.com/neuronets/nobrainer/pull/267) ([@ohinds](https://github.com/ohinds) [@satra](https://github.com/satra))
+- [pre-commit.ci] pre-commit autoupdate [#268](https://github.com/neuronets/nobrainer/pull/268) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+
+#### Authors: 3
+
+- [@ohinds](https://github.com/ohinds)
+- [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot])
+- Satrajit Ghosh ([@satra](https://github.com/satra))
+
+---
+
 # 1.1.0 (Tue Sep 19 2023)
 
 #### 🚀 Enhancement
