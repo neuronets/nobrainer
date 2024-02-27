@@ -361,7 +361,7 @@ class _ConvVariational(tf.keras.layers.Layer):
 
 
 class _ConvReparameterization(_ConvVariational):
-    """Abstract n dimensional convolution layer (private, used as implementation base).
+    """Abstract n-dimensional convolution layer (private, used as implementation base).
     This layer creates a convolution kernel that is convolved
     (actually cross-correlated) with the layer input to produce a tensor of
     outputs. It may also include a bias addition and activation function
