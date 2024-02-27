@@ -28,4 +28,4 @@ repos:
     rev: v2.2.6
     hooks:
     -   id: codespell
-        exclude: ^(nobrainer/_version\.py|versioneer\.py)$
+        exclude: ^(nobrainer/_version\.py|versioneer\.py|pyproject\.toml|CHANGELOG\.md)$
