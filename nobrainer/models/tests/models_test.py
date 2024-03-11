@@ -4,6 +4,8 @@ import tensorflow as tf
 
 from nobrainer.bayesian_utils import default_mean_field_normal_fn
 
+from ..attention_unet import attention_unet
+from ..attention_unet_with_inception import attention_unet_with_inception
 from ..autoencoder import autoencoder
 from ..bayesian_vnet import bayesian_vnet
 from ..bayesian_vnet_semi import bayesian_vnet_semi
@@ -241,3 +243,13 @@ def test_vox2vox():
     pred_shape = (1, 2, 2, 2, 1)
     out = vox_discriminator(inputs=[y, x])
     assert out.shape == pred_shape
+
+
+def test_attention_unet():
+    model_test(attention_unet, n_classes=1, input_shape=(1, 64, 64, 64, 1))
+
+
+def test_attention_unet_with_inception():
+    model_test(
+        attention_unet_with_inception, n_classes=1, input_shape=(1, 64, 64, 64, 1)
+    )

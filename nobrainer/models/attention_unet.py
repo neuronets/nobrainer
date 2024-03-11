@@ -3,8 +3,8 @@ Adapted from https://github.com/nikhilroxtomar/Semantic-Segmentation-Architectur
 """
 
 import tensorflow as tf
-import tensorflow.keras.layers as L
 from tensorflow.keras import layers
+import tensorflow.keras.layers as L
 from tensorflow.keras.models import Model
 
 
@@ -71,7 +71,7 @@ def attention_unet(n_classes, input_shape):
     outputs = layers.Activation(final_activation)(outputs)
 
     """ Model """
-    return Model(inputs=inputs, outputs=outputs, name="Attention U-Net")
+    return Model(inputs=inputs, outputs=outputs, name="Attention_U-Net")
 
 
 if __name__ == "__main__":

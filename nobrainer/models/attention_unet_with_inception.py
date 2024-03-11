@@ -2,11 +2,9 @@
 Adapted from https://github.com/robinvvinod/unet
 """
 
-import tensorflow.keras.backend as K
 from tensorflow.keras import layers
+import tensorflow.keras.backend as K
 from tensorflow.keras.models import Model
-
-from hyperparameters import alpha
 
 K.set_image_data_format("channels_last")
 
@@ -44,7 +42,7 @@ def conv3d_block(
     )(input_tensor)
     if batchnorm:
         conv = layers.BatchNormalization()(conv)
-    output = layers.LeakyReLU(alpha=alpha)(conv)
+    output = layers.LeakyReLU(alpha=0.1)(conv)
 
     for _ in range(recurrent - 1):
         conv = layers.Conv3D(
@@ -57,7 +55,7 @@ def conv3d_block(
         )(output)
         if batchnorm:
             conv = layers.BatchNormalization()(conv)
-        res = layers.LeakyReLU(alpha=alpha)(conv)
+        res = layers.LeakyReLU(alpha=0.1)(conv)
         output = layers.Add()([output, res])
 
     return output
@@ -141,7 +139,7 @@ def transpose_block(
         ),
         kernel_initializer="he_normal",
     )(input_tensor)
-    conv = layers.LeakyReLU(alpha=alpha)(conv)
+    conv = layers.LeakyReLU(alpha=0.1)(conv)
 
     act = conv3d_block(
         conv,
