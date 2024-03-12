@@ -1,3 +1,5 @@
+from .attention_unet import attention_unet
+from .attention_unet_with_inception import attention_unet_with_inception
 from .autoencoder import autoencoder
 from .dcgan import dcgan
 from .highresnet import highresnet
@@ -29,6 +31,8 @@ def get(name):
         "progressivegan": progressivegan,
         "progressiveae": progressiveae,
         "dcgan": dcgan,
+        "attention_unet": attention_unet,
+        "attention_unet_with_inception": attention_unet_with_inception,
     }
 
     try:
