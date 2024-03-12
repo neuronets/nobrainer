@@ -16,6 +16,7 @@ from ..meshnet import meshnet
 from ..progressivegan import progressivegan
 from ..unet import unet
 from ..unet_lstm import unet_lstm
+from ..unetr import unetr
 from ..vnet import vnet
 from ..vox2vox import Vox_ensembler, vox_gan
 
@@ -253,3 +254,7 @@ def test_attention_unet_with_inception():
     model_test(
         attention_unet_with_inception, n_classes=1, input_shape=(1, 64, 64, 64, 1)
     )
+
+
+def test_unetr():
+    model_test(unetr, n_classes=1, input_shape=(1, 96, 96, 96, 1))

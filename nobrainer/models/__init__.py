@@ -7,6 +7,7 @@ from .meshnet import meshnet
 from .progressiveae import progressiveae
 from .progressivegan import progressivegan
 from .unet import unet
+from .unetr import unetr
 
 
 def get(name):
@@ -33,6 +34,7 @@ def get(name):
         "dcgan": dcgan,
         "attention_unet": attention_unet,
         "attention_unet_with_inception": attention_unet_with_inception,
+        "unetr": unetr,
     }
 
     try:
