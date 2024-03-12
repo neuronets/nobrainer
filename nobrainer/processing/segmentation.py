@@ -39,7 +39,7 @@ class Segmentation(BaseEstimator):
         opt_args=None,
         loss=losses.dice,
         metrics=metrics.dice,
-        callbacks=None
+        callbacks=None,
     ):
         """Train a segmentation model"""
         # TODO: check validity of datasets
@@ -84,11 +84,11 @@ class Segmentation(BaseEstimator):
         self.model_.summary()
 
         if callbacks is not None and not isinstance(callbacks, list):
-            raise AttributeError('Callbacks must be either of type list or None')
-        
+            raise AttributeError("Callbacks must be either of type list or None")
+
         if callbacks is None:
             callbacks = []
-            
+
         if self.checkpoint_tracker:
             callbacks.append(self.checkpoint_tracker)
         self.model_.fit(
