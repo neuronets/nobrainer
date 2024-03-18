@@ -19,6 +19,7 @@ from ..unet_lstm import unet_lstm
 from ..unetr import unetr
 from ..vnet import vnet
 from ..vox2vox import Vox_ensembler, vox_gan
+from ..bayesian_meshnet import variational_meshnet
 
 
 def model_test(model_cls, n_classes, input_shape, kwds={}):
@@ -258,3 +259,7 @@ def test_attention_unet_with_inception():
 
 def test_unetr():
     model_test(unetr, n_classes=1, input_shape=(1, 96, 96, 96, 1))
+
+
+def test_variational_meshnet():
+    model_test(variational_meshnet, n_classes=1, input_shape=(1, 128, 128, 128, 1))

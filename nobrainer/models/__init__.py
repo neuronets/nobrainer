@@ -8,7 +8,7 @@ from .progressiveae import progressiveae
 from .progressivegan import progressivegan
 from .unet import unet
 from .unetr import unetr
-
+from .bayesian_meshnet import variational_meshnet
 
 def get(name):
     """Return callable that creates a particular `tf.keras.Model`.
@@ -35,6 +35,7 @@ def get(name):
         "attention_unet": attention_unet,
         "attention_unet_with_inception": attention_unet_with_inception,
         "unetr": unetr,
+        "variational_meshnet": variational_meshnet,
     }
 
     try:
