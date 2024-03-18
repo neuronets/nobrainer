@@ -101,7 +101,7 @@ class Segmentation(BaseEstimator):
             if dataset_validate
             else None,
             callbacks=callbacks,
-            verbose=verbose
+            verbose=verbose,
         )
 
         return self
