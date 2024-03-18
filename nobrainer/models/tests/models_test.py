@@ -7,6 +7,7 @@ from nobrainer.bayesian_utils import default_mean_field_normal_fn
 from ..attention_unet import attention_unet
 from ..attention_unet_with_inception import attention_unet_with_inception
 from ..autoencoder import autoencoder
+from ..bayesian_meshnet import variational_meshnet
 from ..bayesian_vnet import bayesian_vnet
 from ..bayesian_vnet_semi import bayesian_vnet_semi
 from ..brainsiam import brainsiam
@@ -19,7 +20,6 @@ from ..unet_lstm import unet_lstm
 from ..unetr import unetr
 from ..vnet import vnet
 from ..vox2vox import Vox_ensembler, vox_gan
-from ..bayesian_meshnet import variational_meshnet
 
 
 def model_test(model_cls, n_classes, input_shape, kwds={}):

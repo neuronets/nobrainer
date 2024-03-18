@@ -1,6 +1,7 @@
 from .attention_unet import attention_unet
 from .attention_unet_with_inception import attention_unet_with_inception
 from .autoencoder import autoencoder
+from .bayesian_meshnet import variational_meshnet
 from .dcgan import dcgan
 from .highresnet import highresnet
 from .meshnet import meshnet
@@ -8,7 +9,7 @@ from .progressiveae import progressiveae
 from .progressivegan import progressivegan
 from .unet import unet
 from .unetr import unetr
-from .bayesian_meshnet import variational_meshnet
+
 
 def get(name):
     """Return callable that creates a particular `tf.keras.Model`.
