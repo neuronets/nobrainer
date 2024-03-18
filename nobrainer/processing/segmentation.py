@@ -40,6 +40,7 @@ class Segmentation(BaseEstimator):
         loss=losses.dice,
         metrics=metrics.dice,
         callbacks=None,
+        verbose=1,
     ):
         """Train a segmentation model"""
         # TODO: check validity of datasets
@@ -100,6 +101,7 @@ class Segmentation(BaseEstimator):
             if dataset_validate
             else None,
             callbacks=callbacks,
+            verbose=verbose
         )
 
         return self
