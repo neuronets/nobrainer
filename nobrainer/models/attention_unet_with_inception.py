@@ -125,7 +125,7 @@ def transpose_block(
     batchnorm=True,
     recurrent=1,
 ):
-    # A wrapper of the Keras Conv3DTranspose block to serve as a building block 
+    # A wrapper of the Keras Conv3DTranspose block to serve as a building block
     # for upsampling layers
 
     shape_x = K.int_shape(input_tensor)
@@ -168,11 +168,11 @@ def inception_block(
     layers_list=[],
 ):
     # Inception-style convolutional block similar to InceptionNet
-    # The first convolution follows the function arguments, while subsequent 
+    # The first convolution follows the function arguments, while subsequent
     # inception convolutions follow the parameters in
     # argument, layers
 
-    # layers is a nested list containing the different secondary inceptions in 
+    # layers is a nested list containing the different secondary inceptions in
     # the format of (kernel_size, dil_rate)
 
     # E.g => layers=[ [(3,1),(3,1)], [(5,1)], [(3,1),(3,2)] ]
