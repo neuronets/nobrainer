@@ -2,7 +2,6 @@
 Adapted from https://github.com/nikhilroxtomar/Semantic-Segmentation-Architecture/blob/main/TensorFlow/attention-unet.py
 """
 
-import tensorflow as tf
 from tensorflow.keras import layers
 import tensorflow.keras.layers as L
 from tensorflow.keras.models import Model

@@ -1,6 +1,6 @@
 """UNETR implementation in Tensorflow 2.0.
 
-Adapted from https://github.com/nikhilroxtomar/Semantic-Segmentation-Architecture/blob/main/TensorFlow/unetr.py
+Adapted from https://www.kaggle.com/code/usharengaraju/tensorflow-unetr-w-b
 """
 import math
 
@@ -140,7 +140,7 @@ class PositionwiseFeedForward(tf.keras.layers.Layer):
         return self.b(self.c(tf.nn.relu(self.a(inputs))))
 
 
-##embeddings, projection_dim=embed_dim
+# embeddings, projection_dim=embed_dim
 class PatchEmbedding(tf.keras.layers.Layer):
     def __init__(self, cube_size, patch_size, embed_dim):
         super(PatchEmbedding, self).__init__()
@@ -184,7 +184,7 @@ class PatchEmbedding(tf.keras.layers.Layer):
         return patches, positionalEmbedding
 
 
-##transformerblock
+# transformerblock
 class TransformerLayer(tf.keras.layers.Layer):
     def __init__(self, embed_dim, num_heads, dropout, cube_size, patch_size):
         super(TransformerLayer, self).__init__()

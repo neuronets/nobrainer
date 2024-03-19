@@ -11,7 +11,8 @@ K.set_image_data_format("channels_last")
 
 def expend_as(tensor, rep):
     # Anonymous lambda function to expand the specified axis by a factor of argument, rep.
-    # If tensor has shape (512,512,N), lambda will return a tensor of shape (512,512,N*rep), if specified axis=2
+    # If tensor has shape (512,512,N), lambda will return a tensor of shape
+    # (512,512,N*rep), if specified axis=2
 
     my_repeat = layers.Lambda(
         lambda x, repnum: K.repeat_elements(x, repnum, axis=4),
@@ -29,7 +30,8 @@ def conv3d_block(
     dilation_rate=1,
     recurrent=1,
 ):
-    # A wrapper of the Keras Conv3D block to serve as a building block for downsampling layers
+    # A wrapper of the Keras Conv3D block to serve as a building block for
+    # downsampling layers
     # Includes options to use batch normalization, dilation and recurrence
 
     conv = layers.Conv3D(
@@ -123,7 +125,8 @@ def transpose_block(
     batchnorm=True,
     recurrent=1,
 ):
-    # A wrapper of the Keras Conv3DTranspose block to serve as a building block for upsampling layers
+    # A wrapper of the Keras Conv3DTranspose block to serve as a building block 
+    # for upsampling layers
 
     shape_x = K.int_shape(input_tensor)
     shape_xskip = K.int_shape(skip_tensor)
@@ -165,10 +168,12 @@ def inception_block(
     layers_list=[],
 ):
     # Inception-style convolutional block similar to InceptionNet
-    # The first convolution follows the function arguments, while subsequent inception convolutions follow the parameters in
+    # The first convolution follows the function arguments, while subsequent 
+    # inception convolutions follow the parameters in
     # argument, layers
 
-    # layers is a nested list containing the different secondary inceptions in the format of (kernel_size, dil_rate)
+    # layers is a nested list containing the different secondary inceptions in 
+    # the format of (kernel_size, dil_rate)
 
     # E.g => layers=[ [(3,1),(3,1)], [(5,1)], [(3,1),(3,2)] ]
     # This will implement 3 sets of secondary convolutions
