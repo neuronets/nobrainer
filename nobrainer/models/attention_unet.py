@@ -1,6 +1,6 @@
 """Model definition for Attention U-Net.
 Adapted from https://github.com/nikhilroxtomar/Semantic-Segmentation-Architecture/blob/main/TensorFlow/attention-unet.py
-"""
+"""  # noqa: E501
 
 from tensorflow.keras import layers
 import tensorflow.keras.layers as L

@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pytest
 import tensorflow as tf
@@ -20,6 +22,8 @@ from ..unet_lstm import unet_lstm
 from ..unetr import unetr
 from ..vnet import vnet
 from ..vox2vox import Vox_ensembler, vox_gan
+
+IN_GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") == "true"
 
 
 def model_test(model_cls, n_classes, input_shape, kwds={}):
@@ -257,9 +261,11 @@ def test_attention_unet_with_inception():
     )
 
 
+@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Cannot test in GitHub Actions")
 def test_unetr():
     model_test(unetr, n_classes=1, input_shape=(1, 96, 96, 96, 1))
 
 
+@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Cannot test in GitHub Actions")
 def test_variational_meshnet():
     model_test(variational_meshnet, n_classes=1, input_shape=(1, 128, 128, 128, 1))
