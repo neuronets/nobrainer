@@ -47,7 +47,7 @@ class Block(layers.Layer):
 
     def __init__(self, dim, drop_path=0.0, layer_scale_init_value=1e-6, prefix=""):
         super().__init__()
-        self.dwconv = DepthwiseConv3d(kernel_size=7, padding="same")  # depthwise conv
+        self.dwconv = DepthwiseConv3D(kernel_size=7, padding="same")  # depthwise conv
         self.norm = layers.LayerNormalization(epsilon=1e-6)
         # pointwise/1x1x1 convs, implemented with linear layers
         self.pwconv1 = layers.Dense(4 * dim)
