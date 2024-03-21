@@ -266,6 +266,10 @@ def test_unetr():
     model_test(unetr, n_classes=1, input_shape=(1, 96, 96, 96, 1))
 
 
-@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Cannot test in GitHub Actions")
 def test_variational_meshnet():
-    model_test(variational_meshnet, n_classes=1, input_shape=(1, 128, 128, 128, 1))
+    model_test(
+        variational_meshnet,
+        n_classes=1,
+        input_shape=(1, 128, 128, 128, 1),
+        kwds={"filters": 4},
+    )
