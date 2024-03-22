@@ -1,10 +1,15 @@
+import os
+
 import numpy as np
 import pytest
 import tensorflow as tf
 
 from nobrainer.bayesian_utils import default_mean_field_normal_fn
 
+from ..attention_unet import attention_unet
+from ..attention_unet_with_inception import attention_unet_with_inception
 from ..autoencoder import autoencoder
+from ..bayesian_meshnet import variational_meshnet
 from ..bayesian_vnet import bayesian_vnet
 from ..bayesian_vnet_semi import bayesian_vnet_semi
 from ..brainsiam import brainsiam
@@ -14,8 +19,11 @@ from ..meshnet import meshnet
 from ..progressivegan import progressivegan
 from ..unet import unet
 from ..unet_lstm import unet_lstm
+from ..unetr import unetr
 from ..vnet import vnet
 from ..vox2vox import Vox_ensembler, vox_gan
+
+IN_GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") == "true"
 
 
 def model_test(model_cls, n_classes, input_shape, kwds={}):
@@ -241,3 +249,27 @@ def test_vox2vox():
     pred_shape = (1, 2, 2, 2, 1)
     out = vox_discriminator(inputs=[y, x])
     assert out.shape == pred_shape
+
+
+def test_attention_unet():
+    model_test(attention_unet, n_classes=1, input_shape=(1, 64, 64, 64, 1))
+
+
+def test_attention_unet_with_inception():
+    model_test(
+        attention_unet_with_inception, n_classes=1, input_shape=(1, 64, 64, 64, 1)
+    )
+
+
+@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Cannot test in GitHub Actions")
+def test_unetr():
+    model_test(unetr, n_classes=1, input_shape=(1, 96, 96, 96, 1))
+
+
+def test_variational_meshnet():
+    model_test(
+        variational_meshnet,
+        n_classes=1,
+        input_shape=(1, 128, 128, 128, 1),
+        kwds={"filters": 4},
+    )
