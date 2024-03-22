@@ -1,3 +1,27 @@
+# 1.2.0 (Fri Mar 22 2024)
+
+#### 🚀 Enhancement
+
+- Dev [#295](https://github.com/neuronets/nobrainer/pull/295) ([@hvgazula](https://github.com/hvgazula) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@satra](https://github.com/satra))
+- Update setup.cfg [#299](https://github.com/neuronets/nobrainer/pull/299) ([@satra](https://github.com/satra))
+
+#### 🐛 Bug Fix
+
+- Update release.yml ([@satra](https://github.com/satra))
+- change hyphenation [#275](https://github.com/neuronets/nobrainer/pull/275) ([@satra](https://github.com/satra))
+- update precommit checks [#275](https://github.com/neuronets/nobrainer/pull/275) ([@satra](https://github.com/satra))
+- fix docker syntax [#275](https://github.com/neuronets/nobrainer/pull/275) ([@satra](https://github.com/satra))
+- remove trained models [#275](https://github.com/neuronets/nobrainer/pull/275) ([@satra](https://github.com/satra))
+- [pre-commit.ci] pre-commit autoupdate [#269](https://github.com/neuronets/nobrainer/pull/269) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+
+#### Authors: 3
+
+- [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot])
+- H Gazula ([@hvgazula](https://github.com/hvgazula))
+- Satrajit Ghosh ([@satra](https://github.com/satra))
+
+---
+
 # 1.1.1 (Sat Oct 07 2023)
 
 #### 🐛 Bug Fix
