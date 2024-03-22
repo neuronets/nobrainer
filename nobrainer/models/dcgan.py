@@ -1,5 +1,6 @@
 """Model definition for DCGAN.
 """
+
 import math
 
 from tensorflow.keras import layers, models
