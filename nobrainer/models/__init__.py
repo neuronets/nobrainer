@@ -55,6 +55,6 @@ def get(name):
 def available_models():
     return list(_models)
 
+
 def list_available_models():
     pprint(available_models())
-

@@ -133,6 +133,7 @@ class Segmentation(BaseEstimator):
             batch_size=batch_size,
             normalizer=normalizer,
         )
+
     @classmethod
     def list_available_models(cls):
         list_available_models()
