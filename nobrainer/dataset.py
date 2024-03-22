@@ -121,6 +121,9 @@ class Dataset:
         )
         block_length = len([0 for _ in first_shard])
 
+        if not n_volumes:
+            n_volumes = block_length * len(files)
+
         dataset = dataset.interleave(
             map_func=lambda x: tf.data.TFRecordDataset(
                 x, compression_type=compression_type
