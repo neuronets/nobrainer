@@ -38,10 +38,6 @@ class Segmentation(BaseEstimator):
         self.volume_shape_ = None
         self.scalar_labels_ = None
 
-    def add_model(self, base_model, model_args=None):
-        """Add a segmentation model"""
-        self.base_model = base_model
-        self.model_args = model_args or {}
 
     def fit(
         self,
