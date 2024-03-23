@@ -5,7 +5,7 @@ import tensorflow as tf
 
 from .base import BaseEstimator
 from .. import losses
-from ..dataset import get_dataset
+from ..dataset import Dataset
 
 
 class ProgressiveGeneration(BaseEstimator):
@@ -136,8 +136,8 @@ class ProgressiveGeneration(BaseEstimator):
                 d_loss_fn=d_loss,
             )
 
-        print(self.model_.generator.summary())
-        print(self.model_.discriminator.summary())
+        self.model_.generator.summary()
+        self.model_.discriminator.summary()
 
         for resolution, info in dataset_train.items():
             if resolution < self.current_resolution_:
@@ -147,15 +147,15 @@ class ProgressiveGeneration(BaseEstimator):
             if batch_size % self.strategy.num_replicas_in_sync:
                 raise ValueError("batch size must be a multiple of the number of GPUs")
 
-            dataset = get_dataset(
+            dataset = Dataset.from_tfrecords(
                 file_pattern=info.get("file_pattern"),
-                batch_size=batch_size,
                 num_parallel_calls=num_parallel_calls,
                 volume_shape=(resolution, resolution, resolution),
-                n_classes=1,
-                scalar_label=True,
-                normalizer=info.get("normalizer") or normalizer,
+                scalar_labels=True,
             )
+
+            if info.get("normalizer") or normalizer:
+                dataset = dataset.normalize(normalizer)
 
             with self.strategy.scope():
                 # grow the networks by one (2^x) resolution
@@ -164,9 +164,7 @@ class ProgressiveGeneration(BaseEstimator):
                     self.model_.discriminator.add_resolution()
                 _compile()
 
-                steps_per_epoch = (info.get("epochs") or epochs) // info.get(
-                    "batch_size"
-                )
+                steps_per_epoch = dataset.get_steps_per_epoch()
 
                 # save_best_only is set to False as it is an adversarial loss
                 model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
