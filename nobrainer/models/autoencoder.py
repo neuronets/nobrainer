@@ -1,5 +1,6 @@
 """Model definition for Autoencoder.
 """
+
 import math
 
 from tensorflow.keras import layers, models
