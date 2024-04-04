@@ -1,3 +1,20 @@
+# 1.2.1 (Thu Apr 04 2024)
+
+#### 🐛 Bug Fix
+
+- Fix PGAN notebook [#319](https://github.com/neuronets/nobrainer/pull/319) ([@satra](https://github.com/satra) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- fix dependencies [#318](https://github.com/neuronets/nobrainer/pull/318) ([@satra](https://github.com/satra))
+- Update setup.cfg to add cuda option [#309](https://github.com/neuronets/nobrainer/pull/309) ([@satra](https://github.com/satra))
+- [pre-commit.ci] pre-commit autoupdate [#294](https://github.com/neuronets/nobrainer/pull/294) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@satra](https://github.com/satra) [@hvgazula](https://github.com/hvgazula))
+
+#### Authors: 3
+
+- [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot])
+- H Gazula ([@hvgazula](https://github.com/hvgazula))
+- Satrajit Ghosh ([@satra](https://github.com/satra))
+
+---
+
 # 1.2.0 (Fri Mar 22 2024)
 
 #### 🚀 Enhancement
