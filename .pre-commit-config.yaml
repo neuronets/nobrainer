@@ -5,27 +5,27 @@ ci:
 
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.3.0
+    rev: v4.5.0
     hooks:
     -   id: check-added-large-files
     -   id: check-yaml
     -   id: end-of-file-fixer
     -   id: trailing-whitespace
 -   repo: https://github.com/psf/black
-    rev: 22.10.0
+    rev: 24.3.0
     hooks:
     -   id: black
 -   repo: https://github.com/PyCQA/flake8
-    rev: 5.0.4
+    rev: 7.0.0
     hooks:
     - id: flake8
 -   repo: https://github.com/PyCQA/isort
-    rev: 5.10.1
+    rev: 5.13.2
     hooks:
     -   id: isort
         exclude: ^(nobrainer/_version\.py|versioneer\.py)$
 -   repo: https://github.com/codespell-project/codespell
-    rev: v2.2.2
+    rev: v2.2.6
     hooks:
     -   id: codespell
-        exclude: ^(nobrainer/_version\.py|versioneer\.py)$
+        exclude: ^(nobrainer/_version\.py|versioneer\.py|pyproject\.toml|CHANGELOG\.md)$

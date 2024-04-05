@@ -218,7 +218,6 @@ class Wasserstein(LossFunctionWrapper):
 
 
 def gradient_penalty(gradients, real_pred, gp_weight=10, epsilon_weight=0.001):
-
     gradients_squared = tf.square(gradients)
     gradients_sqr_sum = tf.reduce_sum(
         gradients_squared, axis=tf.range(1, tf.rank(gradients_squared))

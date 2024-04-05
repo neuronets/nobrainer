@@ -66,7 +66,7 @@ the Apache 2.0 license. It was started under the support of NIH R01 EB020470.
 
 ### Augmentation methods
 #### Spatial Transforms
-[Center crop](), [Spacial Constant Padding](), [Random Crop](), [Resize](), [Random flip (left and right)]()
+[Center crop](), [Spatial Constant Padding](), [Random Crop](), [Resize](), [Random flip (left and right)]()
 
 #### Intensity Transforms
 [Add gaussian noise](), [Min-Max intensity scaling](), [Costom intensity scaling](), [Intensity masking](), [Contrast adjustment]()
@@ -74,10 +74,10 @@ the Apache 2.0 license. It was started under the support of NIH R01 EB020470.
 #### Affine Transform
 Afifine transformation including rotation, translation, reflection.
 
-## Guide Jupyter Notebooks [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/neuronets/nobrainer)
+## Guide Jupyter Notebooks [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/neuronets/nobrainer-book/blob/master/)
 
-Please refer to the Jupyter notebooks in the [guide](/guide) directory to get
-started with _Nobrainer_. [Try them out](https://colab.research.google.com/github/neuronets/nobrainer) in Google Colaboratory!
+Please refer to the Jupyter notebooks in the [guide](https://github.com/neuronets/nobrainer-book/blob/master/docs/nobrainer-guides/notebooks/) directory to get
+started with _Nobrainer_. [Try them out](https://colab.research.google.com/github/neuronets/nobrainer-book/blob/master/) in Google Colaboratory!
 
 ## Installation
 

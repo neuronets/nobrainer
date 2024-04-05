@@ -51,7 +51,7 @@ doc_args = """activation: Activation function. Set it to None to maintain a
     sample is a `Tensor`."""
 
 
-"""Variational convolutional layer Abstract nD convolution layer (private,
+"""Variational convolutional layer Abstract n-dimensional convolution layer (private,
   used as implementation base).
   This layer creates a convolution kernel that is convolved
   (actually cross-correlated) with the layer input to produce a tensor of
@@ -361,7 +361,7 @@ class _ConvVariational(tf.keras.layers.Layer):
 
 
 class _ConvReparameterization(_ConvVariational):
-    """Abstract nD convolution layer (private, used as implementation base).
+    """Abstract n-dimensional convolution layer (private, used as implementation base).
     This layer creates a convolution kernel that is convolved
     (actually cross-correlated) with the layer input to produce a tensor of
     outputs. It may also include a bias addition and activation function

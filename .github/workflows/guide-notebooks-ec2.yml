@@ -1,0 +1,89 @@
+name: Guide Notebooks Regression - EC2
+run-name: ${{ github.ref_name }} - Guide Notebooks Regression - EC2
+on: [push]
+jobs:
+  start-runner:
+    name: Start self-hosted EC2 runner
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.start-ec2-runner.outputs.label }}
+      ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_KEY_SECRET }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Start EC2 runner
+        id: start-ec2-runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: start
+          github-token: ${{ secrets.GH_TOKEN }}
+          ec2-image-id: ${{ vars.AWS_IMAGE_ID }}
+          ec2-instance-type: ${{ vars.AWS_INSTANCE_TYPE }}
+          subnet-id: ${{ vars.AWS_SUBNET }}
+          security-group-id: ${{ vars.AWS_SECURITY_GROUP }}
+
+  guide_notebooks_regression_ec2:
+    needs: start-runner # required to start the main job when the runner is ready
+    runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
+    steps:
+      - name: clone
+        uses: actions/checkout@v3
+      - name: install
+        run: |
+          set -xe
+          cd ${{ github.workspace }}
+          source /opt/tensorflow/bin/activate
+          export LD_LIBRARY_PATH=opt/amazon/efa/lib:/opt/amazon/openmpi/lib:/usr/local/cuda/efa/lib:/usr/local/cuda/lib:/usr/local/cuda:/usr/local/cuda/lib64:/usr/local/cuda/extras/CUPTI/lib64:/usr/local/cuda/targets/x86_64-linux/lib:/usr/local/lib:/usr/lib
+          echo $LD_LIBRARY_PATH
+          pip install matplotlib nilearn
+          pip install -U tensorflow
+          pip install -e .
+          nobrainer info
+      - name: run
+        run: |
+          set -xe
+          cd ${{ github.workspace }}
+          git clone https://github.com/neuronets/nobrainer-book.git
+          cd nobrainer-book
+
+          # if there is a matching book branch, switch to it
+          if [ $(git ls-remote --heads https://github.com/neuronets/nobrainer-book.git ${{ github.ref_name }} | wc -l) -ne 0 ]; then
+            echo "Checking out branch ${{ github.ref_name }}"
+            git checkout ${{ github.ref_name }};
+          else
+            echo "No matching branch found, sticking with the default"
+          fi
+
+          cd ${{ github.workspace }}
+          export LD_LIBRARY_PATH=opt/amazon/efa/lib:/opt/amazon/openmpi/lib:/usr/local/cuda/efa/lib:/usr/local/cuda/lib:/usr/local/cuda:/usr/local/cuda/lib64:/usr/local/cuda/extras/CUPTI/lib64:/usr/local/cuda/targets/x86_64-linux/lib:/usr/local/lib:/usr/lib
+          source /opt/tensorflow/bin/activate
+          for notebook_script in $(ls nobrainer-book/docs/nobrainer-guides/scripts/*.py); do
+            echo "running ${notebook_script}"
+            python ${notebook_script}
+          done
+
+  stop-runner:
+    name: Stop self-hosted EC2 runner
+    needs:
+      - start-runner # required to get output from the start-runner job
+      - guide_notebooks_regression_ec2 # required to wait when the main job is done
+    runs-on: ubuntu-latest
+    if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_KEY_SECRET }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Stop EC2 runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: stop
+          github-token: ${{ secrets.GH_TOKEN }}
+          label: ${{ needs.start-runner.outputs.label }}
+          ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}

@@ -1,11 +1,13 @@
 import importlib
-import os
+import logging
 
 import tensorflow as tf
 
 from .base import BaseEstimator
 from .. import losses, metrics
-from ..dataset import get_steps_per_epoch
+from ..models import available_models, list_available_models
+
+logging.getLogger().setLevel(logging.INFO)
 
 
 class Segmentation(BaseEstimator):
@@ -13,43 +15,55 @@ class Segmentation(BaseEstimator):
 
     state_variables = ["block_shape_", "volume_shape_", "scalar_labels_"]
 
-    def __init__(self, base_model, model_args=None):
+    def __init__(
+        self, base_model, model_args=None, checkpoint_filepath=None, multi_gpu=True
+    ):
+        super().__init__(checkpoint_filepath=checkpoint_filepath, multi_gpu=multi_gpu)
+
         if not isinstance(base_model, str):
             self.base_model = base_model.__name__
         else:
             self.base_model = base_model
+
+        if self.base_model and self.base_model not in available_models():
+            raise ValueError(
+                "Unknown model: '{}'. Available models are {}.".format(
+                    self.base_model, available_models()
+                )
+            )
+
         self.model_ = None
         self.model_args = model_args or {}
         self.block_shape_ = None
         self.volume_shape_ = None
         self.scalar_labels_ = None
 
+    def add_model(self, base_model, model_args=None):
+        """Add a segmentation model"""
+        self.base_model = base_model
+        self.model_args = model_args or {}
+
     def fit(
         self,
         dataset_train,
         dataset_validate=None,
         epochs=1,
-        checkpoint_dir=os.getcwd(),
-        multi_gpu=False,
-        warm_start=False,
         # TODO: figure out whether optimizer args should be flattened
         optimizer=None,
         opt_args=None,
         loss=losses.dice,
         metrics=metrics.dice,
+        callbacks=None,
+        verbose=1,
     ):
         """Train a segmentation model"""
         # TODO: check validity of datasets
 
-        # extract dataset information
-        batch_size = dataset_train.element_spec[0].shape[0]
-        self.block_shape_ = tuple(dataset_train.element_spec[0].shape[1:4])
+        batch_size = dataset_train.batch_size
+        self.block_shape_ = dataset_train.block_shape
         self.volume_shape_ = dataset_train.volume_shape
-        self.scalar_labels_ = True
-        n_classes = 1
-        if len(dataset_train.element_spec[1].shape) > 1:
-            n_classes = dataset_train.element_spec[1].shape[4]
-            self.scalar_labels_ = False
+        self.scalar_labels_ = dataset_train.scalar_labels
+        n_classes = dataset_train.n_classes
         opt_args = opt_args or {}
         if optimizer is None:
             optimizer = tf.keras.optimizers.Adam
@@ -72,51 +86,36 @@ class Segmentation(BaseEstimator):
                 metrics=metrics,
             )
 
-        if warm_start:
-            if self.model is None:
-                raise ValueError("warm_start requested, but model is undefined")
-            if multi_gpu:
-                strategy = tf.distribute.MirroredStrategy()
-                with strategy.scope():
-                    _compile()
-            else:
-                _compile()
-        else:
+        if self.model is None:
             mod = importlib.import_module("..models", "nobrainer.processing")
             base_model = getattr(mod, self.base_model)
-            if multi_gpu:
-                strategy = tf.distribute.MirroredStrategy()
-                with strategy.scope():
-                    _create(base_model)
-                    _compile()
-            else:
+            if batch_size % self.strategy.num_replicas_in_sync:
+                raise ValueError("batch size must be a multiple of the number of GPUs")
+
+            with self.strategy.scope():
                 _create(base_model)
-                _compile()
-        print(self.model_.summary())
+        with self.strategy.scope():
+            _compile()
+        self.model_.summary()
 
-        train_steps = get_steps_per_epoch(
-            n_volumes=dataset_train.n_volumes,
-            volume_shape=self.volume_shape_,
-            block_shape=self.block_shape_,
-            batch_size=batch_size,
-        )
+        if callbacks is not None and not isinstance(callbacks, list):
+            raise AttributeError("Callbacks must be either of type list or None")
 
-        evaluate_steps = None
-        if dataset_validate is not None:
-            evaluate_steps = get_steps_per_epoch(
-                n_volumes=dataset_validate.n_volumes,
-                volume_shape=self.volume_shape_,
-                block_shape=self.block_shape_,
-                batch_size=batch_size,
-            )
+        if callbacks is None:
+            callbacks = []
 
-        # TODO add checkpoint
+        if self.checkpoint_tracker:
+            callbacks.append(self.checkpoint_tracker)
         self.model_.fit(
-            dataset_train,
+            dataset_train.dataset,
             epochs=epochs,
-            steps_per_epoch=train_steps,
-            validation_data=dataset_validate,
-            validation_steps=evaluate_steps,
+            steps_per_epoch=dataset_train.get_steps_per_epoch(),
+            validation_data=dataset_validate.dataset if dataset_validate else None,
+            validation_steps=(
+                dataset_validate.get_steps_per_epoch() if dataset_validate else None
+            ),
+            callbacks=callbacks,
+            verbose=verbose,
         )
 
         return self
@@ -134,3 +133,7 @@ class Segmentation(BaseEstimator):
             batch_size=batch_size,
             normalizer=normalizer,
         )
+
+    @classmethod
+    def list_available_models(cls):
+        list_available_models()

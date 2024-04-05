@@ -206,7 +206,6 @@ class ProgressiveAETrainer(tf.keras.Model):
         self.loss_fn = compile_utils.LossesContainer(loss_fn)
 
     def train_step(self, images):
-
         if isinstance(images, tuple):
             images = images[0]
 

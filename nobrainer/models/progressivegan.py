@@ -159,7 +159,6 @@ class Generator(tf.keras.Model):
         return models.Sequential(block_layers, name=name)
 
     def generator_head(self, x, y, alpha):
-
         x = self.Upsampling()(x)
         x = self.HeadConv1(x)
 
@@ -171,7 +170,6 @@ class Generator(tf.keras.Model):
         return output
 
     def add_resolution(self):
-
         self.current_resolution += 1
         self.resolution_blocks.append(self.highest_resolution_block)
         self.highest_resolution_block = self._make_generator_block(
@@ -281,7 +279,6 @@ class Discriminator(tf.keras.Model):
         return min(int(self.fmap_base / (2.0 ** (stage))), self.fmap_max)
 
     def discriminator_base(self, x, y, alpha):
-
         x = self.AveragePooling()(x)
         x = self.BaseConv(x)
 
@@ -357,7 +354,6 @@ class Discriminator(tf.keras.Model):
         self.build([images_shape, alpha_shape])
 
     def call(self, inputs):
-
         images, alpha = inputs
 
         # To bring to the right number of filters

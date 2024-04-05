@@ -26,11 +26,11 @@ def vox_gan(
         a value of 1.
     input_shape: list or tuple of four ints, the shape of the input data. Omit
         the batch dimension, and include the number of channels.
-    g_kernal_size: int, size of the kernal for generator. Default kernal size
+    g_kernal_size: int, size of the kernel for generator. Default kernel size
         is set to be 4.
     g_filters: int, number of filters for generator. default is set 64.
     g_norm: str, to set batch or instance norm.
-    d_kernal_size: int, size of the kernal for discriminator. Default kernal size
+    d_kernal_size: int, size of the kernel for discriminator. Default kernel size
         is set to be 4.
     d_filters: int, number of filters for discriminator. default is set 64.
     d_norm: str, to set batch or instance norm.
@@ -65,7 +65,7 @@ def Vox_generator(n_classes, input_shape, n_filters=64, kernel_size=4, norm="bat
         a value of 1.
     input_shape: list or tuple of four ints, the shape of the input data. Omit
         the batch dimension, and include the number of channels.
-    kernal_size: int, size of the kernal of conv layers. Default kernal size
+    kernal_size: int, size of the kernel of conv layers. Default kernel size
         is set to be 4.
     n_filters: int, number of filters. default is set 64.
     norm: str, to set batch or instance norm.
@@ -195,7 +195,7 @@ def Vox_discriminator(input_shape, n_filters=64, kernel_size=4, norm="batch"):
     input_shape: list or tuple of four ints, the shape of the input data. Omit
         the batch dimension, and include the number of channels.
     n_filters: int, number of filters. default is set 64.
-    kernal_size: int, size of the kernal of conv layers. Default kernal size
+    kernal_size: int, size of the kernel of conv layers. Default kernel size
         is set to be 4.
     norm: str, to set batch or instance norm.
 
@@ -275,7 +275,7 @@ def Vox_ensembler(n_classes, input_shape, kernel_size=3, **kwargs):
         a value of 1.
     input_shape: list or tuple of four ints, the shape of the input data. Omit
         the batch dimension, and include the number of channels.
-    kernal_size: int, size of the kernal of conv layers. Default kernal size
+    kernal_size: int, size of the kernel of conv layers. Default kernel size
         is set to be 3.
 
     Returns

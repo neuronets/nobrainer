@@ -1,21 +1,8 @@
-FROM tensorflow/tensorflow:2.10.0-jupyter
-RUN curl -sSL http://neuro.debian.net/lists/focal.us-nh.full | tee /etc/apt/sources.list.d/neurodebian.sources.list \
-  && export GNUPGHOME="$(mktemp -d)" \
-  && echo "disable-ipv6" >> ${GNUPGHOME}/dirmngr.conf \
-  && (apt-key adv --homedir $GNUPGHOME --recv-keys --keyserver hkp://pgpkeys.eu 0xA5D32F012649A5A9 \
-  || { curl -sSL http://neuro.debian.net/_static/neuro.debian.net.asc | apt-key add -; } ) \
-  && apt-get update \
-  && apt-get install -y git-annex-standalone git \
-  && rm -rf /tmp/*
+FROM tensorflow/tensorflow:2.15.0.post1-jupyter
 COPY [".", "/opt/nobrainer"]
 RUN cd /opt/nobrainer \
     && sed -i 's/tensorflow >=/tensorflow-cpu >=/g' setup.cfg
-RUN python3 -m pip install --no-cache-dir /opt/nobrainer datalad datalad-osf
-RUN git config --global user.email "neuronets@example.com" \
-    && git config --global user.name "Neuronets maintainers"
-RUN datalad clone https://github.com/neuronets/trained-models /models \
-  && cd /models && git-annex enableremote osf-storage \
-  && datalad get -r .
+RUN python3 -m pip install --no-cache-dir /opt/nobrainer
 ENV LC_ALL=C.UTF-8 \
     LANG=C.UTF-8
 WORKDIR "/work"

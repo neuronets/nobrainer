@@ -1,4 +1,3 @@
-# import importlib
 import os
 from pathlib import Path
 
@@ -6,7 +5,7 @@ import tensorflow as tf
 
 from .base import BaseEstimator
 from .. import losses
-from ..dataset import get_dataset
+from ..dataset import Dataset
 
 
 class ProgressiveGeneration(BaseEstimator):
@@ -22,7 +21,9 @@ class ProgressiveGeneration(BaseEstimator):
         dimensionality=3,
         g_fmap_base=1024,
         d_fmap_base=1024,
+        multi_gpu=True,
     ):
+        super().__init__(multi_gpu=multi_gpu)
         self.model_ = None
         self.latent_size = latent_size
         self.label_size = label_size
@@ -43,10 +44,9 @@ class ProgressiveGeneration(BaseEstimator):
         g_opt_args=None,
         d_optimizer=None,
         d_opt_args=None,
-        g_loss=losses.wasserstein,
-        d_loss=losses.wasserstein,
+        g_loss=losses.Wasserstein,
+        d_loss=losses.Wasserstein,
         warm_start=False,
-        multi_gpu=False,
         num_parallel_calls=None,
         save_freq=500,
     ):
@@ -91,19 +91,41 @@ class ProgressiveGeneration(BaseEstimator):
             from ..training import ProgressiveGANTrainer
 
             # Instantiate the generator and discriminator
-            generator, discriminator = progressivegan(
-                latent_size=self.latent_size,
-                g_fmap_base=self.g_fmap_base,
-                d_fmap_base=self.d_fmap_base,
-                num_channels=self.num_channels,
-                dimensionality=self.dimensionality,
-            )
-            self.model_ = ProgressiveGANTrainer(
-                generator=generator,
-                discriminator=discriminator,
-                gradient_penalty=True,
-            )
+            with self.strategy.scope():
+                generator, discriminator = progressivegan(
+                    latent_size=self.latent_size,
+                    g_fmap_base=self.g_fmap_base,
+                    d_fmap_base=self.d_fmap_base,
+                    num_channels=self.num_channels,
+                    dimensionality=self.dimensionality,
+                )
+                self.model_ = ProgressiveGANTrainer(
+                    generator=generator,
+                    discriminator=discriminator,
+                    gradient_penalty=True,
+                )
             self.current_resolution_ = 0
+
+        # wrap the losses to work on multiple GPUs
+        with self.strategy.scope():
+            d_loss_object = d_loss(reduction=tf.keras.losses.Reduction.NONE)
+
+            def compute_d_loss(labels, predictions):
+                per_example_loss = d_loss_object(labels, predictions)
+                return tf.nn.compute_average_loss(
+                    per_example_loss, global_batch_size=batch_size
+                )
+
+            g_loss_object = g_loss(reduction=tf.keras.losses.Reduction.NONE)
+
+            def compute_g_loss(labels, predictions):
+                per_example_loss = g_loss_object(labels, predictions)
+                return tf.nn.compute_average_loss(
+                    per_example_loss, global_batch_size=batch_size
+                )
+
+            d_loss = compute_d_loss
+            g_loss = compute_g_loss
 
         # instantiate a progressive training helper and compile with loss and optimizer
         def _compile():
@@ -121,44 +143,46 @@ class ProgressiveGeneration(BaseEstimator):
             if resolution < self.current_resolution_:
                 continue
             # create a train dataset with features for resolution
-            dataset = get_dataset(
+            batch_size = info.get("batch_size")
+            if batch_size % self.strategy.num_replicas_in_sync:
+                raise ValueError("batch size must be a multiple of the number of GPUs")
+
+            dataset = Dataset.from_tfrecords(
                 file_pattern=info.get("file_pattern"),
-                batch_size=info.get("batch_size"),
                 num_parallel_calls=num_parallel_calls,
                 volume_shape=(resolution, resolution, resolution),
                 n_classes=1,
-                scalar_label=True,
-                normalizer=info.get("normalizer") or normalizer,
+                scalar_labels=True,
             )
+            n_epochs = info.get("epochs") or epochs
+            dataset.batch(batch_size).normalize(
+                info.get("normalizer") or normalizer
+            ).repeat(n_epochs)
 
-            # grow the networks by one (2^x) resolution
-            if resolution > self.current_resolution_:
-                self.model_.generator.add_resolution()
-                self.model_.discriminator.add_resolution()
-
-            if multi_gpu:
-                strategy = tf.distribute.MirroredStrategy()
-                with strategy.scope():
-                    _compile()
-            else:
+            with self.strategy.scope():
+                # grow the networks by one (2^x) resolution
+                if resolution > self.current_resolution_:
+                    self.model_.generator.add_resolution()
+                    self.model_.discriminator.add_resolution()
                 _compile()
 
-            steps_per_epoch = (info.get("epochs") or epochs) // info.get("batch_size")
-            # save_best_only is set to False as it is an adversarial loss
-            model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-                str(model_dir),
-                save_weights_only=True,
-                save_best_only=False,
-                save_freq=save_freq,
-                verbose=False,
-            )
+                steps_per_epoch = n_epochs // info.get("batch_size")
+
+                # save_best_only is set to False as it is an adversarial loss
+                model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+                    str(model_dir),
+                    save_weights_only=True,
+                    save_best_only=False,
+                    save_freq=save_freq,
+                    verbose=False,
+                )
 
             # Train at resolution
             print("Resolution : {}".format(resolution))
 
             print("Transition phase")
             self.model_.fit(
-                dataset,
+                dataset.dataset,
                 phase="transition",
                 resolution=resolution,
                 steps_per_epoch=steps_per_epoch,  # necessary for repeat dataset
@@ -167,7 +191,7 @@ class ProgressiveGeneration(BaseEstimator):
 
             print("Resolution phase")
             self.model_.fit(
-                dataset,
+                dataset.dataset,
                 phase="resolution",
                 resolution=resolution,
                 steps_per_epoch=steps_per_epoch,

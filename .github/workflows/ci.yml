@@ -11,14 +11,14 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-20.04]
-        python-version: ["3.10", "3.9", "3.8", "3.7"]
+        python-version: ["3.11", "3.10", "3.9"]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:  # no need for the history
           fetch-depth: 1
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -29,3 +29,19 @@ jobs:
       - name: Test with pytest
         run: |
           pytest
+  image-build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-20.04]
+        python-version: ["3.11", "3.10", "3.9"]
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+      - name: Test CPU Docker image build
+        run: |
+          docker build -t neuronets/nobrainer:master-cpu -f docker/cpu.Dockerfile .
+      - name: Test GPU Docker image build
+        run: |
+          docker build -t neuronets/nobrainer:master-gpu -f docker/gpu.Dockerfile .
