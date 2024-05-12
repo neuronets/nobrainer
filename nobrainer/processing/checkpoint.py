@@ -16,6 +16,7 @@ class CheckpointTracker(tf.keras.callbacks.ModelCheckpoint):
         file_path: str, directory to/from which to save or load.
         """
         self.estimator = estimator
+        self.last_epoch = 0
         super().__init__(file_path, **kwargs)
 
     def _save_model(self, epoch, batch, logs):

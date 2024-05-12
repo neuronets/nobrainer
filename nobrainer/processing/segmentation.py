@@ -50,6 +50,7 @@ class Segmentation(BaseEstimator):
         metrics=metrics.dice,
         callbacks=None,
         verbose=1,
+        initial_epoch=0
     ):
         """Train a segmentation model"""
         # TODO: check validity of datasets
@@ -104,6 +105,7 @@ class Segmentation(BaseEstimator):
 
         if self.checkpoint_tracker:
             callbacks.append(self.checkpoint_tracker)
+            initial_epoch = self.checkpoint_tracker.last_epoch
         self.model_.fit(
             dataset_train.dataset,
             epochs=epochs,
@@ -114,6 +116,7 @@ class Segmentation(BaseEstimator):
             ),
             callbacks=callbacks,
             verbose=verbose,
+            initial_epoch=initial_epoch
         )
 
         return self
