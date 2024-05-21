@@ -4,6 +4,7 @@ from .attention_unet import attention_unet
 from .attention_unet_with_inception import attention_unet_with_inception
 from .autoencoder import autoencoder
 from .bayesian_meshnet import variational_meshnet
+from .bayesian_vnet import bayesian_vnet
 from .dcgan import dcgan
 from .highresnet import highresnet
 from .meshnet import meshnet
@@ -26,6 +27,7 @@ _models = {
     "attention_unet_with_inception": attention_unet_with_inception,
     "unetr": unetr,
     "variational_meshnet": variational_meshnet,
+    "bayesian_vnet": bayesian_vnet
 }
 
 
