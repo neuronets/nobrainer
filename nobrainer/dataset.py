@@ -146,6 +146,8 @@ class Dataset:
             ds_obj.map_labels(
                 label_mapping=label_mapping, num_parallel_calls=num_parallel_calls
             )
+
+        ds_obj.filter_zero_volumes()
         # TODO automatically determine batch size
         ds_obj.batch(1)
 
@@ -384,4 +386,10 @@ class Dataset:
         # indefinitely. If n_epochs is 1, then the dataset will only be iterated
         # through once.
         self.dataset = self.dataset.repeat(n_repeats)
+        return self
+
+    def filter_zero_volumes(self):
+        self.dataset = self.dataset.filter(
+            lambda x, y: tf.cast(tf.math.reduce_sum(y), dtype="bool")
+        )
         return self
