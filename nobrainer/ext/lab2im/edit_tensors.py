@@ -31,11 +31,11 @@ import keras.backend as K
 from itertools import combinations
 
 # project imports
-from ext.lab2im import utils
+from nobrainer.ext.lab2im import utils
 
 # third-party imports
-import ext.neuron.layers as nrn_layers
-from ext.neuron.utils import volshape_to_meshgrid
+import nobrainer.ext.neuron.layers as nrn_layers
+from nobrainer.ext.neuron.utils import volshape_to_meshgrid
 
 
 def blurring_sigma_for_downsampling(current_res, downsample_res, mult_coef=None, thickness=None):

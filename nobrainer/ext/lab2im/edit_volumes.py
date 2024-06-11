@@ -85,9 +85,9 @@ from scipy.ndimage.morphology import distance_transform_edt, binary_fill_holes
 from scipy.ndimage import binary_dilation, binary_erosion, gaussian_filter
 
 # project imports
-from ext.lab2im import utils
-from ext.lab2im.layers import GaussianBlur, ConvertLabels
-from ext.lab2im.edit_tensors import blurring_sigma_for_downsampling
+from nobrainer.ext.lab2im import utils
+from nobrainer.ext.lab2im.layers import GaussianBlur, ConvertLabels
+from nobrainer.ext.lab2im.edit_tensors import blurring_sigma_for_downsampling
 
 
 # ---------------------------------------------------- edit volume -----------------------------------------------------

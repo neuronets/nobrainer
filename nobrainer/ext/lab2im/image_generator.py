@@ -19,9 +19,9 @@ import numpy as np
 import numpy.random as npr
 
 # project imports
-from ext.lab2im import utils
-from ext.lab2im import edit_volumes
-from ext.lab2im.lab2im_model import lab2im_model
+from nobrainer.ext.lab2im import utils
+from nobrainer.ext.lab2im import edit_volumes
+from nobrainer.ext.lab2im.lab2im_model import lab2im_model
 
 
 class ImageGenerator:
