@@ -1,9 +1,9 @@
 """
 tensorflow/keras utilities for the neuron project
 
-If you use this code, please cite 
+If you use this code, please cite
 Dalca AV, Guttag J, Sabuncu MR
-Anatomical Priors in Convolutional Networks for Unsupervised Biomedical Segmentation, 
+Anatomical Priors in Convolutional Networks for Unsupervised Biomedical Segmentation,
 CVPR 2018
 
 or for the transformation/interpolation related functions:
@@ -17,16 +17,17 @@ License: GPLv3
 """
 
 import itertools
+
+import keras.backend as K
 import numpy as np
 import tensorflow as tf
-import keras.backend as K
 
 
-def interpn(vol, loc, interp_method='linear'):
+def interpn(vol, loc, interp_method="linear"):
     """
     N-D gridded interpolation in tensorflow
 
-    vol can have more dimensions than loc[i], in which case loc[i] acts as a slice 
+    vol can have more dimensions than loc[i], in which case loc[i] acts as a slice
     for the first dimensions
 
     Parameters:
@@ -45,18 +46,22 @@ def interpn(vol, loc, interp_method='linear'):
     nb_dims = loc.shape[-1]
 
     if len(vol.shape) not in [nb_dims, nb_dims + 1]:
-        raise Exception("Number of loc Tensors %d does not match volume dimension %d"
-                        % (nb_dims, len(vol.shape[:-1])))
+        raise Exception(
+            "Number of loc Tensors %d does not match volume dimension %d"
+            % (nb_dims, len(vol.shape[:-1]))
+        )
 
     if nb_dims > len(vol.shape):
-        raise Exception("Loc dimension %d does not match volume dimension %d"
-                        % (nb_dims, len(vol.shape)))
+        raise Exception(
+            "Loc dimension %d does not match volume dimension %d"
+            % (nb_dims, len(vol.shape))
+        )
 
     if len(vol.shape) == nb_dims:
         vol = K.expand_dims(vol, -1)
 
     # flatten and float location Tensors
-    loc = tf.cast(loc, 'float32')
+    loc = tf.cast(loc, "float32")
 
     if isinstance(vol.shape, tf.TensorShape):
         volshape = vol.shape.as_list()
@@ -64,26 +69,36 @@ def interpn(vol, loc, interp_method='linear'):
         volshape = vol.shape
 
     # interpolate
-    if interp_method == 'linear':
+    if interp_method == "linear":
         loc0 = tf.floor(loc)
 
         # clip values
         max_loc = [d - 1 for d in vol.get_shape().as_list()]
-        clipped_loc = [tf.clip_by_value(loc[..., d], 0, max_loc[d]) for d in range(nb_dims)]
-        loc0lst = [tf.clip_by_value(loc0[..., d], 0, max_loc[d]) for d in range(nb_dims)]
+        clipped_loc = [
+            tf.clip_by_value(loc[..., d], 0, max_loc[d]) for d in range(nb_dims)
+        ]
+        loc0lst = [
+            tf.clip_by_value(loc0[..., d], 0, max_loc[d]) for d in range(nb_dims)
+        ]
 
         # get other end of point cube
         loc1 = [tf.clip_by_value(loc0lst[d] + 1, 0, max_loc[d]) for d in range(nb_dims)]
-        locs = [[tf.cast(f, 'int32') for f in loc0lst], [tf.cast(f, 'int32') for f in loc1]]
+        locs = [
+            [tf.cast(f, "int32") for f in loc0lst],
+            [tf.cast(f, "int32") for f in loc1],
+        ]
 
         # compute the difference between the upper value and the original value
         # differences are basically 1 - (pt - floor(pt))
         #   because: floor(pt) + 1 - pt = 1 + (floor(pt) - pt) = 1 - (pt - floor(pt))
         diff_loc1 = [loc1[d] - clipped_loc[d] for d in range(nb_dims)]
         diff_loc0 = [1 - d for d in diff_loc1]
-        weights_loc = [diff_loc1, diff_loc0]  # note reverse ordering since weights are inverse of diff.
+        weights_loc = [
+            diff_loc1,
+            diff_loc0,
+        ]  # note reverse ordering since weights are inverse of diff.
 
-        # go through all the cube corners, indexed by a ND binary vector 
+        # go through all the cube corners, indexed by a ND binary vector
         # e.g. [0, 0] means this "first" corner in a 2-D "cube"
         cube_pts = list(itertools.product([0, 1], repeat=nb_dims))
         interp_vol = 0
@@ -110,12 +125,14 @@ def interpn(vol, loc, interp_method='linear'):
             interp_vol += wt * vol_val
 
     else:
-        assert interp_method == 'nearest'
-        roundloc = tf.cast(tf.round(loc), 'int32')
+        assert interp_method == "nearest"
+        roundloc = tf.cast(tf.round(loc), "int32")
 
         # clip values
-        max_loc = [tf.cast(d - 1, 'int32') for d in vol.shape]
-        roundloc = [tf.clip_by_value(roundloc[..., d], 0, max_loc[d]) for d in range(nb_dims)]
+        max_loc = [tf.cast(d - 1, "int32") for d in vol.shape]
+        roundloc = [
+            tf.clip_by_value(roundloc[..., d], 0, max_loc[d]) for d in range(nb_dims)
+        ]
 
         # get values
         idx = sub2ind(vol.shape[:-1], roundloc)
@@ -124,7 +141,7 @@ def interpn(vol, loc, interp_method='linear'):
     return interp_vol
 
 
-def resize(vol, zoom_factor, new_shape, interp_method='linear'):
+def resize(vol, zoom_factor, new_shape, interp_method="linear"):
     """
     if zoom_factor is a list, it will determine the ndims, in which case vol has to be of length ndims or ndims + 1
 
@@ -137,8 +154,10 @@ def resize(vol, zoom_factor, new_shape, interp_method='linear'):
     if isinstance(zoom_factor, (list, tuple)):
         ndims = len(zoom_factor)
         vol_shape = vol.shape[:ndims]
-        assert len(vol_shape) in (ndims, ndims + 1), \
-            "zoom_factor length %d does not match ndims %d" % (len(vol_shape), ndims)
+        assert len(vol_shape) in (
+            ndims,
+            ndims + 1,
+        ), "zoom_factor length %d does not match ndims %d" % (len(vol_shape), ndims)
     else:
         vol_shape = vol.shape[:-1]
         ndims = len(vol_shape)
@@ -146,7 +165,7 @@ def resize(vol, zoom_factor, new_shape, interp_method='linear'):
 
     # get grid for new shape
     grid = volshape_to_ndgrid(new_shape)
-    grid = [tf.cast(f, 'float32') for f in grid]
+    grid = [tf.cast(f, "float32") for f in grid]
     offset = [grid[f] / zoom_factor[f] - grid[f] for f in range(ndims)]
     offset = tf.stack(offset, ndims)
 
@@ -157,7 +176,7 @@ def resize(vol, zoom_factor, new_shape, interp_method='linear'):
 zoom = resize
 
 
-def affine_to_shift(affine_matrix, volshape, shift_center=True, indexing='ij'):
+def affine_to_shift(affine_matrix, volshape, shift_center=True, indexing="ij"):
     """
     transform an affine matrix to a dense location shift tensor in tensorflow
 
@@ -179,35 +198,43 @@ def affine_to_shift(affine_matrix, volshape, shift_center=True, indexing='ij'):
     if isinstance(volshape, tf.TensorShape):
         volshape = volshape.as_list()
 
-    if affine_matrix.dtype != 'float32':
-        affine_matrix = tf.cast(affine_matrix, 'float32')
+    if affine_matrix.dtype != "float32":
+        affine_matrix = tf.cast(affine_matrix, "float32")
 
     nb_dims = len(volshape)
 
     if len(affine_matrix.shape) == 1:
         if len(affine_matrix) != (nb_dims * (nb_dims + 1)):
-            raise ValueError('transform is supposed a vector of len ndims * (ndims + 1).'
-                             'Got len %d' % len(affine_matrix))
+            raise ValueError(
+                "transform is supposed a vector of len ndims * (ndims + 1)."
+                "Got len %d" % len(affine_matrix)
+            )
 
         affine_matrix = tf.reshape(affine_matrix, [nb_dims, nb_dims + 1])
 
-    if not (affine_matrix.shape[0] in [nb_dims, nb_dims + 1] and affine_matrix.shape[1] == (nb_dims + 1)):
-        raise Exception('Affine matrix shape should match'
-                        '%d+1 x %d+1 or ' % (nb_dims, nb_dims) +
-                        '%d x %d+1.' % (nb_dims, nb_dims) +
-                        'Got: ' + str(volshape))
+    if not (
+        affine_matrix.shape[0] in [nb_dims, nb_dims + 1]
+        and affine_matrix.shape[1] == (nb_dims + 1)
+    ):
+        raise Exception(
+            "Affine matrix shape should match"
+            "%d+1 x %d+1 or " % (nb_dims, nb_dims)
+            + "%d x %d+1." % (nb_dims, nb_dims)
+            + "Got: "
+            + str(volshape)
+        )
 
     # list of volume ndgrid
     # N-long list, each entry of shape volshape
     mesh = volshape_to_meshgrid(volshape, indexing=indexing)
-    mesh = [tf.cast(f, 'float32') for f in mesh]
+    mesh = [tf.cast(f, "float32") for f in mesh]
 
     if shift_center:
         mesh = [mesh[f] - (volshape[f] - 1) / 2 for f in range(len(volshape))]
 
     # add an all-ones entry and transform into a large matrix
     flat_mesh = [flatten(f) for f in mesh]
-    flat_mesh.append(tf.ones(flat_mesh[0].shape, dtype='float32'))
+    flat_mesh.append(tf.ones(flat_mesh[0].shape, dtype="float32"))
     mesh_matrix = tf.transpose(tf.stack(flat_mesh, axis=1))  # 4 x nb_voxels
 
     # compute locations
@@ -219,7 +246,9 @@ def affine_to_shift(affine_matrix, volshape, shift_center=True, indexing='ij'):
     return loc - tf.stack(mesh, axis=nb_dims)
 
 
-def combine_non_linear_and_aff_to_shift(transform_list, volshape, shift_center=True, indexing='ij'):
+def combine_non_linear_and_aff_to_shift(
+    transform_list, volshape, shift_center=True, indexing="ij"
+):
     """
     transform an affine matrix to a dense location shift tensor in tensorflow
 
@@ -243,29 +272,37 @@ def combine_non_linear_and_aff_to_shift(transform_list, volshape, shift_center=T
 
     # convert transforms to floats
     for i in range(len(transform_list)):
-        if transform_list[i].dtype != 'float32':
-            transform_list[i] = tf.cast(transform_list[i], 'float32')
+        if transform_list[i].dtype != "float32":
+            transform_list[i] = tf.cast(transform_list[i], "float32")
 
     nb_dims = len(volshape)
 
     # transform affine to matrix if given as vector
     if len(transform_list[1].shape) == 1:
         if len(transform_list[1]) != (nb_dims * (nb_dims + 1)):
-            raise ValueError('transform is supposed a vector of len ndims * (ndims + 1).'
-                             'Got len %d' % len(transform_list[1]))
+            raise ValueError(
+                "transform is supposed a vector of len ndims * (ndims + 1)."
+                "Got len %d" % len(transform_list[1])
+            )
 
         transform_list[1] = tf.reshape(transform_list[1], [nb_dims, nb_dims + 1])
 
-    if not (transform_list[1].shape[0] in [nb_dims, nb_dims + 1] and transform_list[1].shape[1] == (nb_dims + 1)):
-        raise Exception('Affine matrix shape should match'
-                        '%d+1 x %d+1 or ' % (nb_dims, nb_dims) +
-                        '%d x %d+1.' % (nb_dims, nb_dims) +
-                        'Got: ' + str(volshape))
+    if not (
+        transform_list[1].shape[0] in [nb_dims, nb_dims + 1]
+        and transform_list[1].shape[1] == (nb_dims + 1)
+    ):
+        raise Exception(
+            "Affine matrix shape should match"
+            "%d+1 x %d+1 or " % (nb_dims, nb_dims)
+            + "%d x %d+1." % (nb_dims, nb_dims)
+            + "Got: "
+            + str(volshape)
+        )
 
     # list of volume ndgrid
     # N-long list, each entry of shape volshape
     mesh = volshape_to_meshgrid(volshape, indexing=indexing)
-    mesh = [tf.cast(f, 'float32') for f in mesh]
+    mesh = [tf.cast(f, "float32") for f in mesh]
 
     if shift_center:
         mesh = [mesh[f] - (volshape[f] - 1) / 2 for f in range(len(volshape))]
@@ -273,8 +310,8 @@ def combine_non_linear_and_aff_to_shift(transform_list, volshape, shift_center=T
     # add an all-ones entry and transform into a large matrix
     # non_linear_mesh = tf.unstack(transform_list[0], axis=3)
     non_linear_mesh = tf.unstack(transform_list[0], axis=-1)
-    flat_mesh = [flatten(mesh[i]+non_linear_mesh[i]) for i in range(len(mesh))]
-    flat_mesh.append(tf.ones(flat_mesh[0].shape, dtype='float32'))
+    flat_mesh = [flatten(mesh[i] + non_linear_mesh[i]) for i in range(len(mesh))]
+    flat_mesh.append(tf.ones(flat_mesh[0].shape, dtype="float32"))
     mesh_matrix = tf.transpose(tf.stack(flat_mesh, axis=1))  # N+1 x nb_voxels
 
     # compute locations
@@ -286,12 +323,12 @@ def combine_non_linear_and_aff_to_shift(transform_list, volshape, shift_center=T
     return loc - tf.stack(mesh, axis=nb_dims)
 
 
-def transform(vol, loc_shift, interp_method='linear', indexing='ij'):
+def transform(vol, loc_shift, interp_method="linear", indexing="ij"):
     """
     transform interpolation N-D volumes (features) given shifts at each location in tensorflow
 
-    Essentially interpolates volume vol at locations determined by loc_shift. 
-    This is a spatial transform in the sense that at location [x] we now have the data from, 
+    Essentially interpolates volume vol at locations determined by loc_shift.
+    This is a spatial transform in the sense that at location [x] we now have the data from,
     [x + shift] so we've moved data.
 
     Parameters:
@@ -300,7 +337,7 @@ def transform(vol, loc_shift, interp_method='linear', indexing='ij'):
         interp_method (default:'linear'): 'linear', 'nearest'
         indexing (default: 'ij'): 'ij' (matrix) or 'xy' (cartesian).
             In general, prefer to leave this 'ij'
-    
+
     Return:
         new interpolated volumes in the same size as loc_shift[0]
     """
@@ -314,29 +351,29 @@ def transform(vol, loc_shift, interp_method='linear', indexing='ij'):
 
     # location should be meshed and delta
     mesh = volshape_to_meshgrid(volshape, indexing=indexing)  # volume mesh
-    loc = [tf.cast(mesh[d], 'float32') + loc_shift[..., d] for d in range(nb_dims)]
+    loc = [tf.cast(mesh[d], "float32") + loc_shift[..., d] for d in range(nb_dims)]
 
     # test single
     return interpn(vol, loc, interp_method=interp_method)
 
 
-def integrate_vec(vec, time_dep=False, method='ss', **kwargs):
+def integrate_vec(vec, time_dep=False, method="ss", **kwargs):
     """
     Integrate (stationary of time-dependent) vector field (N-D Tensor) in tensorflow
-    
-    Aside from directly using tensorflow's numerical integration odeint(), also implements 
+
+    Aside from directly using tensorflow's numerical integration odeint(), also implements
     "scaling and squaring", and quadrature. Note that the diff. equation given to odeint
-    is the one used in quadrature.   
+    is the one used in quadrature.
 
     Parameters:
-        vec: the Tensor field to integrate. 
+        vec: the Tensor field to integrate.
             If vol_size is the size of the intrinsic volume, and vol_ndim = len(vol_size),
-            then vector shape (vec_shape) should be 
+            then vector shape (vec_shape) should be
             [vol_size, vol_ndim] (if stationary)
             [vol_size, vol_ndim, nb_time_steps] (if time dependent)
         time_dep: bool whether vector is time dependent
         method: 'scaling_and_squaring' or 'ss' or 'quadrature'
-        
+
         if using 'scaling_and_squaring': currently only supports integrating to time point 1.
             nb_steps int number of steps. Note that this means the vec field gets broken own to 2**nb_steps.
             so nb_steps of 0 means integral = vec.
@@ -345,32 +382,36 @@ def integrate_vec(vec, time_dep=False, method='ss', **kwargs):
         int_vec: integral of vector field with same shape as the input
     """
 
-    if method not in ['ss', 'scaling_and_squaring', 'ode', 'quadrature']:
-        raise ValueError("method has to be 'scaling_and_squaring' or 'ode'. found: %s" % method)
+    if method not in ["ss", "scaling_and_squaring", "ode", "quadrature"]:
+        raise ValueError(
+            "method has to be 'scaling_and_squaring' or 'ode'. found: %s" % method
+        )
 
-    if method in ['ss', 'scaling_and_squaring']:
-        nb_steps = kwargs['nb_steps']
-        assert nb_steps >= 0, 'nb_steps should be >= 0, found: %d' % nb_steps
+    if method in ["ss", "scaling_and_squaring"]:
+        nb_steps = kwargs["nb_steps"]
+        assert nb_steps >= 0, "nb_steps should be >= 0, found: %d" % nb_steps
 
         if time_dep:
             svec = K.permute_dimensions(vec, [-1, *range(0, vec.shape[-1] - 1)])
-            assert 2 ** nb_steps == svec.shape[0], "2**nb_steps and vector shape don't match"
+            assert (
+                2**nb_steps == svec.shape[0]
+            ), "2**nb_steps and vector shape don't match"
 
-            svec = svec / (2 ** nb_steps)
+            svec = svec / (2**nb_steps)
             for _ in range(nb_steps):
                 svec = svec[0::2] + tf.map_fn(transform, svec[1::2, :], svec[0::2, :])
 
             disp = svec[0, :]
 
         else:
-            vec = vec / (2 ** nb_steps)
+            vec = vec / (2**nb_steps)
             for _ in range(nb_steps):
                 vec += transform(vec, vec)
             disp = vec
 
     else:  # method == 'quadrature':
-        nb_steps = kwargs['nb_steps']
-        assert nb_steps >= 1, 'nb_steps should be >= 1, found: %d' % nb_steps
+        nb_steps = kwargs["nb_steps"]
+        assert nb_steps >= 1, "nb_steps should be >= 1, found: %d" % nb_steps
 
         vec = vec / nb_steps
 
@@ -441,18 +482,18 @@ def ndgrid(*args, **kwargs):
 
     Returns:
         A list of Tensors
-    
+
     """
-    return meshgrid(*args, indexing='ij', **kwargs)
+    return meshgrid(*args, indexing="ij", **kwargs)
 
 
 def meshgrid(*args, **kwargs):
     """
-    
+
     meshgrid code that builds on (copies) tensorflow's meshgrid but dramatically
     improves runtime by changing the last step to tiling instead of multiplication.
     https://github.com/tensorflow/tensorflow/blob/c19e29306ce1777456b2dbb3a14f511edf7883a8/tensorflow/python/ops/array_ops.py#L1921
-    
+
     Broadcasts parameters for evaluation on an N-D grid.
     Given N one-dimensional coordinate arrays `*args`, returns a list `outputs`
     of N-D coordinate arrays for evaluating expressions on an N-D grid.
@@ -488,8 +529,9 @@ def meshgrid(*args, **kwargs):
     indexing = kwargs.pop("indexing", "xy")
     if kwargs:
         key = list(kwargs.keys())[0]
-        raise TypeError("'{}' is an invalid keyword argument "
-                        "for this function".format(key))
+        raise TypeError(
+            "'{}' is an invalid keyword argument " "for this function".format(key)
+        )
 
     if indexing not in ("xy", "ij"):
         raise ValueError("indexing parameter must be either 'xy' or 'ij'")
@@ -501,7 +543,7 @@ def meshgrid(*args, **kwargs):
     # Prepare reshape by inserting dimensions with size 1 where needed
     output = []
     for i, x in enumerate(args):
-        output.append(tf.reshape(tf.stack(x), (s0[:i] + (-1,) + s0[i + 1::])))
+        output.append(tf.reshape(tf.stack(x), (s0[:i] + (-1,) + s0[i + 1 : :])))
     # Create parameters for broadcasting each tensor to the full size
     shapes = [tf.size(x) for x in args]
     sz = [x.get_shape().as_list()[0] for x in args]
@@ -514,8 +556,8 @@ def meshgrid(*args, **kwargs):
         sz[0], sz[1] = sz[1], sz[0]
 
     for i in range(len(output)):
-        stack_sz = [*sz[:i], 1, *sz[(i + 1):]]
-        if indexing == 'xy' and ndim > 1 and i < 2:
+        stack_sz = [*sz[:i], 1, *sz[(i + 1) :]]
+        if indexing == "xy" and ndim > 1 and i < 2:
             stack_sz[0], stack_sz[1] = stack_sz[1], stack_sz[0]
         output[i] = tf.tile(output[i], tf.stack(stack_sz))
     return output
@@ -537,7 +579,10 @@ def prod_n(lst):
 def sub2ind(siz, subs):
     """assumes column-order major"""
     # subs is a list
-    assert len(siz) == len(subs), 'found inconsistent siz and subs: %d %d' % (len(siz), len(subs))
+    assert len(siz) == len(subs), "found inconsistent siz and subs: %d %d" % (
+        len(siz),
+        len(subs),
+    )
 
     k = np.cumprod(siz[::-1])
 

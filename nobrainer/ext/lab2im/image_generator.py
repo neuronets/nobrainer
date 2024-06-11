@@ -13,34 +13,34 @@ implied. See the License for the specific language governing permissions and lim
 License.
 """
 
-
 # python imports
 import numpy as np
 import numpy.random as npr
 
 # project imports
-from nobrainer.ext.lab2im import utils
-from nobrainer.ext.lab2im import edit_volumes
+from nobrainer.ext.lab2im import edit_volumes, utils
 from nobrainer.ext.lab2im.lab2im_model import lab2im_model
 
 
 class ImageGenerator:
 
-    def __init__(self,
-                 labels_dir,
-                 generation_labels=None,
-                 output_labels=None,
-                 batchsize=1,
-                 n_channels=1,
-                 target_res=None,
-                 output_shape=None,
-                 output_div_by_n=None,
-                 generation_classes=None,
-                 prior_distributions='uniform',
-                 prior_means=None,
-                 prior_stds=None,
-                 use_specific_stats_for_channel=False,
-                 blur_range=1.15):
+    def __init__(
+        self,
+        labels_dir,
+        generation_labels=None,
+        output_labels=None,
+        batchsize=1,
+        n_channels=1,
+        target_res=None,
+        output_shape=None,
+        output_div_by_n=None,
+        generation_classes=None,
+        prior_distributions="uniform",
+        prior_means=None,
+        prior_stds=None,
+        use_specific_stats_for_channel=False,
+        blur_range=1.15,
+    ):
         """
         This class is wrapper around the lab2im_model model. It contains the GPU model that generates images from labels
         maps, and a python generator that supplies the input data for this model.
@@ -115,8 +115,9 @@ class ImageGenerator:
         self.labels_paths = utils.list_images_in_folder(labels_dir)
 
         # generation parameters
-        self.labels_shape, self.aff, self.n_dims, _, self.header, self.atlas_res = \
+        self.labels_shape, self.aff, self.n_dims, _, self.header, self.atlas_res = (
             utils.get_volume_info(self.labels_paths[0], aff_ref=np.eye(4))
+        )
         self.n_channels = n_channels
         if generation_labels is not None:
             self.generation_labels = utils.load_array_if_path(generation_labels)
@@ -135,11 +136,13 @@ class ImageGenerator:
         self.prior_distributions = prior_distributions
         if generation_classes is not None:
             self.generation_classes = utils.load_array_if_path(generation_classes)
-            assert self.generation_classes.shape == self.generation_labels.shape, \
-                'if provided, generation labels should have the same shape as generation_labels'
+            assert (
+                self.generation_classes.shape == self.generation_labels.shape
+            ), "if provided, generation labels should have the same shape as generation_labels"
             unique_classes = np.unique(self.generation_classes)
-            assert np.array_equal(unique_classes, np.arange(np.max(unique_classes)+1)), \
-                'generation_classes should a linear range between 0 and its maximum value.'
+            assert np.array_equal(
+                unique_classes, np.arange(np.max(unique_classes) + 1)
+            ), "generation_classes should a linear range between 0 and its maximum value."
         else:
             self.generation_classes = np.arange(self.generation_labels.shape[0])
         self.prior_means = utils.load_array_if_path(prior_means)
@@ -153,22 +156,26 @@ class ImageGenerator:
         self.labels_to_image_model, self.model_output_shape = self._build_lab2im_model()
 
         # build generator for model inputs
-        self.model_inputs_generator = self._build_model_inputs(len(self.generation_labels))
+        self.model_inputs_generator = self._build_model_inputs(
+            len(self.generation_labels)
+        )
 
         # build brain generator
         self.image_generator = self._build_image_generator()
 
     def _build_lab2im_model(self):
         # build_model
-        lab_to_im_model = lab2im_model(labels_shape=self.labels_shape,
-                                       n_channels=self.n_channels,
-                                       generation_labels=self.generation_labels,
-                                       output_labels=self.output_labels,
-                                       atlas_res=self.atlas_res,
-                                       target_res=self.target_res,
-                                       output_shape=self.output_shape,
-                                       output_div_by_n=self.output_div_by_n,
-                                       blur_range=self.blur_range)
+        lab_to_im_model = lab2im_model(
+            labels_shape=self.labels_shape,
+            n_channels=self.n_channels,
+            generation_labels=self.generation_labels,
+            output_labels=self.output_labels,
+            atlas_res=self.atlas_res,
+            target_res=self.target_res,
+            output_shape=self.output_shape,
+            output_div_by_n=self.output_div_by_n,
+            blur_range=self.blur_range,
+        )
         out_shape = lab_to_im_model.output[0].get_shape().as_list()[1:]
         return lab_to_im_model, out_shape
 
@@ -185,10 +192,16 @@ class ImageGenerator:
         list_images = list()
         list_labels = list()
         for i in range(self.batchsize):
-            list_images.append(edit_volumes.align_volume_to_ref(image[i], np.eye(4), aff_ref=self.aff,
-                                                                n_dims=self.n_dims))
-            list_labels.append(edit_volumes.align_volume_to_ref(labels[i], np.eye(4), aff_ref=self.aff,
-                                                                n_dims=self.n_dims))
+            list_images.append(
+                edit_volumes.align_volume_to_ref(
+                    image[i], np.eye(4), aff_ref=self.aff, n_dims=self.n_dims
+                )
+            )
+            list_labels.append(
+                edit_volumes.align_volume_to_ref(
+                    labels[i], np.eye(4), aff_ref=self.aff, n_dims=self.n_dims
+                )
+            )
         image = np.stack(list_images, axis=0)
         labels = np.stack(list_labels, axis=0)
         return np.squeeze(image), np.squeeze(labels)
@@ -212,7 +225,9 @@ class ImageGenerator:
             for idx in indices:
 
                 # load label in identity space, and add them to inputs
-                y = utils.load_volume(self.labels_paths[idx], dtype='int', aff_ref=np.eye(4))
+                y = utils.load_volume(
+                    self.labels_paths[idx], dtype="int", aff_ref=np.eye(4)
+                )
                 list_label_maps.append(utils.add_axis(y, axis=[0, -1]))
 
                 # add means and standard deviations to inputs
@@ -222,35 +237,61 @@ class ImageGenerator:
 
                     # retrieve channel specific stats if necessary
                     if isinstance(self.prior_means, np.ndarray):
-                        if (self.prior_means.shape[0] > 2) & self.use_specific_stats_for_channel:
+                        if (
+                            self.prior_means.shape[0] > 2
+                        ) & self.use_specific_stats_for_channel:
                             if self.prior_means.shape[0] / 2 != self.n_channels:
-                                raise ValueError("the number of blocks in prior_means does not match n_channels. This "
-                                                 "message is printed because use_specific_stats_for_channel is True.")
-                            tmp_prior_means = self.prior_means[2 * channel:2 * channel + 2, :]
+                                raise ValueError(
+                                    "the number of blocks in prior_means does not match n_channels. This "
+                                    "message is printed because use_specific_stats_for_channel is True."
+                                )
+                            tmp_prior_means = self.prior_means[
+                                2 * channel : 2 * channel + 2, :
+                            ]
                         else:
                             tmp_prior_means = self.prior_means
                     else:
                         tmp_prior_means = self.prior_means
                     if isinstance(self.prior_stds, np.ndarray):
-                        if (self.prior_stds.shape[0] > 2) & self.use_specific_stats_for_channel:
+                        if (
+                            self.prior_stds.shape[0] > 2
+                        ) & self.use_specific_stats_for_channel:
                             if self.prior_stds.shape[0] / 2 != self.n_channels:
-                                raise ValueError("the number of blocks in prior_stds does not match n_channels. This "
-                                                 "message is printed because use_specific_stats_for_channel is True.")
-                            tmp_prior_stds = self.prior_stds[2 * channel:2 * channel + 2, :]
+                                raise ValueError(
+                                    "the number of blocks in prior_stds does not match n_channels. This "
+                                    "message is printed because use_specific_stats_for_channel is True."
+                                )
+                            tmp_prior_stds = self.prior_stds[
+                                2 * channel : 2 * channel + 2, :
+                            ]
                         else:
                             tmp_prior_stds = self.prior_stds
                     else:
                         tmp_prior_stds = self.prior_stds
 
                     # draw means and std devs from priors
-                    tmp_classes_means = utils.draw_value_from_distribution(tmp_prior_means, n_labels,
-                                                                           self.prior_distributions, 125., 100.,
-                                                                           positive_only=True)
-                    tmp_classes_stds = utils.draw_value_from_distribution(tmp_prior_stds, n_labels,
-                                                                          self.prior_distributions, 15., 10.,
-                                                                          positive_only=True)
-                    tmp_means = utils.add_axis(tmp_classes_means[self.generation_classes], axis=[0, -1])
-                    tmp_stds = utils.add_axis(tmp_classes_stds[self.generation_classes], axis=[0, -1])
+                    tmp_classes_means = utils.draw_value_from_distribution(
+                        tmp_prior_means,
+                        n_labels,
+                        self.prior_distributions,
+                        125.0,
+                        100.0,
+                        positive_only=True,
+                    )
+                    tmp_classes_stds = utils.draw_value_from_distribution(
+                        tmp_prior_stds,
+                        n_labels,
+                        self.prior_distributions,
+                        15.0,
+                        10.0,
+                        positive_only=True,
+                    )
+                    tmp_means = utils.add_axis(
+                        tmp_classes_means[self.generation_classes], axis=[0, -1]
+                    )
+                    tmp_stds = utils.add_axis(
+                        tmp_classes_stds[self.generation_classes], axis=[0, -1]
+                    )
                     means = np.concatenate([means, tmp_means], axis=-1)
                     stds = np.concatenate([stds, tmp_stds], axis=-1)
                 list_means.append(means)
@@ -258,7 +299,9 @@ class ImageGenerator:
 
             # build list of inputs of augmentation model
             list_inputs = [list_label_maps, list_means, list_stds]
-            if self.batchsize > 1:  # concatenate individual input types if batchsize > 1
+            if (
+                self.batchsize > 1
+            ):  # concatenate individual input types if batchsize > 1
                 list_inputs = [np.concatenate(item, 0) for item in list_inputs]
             else:
                 list_inputs = [item[0] for item in list_inputs]
