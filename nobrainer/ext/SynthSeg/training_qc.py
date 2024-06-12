@@ -17,55 +17,56 @@ implied. See the License for the specific language governing permissions and lim
 License.
 """
 
+from inspect import getmembers, isclass
 
 # python imports
 import os
-import keras
-import numpy as np
-import tensorflow as tf
-from keras import models
-import keras.layers as KL
-import keras.backend as K
-import keras.callbacks as KC
-from keras.optimizers import Adam
-from inspect import getmembers, isclass
 
 # project imports
 from SynthSeg import metrics_model as metrics
 
 # third-party imports
-from ext.lab2im import utils
 from ext.lab2im import layers as l2i_layers
-from ext.neuron import utils as nrn_utils
+from ext.lab2im import utils
 from ext.neuron import layers as nrn_layers
 from ext.neuron import models as nrn_models
+from ext.neuron import utils as nrn_utils
+import keras
+from keras import models
+import keras.backend as K
+import keras.callbacks as KC
+import keras.layers as KL
+from keras.optimizers import Adam
+import numpy as np
+import tensorflow as tf
 
 
-def training(list_paths_input_labels,
-             list_paths_target_labels,
-             model_dir,
-             labels_list,
-             labels_list_to_convert=None,
-             subjects_prob=None,
-             batchsize=1,
-             output_shape=None,
-             scaling_bounds=.2,
-             rotation_bounds=15,
-             shearing_bounds=.012,
-             translation_bounds=False,
-             nonlin_std=4.,
-             nonlin_scale=.04,
-             n_levels=5,
-             nb_conv_per_level=3,
-             conv_size=5,
-             unet_feat_count=24,
-             feat_multiplier=2,
-             activation='relu',
-             lr=1e-4,
-             epochs=300,
-             steps_per_epoch=1000,
-             checkpoint=None):
-
+def training(
+    list_paths_input_labels,
+    list_paths_target_labels,
+    model_dir,
+    labels_list,
+    labels_list_to_convert=None,
+    subjects_prob=None,
+    batchsize=1,
+    output_shape=None,
+    scaling_bounds=0.2,
+    rotation_bounds=15,
+    shearing_bounds=0.012,
+    translation_bounds=False,
+    nonlin_std=4.0,
+    nonlin_scale=0.04,
+    n_levels=5,
+    nb_conv_per_level=3,
+    conv_size=5,
+    unet_feat_count=24,
+    feat_multiplier=2,
+    activation="relu",
+    lr=1e-4,
+    epochs=300,
+    steps_per_epoch=1000,
+    checkpoint=None,
+):
     """
     This function trains a regressor network to predict Dice scores between segmentations (typically obtained with an
     automated algorithm), and their ground truth (to which we typically do not have access at test time).
@@ -136,55 +137,76 @@ def training(list_paths_input_labels,
     # prepare data files
     labels_list, _ = utils.get_list_labels(label_list=labels_list)
     if labels_list_to_convert is not None:
-        labels_list_to_convert, _ = utils.get_list_labels(label_list=labels_list_to_convert)
+        labels_list_to_convert, _ = utils.get_list_labels(
+            label_list=labels_list_to_convert
+        )
     n_labels = len(np.unique(labels_list))
 
     # create augmentation model
-    labels_shape, _, n_dims, _, _, _ = utils.get_volume_info(list_paths_target_labels[0], aff_ref=np.eye(4))
-    augmentation_model = build_augmentation_model(labels_shape,
-                                                  labels_list,
-                                                  labels_list_to_convert=labels_list_to_convert,
-                                                  output_shape=output_shape,
-                                                  output_div_by_n=2 ** n_levels,
-                                                  scaling_bounds=scaling_bounds,
-                                                  rotation_bounds=rotation_bounds,
-                                                  shearing_bounds=shearing_bounds,
-                                                  translation_bounds=translation_bounds,
-                                                  nonlin_std=nonlin_std,
-                                                  nonlin_scale=nonlin_scale)
+    labels_shape, _, n_dims, _, _, _ = utils.get_volume_info(
+        list_paths_target_labels[0], aff_ref=np.eye(4)
+    )
+    augmentation_model = build_augmentation_model(
+        labels_shape,
+        labels_list,
+        labels_list_to_convert=labels_list_to_convert,
+        output_shape=output_shape,
+        output_div_by_n=2**n_levels,
+        scaling_bounds=scaling_bounds,
+        rotation_bounds=rotation_bounds,
+        shearing_bounds=shearing_bounds,
+        translation_bounds=translation_bounds,
+        nonlin_std=nonlin_std,
+        nonlin_scale=nonlin_scale,
+    )
 
     # prepare QC model
-    regression_model = build_qc_model(input_model=augmentation_model,
-                                      n_labels=n_labels,
-                                      n_levels=n_levels,
-                                      nb_conv_per_level=nb_conv_per_level,
-                                      conv_size=conv_size,
-                                      unet_feat_count=unet_feat_count,
-                                      feat_multiplier=feat_multiplier,
-                                      activation=activation)
+    regression_model = build_qc_model(
+        input_model=augmentation_model,
+        n_labels=n_labels,
+        n_levels=n_levels,
+        nb_conv_per_level=nb_conv_per_level,
+        conv_size=conv_size,
+        unet_feat_count=unet_feat_count,
+        feat_multiplier=feat_multiplier,
+        activation=activation,
+    )
     qc_model = build_qc_loss(regression_model)
 
     # input generator
-    model_inputs = build_model_inputs(path_input_label_maps=list_paths_input_labels,
-                                      path_target_label_maps=list_paths_target_labels,
-                                      batchsize=batchsize,
-                                      subjects_prob=subjects_prob)
+    model_inputs = build_model_inputs(
+        path_input_label_maps=list_paths_input_labels,
+        path_target_label_maps=list_paths_target_labels,
+        batchsize=batchsize,
+        subjects_prob=subjects_prob,
+    )
     input_generator = utils.build_training_generator(model_inputs, batchsize)
 
-    train_model(qc_model, input_generator, lr, epochs, steps_per_epoch, model_dir, 'qc', checkpoint)
+    train_model(
+        qc_model,
+        input_generator,
+        lr,
+        epochs,
+        steps_per_epoch,
+        model_dir,
+        "qc",
+        checkpoint,
+    )
 
 
-def build_augmentation_model(labels_shape,
-                             labels_list,
-                             labels_list_to_convert=None,
-                             output_shape=None,
-                             output_div_by_n=None,
-                             scaling_bounds=0.15,
-                             rotation_bounds=15,
-                             shearing_bounds=0.012,
-                             translation_bounds=False,
-                             nonlin_std=3.,
-                             nonlin_scale=.0625):
+def build_augmentation_model(
+    labels_shape,
+    labels_list,
+    labels_list_to_convert=None,
+    output_shape=None,
+    output_div_by_n=None,
+    scaling_bounds=0.15,
+    rotation_bounds=15,
+    shearing_bounds=0.012,
+    translation_bounds=False,
+    nonlin_std=3.0,
+    nonlin_scale=0.0625,
+):
 
     # reformat resolutions and get shapes
     labels_shape = utils.reformat_to_list(labels_shape)
@@ -194,74 +216,105 @@ def build_augmentation_model(labels_shape,
     output_shape = get_shapes(labels_shape, output_shape, output_div_by_n, n_dims)
 
     # define model inputs
-    net_input = KL.Input(shape=labels_shape + [1], name='noisy_labels_input', dtype='int32')
-    target_input = KL.Input(shape=labels_shape + [1], name='target_input', dtype='int32')
+    net_input = KL.Input(
+        shape=labels_shape + [1], name="noisy_labels_input", dtype="int32"
+    )
+    target_input = KL.Input(
+        shape=labels_shape + [1], name="target_input", dtype="int32"
+    )
 
     # convert labels if necessary
     if labels_list_to_convert is not None:
-        noisy_labels = l2i_layers.ConvertLabels(labels_list_to_convert, labels_list, name='convert_noisy')(net_input)
-        target = l2i_layers.ConvertLabels(labels_list_to_convert, labels_list, name='convert_target')(target_input)
+        noisy_labels = l2i_layers.ConvertLabels(
+            labels_list_to_convert, labels_list, name="convert_noisy"
+        )(net_input)
+        target = l2i_layers.ConvertLabels(
+            labels_list_to_convert, labels_list, name="convert_target"
+        )(target_input)
     else:
         noisy_labels = net_input
         target = target_input
 
     # deform labels
-    noisy_labels, target = l2i_layers.RandomSpatialDeformation(scaling_bounds=scaling_bounds,
-                                                               rotation_bounds=rotation_bounds,
-                                                               shearing_bounds=shearing_bounds,
-                                                               translation_bounds=translation_bounds,
-                                                               nonlin_std=nonlin_std,
-                                                               nonlin_scale=nonlin_scale,
-                                                               inter_method='nearest')([noisy_labels, target])
+    noisy_labels, target = l2i_layers.RandomSpatialDeformation(
+        scaling_bounds=scaling_bounds,
+        rotation_bounds=rotation_bounds,
+        shearing_bounds=shearing_bounds,
+        translation_bounds=translation_bounds,
+        nonlin_std=nonlin_std,
+        nonlin_scale=nonlin_scale,
+        inter_method="nearest",
+    )([noisy_labels, target])
 
     # mask image, compute Dice score with full GT, and crop noisy labels
-    noisy_labels, scores = SimulatePartialFOV(crop_shape=output_shape[0],
-                                              labels_list=np.unique(labels_list),
-                                              min_fov_shape=70,
-                                              prob_mask=0.3, name='partial_fov')([noisy_labels, target])
+    noisy_labels, scores = SimulatePartialFOV(
+        crop_shape=output_shape[0],
+        labels_list=np.unique(labels_list),
+        min_fov_shape=70,
+        prob_mask=0.3,
+        name="partial_fov",
+    )([noisy_labels, target])
 
     # dummy layers
-    scores = KL.Lambda(lambda x: x, name='dice_gt')(scores)
-    noisy_labels = KL.Lambda(lambda x: x[0], name='labels_out')([noisy_labels, scores])
+    scores = KL.Lambda(lambda x: x, name="dice_gt")(scores)
+    noisy_labels = KL.Lambda(lambda x: x[0], name="labels_out")([noisy_labels, scores])
 
     # build model and return
     brain_model = models.Model(inputs=[net_input, target_input], outputs=noisy_labels)
     return brain_model
 
 
-def build_qc_model(input_model,
-                   n_labels,
-                   n_levels,
-                   nb_conv_per_level,
-                   conv_size,
-                   unet_feat_count,
-                   feat_multiplier,
-                   activation):
+def build_qc_model(
+    input_model,
+    n_labels,
+    n_levels,
+    nb_conv_per_level,
+    conv_size,
+    unet_feat_count,
+    feat_multiplier,
+    activation,
+):
 
     # get prediction
     last_tensor = input_model.outputs[0]
     input_shape = last_tensor.get_shape().as_list()[1:]
-    assert input_shape[-1] == n_labels, 'mismatch between number of predicted labels, and segmentation labels'
+    assert (
+        input_shape[-1] == n_labels
+    ), "mismatch between number of predicted labels, and segmentation labels"
 
     # build model
-    model = nrn_models.conv_enc(input_model=input_model,
-                                input_shape=input_shape,
-                                nb_levels=n_levels,
-                                nb_conv_per_level=nb_conv_per_level,
-                                conv_size=conv_size,
-                                nb_features=unet_feat_count,
-                                feat_mult=feat_multiplier,
-                                activation=activation,
-                                batch_norm=-1,
-                                use_residuals=True,
-                                name='qc')
+    model = nrn_models.conv_enc(
+        input_model=input_model,
+        input_shape=input_shape,
+        nb_levels=n_levels,
+        nb_conv_per_level=nb_conv_per_level,
+        conv_size=conv_size,
+        nb_features=unet_feat_count,
+        feat_mult=feat_multiplier,
+        activation=activation,
+        batch_norm=-1,
+        use_residuals=True,
+        name="qc",
+    )
     last = model.outputs[0]
 
-    conv_kwargs = {'padding': 'same', 'activation': 'relu', 'data_format': 'channels_last'}
-    last = KL.MaxPool3D(pool_size=(2, 2, 2), name='qc_maxpool_%s' % (n_levels - 1), padding='same')(last)
-    last = KL.Conv3D(n_labels, kernel_size=5, **conv_kwargs, name='qc_final_conv_0')(last)
-    last = KL.Conv3D(n_labels, kernel_size=5, **conv_kwargs, name='qc_final_conv_1')(last)
-    last = KL.Lambda(lambda x: tf.reduce_mean(x, axis=[1, 2, 3]), name='qc_final_pred')(last)
+    conv_kwargs = {
+        "padding": "same",
+        "activation": "relu",
+        "data_format": "channels_last",
+    }
+    last = KL.MaxPool3D(
+        pool_size=(2, 2, 2), name="qc_maxpool_%s" % (n_levels - 1), padding="same"
+    )(last)
+    last = KL.Conv3D(n_labels, kernel_size=5, **conv_kwargs, name="qc_final_conv_0")(
+        last
+    )
+    last = KL.Conv3D(n_labels, kernel_size=5, **conv_kwargs, name="qc_final_conv_1")(
+        last
+    )
+    last = KL.Lambda(lambda x: tf.reduce_mean(x, axis=[1, 2, 3]), name="qc_final_pred")(
+        last
+    )
 
     return models.Model(input_model.inputs, last)
 
@@ -269,20 +322,21 @@ def build_qc_model(input_model,
 def build_qc_loss(input_model):
 
     # get Dice scores
-    dice_gt = input_model.get_layer('dice_gt').output
+    dice_gt = input_model.get_layer("dice_gt").output
     dice_pred = input_model.outputs[0]
 
     # get loss
-    loss = KL.Lambda(lambda x: K.sum(K.mean(K.square(x[0] - x[1]), axis=0)), name='qc_loss')([dice_gt, dice_pred])
+    loss = KL.Lambda(
+        lambda x: K.sum(K.mean(K.square(x[0] - x[1]), axis=0)), name="qc_loss"
+    )([dice_gt, dice_pred])
     loss._keras_shape = tuple(loss.get_shape().as_list())
 
     return models.Model(inputs=input_model.inputs, outputs=loss)
 
 
-def build_model_inputs(path_input_label_maps,
-                       path_target_label_maps,
-                       batchsize=1,
-                       subjects_prob=None):
+def build_model_inputs(
+    path_input_label_maps, path_target_label_maps, batchsize=1, subjects_prob=None
+):
 
     # make sure subjects_prob sums to 1
     subjects_prob = utils.load_array_if_path(subjects_prob)
@@ -293,7 +347,9 @@ def build_model_inputs(path_input_label_maps,
     while True:
 
         # randomly pick as many images as batchsize
-        indices = np.random.choice(np.arange(len(path_input_label_maps)), size=batchsize, p=subjects_prob)
+        indices = np.random.choice(
+            np.arange(len(path_input_label_maps)), size=batchsize, p=subjects_prob
+        )
 
         # initialise input lists
         list_input_label_maps = list()
@@ -302,17 +358,23 @@ def build_model_inputs(path_input_label_maps,
         for idx in indices:
 
             # load input
-            input_net = utils.load_volume(path_input_label_maps[idx], dtype='int', aff_ref=np.eye(4))
+            input_net = utils.load_volume(
+                path_input_label_maps[idx], dtype="int", aff_ref=np.eye(4)
+            )
             list_input_label_maps.append(utils.add_axis(input_net, axis=[0, -1]))
 
             # load target
-            target = utils.load_volume(path_target_label_maps[idx], dtype='int', aff_ref=np.eye(4))
+            target = utils.load_volume(
+                path_target_label_maps[idx], dtype="int", aff_ref=np.eye(4)
+            )
             list_target_label_maps.append(utils.add_axis(target, axis=[0, -1]))
 
         # build list of training pairs
         list_training_pairs = [list_input_label_maps, list_target_label_maps]
         if batchsize > 1:  # concatenate individual input types if batchsize > 1
-            list_training_pairs = [np.concatenate(item, 0) for item in list_training_pairs]
+            list_training_pairs = [
+                np.concatenate(item, 0) for item in list_training_pairs
+            ]
         else:
             list_training_pairs = [item[0] for item in list_training_pairs]
 
@@ -323,17 +385,27 @@ def get_shapes(labels_shape, cropping_shape, output_div_by_n, n_dims):
 
     # cropping shape specified, make sure it's okay
     if cropping_shape is not None:
-        cropping_shape = utils.reformat_to_list(cropping_shape, length=n_dims, dtype='int')
+        cropping_shape = utils.reformat_to_list(
+            cropping_shape, length=n_dims, dtype="int"
+        )
 
         # make sure that cropping shape is smaller or equal to label shape
-        cropping_shape = [min(labels_shape[i], cropping_shape[i]) for i in range(n_dims)]
+        cropping_shape = [
+            min(labels_shape[i], cropping_shape[i]) for i in range(n_dims)
+        ]
 
         # make sure cropping shape is divisible by output_div_by_n
         if output_div_by_n is not None:
-            tmp_shape = [utils.find_closest_number_divisible_by_m(s, output_div_by_n) for s in cropping_shape]
+            tmp_shape = [
+                utils.find_closest_number_divisible_by_m(s, output_div_by_n)
+                for s in cropping_shape
+            ]
             if cropping_shape != tmp_shape:
-                print('output shape {0} not divisible by {1}, changed to {2}'.format(cropping_shape, output_div_by_n,
-                                                                                     tmp_shape))
+                print(
+                    "output shape {0} not divisible by {1}, changed to {2}".format(
+                        cropping_shape, output_div_by_n, tmp_shape
+                    )
+                )
                 cropping_shape = tmp_shape
 
     # no cropping shape specified, so no cropping unless label_shape is not divisible by output_div_by_n
@@ -341,7 +413,10 @@ def get_shapes(labels_shape, cropping_shape, output_div_by_n, n_dims):
 
         # make sure labels shape is divisible by output_div_by_n
         if output_div_by_n is not None:
-            cropping_shape = [utils.find_closest_number_divisible_by_m(s, output_div_by_n) for s in labels_shape]
+            cropping_shape = [
+                utils.find_closest_number_divisible_by_m(s, output_div_by_n)
+                for s in labels_shape
+            ]
 
         # if no need to be divisible by n, simply take cropping_shape as image_shape, and build output_shape
         else:
@@ -350,33 +425,53 @@ def get_shapes(labels_shape, cropping_shape, output_div_by_n, n_dims):
     return cropping_shape
 
 
-def train_model(model,
-                generator,
-                learning_rate,
-                n_epochs,
-                n_steps,
-                model_dir,
-                metric_type,
-                path_checkpoint=None,
-                reinitialise_momentum=False):
+def train_model(
+    model,
+    generator,
+    learning_rate,
+    n_epochs,
+    n_steps,
+    model_dir,
+    metric_type,
+    path_checkpoint=None,
+    reinitialise_momentum=False,
+):
 
     # prepare model and log folders
     utils.mkdir(model_dir)
-    log_dir = os.path.join(model_dir, 'logs')
+    log_dir = os.path.join(model_dir, "logs")
     utils.mkdir(log_dir)
 
     # model saving callback
-    save_file_name = os.path.join(model_dir, 'qc_{epoch:03d}.h5')
-    callbacks = [KC.ModelCheckpoint(save_file_name, verbose=1),
-                 KC.TensorBoard(log_dir=log_dir, histogram_freq=0, write_graph=True, write_images=False)]
+    save_file_name = os.path.join(model_dir, "qc_{epoch:03d}.h5")
+    callbacks = [
+        KC.ModelCheckpoint(save_file_name, verbose=1),
+        KC.TensorBoard(
+            log_dir=log_dir, histogram_freq=0, write_graph=True, write_images=False
+        ),
+    ]
 
     compile_model = True
     init_epoch = 0
     if (path_checkpoint is not None) & (not reinitialise_momentum):
         init_epoch = int(os.path.basename(path_checkpoint).split(metric_type)[1][1:-3])
-        custom_l2i = {key: value for (key, value) in getmembers(l2i_layers, isclass) if key != 'Layer'}
-        custom_nrn = {key: value for (key, value) in getmembers(nrn_layers, isclass) if key != 'Layer'}
-        custom_objects = {**custom_l2i, **custom_nrn, 'tf': tf, 'keras': keras, 'loss': metrics.IdentityLoss().loss}
+        custom_l2i = {
+            key: value
+            for (key, value) in getmembers(l2i_layers, isclass)
+            if key != "Layer"
+        }
+        custom_nrn = {
+            key: value
+            for (key, value) in getmembers(nrn_layers, isclass)
+            if key != "Layer"
+        }
+        custom_objects = {
+            **custom_l2i,
+            **custom_nrn,
+            "tf": tf,
+            "keras": keras,
+            "loss": metrics.IdentityLoss().loss,
+        }
         model = models.load_model(path_checkpoint, custom_objects=custom_objects)
         compile_model = False
     elif path_checkpoint is not None:
@@ -384,14 +479,18 @@ def train_model(model,
 
     # compile
     if compile_model:
-        model.compile(optimizer=Adam(lr=learning_rate), loss=metrics.IdentityLoss().loss)
+        model.compile(
+            optimizer=Adam(lr=learning_rate), loss=metrics.IdentityLoss().loss
+        )
 
     # fit
-    model.fit_generator(generator,
-                        epochs=n_epochs,
-                        steps_per_epoch=n_steps,
-                        callbacks=callbacks,
-                        initial_epoch=init_epoch)
+    model.fit_generator(
+        generator,
+        epochs=n_epochs,
+        steps_per_epoch=n_steps,
+        callbacks=callbacks,
+        initial_epoch=init_epoch,
+    )
 
 
 class SimulatePartialFOV(KL.Layer):
@@ -428,14 +527,20 @@ class SimulatePartialFOV(KL.Layer):
     def build(self, input_shape):
 
         # check shapes
-        assert len(input_shape) == 2, 'SimulatePartialFOV expects 2 inputs: labels to deform and GT (for Dice scores).'
-        assert input_shape[0] == input_shape[1], 'the two inputs must have the same shape.'
+        assert (
+            len(input_shape) == 2
+        ), "SimulatePartialFOV expects 2 inputs: labels to deform and GT (for Dice scores)."
+        assert (
+            input_shape[0] == input_shape[1]
+        ), "the two inputs must have the same shape."
         self.n_dims = len(input_shape[0]) - 2
-        self.inshape = input_shape[0][1:self.n_dims + 1]
+        self.inshape = input_shape[0][1 : self.n_dims + 1]
 
         self.crop_max_val = self.inshape[0] - self.crop_shape
         self.meshgrid = nrn_utils.volshape_to_ndgrid(self.inshape)
-        self.lut = tf.convert_to_tensor(utils.get_mapping_lut(self.labels_list), dtype='int32')
+        self.lut = tf.convert_to_tensor(
+            utils.get_mapping_lut(self.labels_list), dtype="int32"
+        )
 
         self.built = True
         super(SimulatePartialFOV, self).build(input_shape)
@@ -448,17 +553,30 @@ class SimulatePartialFOV(KL.Layer):
 
         # sample cropping indices
         batchsize = tf.split(tf.shape(x), [1, -1])[0]
-        sample_shape = tf.concat([batchsize, self.n_dims * tf.ones([1], dtype='int32')], 0)
+        sample_shape = tf.concat(
+            [batchsize, self.n_dims * tf.ones([1], dtype="int32")], 0
+        )
         if self.crop_max_val > 0:
-            crop_idx_inf = tf.random.uniform(shape=sample_shape, minval=0, maxval=self.crop_max_val, dtype='int32')
+            crop_idx_inf = tf.random.uniform(
+                shape=sample_shape, minval=0, maxval=self.crop_max_val, dtype="int32"
+            )
             crop_idx_sup = crop_idx_inf + self.crop_shape
         else:
             crop_idx_inf = crop_idx_sup = None
 
         # sample masking indices
-        fov_shape = tf.random.uniform(sample_shape, minval=self.min_fov_shape, maxval=self.inshape[0], dtype='int32')
-        mask_idx_inf = tf.random.uniform(shape=sample_shape, minval=0, maxval=1, dtype='float32')
-        mask_idx_inf_tmp = tf.cast(mask_idx_inf * tf.cast(self.inshape[0]-fov_shape, 'float32'), 'int32')
+        fov_shape = tf.random.uniform(
+            sample_shape,
+            minval=self.min_fov_shape,
+            maxval=self.inshape[0],
+            dtype="int32",
+        )
+        mask_idx_inf = tf.random.uniform(
+            shape=sample_shape, minval=0, maxval=1, dtype="float32"
+        )
+        mask_idx_inf_tmp = tf.cast(
+            mask_idx_inf * tf.cast(self.inshape[0] - fov_shape, "float32"), "int32"
+        )
         mask_idx_sup_tmp = mask_idx_inf_tmp + fov_shape
         if self.crop_max_val > 0:
             mask_idx_inf = tf.maximum(mask_idx_inf_tmp, crop_idx_inf)
@@ -468,8 +586,14 @@ class SimulatePartialFOV(KL.Layer):
             mask_idx_sup = mask_idx_sup_tmp
 
         # mask input labels
-        mask = tf.map_fn(self._single_build_mask, [x, mask_idx_inf, mask_idx_sup], tf.int32)
-        x = K.switch(tf.squeeze(K.greater(tf.random.uniform([1], 0, 1), 1 - self.prob_mask)), x * mask, x)
+        mask = tf.map_fn(
+            self._single_build_mask, [x, mask_idx_inf, mask_idx_sup], tf.int32
+        )
+        x = K.switch(
+            tf.squeeze(K.greater(tf.random.uniform([1], 0, 1), 1 - self.prob_mask)),
+            x * mask,
+            x,
+        )
 
         # compute dice score for each label value
         x = tf.one_hot(tf.gather(self.lut, x), depth=self.n_labels, axis=-1)
@@ -481,7 +605,9 @@ class SimulatePartialFOV(KL.Layer):
 
         # crop input labels
         if self.crop_max_val > 0:
-            x_cropped = tf.map_fn(self._single_slice, [x, crop_idx_inf], dtype=tf.float32)
+            x_cropped = tf.map_fn(
+                self._single_slice, [x, crop_idx_inf], dtype=tf.float32
+            )
         else:
             x_cropped = x
 
@@ -491,19 +617,28 @@ class SimulatePartialFOV(KL.Layer):
         vol = inputs[0]
         mask_idx_inf = inputs[1]
         mask_idx_sup = inputs[2]
-        mask = tf.ones(vol.shape, dtype='bool')
+        mask = tf.ones(vol.shape, dtype="bool")
         for i in range(self.n_dims):
             tmp_mask_inf = tf.less(self.meshgrid[i], mask_idx_inf[i])
             tmp_mask_sup = tf.greater(self.meshgrid[i], mask_idx_sup[i])
-            mask = tf.logical_and(mask, tf.logical_not(tf.logical_or(tmp_mask_inf, tmp_mask_sup)))
-        return tf.cast(mask, 'int32')
+            mask = tf.logical_and(
+                mask, tf.logical_not(tf.logical_or(tmp_mask_inf, tmp_mask_sup))
+            )
+        return tf.cast(mask, "int32")
 
     def _single_slice(self, inputs):
         vol = inputs[0]
         crop_idx_inf = inputs[1]
-        crop_idx_inf = tf.concat([tf.cast(crop_idx_inf, 'int32'), tf.zeros([1], dtype='int32')], axis=0)
-        crop_size = tf.convert_to_tensor([self.crop_shape] * self.n_dims + [-1], dtype='int32')
+        crop_idx_inf = tf.concat(
+            [tf.cast(crop_idx_inf, "int32"), tf.zeros([1], dtype="int32")], axis=0
+        )
+        crop_size = tf.convert_to_tensor(
+            [self.crop_shape] * self.n_dims + [-1], dtype="int32"
+        )
         return tf.slice(vol, begin=crop_idx_inf, size=crop_size)
 
     def compute_output_shape(self, input_shape):
-        return [(None, *[self.crop_shape] * self.n_dims, self.n_labels), (None, self.n_labels)]
+        return [
+            (None, *[self.crop_shape] * self.n_dims, self.n_labels),
+            (None, self.n_labels),
+        ]
