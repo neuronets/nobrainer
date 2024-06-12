@@ -7,7 +7,7 @@ from .bayesian_meshnet import variational_meshnet
 from .bayesian_vnet import bayesian_vnet
 from .dcgan import dcgan
 from .highresnet import highresnet
-from .lab2im_model import lab2im_model
+from .labels_to_image_model import labels_to_image_model
 from .meshnet import meshnet
 from .progressiveae import progressiveae
 from .progressivegan import progressivegan
@@ -29,7 +29,7 @@ _models = {
     "unetr": unetr,
     "variational_meshnet": variational_meshnet,
     "bayesian_vnet": bayesian_vnet,
-    "synth_generator": lab2im_model,
+    "synth_generator": labels_to_image_model,
 }
 
 
