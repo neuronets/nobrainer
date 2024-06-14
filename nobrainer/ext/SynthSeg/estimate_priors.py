@@ -25,7 +25,7 @@ except ImportError:
 
 
 # third-party imports
-from ext.lab2im import edit_volumes, utils
+from nobrainer.ext.lab2im import edit_volumes, utils
 
 
 def sample_intensity_stats_from_image(

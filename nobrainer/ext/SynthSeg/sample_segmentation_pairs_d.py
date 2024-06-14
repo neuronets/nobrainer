@@ -19,11 +19,11 @@ import copy
 import os
 
 # third-party imports
-from ext.lab2im import edit_tensors as l2i_et
-from ext.lab2im import edit_volumes
-from ext.lab2im import layers as layers
-from ext.lab2im import utils
-from ext.neuron import models as nrn_models
+from nobrainer.ext.lab2im import edit_tensors as l2i_et
+from nobrainer.ext.lab2im import edit_volumes
+from nobrainer.ext.lab2im import layers as layers
+from nobrainer.ext.lab2im import utils
+from nobrainer.ext.neuron import models as nrn_models
 from keras import models
 import keras.layers as KL
 import numpy as np

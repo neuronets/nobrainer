@@ -14,7 +14,7 @@ License.
 """
 
 # third-party imports
-from ext.lab2im import layers
+from nobrainer.ext.lab2im import layers
 import keras.layers as KL
 from keras.models import Model
 

@@ -17,7 +17,7 @@ License.
 import os
 
 # third-party imports
-from ext.lab2im import edit_volumes, utils
+from nobrainer.ext.lab2im import edit_volumes, utils
 import numpy as np
 from scipy.ndimage.morphology import distance_transform_edt
 from scipy.stats import wilcoxon

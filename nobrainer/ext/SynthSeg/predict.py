@@ -19,11 +19,11 @@ import csv
 import os
 
 # project imports
-from SynthSeg import evaluate
+from nobrainer.ext.SynthSeg import evaluate
 
 # third-party imports
-from ext.lab2im import edit_volumes, layers, utils
-from ext.neuron import models as nrn_models
+from nobrainer.ext.lab2im import edit_volumes, layers, utils
+from nobrainer.ext.neuron import models as nrn_models
 import keras.backend as K
 import keras.layers as KL
 from keras.models import Model

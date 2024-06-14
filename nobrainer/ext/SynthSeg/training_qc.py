@@ -23,14 +23,14 @@ from inspect import getmembers, isclass
 import os
 
 # project imports
-from SynthSeg import metrics_model as metrics
+from nobrainer.ext.SynthSeg import metrics_model as metrics
 
 # third-party imports
-from ext.lab2im import layers as l2i_layers
-from ext.lab2im import utils
-from ext.neuron import layers as nrn_layers
-from ext.neuron import models as nrn_models
-from ext.neuron import utils as nrn_utils
+from nobrainer.ext.lab2im import layers as l2i_layers
+from nobrainer.ext.lab2im import utils
+from nobrainer.ext.neuron import layers as nrn_layers
+from nobrainer.ext.neuron import models as nrn_models
+from nobrainer.ext.neuron import utils as nrn_utils
 import keras
 from keras import models
 import keras.backend as K

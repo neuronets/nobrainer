@@ -16,7 +16,7 @@ License.
 # python imports
 import numpy as np
 
-from nobrainer.ext.SynthSeg.labels_to_image_model import labels_to_image_model
+from nobrainer.models.labels_to_image_model import labels_to_image_model
 
 # project imports
 from nobrainer.ext.SynthSeg.model_inputs import build_model_inputs

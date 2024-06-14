@@ -20,10 +20,10 @@ import os
 import re
 
 # project imports
-from SynthSeg.predict import predict
+from nobrainer.ext.SynthSeg.predict import predict
 
 # third-party imports
-from ext.lab2im import utils
+from nobrainer.ext.lab2im import utils
 import matplotlib.pyplot as plt
 import numpy as np
 from tensorflow.python.summary.summary_iterator import summary_iterator

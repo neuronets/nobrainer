@@ -22,15 +22,15 @@ License.
 import os
 
 # project imports
-from SynthSeg import metrics_model as metrics
-from SynthSeg.labels_to_image_model import get_shapes
-from SynthSeg.training import train_model
+from nobrainer.ext.SynthSeg import metrics_model as metrics
+from nobrainer.models.labels_to_image_model import get_shapes
+from nobrainer.ext.SynthSeg.training import train_model
 
 # third-party imports
-from ext.lab2im import edit_tensors as l2i_et
-from ext.lab2im import layers, utils
-from ext.lab2im.edit_volumes import get_ras_axes
-from ext.neuron import models as nrn_models
+from nobrainer.ext.lab2im import edit_tensors as l2i_et
+from nobrainer.ext.lab2im import layers, utils
+from nobrainer.ext.lab2im.edit_volumes import get_ras_axes
+from nobrainer.ext.neuron import models as nrn_models
 from keras import models
 import keras.layers as KL
 import numpy as np
