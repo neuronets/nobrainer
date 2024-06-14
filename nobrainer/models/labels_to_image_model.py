@@ -13,16 +13,17 @@ implied. See the License for the specific language governing permissions and lim
 License.
 """
 
-# third-party imports
-from nobrainer.SynthSeg.ext.lab2im import edit_tensors as l2i_et
-from nobrainer.SynthSeg.ext.lab2im import layers, utils
-from nobrainer.SynthSeg.ext.lab2im.edit_volumes import get_ras_axes
 import keras.layers as KL
 from keras.models import Model
 
 # python imports
 import numpy as np
 import tensorflow as tf
+
+# third-party imports
+from nobrainer.SynthSeg.ext.lab2im import edit_tensors as l2i_et
+from nobrainer.SynthSeg.ext.lab2im import layers, utils
+from nobrainer.SynthSeg.ext.lab2im.edit_volumes import get_ras_axes
 
 
 def labels_to_image_model(
