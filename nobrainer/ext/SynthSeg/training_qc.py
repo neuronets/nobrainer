@@ -22,6 +22,15 @@ from inspect import getmembers, isclass
 # python imports
 import os
 
+import keras
+from keras import models
+import keras.backend as K
+import keras.callbacks as KC
+import keras.layers as KL
+from keras.optimizers import Adam
+import numpy as np
+import tensorflow as tf
+
 # project imports
 from nobrainer.ext.SynthSeg import metrics_model as metrics
 
@@ -31,14 +40,6 @@ from nobrainer.ext.lab2im import utils
 from nobrainer.ext.neuron import layers as nrn_layers
 from nobrainer.ext.neuron import models as nrn_models
 from nobrainer.ext.neuron import utils as nrn_utils
-import keras
-from keras import models
-import keras.backend as K
-import keras.callbacks as KC
-import keras.layers as KL
-from keras.optimizers import Adam
-import numpy as np
-import tensorflow as tf
 
 
 def training(

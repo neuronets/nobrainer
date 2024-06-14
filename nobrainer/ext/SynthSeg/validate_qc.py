@@ -19,14 +19,15 @@ import logging
 import os
 import re
 
+import matplotlib.pyplot as plt
+import numpy as np
+from tensorflow.python.summary.summary_iterator import summary_iterator
+
 # project imports
 from nobrainer.ext.SynthSeg.predict_qc import predict
 
 # third-party imports
 from nobrainer.ext.lab2im import utils
-import matplotlib.pyplot as plt
-import numpy as np
-from tensorflow.python.summary.summary_iterator import summary_iterator
 
 
 def validate_training(

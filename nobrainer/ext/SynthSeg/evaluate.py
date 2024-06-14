@@ -16,11 +16,12 @@ License.
 # python imports
 import os
 
-# third-party imports
-from nobrainer.ext.lab2im import edit_volumes, utils
 import numpy as np
 from scipy.ndimage.morphology import distance_transform_edt
 from scipy.stats import wilcoxon
+
+# third-party imports
+from nobrainer.ext.lab2im import edit_volumes, utils
 
 
 def fast_dice(x, y, labels):

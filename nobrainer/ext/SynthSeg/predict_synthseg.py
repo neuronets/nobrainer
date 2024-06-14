@@ -18,6 +18,12 @@ import os
 import sys
 import traceback
 
+import keras.backend as K
+import keras.layers as KL
+from keras.models import Model
+import numpy as np
+import tensorflow as tf
+
 # project imports
 from nobrainer.ext.SynthSeg import evaluate
 from nobrainer.ext.SynthSeg.predict import get_flip_indices, write_csv
@@ -25,11 +31,6 @@ from nobrainer.ext.SynthSeg.predict import get_flip_indices, write_csv
 # third-party imports
 from nobrainer.ext.lab2im import edit_volumes, layers, utils
 from nobrainer.ext.neuron import models as nrn_models
-import keras.backend as K
-import keras.layers as KL
-from keras.models import Model
-import numpy as np
-import tensorflow as tf
 
 
 def predict(

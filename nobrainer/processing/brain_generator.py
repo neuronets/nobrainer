@@ -16,13 +16,12 @@ License.
 # python imports
 import numpy as np
 
-from nobrainer.models.labels_to_image_model import labels_to_image_model
-
 # project imports
 from nobrainer.ext.SynthSeg.model_inputs import build_model_inputs
 
 # third-party imports
 from nobrainer.ext.lab2im import edit_volumes, utils
+from nobrainer.models.labels_to_image_model import labels_to_image_model
 
 
 class BrainGenerator:

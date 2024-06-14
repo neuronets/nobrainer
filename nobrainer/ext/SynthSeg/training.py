@@ -22,20 +22,21 @@ from inspect import getmembers, isclass
 # python imports
 import os
 
-# project imports
-from nobrainer.ext.SynthSeg import metrics_model as metrics
-from nobrainer.processing.brain_generator import BrainGenerator
-
-# third-party imports
-from nobrainer.ext.lab2im import layers, utils
-from nobrainer.ext.neuron import layers as nrn_layers
-from nobrainer.ext.neuron import models as nrn_models
 import keras
 from keras import models
 import keras.callbacks as KC
 from keras.optimizers import Adam
 import numpy as np
 import tensorflow as tf
+
+# project imports
+from nobrainer.ext.SynthSeg import metrics_model as metrics
+
+# third-party imports
+from nobrainer.ext.lab2im import layers, utils
+from nobrainer.ext.neuron import layers as nrn_layers
+from nobrainer.ext.neuron import models as nrn_models
+from nobrainer.processing.brain_generator import BrainGenerator
 
 
 def training(

@@ -18,16 +18,17 @@ import copy
 # python imports
 import os
 
+from keras import models
+import keras.layers as KL
+import numpy as np
+import tensorflow as tf
+
 # third-party imports
 from nobrainer.ext.lab2im import edit_tensors as l2i_et
 from nobrainer.ext.lab2im import edit_volumes
 from nobrainer.ext.lab2im import layers as layers
 from nobrainer.ext.lab2im import utils
 from nobrainer.ext.neuron import models as nrn_models
-from keras import models
-import keras.layers as KL
-import numpy as np
-import tensorflow as tf
 
 
 def sample_segmentation_pairs(

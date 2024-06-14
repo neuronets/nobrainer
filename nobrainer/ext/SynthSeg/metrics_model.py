@@ -13,14 +13,15 @@ implied. See the License for the specific language governing permissions and lim
 License.
 """
 
-# third-party imports
-from nobrainer.ext.lab2im import layers
 import keras.layers as KL
 from keras.models import Model
 
 # python imports
 import numpy as np
 import tensorflow as tf
+
+# third-party imports
+from nobrainer.ext.lab2im import layers
 
 
 def metrics_model(input_model, label_list, metrics="dice"):

@@ -16,19 +16,20 @@ License.
 # python imports
 import os
 
+from keras import layers as KL
+from keras import models
+import numpy as np
+import tensorflow as tf
+
 # project imports
 from nobrainer.ext.SynthSeg import metrics_model as metrics
-from nobrainer.models.labels_to_image_model import get_shapes
 from nobrainer.ext.SynthSeg.training import train_model
 from nobrainer.ext.SynthSeg.training_supervised import build_model_inputs
 
 # third-party imports
 from nobrainer.ext.lab2im import layers, utils
 from nobrainer.ext.neuron import models as nrn_models
-from keras import layers as KL
-from keras import models
-import numpy as np
-import tensorflow as tf
+from nobrainer.models.labels_to_image_model import get_shapes
 
 
 def training(
