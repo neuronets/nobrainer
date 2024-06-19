@@ -147,7 +147,7 @@ class Dataset:
                 label_mapping=label_mapping, num_parallel_calls=num_parallel_calls
             )
 
-        ds_obj.filter_zero_volumes()
+        # ds_obj.filter_zero_volumes()
         # TODO automatically determine batch size
         ds_obj.batch(1)
 
