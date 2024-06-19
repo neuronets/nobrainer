@@ -12,6 +12,7 @@ from .progressiveae import progressiveae
 from .progressivegan import progressivegan
 from .unet import unet
 from .unetr import unetr
+from .labels_to_image_model import labels_to_image_model
 
 __all__ = ["get", "list_available_models"]
 
@@ -27,7 +28,8 @@ _models = {
     "attention_unet_with_inception": attention_unet_with_inception,
     "unetr": unetr,
     "variational_meshnet": variational_meshnet,
-    "bayesian_vnet": bayesian_vnet
+    "bayesian_vnet": bayesian_vnet,
+    "synthgenerator": labels_to_image_model
 }
 
 
