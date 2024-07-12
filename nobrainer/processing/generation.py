@@ -153,6 +153,10 @@ class ProgressiveGeneration(BaseEstimator):
                 volume_shape=(resolution, resolution, resolution),
                 scalar_labels=True,
             )
+            n_epochs = info.get("epochs") or epochs
+            dataset.batch(batch_size).normalize(
+                info.get("normalizer") or normalizer
+            ).repeat(n_epochs)
 
             if info.get("normalizer") or normalizer:
                 dataset = dataset.normalize(normalizer)
@@ -167,7 +171,6 @@ class ProgressiveGeneration(BaseEstimator):
                     self.model_.generator.add_resolution()
                     self.model_.discriminator.add_resolution()
                 _compile()
-
                 # save_best_only is set to False as it is an adversarial loss
                 model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
                     str(model_dir),
