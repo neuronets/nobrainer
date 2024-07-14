@@ -58,7 +58,9 @@ def write(
     verbose: int, if 1, print progress bar. If 0, print nothing.
     """
     n_examples = len(features_labels)
-    shards = np.array_split(features_labels, np.arange(examples_per_shard, n_examples, examples_per_shard))
+    shards = np.array_split(
+        features_labels, np.arange(examples_per_shard, n_examples, examples_per_shard)
+    )
 
     # Test that the `filename_template` has a `shard` formatting key.
     try:
@@ -77,7 +79,9 @@ def write(
     # This is the object that returns a protocol buffer string of the feature and label
     # on each iteration. It is pickle-able, unlike a generator.
     proto_iterators = [
-        _ProtoIterator(s, to_ras=to_ras, multi_resolution=multi_resolution, resolutions=resolutions)
+        _ProtoIterator(
+            s, to_ras=to_ras, multi_resolution=multi_resolution, resolutions=resolutions
+        )
         for s in shards
     ]
     # Set up positional arguments for the core writer function.

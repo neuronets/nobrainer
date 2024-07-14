@@ -7,12 +7,12 @@ from .bayesian_meshnet import variational_meshnet
 from .bayesian_vnet import bayesian_vnet
 from .dcgan import dcgan
 from .highresnet import highresnet
+from .labels_to_image_model import labels_to_image_model
 from .meshnet import meshnet
 from .progressiveae import progressiveae
 from .progressivegan import progressivegan
 from .unet import unet
 from .unetr import unetr
-from .labels_to_image_model import labels_to_image_model
 
 __all__ = ["get", "list_available_models"]
 
@@ -29,7 +29,7 @@ _models = {
     "unetr": unetr,
     "variational_meshnet": variational_meshnet,
     "bayesian_vnet": bayesian_vnet,
-    "synthgenerator": labels_to_image_model
+    "synthgenerator": labels_to_image_model,
 }
 
 

@@ -50,7 +50,7 @@ class Segmentation(BaseEstimator):
         metrics=metrics.dice,
         callbacks=None,
         verbose=1,
-        initial_epoch=0
+        initial_epoch=0,
     ):
         """Train a segmentation model"""
         # TODO: check validity of datasets
@@ -116,7 +116,7 @@ class Segmentation(BaseEstimator):
             ),
             callbacks=callbacks,
             verbose=verbose,
-            initial_epoch=initial_epoch
+            initial_epoch=initial_epoch,
         )
 
         return self
