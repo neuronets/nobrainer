@@ -95,9 +95,8 @@ class RandomSpatialDeformation(Layer):
         nonlin_scale=0.0625,
         inter_method="linear",
         prob_deform=1,
-        **kwargs
+        **kwargs,
     ):
-
         # shape attributes
         self.n_inputs = 1
         self.inshape = None
@@ -143,7 +142,6 @@ class RandomSpatialDeformation(Layer):
         return config
 
     def build(self, input_shape):
-
         if not isinstance(input_shape, list):
             inputshape = [input_shape]
         else:
@@ -167,7 +165,6 @@ class RandomSpatialDeformation(Layer):
         super(RandomSpatialDeformation, self).build(input_shape)
 
     def call(self, inputs, **kwargs):
-
         # reformat inputs and get its shape
         if self.n_inputs < 2:
             inputs = [inputs]
@@ -193,7 +190,6 @@ class RandomSpatialDeformation(Layer):
 
         # prepare non-linear deformation field and add it to inputs list
         if self.apply_elastic_trans:
-
             # sample small field from normal distribution of specified std dev
             trans_shape = tf.concat(
                 [batchsize, tf.convert_to_tensor(self.small_shape, dtype="int32")],
@@ -254,7 +250,6 @@ class RandomCrop(Layer):
     """
 
     def __init__(self, crop_shape, **kwargs):
-
         self.several_inputs = True
         self.crop_max_val = None
         self.crop_shape = crop_shape
@@ -268,7 +263,6 @@ class RandomCrop(Layer):
         return config
 
     def build(self, input_shape):
-
         if not isinstance(input_shape, list):
             self.several_inputs = False
             inputshape = [input_shape]
@@ -282,7 +276,6 @@ class RandomCrop(Layer):
         super(RandomCrop, self).build(input_shape)
 
     def call(self, inputs, **kwargs):
-
         # if one input only is provided, performs the cropping directly
         if not self.several_inputs:
             return tf.map_fn(self._single_slice, inputs, dtype=inputs.dtype)
@@ -373,9 +366,8 @@ class RandomFlip(Layer):
         label_list=None,
         n_neutral_labels=None,
         prob=0.5,
-        **kwargs
+        **kwargs,
     ):
-
         # shape attributes
         self.several_inputs = True
         self.n_dims = None
@@ -405,7 +397,6 @@ class RandomFlip(Layer):
         return config
 
     def build(self, input_shape):
-
         if not isinstance(input_shape, list):
             self.several_inputs = False
             inputshape = [input_shape]
@@ -422,8 +413,8 @@ class RandomFlip(Layer):
 
         # create label list with swapped labels
         if any(self.swap_labels):
-            assert (self.label_list is not None) & (
-                self.n_neutral_labels is not None
+            assert (
+                (self.label_list is not None) & (self.n_neutral_labels is not None)
             ), "please provide a label_list, and n_neutral_labels when swapping the values of at least one input"
             n_labels = len(self.label_list)
             if self.n_neutral_labels == n_labels:
@@ -447,7 +438,6 @@ class RandomFlip(Layer):
         super(RandomFlip, self).build(input_shape)
 
     def call(self, inputs, **kwargs):
-
         # convert inputs to list, and get each input type
         inputs = [inputs] if not self.several_inputs else inputs
         types = [v.dtype for v in inputs]
@@ -531,7 +521,6 @@ class SampleConditionalGMM(Layer):
         return config
 
     def build(self, input_shape):
-
         # check n_labels and n_channels
         assert (
             len(input_shape) == 3
@@ -563,7 +552,6 @@ class SampleConditionalGMM(Layer):
         super(SampleConditionalGMM, self).build(input_shape)
 
     def call(self, inputs, **kwargs):
-
         # reformat labels and scatter indices
         batch = tf.split(tf.shape(inputs[0]), [1, -1])[0]
         tmp_indices = tf.tile(
@@ -653,9 +641,8 @@ class SampleResolution(Layer):
         prob_iso=0.1,
         prob_min=0.05,
         return_thickness=True,
-        **kwargs
+        **kwargs,
     ):
-
         self.min_res = min_resolution
         self.max_res_iso_input = max_res_iso
         self.max_res_iso = None
@@ -680,10 +667,10 @@ class SampleResolution(Layer):
         return config
 
     def build(self, input_shape):
-
         # check maximum resolutions
-        assert (self.max_res_iso_input is not None) | (
-            self.max_res_aniso_input is not None
+        assert (
+            (self.max_res_iso_input is not None)
+            | (self.max_res_aniso_input is not None)
         ), "at least one of maximum isotropic or anisotropic resolutions must be provided, received none"
 
         # reformat resolutions as numpy arrays
@@ -724,7 +711,6 @@ class SampleResolution(Layer):
         super(SampleResolution, self).build(input_shape)
 
     def call(self, inputs, **kwargs):
-
         if not self.add_batchsize:
             shape = [self.n_dims]
             dim = tf.random.uniform(
@@ -740,7 +726,7 @@ class SampleResolution(Layer):
             tile_shape = tf.concat(
                 [batch, tf.convert_to_tensor([1], dtype="int32")], axis=0
             )
-            self.min_res_tens = tf.tile(
+            self.min_res_tens_tiled = tf.tile(
                 tf.expand_dims(self.min_res_tens, 0), tile_shape
             )
 
@@ -760,7 +746,7 @@ class SampleResolution(Layer):
 
         # return min resolution as tensor if min=max
         if (self.max_res_iso is None) & (self.max_res_aniso is None):
-            new_resolution = self.min_res_tens
+            new_resolution = self.min_res_tens_tiled
 
         # sample isotropic resolution only
         elif (self.max_res_iso is not None) & (self.max_res_aniso is None):
@@ -769,7 +755,7 @@ class SampleResolution(Layer):
             )
             new_resolution = K.switch(
                 tf.squeeze(K.less(tf.random.uniform([1], 0, 1), self.prob_min)),
-                self.min_res_tens,
+                self.min_res_tens_tiled,
                 new_resolution_iso,
             )
 
@@ -780,8 +766,8 @@ class SampleResolution(Layer):
             )
             new_resolution = K.switch(
                 tf.squeeze(K.less(tf.random.uniform([1], 0, 1), self.prob_min)),
-                self.min_res_tens,
-                tf.where(mask, new_resolution_aniso, self.min_res_tens),
+                self.min_res_tens_tiled,
+                tf.where(mask, new_resolution_aniso, self.min_res_tens_tiled),
             )
 
         # sample either anisotropic or isotropic resolution
@@ -795,11 +781,11 @@ class SampleResolution(Layer):
             new_resolution = K.switch(
                 tf.squeeze(K.less(tf.random.uniform([1], 0, 1), self.prob_iso)),
                 new_resolution_iso,
-                tf.where(mask, new_resolution_aniso, self.min_res_tens),
+                tf.where(mask, new_resolution_aniso, self.min_res_tens_tiled),
             )
             new_resolution = K.switch(
                 tf.squeeze(K.less(tf.random.uniform([1], 0, 1), self.prob_min)),
-                self.min_res_tens,
+                self.min_res_tens_tiled,
                 new_resolution,
             )
 
@@ -807,7 +793,9 @@ class SampleResolution(Layer):
             return [
                 new_resolution,
                 tf.random.uniform(
-                    tf.shape(self.min_res_tens), self.min_res_tens, new_resolution
+                    tf.shape(self.min_res_tens_tiled),
+                    self.min_res_tens_tiled,
+                    new_resolution,
                 ),
             ]
         else:
@@ -876,7 +864,6 @@ class GaussianBlur(Layer):
         return config
 
     def build(self, input_shape):
-
         # get shapes
         if self.use_mask:
             assert (
@@ -904,7 +891,6 @@ class GaussianBlur(Layer):
         super(GaussianBlur, self).build(input_shape)
 
     def call(self, inputs, **kwargs):
-
         if self.use_mask:
             image = inputs[0]
             mask = tf.cast(inputs[1], "bool")
@@ -1110,9 +1096,8 @@ class MimicAcquisition(Layer):
         build_dist_map=False,
         noise_std=0,
         prob_noise=0.95,
-        **kwargs
+        **kwargs,
     ):
-
         # resolutions and dimensions
         self.volume_res = volume_res
         self.min_subsample_res = min_subsample_res
@@ -1148,7 +1133,6 @@ class MimicAcquisition(Layer):
         return config
 
     def build(self, input_shape):
-
         # set up input shape and acquisition shape
         self.inshape = input_shape[0][1:]
         self.n_channels = input_shape[0][-1]
@@ -1169,7 +1153,6 @@ class MimicAcquisition(Layer):
         super(MimicAcquisition, self).build(input_shape)
 
     def call(self, inputs, **kwargs):
-
         # sort inputs
         assert (
             len(inputs) == 2
@@ -1252,7 +1235,6 @@ class MimicAcquisition(Layer):
 
         # return upsampled volumes with distance maps
         else:
-
             # get grid points
             floor = tf.math.floor(up_loc)
             ceil = tf.math.ceil(up_loc)
@@ -1306,9 +1288,8 @@ class BiasFieldCorruption(Layer):
         bias_scale=0.025,
         same_bias_for_all_channels=False,
         prob=0.95,
-        **kwargs
+        **kwargs,
     ):
-
         # input shape
         self.several_inputs = False
         self.inshape = None
@@ -1336,7 +1317,6 @@ class BiasFieldCorruption(Layer):
         return config
 
     def build(self, input_shape):
-
         # input shape
         if isinstance(input_shape, list):
             self.several_inputs = True
@@ -1359,12 +1339,10 @@ class BiasFieldCorruption(Layer):
         super(BiasFieldCorruption, self).build(input_shape)
 
     def call(self, inputs, **kwargs):
-
         if not self.several_inputs:
             inputs = [inputs]
 
         if self.bias_field_std > 0:
-
             # sampling shapes
             batchsize = tf.split(tf.shape(inputs[0]), [1, -1])[0]
             std_shape = tf.concat(
@@ -1445,9 +1423,8 @@ class IntensityAugmentation(Layer):
         separate_channels=True,
         prob_noise=0.95,
         prob_gamma=1,
-        **kwargs
+        **kwargs,
     ):
-
         # shape attributes
         self.n_dims = None
         self.n_channels = None
@@ -1516,7 +1493,6 @@ class IntensityAugmentation(Layer):
         super(IntensityAugmentation, self).build(input_shape)
 
     def call(self, inputs, **kwargs):
-
         # prepare shape for sampling the noise and gamma std dev (depending on whether we augment channels separately)
         batchsize = tf.split(tf.shape(inputs), [1, -1])[0]
         if (self.noise_std > 0) | (self.gamma_std > 0) | self.contrast_inversion:
@@ -1646,9 +1622,8 @@ class DiceLoss(Layer):
         boundary_dist=3,
         skip_background=True,
         enable_checks=True,
-        **kwargs
+        **kwargs,
     ):
-
         self.class_weights = class_weights
         self.dynamic_weighting = False
         self.class_weights_tens = None
@@ -1670,7 +1645,6 @@ class DiceLoss(Layer):
         return config
 
     def build(self, input_shape):
-
         # get shape
         assert (
             len(input_shape) == 2
@@ -1700,7 +1674,6 @@ class DiceLoss(Layer):
         super(DiceLoss, self).build(input_shape)
 
     def call(self, inputs, **kwargs):
-
         # make sure tensors are probabilistic
         gt = inputs[0]
         pred = inputs[1]
@@ -1847,9 +1820,8 @@ class CrossEntropyLoss(Layer):
         boundary_dist=3,
         skip_background=True,
         enable_checks=True,
-        **kwargs
+        **kwargs,
     ):
-
         self.class_weights = class_weights
         self.dynamic_weighting = False
         self.class_weights_tens = None
@@ -1871,7 +1843,6 @@ class CrossEntropyLoss(Layer):
         return config
 
     def build(self, input_shape):
-
         # get shape
         assert (
             len(input_shape) == 2
@@ -1903,7 +1874,6 @@ class CrossEntropyLoss(Layer):
         super(CrossEntropyLoss, self).build(input_shape)
 
     def call(self, inputs, **kwargs):
-
         # make sure tensors are probabilistic
         gt = inputs[0]
         pred = inputs[1]
@@ -2003,7 +1973,6 @@ class MomentLoss(Layer):
         return config
 
     def build(self, input_shape):
-
         # get shape
         assert (
             len(input_shape) == 2
@@ -2038,7 +2007,6 @@ class MomentLoss(Layer):
         super(MomentLoss, self).build(input_shape)
 
     def call(self, inputs, **kwargs):
-
         # make sure tensors are probabilistic
         gt = inputs[0]  # (B, dim1, dim2, ..., dimN, nchan)
         pred = inputs[1]
@@ -2315,11 +2283,9 @@ class MaskEdges(Layer):
         super(MaskEdges, self).build(input_shape)
 
     def call(self, inputs, **kwargs):
-
         # build mask
         mask = tf.ones_like(inputs)
         for i, axis in enumerate(self.axes):
-
             # select restricting indices
             axis_boundaries = self.boundaries[i, :]
             idx1 = tf.math.round(
@@ -2366,9 +2332,7 @@ class MaskEdges(Layer):
 
 
 class ImageGradients(Layer):
-
     def __init__(self, gradient_type="sobel", return_magnitude=False, **kwargs):
-
         self.gradient_type = gradient_type
         assert (self.gradient_type == "sobel") | (
             self.gradient_type == "1-step_diff"
@@ -2398,7 +2362,6 @@ class ImageGradients(Layer):
         return config
 
     def build(self, input_shape):
-
         # get shapes
         self.n_dims = len(input_shape) - 2
         self.shape = input_shape[1:]
@@ -2416,7 +2379,6 @@ class ImageGradients(Layer):
         super(ImageGradients, self).build(input_shape)
 
     def call(self, inputs, **kwargs):
-
         image = inputs
         batchsize = tf.split(tf.shape(inputs), [1, -1])[0]
         gradients = list()
@@ -2444,7 +2406,6 @@ class ImageGradients(Layer):
 
         # 1-step method, only supports 2 and 3D
         else:
-
             # get 1-step diff
             if self.n_dims == 2:
                 gradients.append(image[:, 1:, :, :] - image[:, :-1, :, :])  # dx
@@ -2513,9 +2474,8 @@ class RandomDilationErosion(Layer):
         prob=1,
         operation="random",
         return_mask=False,
-        **kwargs
+        **kwargs,
     ):
-
         self.min_factor = min_factor
         self.max_factor = max_factor
         self.max_factor_dilate = (
@@ -2541,7 +2501,6 @@ class RandomDilationErosion(Layer):
         return config
 
     def build(self, input_shape):
-
         # input shape
         self.inshape = input_shape
         self.n_dims = len(self.inshape) - 2
@@ -2554,7 +2513,6 @@ class RandomDilationErosion(Layer):
         super(RandomDilationErosion, self).build(input_shape)
 
     def call(self, inputs, **kwargs):
-
         # sample probability of applying operation. If random negative is erosion and positive is dilation
         batchsize = tf.split(tf.shape(inputs), [1, -1])[0]
         shape = tf.concat([batchsize, tf.convert_to_tensor([1], dtype="int32")], axis=0)
