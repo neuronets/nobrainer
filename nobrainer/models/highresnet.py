@@ -1,5 +1,4 @@
-"""Model definition for HighResNet.
-"""
+"""Model definition for HighResNet."""
 
 import tensorflow as tf
 from tensorflow.keras import layers

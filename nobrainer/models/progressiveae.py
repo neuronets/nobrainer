@@ -1,5 +1,4 @@
-"""Model definition for ProgressiveAE.
-"""
+"""Model definition for ProgressiveAE."""
 
 import tensorflow as tf
 from tensorflow.keras import layers, models

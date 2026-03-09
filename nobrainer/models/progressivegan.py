@@ -1,5 +1,4 @@
-"""Model definition for ProgressiveGAN.
-"""
+"""Model definition for ProgressiveGAN."""
 
 import tensorflow as tf
 from tensorflow.keras import layers, models

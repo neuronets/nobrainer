@@ -1,5 +1,4 @@
-"""Model definition for UNet.
-"""
+"""Model definition for UNet."""
 
 import tensorflow as tf
 from tensorflow.keras import layers

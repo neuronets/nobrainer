@@ -1,5 +1,4 @@
-"""Model definition for Autoencoder.
-"""
+"""Model definition for Autoencoder."""
 
 import math
 
