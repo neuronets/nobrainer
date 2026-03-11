@@ -408,7 +408,7 @@ def commit_best_model(
     commit_msg = (
         f"autoresearch: add {model_family} model ({date_str}) val_dice={val_dice:.4f}"
     )
-    dl.save(path=str(trained_models_path), message=commit_msg)
+    dl.save(dataset=str(trained_models_path), message=commit_msg)
 
     try:
         dl.push(dataset=str(trained_models_path), to="osf")
