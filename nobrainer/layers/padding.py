@@ -1,20 +1,29 @@
-"""Custom padding layers for nobrainer."""
+"""Custom padding layers for nobrainer (PyTorch)."""
 
-import tensorflow as tf
-from tensorflow.keras import layers
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 
-class ZeroPadding3DChannels(layers.Layer):
-    """Pad the last dimension of a 5D tensor symmetrically with zeros.
+class ZeroPadding3DChannels(nn.Module):
+    """Pad the channel dimension of a 5-D tensor symmetrically with zeros.
 
-    This is meant for 3D convolutions, where tensors are 5D.
+    Expects input of shape ``(N, C, D, H, W)`` and pads ``C`` by
+    ``padding`` on each side, yielding ``(N, C + 2*padding, D, H, W)``.
+
+    Parameters
+    ----------
+    padding : int
+        Number of zero channels to prepend and append.
     """
 
-    def __init__(self, padding, **kwds):
+    def __init__(self, padding: int) -> None:
+        super().__init__()
         self.padding = padding
-        # batch, x, y, z, channels
-        self._paddings = [[0, 0], [0, 0], [0, 0], [0, 0], [self.padding, self.padding]]
-        super(ZeroPadding3DChannels, self).__init__(**kwds)
 
-    def call(self, x):
-        return tf.pad(x, paddings=self._paddings, mode="CONSTANT", constant_values=0)
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # F.pad pads in reverse dim order; last two entries pad dim 1 (C)
+        return F.pad(x, (0, 0, 0, 0, 0, 0, self.padding, self.padding))
+
+    def extra_repr(self) -> str:
+        return f"padding={self.padding}"
