@@ -435,6 +435,84 @@ def research(
 
 
 @cli.command()
+@click.option(
+    "--model-path",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to best_model.pth file.",
+    **_option_kwds,
+)
+@click.option(
+    "--config-path",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to best_config.json file.",
+    **_option_kwds,
+)
+@click.option(
+    "--trained-models-path",
+    required=True,
+    type=click.Path(),
+    help="Root of the DataLad-managed trained_models dataset.",
+    **_option_kwds,
+)
+@click.option(
+    "--model-family",
+    default="bayesian_vnet",
+    help="Model family name (used as subdirectory).",
+    **_option_kwds,
+)
+@click.option(
+    "--val-dice",
+    type=float,
+    required=True,
+    help="Validation Dice score of the best model.",
+    **_option_kwds,
+)
+@click.option(
+    "--source-run-id",
+    default="",
+    help="Run ID string for traceability.",
+    **_option_kwds,
+)
+def commit(
+    *,
+    model_path,
+    config_path,
+    trained_models_path,
+    model_family,
+    val_dice,
+    source_run_id,
+):
+    """Version the best model with DataLad and push to OSF.
+
+    Copies model weights and config into the trained_models DataLad dataset,
+    generates a model card, saves with DataLad, and pushes to OSF.
+    """
+    from ..research.loop import commit_best_model
+
+    try:
+        result = commit_best_model(
+            best_model_path=model_path,
+            best_config_path=config_path,
+            trained_models_path=trained_models_path,
+            model_family=model_family,
+            val_dice=val_dice,
+            source_run_id=source_run_id,
+        )
+    except ImportError as exc:
+        click.echo(click.style(f"ERROR: {exc}", fg="red"))
+        raise SystemExit(1) from exc
+
+    click.echo(f"Model versioned at: {result['path']}")
+    click.echo(f"DataLad commit: {result['datalad_commit']}")
+    if result.get("osf_url"):
+        click.echo(click.style(f"OSF URL: {result['osf_url']}", fg="green"))
+    else:
+        click.echo(click.style("OSF push skipped (no remote configured)", fg="yellow"))
+
+
+@cli.command()
 def save():
     """Save a model to PyTorch format."""
     click.echo("Not implemented yet.")
