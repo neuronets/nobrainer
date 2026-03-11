@@ -125,18 +125,30 @@ def elbo(
     """Compute ELBO = reconstruction_loss + kl_weight * KL.
 
     The KL term is accumulated by Pyro sampling during the forward pass
-    of Bayesian modules.  Use ``pyro.infer.Trace_ELBO`` or
-    ``nobrainer.models.bayesian.utils.accumulate_kl`` to obtain it.
+    of Bayesian modules (:class:`~nobrainer.models.bayesian.layers.BayesianConv3d`
+    and :class:`~nobrainer.models.bayesian.layers.BayesianLinear`).
 
-    .. note::
-        Full implementation is in Phase 4 (US2 — Bayesian Models).
-        This stub ensures ``nobrainer.losses.elbo`` is importable from
-        Phase 2 onward.
+    Parameters
+    ----------
+    model : nn.Module
+        A model with one or more Bayesian layers whose ``.kl`` attributes
+        have been populated by a recent forward pass.
+    kl_weight : float
+        Scalar multiplier for the KL divergence term (often ``1 / N_data``
+        or ``1 / N_batches``).
+    reconstruction_loss : torch.Tensor
+        Scalar reconstruction loss (e.g., Dice or cross-entropy) already
+        computed for the current batch.
+
+    Returns
+    -------
+    torch.Tensor
+        Scalar ELBO = reconstruction_loss + kl_weight * KL.
     """
-    raise NotImplementedError(
-        "elbo() is implemented in Phase 4 (US2). "
-        "Import from nobrainer.models.bayesian after completing Phase 4."
-    )
+    from .models.bayesian.utils import accumulate_kl
+
+    kl = accumulate_kl(model)
+    return reconstruction_loss + kl_weight * kl
 
 
 def wasserstein(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:

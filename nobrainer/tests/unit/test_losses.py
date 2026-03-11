@@ -116,13 +116,15 @@ class TestTverskyLoss:
 
 
 class TestStubs:
-    def test_elbo_raises(self):
+    def test_elbo_returns_tensor(self):
+        """elbo() is implemented in Phase 4; non-Bayesian model yields zero KL."""
         import torch.nn as nn
 
-        with pytest.raises(NotImplementedError):
-            losses_module.elbo(
-                nn.Linear(1, 1), kl_weight=1.0, reconstruction_loss=torch.tensor(0.0)
-            )
+        result = losses_module.elbo(
+            nn.Linear(1, 1), kl_weight=1.0, reconstruction_loss=torch.tensor(0.5)
+        )
+        assert isinstance(result, torch.Tensor)
+        assert result.item() == pytest.approx(0.5)
 
     def test_wasserstein_raises(self):
         with pytest.raises(NotImplementedError):

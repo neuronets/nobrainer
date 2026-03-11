@@ -3,13 +3,13 @@
 from pprint import pprint
 
 from .autoencoder import autoencoder
+from .bayesian import bayesian_meshnet, bayesian_vnet
 from .highresnet import highresnet
 from .meshnet import meshnet
 from .segmentation import attention_unet, unet, unetr, vnet
 from .simsiam import simsiam
 
-# Bayesian and generative models are added in Phases 4 & 5
-# from .bayesian import bayesian_vnet, bayesian_meshnet
+# Generative models are added in Phase 5
 # from .generative import progressivegan, dcgan
 
 __all__ = ["get", "list_available_models"]
@@ -23,6 +23,8 @@ _models = {
     "highresnet": highresnet,
     "autoencoder": autoencoder,
     "simsiam": simsiam,
+    "bayesian_vnet": bayesian_vnet,
+    "bayesian_meshnet": bayesian_meshnet,
 }
 
 

@@ -46,10 +46,6 @@ def _stitch_blocks(
     nd, nh, nw = grid
     bd, bh, bw = block_shape
     # block_preds: (N_blocks, n_classes, bD, bH, bW)
-    vol = block_preds.reshape(nd, nh, nw, n_classes, bd, bh, bw)
-    vol = vol.transpose(3, 0, 3, 1, 4, 2, 5)
-    # → (n_classes, nd, bD, nh, bH, nw, bW)
-    # This ordering is tricky; use a clean loop instead for clarity
     full = np.zeros((n_classes, nd * bd, nh * bh, nw * bw), dtype=block_preds.dtype)
     idx = 0
     for i in range(nd):
@@ -175,23 +171,100 @@ def predict_with_uncertainty(
     batch_size: int = 4,
     device: str | torch.device | None = None,
 ) -> tuple[nib.Nifti1Image, nib.Nifti1Image, nib.Nifti1Image]:
-    """MC-Dropout uncertainty estimation.
+    """MC-Dropout / Bayesian uncertainty estimation.
 
-    Runs ``n_samples`` stochastic forward passes (model in train mode to
-    activate dropout) and returns label, variance, and entropy maps.
+    Runs ``n_samples`` stochastic forward passes with the model in **train**
+    mode (activating Dropout and Pyro sampling in Bayesian layers) and
+    returns mean label, predictive variance, and predictive entropy maps.
 
-    .. note::
-        Full implementation wired to Bayesian models is in Phase 4 (US2).
-        This stub is importable from Phase 3 onward.
+    Parameters
+    ----------
+    inputs : path, ndarray, or Nifti1Image
+        Input brain MRI (same format as :func:`predict`).
+    model : nn.Module
+        Trained segmentation model.  Should contain dropout or Bayesian
+        layers so that repeated forward passes are stochastic.
+    n_samples : int
+        Number of Monte-Carlo forward passes.
+    block_shape, batch_size, device
+        Same semantics as :func:`predict`.
 
     Returns
     -------
-    label_img, variance_img, entropy_img : nib.Nifti1Image
+    label_img : nib.Nifti1Image
+        Mean class label (argmax over mean softmax probabilities).
+    variance_img : nib.Nifti1Image
+        Mean predictive variance across classes.
+    entropy_img : nib.Nifti1Image
+        Predictive entropy of the mean softmax distribution.
     """
-    raise NotImplementedError(
-        "predict_with_uncertainty() is fully implemented in Phase 4 (US2). "
-        "Use predict() for deterministic inference."
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(device)
+
+    affine = np.eye(4)
+    if isinstance(inputs, (str, Path)):
+        img = nib.load(str(inputs))
+        arr = np.asarray(img.dataobj, dtype=np.float32)
+        affine = img.affine
+    elif isinstance(inputs, nib.Nifti1Image):
+        arr = np.asarray(inputs.dataobj, dtype=np.float32)
+        affine = inputs.affine
+    else:
+        arr = np.asarray(inputs, dtype=np.float32)
+
+    orig_shape = arr.shape[:3]
+    arr3d = arr if arr.ndim == 3 else arr[..., 0]
+
+    padded, pad = _pad_to_multiple(arr3d, block_shape)
+    blocks, grid = _extract_blocks(padded, block_shape)
+    n_blocks = blocks.shape[0]
+
+    model = model.to(device)
+    # Keep model in train mode so dropout / Pyro sampling remains stochastic
+    model.train()
+
+    sample_probs: list[np.ndarray] = []  # each entry: (N_blocks, C, bD, bH, bW)
+    with torch.no_grad():
+        for _ in range(n_samples):
+            preds: list[np.ndarray] = []
+            for start in range(0, n_blocks, batch_size):
+                chunk = blocks[start : start + batch_size]
+                tensor = torch.from_numpy(chunk[:, None]).to(device)
+                out = model(tensor)
+                probs = torch.softmax(out, dim=1).cpu().numpy()
+                preds.append(probs)
+            sample_probs.append(np.concatenate(preds, axis=0))
+
+    # Stack → (n_samples, N_blocks, C, bD, bH, bW)
+    stacked = np.stack(sample_probs, axis=0)
+    mean_probs = stacked.mean(axis=0)  # (N_blocks, C, bD, bH, bW)
+    var_probs = stacked.var(axis=0)  # (N_blocks, C, bD, bH, bW)
+    n_classes = mean_probs.shape[1]
+
+    # Reconstruct full volumes
+    full_mean = _stitch_blocks(
+        mean_probs, grid, block_shape, pad, orig_shape, n_classes
     )
+    full_var = _stitch_blocks(var_probs, grid, block_shape, pad, orig_shape, n_classes)
+
+    # Mean variance across classes
+    mean_var = full_var.mean(axis=0)  # (D, H, W)
+
+    # Predictive entropy: -sum(p * log(p + eps), axis=classes)
+    eps = 1e-8
+    entropy = -(full_mean * np.log(full_mean + eps)).sum(axis=0)  # (D, H, W)
+
+    # Label = argmax of mean softmax
+    if n_classes == 1:
+        labels = (full_mean[0] > 0.5).astype(np.float32)
+    else:
+        labels = full_mean.argmax(axis=0).astype(np.float32)
+
+    label_img = nib.Nifti1Image(labels, affine)
+    var_img = nib.Nifti1Image(mean_var.astype(np.float32), affine)
+    entropy_img = nib.Nifti1Image(entropy.astype(np.float32), affine)
+    return label_img, var_img, entropy_img
 
 
 __all__ = ["predict", "predict_with_uncertainty"]
