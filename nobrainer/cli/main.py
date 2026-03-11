@@ -250,10 +250,110 @@ def merge():
 
 
 @cli.command()
-def generate():
-    """Generate images from latents using a trained GAN model (Phase 5)."""
-    click.echo("Not implemented yet. Generative models are in Phase 5 (US3).")
-    sys.exit(-2)
+@click.argument("outfile")
+@click.option(
+    "-m",
+    "--model",
+    type=click.Path(exists=True),
+    required=True,
+    help="Path to model checkpoint (.ckpt) or weights (.pth).",
+    **_option_kwds,
+)
+@click.option(
+    "--model-type",
+    default="progressivegan",
+    type=click.Choice(["progressivegan", "dcgan"]),
+    help="Generative model architecture.",
+    **_option_kwds,
+)
+@click.option(
+    "--latent-size",
+    type=int,
+    default=512,
+    help="Latent vector dimension.",
+    **_option_kwds,
+)
+@click.option(
+    "--n-samples",
+    type=int,
+    default=1,
+    help="Number of images to generate.",
+    **_option_kwds,
+)
+@click.option(
+    "--device",
+    default="auto",
+    help='Compute device: "auto", "cpu", "cuda", …',
+    **_option_kwds,
+)
+@click.option(
+    "-v", "--verbose", is_flag=True, help="Print progress messages.", **_option_kwds
+)
+def generate(
+    *,
+    outfile,
+    model,
+    model_type,
+    latent_size,
+    n_samples,
+    device,
+    verbose,
+):
+    """Generate brain volumes from a trained GAN model.
+
+    Saves OUTFILE (NIfTI) for each generated sample.  When ``--n-samples > 1``
+    the file stem is suffixed with ``_0``, ``_1``, … before the extension.
+    """
+    import os
+
+    if device == "auto":
+        _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    else:
+        _device = torch.device(device)
+
+    if verbose:
+        click.echo(f"Using device: {_device}")
+
+    from ..models import get as _get_model
+
+    try:
+        factory = _get_model(model_type)
+        pt_model = factory(latent_size=latent_size)
+        # Support both .ckpt (Lightning) and .pth (state dict)
+        if model.endswith(".ckpt"):
+            model_cls = type(pt_model)
+            pt_model = model_cls.load_from_checkpoint(model, map_location=_device)
+        else:
+            state = torch.load(model, map_location=_device, weights_only=True)
+            pt_model.load_state_dict(state, strict=False)
+    except Exception as exc:
+        click.echo(click.style(f"ERROR: could not load model: {exc}", fg="red"))
+        raise SystemExit(1) from exc
+
+    pt_model = pt_model.to(_device)
+    pt_model.eval()
+
+    if verbose:
+        click.echo(f"Generating {n_samples} sample(s) …")
+
+    stem, ext = os.path.splitext(outfile)
+    if ext == ".gz":
+        stem, ext2 = os.path.splitext(stem)
+        ext = ext2 + ext
+
+    with torch.no_grad():
+        for i in range(n_samples):
+            z = torch.randn(1, latent_size, device=_device)
+            out = pt_model.generator(z)  # (1, 1, D, H, W)
+            arr = out.squeeze().cpu().numpy()
+            img = nib.Nifti1Image(arr.astype(np.float32), np.eye(4))
+            path = f"{stem}_{i}{ext}" if n_samples > 1 else outfile
+            nib.save(img, path)
+            if verbose:
+                click.echo(f"  Saved {path}")
+
+    if verbose:
+        click.echo(click.style("Done.", fg="green"))
 
 
 @cli.command()
