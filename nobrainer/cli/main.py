@@ -357,6 +357,84 @@ def generate(
 
 
 @cli.command()
+@click.option(
+    "--working-dir",
+    required=True,
+    type=click.Path(),
+    help="Directory with train script and data_manifest.json.",
+    **_option_kwds,
+)
+@click.option(
+    "--model-family",
+    default="bayesian_vnet",
+    help="Model family to use for training.",
+    **_option_kwds,
+)
+@click.option(
+    "--max-experiments",
+    type=int,
+    default=10,
+    help="Maximum number of experiments.",
+    **_option_kwds,
+)
+@click.option(
+    "--budget-hours",
+    type=float,
+    default=8.0,
+    help="Wall-clock budget in hours.",
+    **_option_kwds,
+)
+@click.option(
+    "-v",
+    "--verbose",
+    is_flag=True,
+    help="Print per-experiment progress.",
+    **_option_kwds,
+)
+def research(
+    *,
+    working_dir,
+    model_family,
+    max_experiments,
+    budget_hours,
+    verbose,
+):
+    """Run the autoresearch experiment loop.
+
+    Proposes hyperparameter configs (via Anthropic API or random grid),
+    runs training experiments, and keeps improvements.
+    Writes ``run_summary.md`` in WORKING_DIR on completion.
+    """
+    from ..research.loop import run_loop
+
+    if verbose:
+        import logging
+
+        logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+
+    results = run_loop(
+        working_dir=working_dir,
+        model_family=model_family,
+        max_experiments=max_experiments,
+        budget_hours=budget_hours,
+    )
+
+    # Progress table
+    click.echo(
+        f"\n{'run_id':>6}  {'val_dice':>10}  {'outcome':<12}  {'failure_reason'}"
+    )
+    click.echo("-" * 55)
+    for r in results:
+        dice_str = f"{r.val_dice:.4f}" if r.val_dice is not None else "—"
+        click.echo(
+            f"{r.run_id:>6}  {dice_str:>10}  {r.outcome:<12}  {r.failure_reason or '—'}"
+        )
+
+    summary_path = click.format_filename(f"{working_dir}/run_summary.md")
+    click.echo(click.style(f"\nSummary written to {summary_path}", fg="green"))
+
+
+@cli.command()
 def save():
     """Save a model to PyTorch format."""
     click.echo("Not implemented yet.")
