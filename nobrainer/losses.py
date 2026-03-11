@@ -152,15 +152,63 @@ def elbo(
 
 
 def wasserstein(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
-    """Wasserstein (Earth-Mover) loss for GAN training.
+    """Wasserstein critic loss: ``E[D(fake)] - E[D(real)]``.
 
-    .. note::
-        Full implementation is in Phase 5 (US3 — Generative Models).
+    Parameters
+    ----------
+    y_true : torch.Tensor
+        Critic scores for real samples, shape ``(N,)`` or ``(N, 1)``.
+    y_pred : torch.Tensor
+        Critic scores for fake samples, shape ``(N,)`` or ``(N, 1)``.
+
+    Returns
+    -------
+    torch.Tensor
+        Scalar Wasserstein critic loss (minimised by the discriminator).
     """
-    raise NotImplementedError(
-        "wasserstein() is implemented in Phase 5 (US3). "
-        "Import from nobrainer.models.generative after completing Phase 5."
-    )
+    return y_pred.mean() - y_true.mean()
+
+
+def gradient_penalty(
+    discriminator: torch.nn.Module,
+    real: torch.Tensor,
+    fake: torch.Tensor,
+    lambda_gp: float = 10.0,
+) -> torch.Tensor:
+    """WGAN-GP gradient penalty.
+
+    Interpolates between ``real`` and ``fake`` samples and penalises the
+    discriminator gradient norm for deviating from 1.
+
+    Parameters
+    ----------
+    discriminator : nn.Module
+        The discriminator / critic network.
+    real : torch.Tensor
+        Real samples, shape ``(N, C, D, H, W)``.
+    fake : torch.Tensor
+        Generated samples, same shape as ``real``.
+    lambda_gp : float
+        Penalty weight (default 10, standard WGAN-GP value).
+
+    Returns
+    -------
+    torch.Tensor
+        Scalar gradient penalty term.
+    """
+    b = real.size(0)
+    eps = torch.rand(b, *([1] * (real.dim() - 1)), device=real.device)
+    interp = (eps * real + (1.0 - eps) * fake.detach()).requires_grad_(True)
+    d_interp = discriminator(interp)
+    grads = torch.autograd.grad(
+        outputs=d_interp,
+        inputs=interp,
+        grad_outputs=torch.ones_like(d_interp),
+        create_graph=True,
+        retain_graph=True,
+    )[0]
+    gp = ((grads.norm(2, dim=list(range(1, real.dim()))) - 1) ** 2).mean()
+    return lambda_gp * gp
 
 
 # ---------------------------------------------------------------------------
@@ -174,6 +222,7 @@ _losses = {
     "tversky": tversky,
     "elbo": elbo,
     "wasserstein": wasserstein,
+    "gradient_penalty": gradient_penalty,
 }
 
 

@@ -126,9 +126,14 @@ class TestStubs:
         assert isinstance(result, torch.Tensor)
         assert result.item() == pytest.approx(0.5)
 
-    def test_wasserstein_raises(self):
-        with pytest.raises(NotImplementedError):
-            losses_module.wasserstein(torch.zeros(1), torch.zeros(1))
+    def test_wasserstein_returns_tensor(self):
+        """wasserstein() is implemented in Phase 5; E[fake] - E[real]."""
+        real_scores = torch.ones(4)
+        fake_scores = torch.zeros(4)
+        loss = losses_module.wasserstein(real_scores, fake_scores)
+        assert isinstance(loss, torch.Tensor)
+        # E[fake] - E[real] = 0 - 1 = -1
+        assert loss.item() == pytest.approx(-1.0)
 
 
 # ---------------------------------------------------------------------------
