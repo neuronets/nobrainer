@@ -54,7 +54,7 @@ jobs:
       - name: Set up venv from pre-installed base
         run: |
           set -ex
-          BASE_VENV="${EC2_USER_HOME}/nobrainer/.venv"
+          BASE_VENV="${EC2_USER_HOME}/nobrainer/nobrainer-env"
           export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
 
           if [ -d "$BASE_VENV" ]; then
@@ -82,14 +82,6 @@ jobs:
           print(f'CUDA: {torch.version.cuda}')
           print(f'PyTorch: {torch.__version__}')
           "
-
-      - name: Run GPU integration tests
-        run: |
-          export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
-          uv run pytest nobrainer/tests/gpu/ -v \
-            -m gpu \
-            --no-header \
-            --tb=short
 
       - name: Run full test suite (including GPU)
         run: |
