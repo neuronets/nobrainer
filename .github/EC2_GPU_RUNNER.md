@@ -50,15 +50,12 @@ source $HOME/.local/bin/env
 
 #### Create the pre-installed nobrainer venv
 
-The CI workflow expects a directory at `~/nobrainer/` containing a venv with
-heavy dependencies (torch, monai, pyro-ppl) already installed. This avoids
-re-downloading ~2 GB of packages on every CI run.
+The CI workflow expects a venv at `~/nobrainer-env` with heavy dependencies
+(torch, monai, pyro-ppl) already installed. This avoids re-downloading ~2 GB
+of packages on every CI run.
 
 ```bash
-mkdir -p ~/nobrainer
-cd ~/nobrainer
-
-uv venv --python 3.14 nobrainer-env
+uv venv --python 3.14 ~/nobrainer-env
 
 # Install the heavy GPU dependencies into the base venv
 uv pip install \
@@ -72,7 +69,7 @@ uv pip install \
 #### Verify GPU access
 
 ```bash
-source ~/nobrainer/nobrainer-env/bin/activate
+source ~/nobrainer-env/bin/activate
 python -c "
 import torch
 assert torch.cuda.is_available(), 'CUDA not available'
@@ -152,7 +149,7 @@ aws ec2 terminate-instances --instance-id i-XXXXXXXXX
 ## Updating the base venv
 
 When upgrading PyTorch or other dependencies, SSH into a running instance (or
-launch the AMI), update `~/nobrainer/nobrainer-env`, and create a new AMI snapshot:
+launch the AMI), update `~/nobrainer-env`, and create a new AMI snapshot:
 
 ```bash
 ssh -i your-key.pem ec2-user@<ip>

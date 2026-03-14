@@ -54,7 +54,7 @@ jobs:
       - name: Set up venv from pre-installed base
         run: |
           set -ex
-          BASE_VENV="${EC2_USER_HOME}/nobrainer/nobrainer-env"
+          BASE_VENV="${EC2_USER_HOME}/nobrainer-env"
           export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
 
           if [ -d "$BASE_VENV" ]; then
