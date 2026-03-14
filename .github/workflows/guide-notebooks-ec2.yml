@@ -2,14 +2,22 @@ name: GPU Tests - EC2
 run-name: ${{ github.ref_name }} - GPU Tests - EC2
 on:
   push:
-    branches: [main, master, "001-nobrainer-update"]
+    branches: [main, master]
+  # PRs require approval label from a repo admin before this workflow runs.
+  # This prevents untrusted PR code from executing on the self-hosted GPU runner.
   pull_request:
     branches: [main, master]
+    types: [labeled]
 
 jobs:
   start-runner:
     name: Start self-hosted EC2 runner
     runs-on: ubuntu-latest
+    # Only run on PRs if an admin added the 'gpu-test-approved' label
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' &&
+       contains(github.event.pull_request.labels.*.name, 'gpu-test-approved'))
     outputs:
       label: ${{ steps.start-ec2-runner.outputs.label }}
       ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
@@ -34,6 +42,11 @@ jobs:
   gpu-tests:
     needs: start-runner
     runs-on: ${{ needs.start-runner.outputs.label }}
+    env:
+      # The GitHub Actions runner runs as root on the EC2 instance, but
+      # the AMI was set up as ec2-user. Use absolute paths to ec2-user's
+      # home directory for the pre-installed venv and uv binary.
+      EC2_USER_HOME: /home/ec2-user
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,10 +54,8 @@ jobs:
       - name: Set up venv from pre-installed base
         run: |
           set -ex
-          BASE_VENV="$HOME/nobrainer/.venv"
-
-          # Ensure uv is on PATH (installed during AMI build)
-          export PATH="$HOME/.local/bin:$PATH"
+          BASE_VENV="${EC2_USER_HOME}/nobrainer/.venv"
+          export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
 
           if [ -d "$BASE_VENV" ]; then
             echo "Found pre-installed base venv at $BASE_VENV"
@@ -63,7 +74,7 @@ jobs:
 
       - name: Verify GPU access
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
+          export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
           uv run python -c "
           import torch
           assert torch.cuda.is_available(), 'CUDA not available'
@@ -74,7 +85,7 @@ jobs:
 
       - name: Run GPU integration tests
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
+          export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
           uv run pytest nobrainer/tests/gpu/ -v \
             -m gpu \
             --no-header \
@@ -82,7 +93,7 @@ jobs:
 
       - name: Run full test suite (including GPU)
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
+          export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
           uv run pytest nobrainer/tests/ -v \
             --no-header \
             --tb=short
