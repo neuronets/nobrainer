@@ -1,23 +1,36 @@
-name: Guide Notebooks Regression - EC2
-run-name: ${{ github.ref_name }} - Guide Notebooks Regression - EC2
-on: [push]
+name: GPU Tests - EC2
+run-name: ${{ github.ref_name }} - GPU Tests - EC2
+on:
+  push:
+    branches: [main, master]
+  # PRs require approval label from a repo admin before this workflow runs.
+  # This prevents untrusted PR code from executing on the self-hosted GPU runner.
+  pull_request:
+    branches: [main, master]
+    types: [labeled]
+
 jobs:
   start-runner:
     name: Start self-hosted EC2 runner
     runs-on: ubuntu-latest
+    # Only run on PRs if an admin added the 'gpu-test-approved' label
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' &&
+       contains(github.event.pull_request.labels.*.name, 'gpu-test-approved'))
     outputs:
       label: ${{ steps.start-ec2-runner.outputs.label }}
       ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
     steps:
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-access-key-id: ${{ secrets.AWS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_KEY_SECRET }}
           aws-region: ${{ vars.AWS_REGION }}
       - name: Start EC2 runner
         id: start-ec2-runner
-        uses: machulav/ec2-github-runner@v2
+        uses: machulav/ec2-github-runner@v2.5.2
         with:
           mode: start
           github-token: ${{ secrets.GH_TOKEN }}
@@ -26,62 +39,73 @@ jobs:
           subnet-id: ${{ vars.AWS_SUBNET }}
           security-group-id: ${{ vars.AWS_SECURITY_GROUP }}
 
-  guide_notebooks_regression_ec2:
-    needs: start-runner # required to start the main job when the runner is ready
-    runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
+  gpu-tests:
+    needs: start-runner
+    runs-on: ${{ needs.start-runner.outputs.label }}
+    env:
+      # The GitHub Actions runner runs as root on the EC2 instance, but
+      # the AMI was set up as ec2-user. Use absolute paths to ec2-user's
+      # home directory for the pre-installed venv and uv binary.
+      EC2_USER_HOME: /home/ec2-user
     steps:
-      - name: clone
-        uses: actions/checkout@v3
-      - name: install
-        run: |
-          set -xe
-          cd ${{ github.workspace }}
-          source /opt/tensorflow/bin/activate
-          export LD_LIBRARY_PATH=opt/amazon/efa/lib:/opt/amazon/openmpi/lib:/usr/local/cuda/efa/lib:/usr/local/cuda/lib:/usr/local/cuda:/usr/local/cuda/lib64:/usr/local/cuda/extras/CUPTI/lib64:/usr/local/cuda/targets/x86_64-linux/lib:/usr/local/lib:/usr/lib
-          echo $LD_LIBRARY_PATH
-          pip install matplotlib nilearn
-          pip install -U tensorflow
-          pip install -e .
-          nobrainer info
-      - name: run
-        run: |
-          set -xe
-          cd ${{ github.workspace }}
-          git clone https://github.com/neuronets/nobrainer-book.git
-          cd nobrainer-book
+      - name: Checkout
+        uses: actions/checkout@v4
 
-          # if there is a matching book branch, switch to it
-          if [ $(git ls-remote --heads https://github.com/neuronets/nobrainer-book.git ${{ github.ref_name }} | wc -l) -ne 0 ]; then
-            echo "Checking out branch ${{ github.ref_name }}"
-            git checkout ${{ github.ref_name }};
+      - name: Set up venv from pre-installed base
+        run: |
+          set -ex
+          BASE_VENV="${EC2_USER_HOME}/nobrainer-env"
+          export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
+
+          if [ -d "$BASE_VENV" ]; then
+            echo "Found pre-installed base venv at $BASE_VENV"
+            # Copy the base venv so the AMI stays clean for next run
+            cp -a "$BASE_VENV" .venv
           else
-            echo "No matching branch found, sticking with the default"
+            echo "No base venv found — creating from scratch"
+            uv venv --python 3.14
           fi
 
-          cd ${{ github.workspace }}
-          export LD_LIBRARY_PATH=opt/amazon/efa/lib:/opt/amazon/openmpi/lib:/usr/local/cuda/efa/lib:/usr/local/cuda/lib:/usr/local/cuda:/usr/local/cuda/lib64:/usr/local/cuda/extras/CUPTI/lib64:/usr/local/cuda/targets/x86_64-linux/lib:/usr/local/lib:/usr/lib
-          source /opt/tensorflow/bin/activate
-          for notebook_script in $(ls nobrainer-book/docs/nobrainer-guides/scripts/*.py); do
-            echo "running ${notebook_script}"
-            python ${notebook_script}
-          done
+          # Install nobrainer from checkout on top of the base layer
+          uv pip install \
+            ".[bayesian,generative,dev]" \
+            monai \
+            pyro-ppl
+
+      - name: Verify GPU access
+        run: |
+          export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
+          uv run python -c "
+          import torch
+          assert torch.cuda.is_available(), 'CUDA not available'
+          print(f'GPU: {torch.cuda.get_device_name(0)}')
+          print(f'CUDA: {torch.version.cuda}')
+          print(f'PyTorch: {torch.__version__}')
+          "
+
+      - name: Run full test suite (including GPU)
+        run: |
+          export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
+          uv run pytest nobrainer/tests/ -v \
+            --no-header \
+            --tb=short
 
   stop-runner:
     name: Stop self-hosted EC2 runner
     needs:
-      - start-runner # required to get output from the start-runner job
-      - guide_notebooks_regression_ec2 # required to wait when the main job is done
+      - start-runner
+      - gpu-tests
     runs-on: ubuntu-latest
-    if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
+    if: ${{ always() }}
     steps:
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-access-key-id: ${{ secrets.AWS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_KEY_SECRET }}
           aws-region: ${{ vars.AWS_REGION }}
       - name: Stop EC2 runner
-        uses: machulav/ec2-github-runner@v2
+        uses: machulav/ec2-github-runner@v2.5.2
         with:
           mode: stop
           github-token: ${{ secrets.GH_TOKEN }}

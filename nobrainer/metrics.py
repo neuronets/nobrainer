@@ -1,123 +1,130 @@
-import tensorflow as tf
+"""Evaluation metrics for 3-D semantic segmentation (PyTorch / MONAI)."""
+
+from __future__ import annotations
+
+from monai.metrics import DiceMetric, HausdorffDistanceMetric, MeanIoU
+
+# ---------------------------------------------------------------------------
+# Factory functions returning configured MONAI metric objects
+# ---------------------------------------------------------------------------
 
 
-def average_volume_difference():
-    raise NotImplementedError()
+def dice_metric(
+    include_background: bool = True,
+    reduction: str = "mean",
+    **kwargs,
+) -> DiceMetric:
+    """Return a MONAI ``DiceMetric`` instance.
 
-
-def dice(y_true, y_pred, axis=(1, 2, 3, 4)):
-    """Calculate Dice similarity between labels and predictions.
-    Dice similarity is in [0, 1], where 1 is perfect overlap and 0 is no
-    overlap. If both labels and predictions are empty (e.g., all background),
-    then Dice similarity is 1.
-    If we assume the inputs are rank 5 [`(batch, x, y, z, classes)`], then an
-    axis parameter of `(1, 2, 3)` will result in a tensor that contains a Dice
-    score for every class in every item in the batch. The shape of this tensor
-    will be `(batch, classes)`. If the inputs only have one class (e.g., binary
-    segmentation), then an axis parameter of `(1, 2, 3, 4)` should be used.
-    This will result in a tensor of shape `(batch,)`, where every value is the
-    Dice similarity for that prediction.
-    Implemented according to https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4533825/#Equ6
-    Returns
-    -------
-    Tensor of Dice similarities.
-    Citations
-    ---------
-    Taha AA, Hanbury A. Metrics for evaluating 3D medical image segmentation:
-        analysis, selection, and tool. BMC Med Imaging. 2015;15:29. Published 2015
-        Aug 12. doi:10.1186/s12880-015-0068-x
+    Parameters
+    ----------
+    include_background : bool
+        Include the background class in the Dice computation.
+    reduction : str
+        Reduction applied over the batch (``"mean"``, ``"sum"``, ``"none"``).
     """
-    y_pred = tf.convert_to_tensor(y_pred)
-    y_true = tf.cast(y_true, y_pred.dtype)
-    eps = tf.keras.backend.epsilon()
-
-    intersection = tf.reduce_sum(y_true * y_pred, axis=axis)
-    summation = tf.reduce_sum(y_true, axis=axis) + tf.reduce_sum(y_pred, axis=axis)
-    return (2 * intersection + eps) / (summation + eps)
-
-
-def generalized_dice(y_true, y_pred, axis=(1, 2, 3)):
-    """Calculate Generalized Dice similarity. This is useful for multi-class
-    predictions.
-    If we assume the inputs are rank 5 [`(batch, x, y, z, classes)`], then an
-    axis parameter of `(1, 2, 3)` should be used. This will result in a tensor
-    of shape `(batch,)`, where every value is the Generalized Dice similarity
-    for that prediction, across all classes.
-    Returns
-    -------
-    Tensor of Generalized Dice similarities.
-    """
-    y_pred = tf.convert_to_tensor(y_pred)
-    y_true = tf.cast(y_true, y_pred.dtype)
-
-    if y_true.get_shape().ndims < 2 or y_pred.get_shape().ndims < 2:
-        raise ValueError("y_true and y_pred must be at least rank 2.")
-
-    epsilon = tf.keras.backend.epsilon()
-
-    w = tf.math.reciprocal(tf.square(tf.reduce_sum(y_true, axis=axis)))
-    w = tf.where(tf.math.is_finite(w), w, epsilon)
-    num = 2 * tf.reduce_sum(w * tf.reduce_sum(y_true * y_pred, axis=axis), axis=-1)
-    den = tf.reduce_sum(w * tf.reduce_sum(y_true + y_pred, axis=axis), axis=-1)
-    gdice = (num + epsilon) / (den + epsilon)
-    return gdice
-
-
-def hamming(y_true, y_pred, axis=(1, 2, 3)):
-    y_pred = tf.convert_to_tensor(y_pred)
-    y_true = tf.cast(y_true, y_pred.dtype)
-    return tf.reduce_mean(tf.not_equal(y_pred, y_true), axis=axis)
-
-
-def haussdorf():
-    raise NotADirectoryError()
-
-
-def jaccard(y_true, y_pred, axis=(1, 2, 3, 4)):
-    """Calculate Jaccard similarity between labels and predictions.
-    Jaccard similarity is in [0, 1], where 1 is perfect overlap and 0 is no
-    overlap. If both labels and predictions are empty (e.g., all background),
-    then Jaccard similarity is 1.
-    If we assume the inputs are rank 5 [`(batch, x, y, z, classes)`], then an
-    axis parameter of `(1, 2, 3)` will result in a tensor that contains a Jaccard
-    score for every class in every item in the batch. The shape of this tensor
-    will be `(batch, classes)`. If the inputs only have one class (e.g., binary
-    segmentation), then an axis parameter of `(1, 2, 3, 4)` should be used.
-    This will result in a tensor of shape `(batch,)`, where every value is the
-    Jaccard similarity for that prediction.
-    Implemented according to https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4533825/#Equ7
-    Returns
-    -------
-    Tensor of Jaccard similarities.
-    Citations
-    ---------
-    Taha AA, Hanbury A. Metrics for evaluating 3D medical image segmentation:
-        analysis, selection, and tool. BMC Med Imaging. 2015;15:29. Published 2015
-        Aug 12. doi:10.1186/s12880-015-0068-x
-    """
-    y_pred = tf.convert_to_tensor(y_pred)
-    y_true = tf.cast(y_true, y_pred.dtype)
-    eps = tf.keras.backend.epsilon()
-
-    intersection = tf.reduce_sum(y_true * y_pred, axis=axis)
-    union = tf.reduce_sum(y_true, axis=axis) + tf.reduce_sum(y_pred, axis=axis)
-    return (intersection + eps) / (union - intersection + eps)
-
-
-def tversky(y_true, y_pred, axis=(1, 2, 3), alpha=0.3, beta=0.7):
-    y_pred = tf.convert_to_tensor(y_pred)
-    y_true = tf.cast(y_true, y_pred.dtype)
-
-    if y_true.get_shape().ndims < 2 or y_pred.get_shape().ndims < 2:
-        raise ValueError("y_true and y_pred must be at least rank 2.")
-
-    eps = tf.keras.backend.epsilon()
-
-    num = tf.reduce_sum(y_pred * y_true, axis=axis)
-    den = (
-        num
-        + alpha * tf.reduce_sum(y_pred * (1 - y_true), axis=axis)
-        + beta * tf.reduce_sum((1 - y_pred) * y_true, axis=axis)
+    return DiceMetric(
+        include_background=include_background,
+        reduction=reduction,
+        **kwargs,
     )
-    # Sum over classes.
-    return tf.reduce_sum((num + eps) / (den + eps), axis=-1)
+
+
+def generalized_dice_metric(
+    include_background: bool = True,
+    reduction: str = "mean",
+    **kwargs,
+) -> DiceMetric:
+    """Return a ``DiceMetric`` configured for multi-class (generalised) Dice.
+
+    MONAI's ``DiceMetric`` computes per-class Dice and averages over
+    classes, which is equivalent to Generalized Dice when class weights
+    are uniform.
+    """
+    return DiceMetric(
+        include_background=include_background,
+        reduction=reduction,
+        **kwargs,
+    )
+
+
+def jaccard_metric(
+    include_background: bool = True,
+    reduction: str = "mean",
+    **kwargs,
+) -> MeanIoU:
+    """Return a MONAI ``MeanIoU`` (Jaccard) metric instance."""
+    return MeanIoU(
+        include_background=include_background,
+        reduction=reduction,
+        **kwargs,
+    )
+
+
+def tversky_metric(
+    include_background: bool = True,
+    reduction: str = "mean",
+    **kwargs,
+) -> DiceMetric:
+    """Return a ``DiceMetric`` used as a Tversky metric proxy.
+
+    Tversky with alpha=beta=0.5 equals Dice.  For asymmetric Tversky,
+    compute the Tversky index manually and wrap it in a custom metric.
+    """
+    return DiceMetric(
+        include_background=include_background,
+        reduction=reduction,
+        **kwargs,
+    )
+
+
+def hausdorff_metric(
+    include_background: bool = False,
+    distance_metric: str = "euclidean",
+    percentile: float | None = 95.0,
+    directed: bool = False,
+    **kwargs,
+) -> HausdorffDistanceMetric:
+    """Return a MONAI ``HausdorffDistanceMetric`` instance.
+
+    Parameters
+    ----------
+    include_background : bool
+        Include background class in distance computation.
+    distance_metric : str
+        ``"euclidean"``, ``"chessboard"``, or ``"taxicab"``.
+    percentile : float or None
+        If set, computes the *n*-th percentile Hausdorff distance (e.g.
+        95 for HD95).  ``None`` returns the maximum (HD100).
+    directed : bool
+        Compute directed (asymmetric) Hausdorff distance.
+    """
+    return HausdorffDistanceMetric(
+        include_background=include_background,
+        distance_metric=distance_metric,
+        percentile=percentile,
+        directed=directed,
+        **kwargs,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Registry
+# ---------------------------------------------------------------------------
+
+_metrics = {
+    "dice": dice_metric,
+    "generalized_dice": generalized_dice_metric,
+    "jaccard": jaccard_metric,
+    "tversky": tversky_metric,
+    "hausdorff": hausdorff_metric,
+}
+
+
+def get(name: str):
+    """Return metric factory by name (case-insensitive)."""
+    try:
+        return _metrics[name.lower()]
+    except KeyError:
+        avail = ", ".join(_metrics)
+        raise ValueError(f"Unknown metric '{name}'. Available: {avail}") from None

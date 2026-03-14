@@ -1,47 +1,51 @@
 name: CI
 
 on:
+  push:
+    branches: [main, master, "001-nobrainer-update"]
   pull_request:
-    branches: [master]
+    branches: [main, master]
 
 jobs:
-  build:
-
+  unit-tests:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-20.04]
-        python-version: ["3.11", "3.10", "3.9"]
+        os: [ubuntu-latest]
+        python-version: ["3.13", "3.14"]
 
     steps:
-      - uses: actions/checkout@v3
-        with:  # no need for the history
-          fetch-depth: 1
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
         with:
-          python-version: ${{ matrix.python-version }}
+          fetch-depth: 1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv venv --python ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip setuptools
-          pip install --upgrade --force-reinstall --no-cache-dir --editable=".[dev]"
-      - name: Test with pytest
+          uv pip install \
+            ".[bayesian,generative,dev]" \
+            monai \
+            pyro-ppl
+
+      - name: Test with pytest (CPU, skip GPU)
         run: |
-          pytest
+          uv run pytest nobrainer/tests/unit/ -v \
+            -m "not gpu" \
+            --no-header
+
   image-build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-20.04]
-        python-version: ["3.11", "3.10", "3.9"]
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 1
+
       - name: Test CPU Docker image build
         run: |
-          docker build -t neuronets/nobrainer:master-cpu -f docker/cpu.Dockerfile .
-      - name: Test GPU Docker image build
-        run: |
-          docker build -t neuronets/nobrainer:master-gpu -f docker/gpu.Dockerfile .
+          docker build -t neuronets/nobrainer:ci-cpu -f docker/cpu.Dockerfile .

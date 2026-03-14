@@ -13,5 +13,11 @@ reverse_relative = true
 sort_relative_in_force_sorted_sections = true
 known_first_party = ["nobrainer"]
 
+[tool.pytest.ini_options]
+testpaths = ["nobrainer/tests"]
+markers = [
+    "gpu: marks tests that require a CUDA-capable GPU (deselect with '-m not gpu')",
+]
+
 [tool.codespell]
 ignore-words-list = "nd"
