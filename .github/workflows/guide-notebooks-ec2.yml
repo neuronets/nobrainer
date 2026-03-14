@@ -86,7 +86,7 @@ jobs:
       - name: Run full test suite (including GPU)
         run: |
           export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
-          uv run pytest nobrainer/tests/ -v \
+          uv run pytest nobrainer/tests/unit/ nobrainer/tests/contract/ nobrainer/tests/integration/ -v \
             --no-header \
             --tb=short
 
