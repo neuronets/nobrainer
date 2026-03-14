@@ -24,18 +24,18 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Set up Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
+        run: uv venv --python ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
-          uv pip install --system \
+          uv pip install \
             ".[bayesian,generative,dev]" \
             monai \
             pyro-ppl
 
       - name: Test with pytest (CPU, skip GPU)
         run: |
-          pytest nobrainer/tests/unit/ -v \
+          uv run pytest nobrainer/tests/unit/ -v \
             -m "not gpu" \
             --no-header
 
