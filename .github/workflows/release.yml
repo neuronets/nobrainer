@@ -2,7 +2,7 @@ name: Auto-release on PR merge
 
 on:
   pull_request:
-    branches: [master]
+    branches: [master, alpha]
     types: [closed]
 
 env:
@@ -11,10 +11,14 @@ env:
 jobs:
   auto-release:
     runs-on: ubuntu-latest
-    # Only run when a PR with the 'release' label is merged (not just closed)
+    # Stable release: merged PR to master with 'release' label
+    # Alpha pre-release: any merged PR to alpha branch (no label required)
     if: >-
       github.event.pull_request.merged == true &&
-      contains(github.event.pull_request.labels.*.name, 'release')
+      (
+        contains(github.event.pull_request.labels.*.name, 'release') ||
+        github.event.pull_request.base.ref == 'alpha'
+      )
     steps:
       - uses: actions/checkout@v4
         with:

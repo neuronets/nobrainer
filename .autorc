@@ -1,6 +1,7 @@
 {
     "onlyPublishWithReleaseLabel": true,
     "baseBranch": "master",
+    "prereleaseBranches": ["alpha"],
     "author": "Nobrainer Bot <nobrainer@mit.edu>",
     "noVersionPrefix": true,
     "plugins": ["git-tag"]
