@@ -39,6 +39,13 @@ jobs:
             -m "not gpu" \
             --no-header
 
+      - name: Run tutorial scripts
+        run: |
+          for script in guide/0*.py; do
+            echo "=== Running $script ==="
+            uv run python "$script"
+          done
+
   image-build:
     runs-on: ubuntu-latest
     steps:
