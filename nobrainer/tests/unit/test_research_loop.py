@@ -218,8 +218,8 @@ class TestRunLoop:
         )
         start = time.time()
         with patch(
-            "nobrainer.research.loop._propose_diff",
-            return_value="# no change",
+            "nobrainer.research.loop._propose_config",
+            return_value={},
         ):
             run_loop(
                 tmp_path,
