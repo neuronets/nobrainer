@@ -2,11 +2,11 @@ name: GPU Tests - EC2
 run-name: ${{ github.ref_name }} - GPU Tests - EC2
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, alpha]
   # PRs require approval label from a repo admin before this workflow runs.
   # This prevents untrusted PR code from executing on the self-hosted GPU runner.
   pull_request:
-    branches: [main, master]
+    branches: [main, master, alpha]
     types: [labeled]
 
 jobs:
