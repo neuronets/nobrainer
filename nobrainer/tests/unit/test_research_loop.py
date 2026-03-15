@@ -207,3 +207,24 @@ class TestRunLoop:
     def test_missing_train_script_raises(self, tmp_path):
         with pytest.raises(FileNotFoundError):
             run_loop(tmp_path, max_experiments=1, budget_hours=1.0)
+
+    def test_budget_seconds_terminates_quickly(self, tmp_path):
+        """T013: budget_seconds=10 should terminate within 15s."""
+        import time
+
+        (tmp_path / "train.py").write_text(
+            "import json, time; time.sleep(0.1);\n"
+            'json.dump({"val_dice": 0.5}, open("val_dice.json", "w"))\n'
+        )
+        start = time.time()
+        with patch(
+            "nobrainer.research.loop._propose_diff",
+            return_value="# no change",
+        ):
+            run_loop(
+                tmp_path,
+                max_experiments=100,
+                budget_seconds=5,
+            )
+        elapsed = time.time() - start
+        assert elapsed < 15, f"Loop took {elapsed:.1f}s, expected < 15s"
