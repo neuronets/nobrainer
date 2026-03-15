@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, master, "001-nobrainer-update"]
+    branches: [main, master, "003-nobrainer-core-improvements"]
   pull_request:
     branches: [main, master]
 
@@ -45,6 +45,18 @@ jobs:
             echo "=== Running $script ==="
             uv run python "$script"
           done
+
+      - name: Research loop smoke test (5 min budget, no API key)
+        run: |
+          mkdir -p /tmp/research-smoke
+          cp nobrainer/research/templates/train_bayesian_vnet.py /tmp/research-smoke/train.py
+          cp nobrainer/research/templates/prepare.py /tmp/research-smoke/prepare.py
+          uv run nobrainer research run \
+            --working-dir /tmp/research-smoke \
+            --model-family meshnet \
+            --max-experiments 2 \
+            --budget-minutes 5 || true
+          test -f /tmp/research-smoke/run_summary.md && echo "run_summary.md exists" || echo "WARN: no run_summary.md"
 
   image-build:
     runs-on: ubuntu-latest

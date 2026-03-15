@@ -51,6 +51,7 @@ def run_loop(
     train_script: str = "train.py",
     val_dice_file: str = "val_dice.json",
     budget_timeout_per_run: float = 3600.0,
+    budget_seconds: float | None = None,
 ) -> list[ExperimentResult]:
     """Run the autoresearch experiment loop.
 
@@ -80,7 +81,10 @@ def run_loop(
     train_path = working_dir / train_script
     val_dice_path = working_dir / val_dice_file
     backup_path = working_dir / f"{train_script}.backup"
-    budget_end = time.time() + budget_hours * 3600.0
+    if budget_seconds is not None:
+        budget_end = time.time() + budget_seconds
+    else:
+        budget_end = time.time() + budget_hours * 3600.0
 
     if not train_path.exists():
         raise FileNotFoundError(

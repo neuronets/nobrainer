@@ -22,12 +22,24 @@ jobs:
       label: ${{ steps.start-ec2-runner.outputs.label }}
       ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
     steps:
+      - name: Parse GPU config labels
+        id: gpu-config
+        if: github.event_name == 'pull_request'
+        run: |
+          LABELS='${{ toJSON(github.event.pull_request.labels.*.name) }}'
+          INSTANCE=$(echo "$LABELS" | jq -r '[.[] | select(startswith("gpu-instance:"))] | if length > 0 then .[0] | split(":")[1] else "" end')
+          SPOT=$(echo "$LABELS" | jq -r '[.[] | select(. == "gpu-spot:true")] | if length > 0 then "spot" else "" end')
+          echo "instance=${INSTANCE}" >> $GITHUB_OUTPUT
+          echo "market_type=${SPOT}" >> $GITHUB_OUTPUT
+          echo "Parsed labels: instance=${INSTANCE:-default}, market=${SPOT:-on-demand}"
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-access-key-id: ${{ secrets.AWS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_KEY_SECRET }}
           aws-region: ${{ vars.AWS_REGION }}
+
       - name: Start EC2 runner
         id: start-ec2-runner
         uses: machulav/ec2-github-runner@v2.5.2
@@ -35,9 +47,10 @@ jobs:
           mode: start
           github-token: ${{ secrets.GH_TOKEN }}
           ec2-image-id: ${{ vars.AWS_IMAGE_ID }}
-          ec2-instance-type: ${{ vars.AWS_INSTANCE_TYPE }}
+          ec2-instance-type: ${{ steps.gpu-config.outputs.instance || vars.AWS_INSTANCE_TYPE }}
           subnet-id: ${{ vars.AWS_SUBNET }}
           security-group-id: ${{ vars.AWS_SECURITY_GROUP }}
+          market-type: ${{ steps.gpu-config.outputs.market_type }}
 
   gpu-tests:
     needs: start-runner
@@ -50,6 +63,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Log GPU runner config
+        run: |
+          echo "Instance type: $(curl -s http://169.254.169.254/latest/meta-data/instance-type 2>/dev/null || echo 'unknown')"
+          echo "Availability zone: $(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone 2>/dev/null || echo 'unknown')"
+          echo "Market type: $(curl -s http://169.254.169.254/latest/meta-data/instance-life-cycle 2>/dev/null || echo 'unknown')"
 
       - name: Set up venv from pre-installed base
         run: |
