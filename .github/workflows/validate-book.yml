@@ -1,0 +1,42 @@
+name: Validate nobrainer-book tutorials
+
+on:
+  pull_request:
+    branches: [alpha]
+
+jobs:
+  validate-book:
+    name: Run nobrainer-book tutorials
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        run: uv venv --python 3.14
+
+      - name: Install nobrainer from PR branch
+        run: |
+          uv pip install \
+            ".[bayesian,generative,dev]" \
+            monai \
+            pyro-ppl
+
+      - name: Clone nobrainer-book alpha branch
+        run: |
+          git clone --branch alpha --depth 1 \
+            https://github.com/neuronets/nobrainer-book.git \
+            /tmp/nobrainer-book
+
+      - name: Run book tutorials
+        run: |
+          for script in /tmp/nobrainer-book/docs/nobrainer-guides/scripts/0[1-6]*.py; do
+            echo "=== Running $(basename $script) ==="
+            uv run python "$script" || {
+              echo "FAILED: $script"
+              exit 1
+            }
+          done
+          echo "All book tutorials passed"
