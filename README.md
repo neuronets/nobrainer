@@ -248,6 +248,28 @@ nobrainer-runner results --format json $JOB_ID
 - `nobrainer.research` — autoresearch loop and DataLad model versioning
 - `nobrainer.cli` — Click CLI (`predict`, `generate`, `research`, `commit`, `info`)
 
+## Development and releases
+
+Nobrainer uses a two-branch release workflow:
+
+| Branch | Purpose | PyPI version |
+|--------|---------|--------------|
+| `master` | Stable releases | `uv pip install nobrainer` |
+| `alpha` | Pre-releases for testing | `uv pip install --pre nobrainer` |
+
+**Alpha workflow**: Feature branches merge to `alpha`. Each merge triggers
+book tutorial validation (using a matching branch on
+[nobrainer-book](https://github.com/neuronets/nobrainer-book) if available,
+otherwise the book's `alpha` branch) followed by an automatic pre-release
+tag (e.g., `0.5.0-alpha.0`).
+
+**Stable workflow**: When `alpha` is merged to `master` with the `release`
+label, a stable version is tagged and published to PyPI.
+
+**GPU CI**: PRs to `master` can request GPU testing on EC2 by adding the
+`gpu-test-approved` label. Instance type and spot pricing are configurable
+via `gpu-instance:<type>` and `gpu-spot:true` labels.
+
 ## Citation
 
 If you use this package, please [cite](https://github.com/neuronets/nobrainer/blob/master/CITATION) it.
