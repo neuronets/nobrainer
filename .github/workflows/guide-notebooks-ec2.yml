@@ -115,7 +115,7 @@ jobs:
       - start-runner
       - gpu-tests
     runs-on: ubuntu-latest
-    if: ${{ always() }}
+    if: ${{ always() && needs.start-runner.result == 'success' }}
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
