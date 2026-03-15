@@ -154,6 +154,26 @@ nobrainer generate \
   output_synthetic.nii.gz
 ```
 
+### Zarr v3 data pipeline
+
+```python
+from nobrainer.io import nifti_to_zarr, zarr_to_nifti
+
+# Convert NIfTI to sharded Zarr v3 with multi-resolution pyramid
+nifti_to_zarr("brain_T1w.nii.gz", "brain.zarr", chunk_shape=(64, 64, 64), levels=3)
+
+# Load Zarr stores directly in the training pipeline
+from nobrainer.dataset import get_dataset
+
+loader = get_dataset(
+    data=[{"image": "brain.zarr", "label": "label.zarr"}],
+    batch_size=2,
+)
+
+# Round-trip back to NIfTI
+zarr_to_nifti("brain.zarr", "brain_roundtrip.nii.gz")
+```
+
 ### Training a model
 
 ```python

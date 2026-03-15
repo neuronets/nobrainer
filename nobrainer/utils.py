@@ -2,14 +2,37 @@
 
 from collections import namedtuple
 import csv
+import hashlib
 import os
 import tempfile
+import urllib.request
 
 import numpy as np
 import psutil
-import tensorflow as tf
 
 _cache_dir = os.path.join(tempfile.gettempdir(), "nobrainer-data")
+
+
+def _sha256(path: str) -> str:
+    """Compute SHA-256 hex digest of a file."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 16), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _download_if_needed(url: str, dest: str, expected_hash: str) -> None:
+    """Download *url* to *dest* if the file is missing or hash mismatches."""
+    if os.path.isfile(dest):
+        if _sha256(dest) == expected_hash:
+            return
+    urllib.request.urlretrieve(url, dest)
+    actual = _sha256(dest)
+    if actual != expected_hash:
+        raise RuntimeError(
+            f"Hash mismatch for {dest}: expected {expected_hash}, got {actual}"
+        )
 
 
 def get_data(cache_dir=_cache_dir):
@@ -91,17 +114,17 @@ def get_data(cache_dir=_cache_dir):
         "freesurfer/{sub}/mri/{fname}"
     )
     output = [("features", "labels")]
+    downloads_dir = os.path.join(cache_dir, "datasets")
+    os.makedirs(downloads_dir, exist_ok=True)
     for h in hashes:
         x_origin = url_template.format(sub=h.sub, fname=x_filename)
         y_origin = url_template.format(sub=h.sub, fname=y_filename)
         x_fname = h.sub + "_" + x_origin.rsplit("/", 1)[-1]
         y_fname = h.sub + "_" + y_origin.rsplit("/", 1)[-1]
-        x_out = tf.keras.utils.get_file(
-            fname=x_fname, origin=x_origin, file_hash=h.x_hash, cache_dir=cache_dir
-        )
-        y_out = tf.keras.utils.get_file(
-            fname=y_fname, origin=y_origin, file_hash=h.y_hash, cache_dir=cache_dir
-        )
+        x_out = os.path.join(downloads_dir, x_fname)
+        y_out = os.path.join(downloads_dir, y_fname)
+        _download_if_needed(x_origin, x_out, h.x_hash)
+        _download_if_needed(y_origin, y_out, h.y_hash)
         output.append((x_out, y_out))
 
     csvpath = os.path.join(cache_dir, "filepaths.csv")

@@ -385,6 +385,13 @@ def generate(
     **_option_kwds,
 )
 @click.option(
+    "--budget-minutes",
+    type=float,
+    default=None,
+    help="Wall-clock budget in minutes (overrides --budget-hours).",
+    **_option_kwds,
+)
+@click.option(
     "-v",
     "--verbose",
     is_flag=True,
@@ -397,6 +404,7 @@ def research(
     model_family,
     max_experiments,
     budget_hours,
+    budget_minutes,
     verbose,
 ):
     """Run the autoresearch experiment loop.
@@ -412,11 +420,15 @@ def research(
 
         logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
+    budget_seconds = None
+    if budget_minutes is not None:
+        budget_seconds = budget_minutes * 60
     results = run_loop(
         working_dir=working_dir,
         model_family=model_family,
         max_experiments=max_experiments,
         budget_hours=budget_hours,
+        budget_seconds=budget_seconds,
     )
 
     # Progress table

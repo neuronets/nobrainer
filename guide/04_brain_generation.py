@@ -13,54 +13,77 @@
 # %% [markdown]
 # # Train a Progressive GAN for Brain Generation
 #
-# This tutorial trains a Progressive GAN on synthetic 3D volumes using
-# PyTorch Lightning. In practice, replace with real brain MRI data.
+# This tutorial trains a Progressive GAN on real brain MRI data using
+# PyTorch Lightning. The volumes are downsampled to 4^3 resolution for
+# fast CPU training.
 #
 # We will:
-# 1. Create a synthetic dataset
-# 2. Build a ProgressiveGAN model
-# 3. Train with PyTorch Lightning
-# 4. Generate synthetic volumes
+# 1. Download real brain MRI data
+# 2. Downsample volumes to small resolution
+# 3. Build a ProgressiveGAN model
+# 4. Train with PyTorch Lightning
+# 5. Generate synthetic volumes
 
 # %%
+import nibabel as nib
+import numpy as np
 import pytorch_lightning as pl
+from scipy.ndimage import zoom
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
+from nobrainer.io import read_csv
 from nobrainer.models.generative import ProgressiveGAN
+from nobrainer.utils import get_data
 
 # %% [markdown]
-# ## Create synthetic training data
+# ## Download and downsample real brain MRI data
 #
-# We use small 4^3 volumes to keep this tutorial fast on CPU.
-# For real brain generation, use 64^3 or 128^3 volumes with a
-# multi-resolution schedule like [4, 8, 16, 32, 64].
+# We load all 10 T1-weighted volumes, normalize each to [0, 1], and
+# downsample to 4^3 for fast GAN training on CPU.
+
+# %%
+TARGET_SIZE = 4
+
+csv_path = get_data()
+filepaths = read_csv(csv_path)
+print(f"Downloaded {len(filepaths)} subjects")
+
+volumes = []
+for img_path, _ in filepaths:
+    vol = np.asarray(nib.load(img_path).dataobj, dtype=np.float32)
+    # Normalize to [0, 1]
+    vmin, vmax = vol.min(), vol.max()
+    if vmax > vmin:
+        vol = (vol - vmin) / (vmax - vmin)
+    # Downsample to TARGET_SIZE^3
+    factors = [TARGET_SIZE / s for s in vol.shape[:3]]
+    vol_small = zoom(vol, factors, order=1)
+    volumes.append(vol_small)
+
+imgs = torch.from_numpy(np.stack(volumes)[:, None])  # (N, 1, 4, 4, 4)
+print(f"Training set: {imgs.shape[0]} volumes of shape {TARGET_SIZE}^3")
+print(f"Value range: [{imgs.min():.3f}, {imgs.max():.3f}]")
 
 # %%
 torch.manual_seed(42)
 
-SPATIAL = 4
-N_SAMPLES = 64
-BATCH_SIZE = 8
-
-# Random "brain-like" volumes (in practice, load real NIfTI data)
-imgs = torch.randn(N_SAMPLES, 1, SPATIAL, SPATIAL, SPATIAL)
+BATCH_SIZE = 4
 loader = DataLoader(TensorDataset(imgs), batch_size=BATCH_SIZE, shuffle=True)
-print(f"Training set: {N_SAMPLES} volumes of shape {SPATIAL}^3")
 
 # %% [markdown]
 # ## Build the ProgressiveGAN
 #
-# ProgressiveGAN trains at increasing resolutions. Here we use a
-# single resolution for the demo. For multi-resolution training,
-# pass `resolution_schedule=[4, 8, 16, 32, 64]`.
+# We use a single resolution level (4) to keep this demo fast on CPU.
+# For multi-resolution training, pass e.g.
+# `resolution_schedule=[4, 8, 16, 32, 64]`.
 
 # %%
 model = ProgressiveGAN(
     latent_size=64,
     fmap_base=64,
     fmap_max=64,
-    resolution_schedule=[SPATIAL],
+    resolution_schedule=[TARGET_SIZE],
     steps_per_phase=500,
 )
 
@@ -74,8 +97,8 @@ print(f"Discriminator params: {n_params_d:,}")
 
 # %%
 trainer = pl.Trainer(
-    max_steps=200,
-    accelerator="auto",  # uses GPU if available
+    max_steps=100,
+    accelerator="auto",
     devices=1,
     enable_checkpointing=False,
     logger=False,
@@ -98,7 +121,7 @@ with torch.no_grad():
     generated = model.generator(z)
 
 gen_np = generated.cpu().numpy()
-print(f"Generated shape: {gen_np.shape}")  # (4, 1, 8, 8, 8)
+print(f"Generated shape: {gen_np.shape}")
 print(f"Value range: [{gen_np.min():.3f}, {gen_np.max():.3f}]")
 print(f"Std: {gen_np.std():.4f}")
 

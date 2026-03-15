@@ -267,9 +267,143 @@ def _map_name(
     return candidate if candidate in state else None
 
 
+# ---------------------------------------------------------------------------
+# Zarr v3 conversion (requires [zarr] extras)
+# ---------------------------------------------------------------------------
+
+
+def nifti_to_zarr(
+    input_path: str | Path,
+    output_path: str | Path,
+    chunk_shape: tuple[int, int, int] = (64, 64, 64),
+    shard_shape: tuple[int, int, int] | None = None,
+    compressor: str = "blosc",
+    levels: int = 1,
+) -> Path:
+    """Convert a NIfTI file to a sharded Zarr v3 store.
+
+    Uses ``niizarr.nii2zarr`` for NIfTI-Zarr specification compliance
+    (NIfTI header, OME multiscale metadata) and adds nobrainer provenance.
+
+    Parameters
+    ----------
+    input_path : path to .nii or .nii.gz file
+    output_path : path for the output .zarr directory
+    chunk_shape : inner chunk dimensions
+    shard_shape : outer shard dimensions; None lets niizarr choose
+    compressor : compression codec ("blosc" or "zlib")
+    levels : number of resolution levels (1 = single level, -1 = auto)
+
+    Returns
+    -------
+    Path to the created .zarr store
+    """
+    import datetime
+
+    import zarr
+
+    import nobrainer
+
+    img = nib.load(str(input_path))
+    output_path = Path(output_path)
+
+    try:
+        import niizarr
+
+        niizarr.nii2zarr(
+            img,
+            str(output_path),
+            chunk=chunk_shape,
+            shard=shard_shape,
+            nb_levels=levels,
+            compressor=compressor,
+            zarr_version=3,
+        )
+    except ImportError:
+        # Fallback: manual Zarr v3 creation without niizarr
+        arr = np.asarray(img.dataobj, dtype=np.float32)
+        clamped_chunk = tuple(min(c, s) for c, s in zip(chunk_shape, arr.shape))
+        if shard_shape is None:
+            eff_shard = tuple(min(c * 2, s) for c, s in zip(clamped_chunk, arr.shape))
+        else:
+            eff_shard = tuple(max(c, s) for c, s in zip(clamped_chunk, shard_shape))
+        store = zarr.open_group(str(output_path), mode="w", zarr_format=3)
+        store.create_array("0", data=arr, chunks=clamped_chunk, shards=eff_shard)
+        if levels > 1:
+            from scipy.ndimage import zoom
+
+            for lvl in range(1, levels):
+                factor = 1 / 2**lvl
+                down = zoom(arr, factor, order=1).astype(arr.dtype)
+                lc = tuple(min(c, s) for c, s in zip(clamped_chunk, down.shape))
+                ls = tuple(min(c * 2, s) for c, s in zip(lc, down.shape))
+                store.create_array(str(lvl), data=down, chunks=lc, shards=ls)
+        store.attrs["nifti_affine"] = img.affine.tolist()
+
+    # Store provenance in group attrs
+    store = zarr.open_group(str(output_path), mode="r+")
+    store.attrs["nobrainer_provenance"] = {
+        "source_file": str(Path(input_path).name),
+        "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "tool": "nobrainer.io.nifti_to_zarr",
+        "nobrainer_version": nobrainer.__version__,
+        "chunk_shape": list(chunk_shape),
+        "levels": levels,
+    }
+
+    return output_path
+
+
+def zarr_to_nifti(
+    input_path: str | Path,
+    output_path: str | Path,
+    level: int = 0,
+) -> Path:
+    """Convert a Zarr v3 store back to NIfTI.
+
+    Tries ``niizarr.zarr2nii`` first for NIfTI-Zarr spec compliance.
+    Falls back to reading the array + stored affine if niizarr is
+    unavailable or fails.
+
+    Parameters
+    ----------
+    input_path : path to .zarr directory
+    output_path : path for the output .nii.gz file
+    level : resolution level to export (0 = full resolution)
+
+    Returns
+    -------
+    Path to the created NIfTI file
+    """
+    import zarr
+
+    output_path = Path(output_path)
+
+    # Try niizarr first
+    try:
+        import niizarr
+
+        img = niizarr.zarr2nii(str(input_path), level=level)
+        if img.affine is not None:
+            nib.save(img, str(output_path))
+            return output_path
+    except Exception:
+        pass
+
+    # Fallback: manual read
+    store = zarr.open_group(str(input_path), mode="r")
+    arr = np.asarray(store[str(level)])
+    affine = np.array(store.attrs.get("nifti_affine", np.eye(4).tolist()))
+    img = nib.Nifti1Image(arr.astype(np.float32), affine)
+    nib.save(img, str(output_path))
+    return output_path
+
+
 __all__ = [
     "read_csv",
     "read_mapping",
     "convert_tfrecords",
     "convert_weights",
+    "nifti_to_zarr",
+    "zarr_to_nifti",
 ]
