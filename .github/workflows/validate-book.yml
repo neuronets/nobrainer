@@ -24,11 +24,20 @@ jobs:
             monai \
             pyro-ppl
 
-      - name: Clone nobrainer-book alpha branch
+      - name: Clone nobrainer-book (matching branch or alpha)
         run: |
-          git clone --branch alpha --depth 1 \
-            https://github.com/neuronets/nobrainer-book.git \
-            /tmp/nobrainer-book
+          PR_BRANCH="${{ github.head_ref }}"
+          BOOK_REPO="https://github.com/neuronets/nobrainer-book.git"
+
+          # Try the PR's branch name first (for lockstep development),
+          # fall back to alpha
+          if git ls-remote --heads "$BOOK_REPO" "$PR_BRANCH" | grep -q .; then
+            echo "Using matching book branch: $PR_BRANCH"
+            git clone --branch "$PR_BRANCH" --depth 1 "$BOOK_REPO" /tmp/nobrainer-book
+          else
+            echo "No matching branch '$PR_BRANCH' on nobrainer-book, using alpha"
+            git clone --branch alpha --depth 1 "$BOOK_REPO" /tmp/nobrainer-book
+          fi
 
       - name: Run book tutorials
         run: |
