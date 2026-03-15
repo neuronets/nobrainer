@@ -1,34 +1,76 @@
 name: Auto-release on PR merge
 
 on:
-  # ATM, this is the closest trigger to a PR merging
-  push:
-    branches:
-      - master
+  pull_request:
+    branches: [master, alpha]
+    types: [closed]
 
 env:
-  AUTO_VERSION: v11.0.5
+  AUTO_VERSION: v11.2.1
 
 jobs:
-  auto-release:
+  validate-book:
+    name: Validate nobrainer-book tutorials
     runs-on: ubuntu-latest
-    if: "!contains(github.event.head_commit.message, 'ci skip') && !contains(github.event.head_commit.message, 'skip ci')"
+    # Only run for alpha releases (book must pass before alpha tag)
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'alpha'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Prepare repository
-        # Fetch full git history and tags
-        run: git fetch --unshallow --tags
-
-      - name: Unset header
-        # checkout@v2 adds a header that makes branch protection report errors
-        # because the Github action bot is not a collaborator on the repo
-        run: git config --local --unset http.https://github.com/.extraheader
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        run: uv venv --python 3.14
+
+      - name: Install nobrainer from this branch
+        run: |
+          uv pip install \
+            ".[bayesian,generative,dev]" \
+            monai \
+            pyro-ppl
+
+      - name: Clone nobrainer-book alpha branch
+        run: |
+          git clone --branch alpha --depth 1 \
+            https://github.com/neuronets/nobrainer-book.git \
+            /tmp/nobrainer-book
+
+      - name: Run book tutorials
+        run: |
+          for script in /tmp/nobrainer-book/docs/nobrainer-guides/scripts/0[1-6]*.py; do
+            echo "=== Running $(basename $script) ==="
+            uv run python "$script" || {
+              echo "FAILED: $script"
+              exit 1
+            }
+          done
+          echo "All book tutorials passed"
+
+  auto-release:
+    name: Create release
+    runs-on: ubuntu-latest
+    # For alpha: wait for book validation; for master: run directly
+    needs: [validate-book]
+    if: >-
+      always() &&
+      github.event.pull_request.merged == true &&
+      (
+        (github.event.pull_request.base.ref == 'alpha' &&
+         needs.validate-book.result == 'success') ||
+        (github.event.pull_request.base.ref == 'master' &&
+         contains(github.event.pull_request.labels.*.name, 'release'))
+      )
+    steps:
+      - uses: actions/checkout@v4
         with:
-          python-version: 3.9
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Unset header
+        run: git config --local --unset http.https://github.com/.extraheader
 
       - name: Download auto
         run: |
@@ -37,7 +79,6 @@ jobs:
           chmod a+x ~/auto
 
       - name: Create release
-        run: |
-          ~/auto shipit -vv
+        run: ~/auto shipit -vv
         env:
           GH_TOKEN: ${{ secrets.AUTO_USER_TOKEN }}
