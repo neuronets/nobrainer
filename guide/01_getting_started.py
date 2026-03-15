@@ -16,74 +16,81 @@
 # Nobrainer is a deep learning framework for 3D brain image processing built
 # on PyTorch and MONAI. This tutorial covers:
 #
-# 1. Installation
-# 2. Loading a segmentation model
-# 3. Running inference on a synthetic volume
-# 4. Inspecting the output
+# 1. Downloading sample brain MRI data
+# 2. Loading a T1-weighted volume
+# 3. Instantiating a segmentation model
+# 4. Running block-based inference
+# 5. Listing available model families
 
 # %%
 # Install nobrainer (uncomment if needed)
 # !pip install nobrainer monai
 
 # %%
+import nibabel as nib
 import numpy as np
 import torch
 
-import nobrainer  # noqa: F401
+from nobrainer.io import read_csv
 from nobrainer.models.segmentation import unet
 from nobrainer.prediction import predict
+from nobrainer.utils import get_data
 
 print(f"PyTorch version: {torch.__version__}")
 print(f"CUDA available: {torch.cuda.is_available()}")
 
 # %% [markdown]
-# ## Create a synthetic brain volume
+# ## Download sample brain MRI data
 #
-# For demonstration, we create a 64^3 volume with a bright sphere
-# (simulating a brain structure).
-
+# `get_data()` downloads 10 T1-weighted / FreeSurfer label pairs (~46 MB)
+# and returns a CSV path. We parse it with `read_csv()`.
 
 # %%
-def make_sphere_volume(shape=(64, 64, 64), radius=20):
-    """Synthetic volume with a centered sphere."""
-    vol = np.random.rand(*shape).astype(np.float32) * 0.3
-    center = np.array(shape) / 2
-    coords = np.mgrid[: shape[0], : shape[1], : shape[2]]
-    dist = np.sqrt(sum((c - ctr) ** 2 for c, ctr in zip(coords, center)))
-    vol[dist < radius] += 0.7
-    label = (dist < radius).astype(np.float32)
-    return vol, label
+csv_path = get_data()
+filepaths = read_csv(csv_path)
+print(f"Number of subjects: {len(filepaths)}")
+print(f"First pair: {filepaths[0]}")
 
+# %% [markdown]
+# ## Load and inspect a T1-weighted volume
 
-vol, label = make_sphere_volume()
-print(f"Volume shape: {vol.shape}, Label shape: {label.shape}")
-print(f"Foreground voxels: {label.sum():.0f}")
+# %%
+t1_path, label_path = filepaths[0]
+img = nib.load(t1_path)
+vol = np.asarray(img.dataobj, dtype=np.float32)
+
+print(f"Volume shape: {vol.shape}")
+print(f"Voxel range:  [{vol.min():.1f}, {vol.max():.1f}]")
+print(f"Affine:\n{img.affine}")
 
 # %% [markdown]
 # ## Instantiate and inspect a UNet
+#
+# We create a small UNet (fewer channels) so this runs fast on CPU.
 
 # %%
-model = unet(n_classes=2)
+model = unet(n_classes=2, channels=(8, 16, 32), strides=(2, 2))
 n_params = sum(p.numel() for p in model.parameters())
 print(f"Model: {model.__class__.__name__}")
 print(f"Parameters: {n_params:,}")
 
-# Quick forward pass
-x = torch.randn(1, 1, 64, 64, 64)
+# Quick forward pass with a small block
+x = torch.randn(1, 1, 32, 32, 32)
 with torch.no_grad():
     out = model(x)
 print(f"Input shape:  {x.shape}")
 print(f"Output shape: {out.shape}")
 
 # %% [markdown]
-# ## Run block-based prediction
+# ## Run block-based prediction on a real brain volume
 #
 # `predict()` splits the volume into blocks, runs inference, and
-# stitches the result back together.
+# stitches the result back together. The model is randomly initialized
+# so predictions will not be meaningful.
 
 # %%
 result = predict(
-    inputs=vol,
+    inputs=t1_path,
     model=model,
     block_shape=(32, 32, 32),
     batch_size=4,
