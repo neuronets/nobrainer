@@ -110,6 +110,10 @@ def predict(
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = torch.device(device)
 
+    # Multi-GPU: distribute blocks across GPUs when device="cuda" and >1 GPU
+    n_gpus = torch.cuda.device_count() if device.type == "cuda" else 1
+    use_multi_gpu = n_gpus > 1
+
     # Load input
     affine = np.eye(4)
     if isinstance(inputs, (str, Path)):
@@ -130,8 +134,14 @@ def predict(
     blocks, grid = _extract_blocks(padded, block_shape)  # (N_blocks, bD, bH, bW)
     n_blocks = blocks.shape[0]
 
-    model = model.to(device)
-    model.eval()
+    if use_multi_gpu:
+        # Replicate model to each GPU
+        models = [model.to(torch.device(f"cuda:{i}")) for i in range(n_gpus)]
+        for m in models:
+            m.eval()
+    else:
+        model = model.to(device)
+        model.eval()
 
     all_preds: list[np.ndarray] = []
     with torch.no_grad():
@@ -139,10 +149,19 @@ def predict(
             chunk = blocks[start : start + batch_size]  # (B, bD, bH, bW)
             if normalizer is not None:
                 chunk = np.stack([normalizer(b) for b in chunk])
-            tensor = torch.from_numpy(chunk[:, None]).to(device)  # (B, 1, bD, bH, bW)
-            out = model(tensor)  # (B, C, bD, bH, bW)
+
+            if use_multi_gpu:
+                # Round-robin distribute across GPUs
+                gpu_idx = (start // batch_size) % n_gpus
+                dev = torch.device(f"cuda:{gpu_idx}")
+                tensor = torch.from_numpy(chunk[:, None]).to(dev)
+                out = models[gpu_idx](tensor)
+            else:
+                tensor = torch.from_numpy(chunk[:, None]).to(device)
+                out = model(tensor)
+
             if return_labels:
-                out = out.argmax(dim=1, keepdim=True).float()  # (B, 1, bD, bH, bW)
+                out = out.argmax(dim=1, keepdim=True).float()
             else:
                 out = torch.softmax(out, dim=1)
             all_preds.append(out.cpu().numpy())
