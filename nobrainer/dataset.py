@@ -17,6 +17,7 @@ from monai.transforms import (
     RandGaussianNoised,
     Spacingd,
 )
+import numpy as np
 import torch
 
 
@@ -140,4 +141,93 @@ def get_dataset(
     )
 
 
-__all__ = ["get_dataset"]
+# ---------------------------------------------------------------------------
+# Zarr v3 dataset (requires [zarr] extras)
+# ---------------------------------------------------------------------------
+
+
+class ZarrDataset(torch.utils.data.Dataset):
+    """PyTorch Dataset backed by Zarr v3 stores.
+
+    Each item in *data_list* is a dict with ``"image"`` (and optionally
+    ``"label"``) keys pointing to ``.zarr`` store paths.
+    """
+
+    def __init__(
+        self,
+        data_list: list[dict[str, str]],
+        transform: Any | None = None,
+        zarr_level: int = 0,
+    ):
+        self.data = data_list
+        self.transform = transform
+        self.level = zarr_level
+
+    def __len__(self) -> int:
+        return len(self.data)
+
+    def __getitem__(self, idx: int) -> dict:
+        import zarr
+
+        item = self.data[idx]
+        store = zarr.open_group(str(item["image"]), mode="r")
+        img_arr = np.asarray(store[str(self.level)]).astype(np.float32)
+
+        result: dict[str, Any] = {"image": img_arr[None]}  # add channel dim
+
+        if "label" in item:
+            lbl_store = zarr.open_group(str(item["label"]), mode="r")
+            lbl_arr = np.asarray(lbl_store[str(self.level)]).astype(np.float32)
+            result["label"] = lbl_arr[None]
+
+        if self.transform is not None:
+            result = self.transform(result)
+
+        # Convert to tensors if still numpy
+        for k, v in result.items():
+            if isinstance(v, np.ndarray):
+                result[k] = torch.from_numpy(v)
+
+        return result
+
+
+def _is_zarr_path(path: str | Path) -> bool:
+    """Check if a path looks like a Zarr store."""
+    return str(path).rstrip("/").endswith(".zarr")
+
+
+def _get_zarr_dataset(
+    data: list[dict[str, str]],
+    batch_size: int,
+    num_workers: int,
+    augment: bool,
+    zarr_level: int,
+    **kwargs: Any,
+) -> DataLoader:
+    """Build a DataLoader from Zarr v3 stores."""
+    transform = None
+    if augment:
+        import monai.transforms as mt
+
+        transform = mt.Compose(
+            [
+                mt.RandAffined(
+                    keys=list(data[0].keys()),
+                    prob=0.5,
+                    rotate_range=(0.1, 0.1, 0.1),
+                ),
+                mt.RandFlipd(keys=list(data[0].keys()), prob=0.5),
+            ]
+        )
+    dataset = ZarrDataset(data, transform=transform, zarr_level=zarr_level)
+    return DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=torch.cuda.is_available(),
+        **kwargs,
+    )
+
+
+__all__ = ["get_dataset", "ZarrDataset"]
