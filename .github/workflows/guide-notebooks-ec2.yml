@@ -28,10 +28,16 @@ jobs:
         run: |
           LABELS='${{ toJSON(github.event.pull_request.labels.*.name) }}'
           INSTANCE=$(echo "$LABELS" | jq -r '[.[] | select(startswith("gpu-instance:"))] | if length > 0 then .[0] | split(":")[1] else "" end')
-          SPOT=$(echo "$LABELS" | jq -r '[.[] | select(. == "gpu-spot:true")] | if length > 0 then "spot" else "" end')
+          # Default to spot pricing; gpu-ondemand:true overrides to on-demand
+          ONDEMAND=$(echo "$LABELS" | jq -r '[.[] | select(. == "gpu-ondemand:true")] | if length > 0 then "true" else "" end')
+          if [ -n "$ONDEMAND" ]; then
+            MARKET=""
+          else
+            MARKET="spot"
+          fi
           echo "instance=${INSTANCE}" >> $GITHUB_OUTPUT
-          echo "market_type=${SPOT}" >> $GITHUB_OUTPUT
-          echo "Parsed labels: instance=${INSTANCE:-default}, market=${SPOT:-on-demand}"
+          echo "market_type=${MARKET}" >> $GITHUB_OUTPUT
+          echo "Parsed labels: instance=${INSTANCE:-default}, market=${MARKET:-spot}"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -50,7 +56,7 @@ jobs:
           ec2-instance-type: ${{ steps.gpu-config.outputs.instance || vars.AWS_INSTANCE_TYPE }}
           subnet-id: ${{ vars.AWS_SUBNET }}
           security-group-id: ${{ vars.AWS_SECURITY_GROUP }}
-          market-type: ${{ steps.gpu-config.outputs.market_type }}
+          market-type: ${{ steps.gpu-config.outputs.market_type || 'spot' }}
 
   gpu-tests:
     needs: start-runner
