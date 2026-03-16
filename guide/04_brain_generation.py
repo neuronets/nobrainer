@@ -30,7 +30,17 @@ try:
     import google.colab  # noqa: F401
 
     subprocess.run(
-        ["pip", "install", "nobrainer" + ("[dev]" if PRE_RELEASE else "")],
+        [
+            "pip",
+            "install",
+            "-q",
+            "nobrainer[generative,dev]",
+            "monai",
+            "pytorch-lightning",
+            "nilearn",
+            "matplotlib",
+        ]
+        + (["--pre"] if PRE_RELEASE else []),
         check=True,
     )
 except ImportError:
