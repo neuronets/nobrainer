@@ -1,5 +1,4 @@
-"""Model definition for DCGAN.
-"""
+"""Model definition for DCGAN."""
 
 import math
 

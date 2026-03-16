@@ -24,9 +24,7 @@ def test_convert_nonscalar_labels(tmp_path):
         args = """\
     convert --csv={} --tfrecords-template={} --volume-shape 256 256 256
         --examples-per-shard=2 --to-ras --no-verify-volumes
-    """.format(
-            csvpath, tfrecords_template
-        )
+    """.format(csvpath, tfrecords_template)
         result = runner.invoke(climain.cli, args.split())
         assert result.exit_code == 0
         assert Path("data/shard-000.tfrecords").is_file()
@@ -52,9 +50,7 @@ def test_convert_scalar_int_labels(tmp_path):
         args = """\
     convert --csv={} --tfrecords-template={} --volume-shape 256 256 256
         --examples-per-shard=2 --to-ras --no-verify-volumes
-    """.format(
-            csvpath, tfrecords_template
-        )
+    """.format(csvpath, tfrecords_template)
         result = runner.invoke(climain.cli, args.split())
         assert result.exit_code == 0
         assert Path("data/shard-000.tfrecords").is_file()
@@ -80,9 +76,7 @@ def test_convert_scalar_float_labels(tmp_path):
         args = """\
     convert --csv={} --tfrecords-template={} --volume-shape 256 256 256
         --examples-per-shard=2 --to-ras --no-verify-volumes
-    """.format(
-            csvpath, tfrecords_template
-        )
+    """.format(csvpath, tfrecords_template)
         result = runner.invoke(climain.cli, args.split())
         assert result.exit_code == 0
         assert Path("data/shard-000.tfrecords").is_file()
@@ -108,9 +102,7 @@ def test_convert_multi_resolution(tmp_path):
         args = """\
     convert --csv={} --tfrecords-template={} --volume-shape 256 256 256 --start-resolution 64
         --examples-per-shard=2 --no-verify-volumes --multi-resolution
-    """.format(
-            csvpath, tfrecords_template
-        )
+    """.format(csvpath, tfrecords_template)
         result = runner.invoke(climain.cli, args.split())
         assert result.exit_code == 0
 
@@ -143,9 +135,7 @@ def test_predict():
         args = """\
     predict --model={} --block-shape 10 10 10 --resize-features-to 20 20 20
         --largest-label --rotate-and-predict {} {}
-    """.format(
-            model_path, img_path, out_path
-        )
+    """.format(model_path, img_path, out_path)
 
         result = runner.invoke(climain.cli, args.split())
         assert result.exit_code == 0
@@ -172,9 +162,7 @@ def test_generate():
 
         args = """\
     generate --model {} --multi-resolution --latent-size 256 {}
-    """.format(
-            "models", out_path
-        )
+    """.format("models", out_path)
         result = runner.invoke(climain.cli, args.split())
         assert result.exit_code == 0
         for res in resolutions:
