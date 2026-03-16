@@ -3,8 +3,6 @@
 from pprint import pprint
 
 from .autoencoder import autoencoder
-from .bayesian import bayesian_meshnet, bayesian_vnet
-from .generative import dcgan, progressivegan
 from .highresnet import highresnet
 from .meshnet import meshnet
 from .segmentation import attention_unet, unet, unetr, vnet
@@ -12,6 +10,7 @@ from .simsiam import simsiam
 
 __all__ = ["get", "list_available_models"]
 
+# Core models (always available)
 _models = {
     "unet": unet,
     "vnet": vnet,
@@ -21,11 +20,25 @@ _models = {
     "highresnet": highresnet,
     "autoencoder": autoencoder,
     "simsiam": simsiam,
-    "bayesian_vnet": bayesian_vnet,
-    "bayesian_meshnet": bayesian_meshnet,
-    "progressivegan": progressivegan,
-    "dcgan": dcgan,
 }
+
+# Optional: Bayesian models (require pyro-ppl)
+try:
+    from .bayesian import bayesian_meshnet, bayesian_vnet
+
+    _models["bayesian_vnet"] = bayesian_vnet
+    _models["bayesian_meshnet"] = bayesian_meshnet
+except ImportError:
+    pass
+
+# Optional: Generative models (require pytorch-lightning)
+try:
+    from .generative import dcgan, progressivegan
+
+    _models["progressivegan"] = progressivegan
+    _models["dcgan"] = dcgan
+except ImportError:
+    pass
 
 
 def get(name: str):
@@ -42,11 +55,23 @@ def get(name: str):
     """
     if not isinstance(name, str):
         raise ValueError("Model name must be a string.")
-    try:
-        return _models[name.lower()]
-    except KeyError:
-        avail = ", ".join(_models)
-        raise ValueError(f"Unknown model '{name}'. Available: {avail}.") from None
+    key = name.lower()
+    if key in _models:
+        return _models[key]
+    # Check if it's an optional model that wasn't loaded
+    optional = {
+        "bayesian_vnet": "pyro-ppl",
+        "bayesian_meshnet": "pyro-ppl",
+        "progressivegan": "pytorch-lightning",
+        "dcgan": "pytorch-lightning",
+    }
+    if key in optional:
+        raise ImportError(
+            f"Model '{name}' requires '{optional[key]}'. "
+            f"Install with: uv pip install {optional[key]}"
+        )
+    avail = ", ".join(_models)
+    raise ValueError(f"Unknown model '{name}'. Available: {avail}.")
 
 
 def available_models() -> list[str]:
