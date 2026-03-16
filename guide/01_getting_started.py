@@ -11,112 +11,85 @@
 # ---
 
 # %% [markdown]
-# # Getting Started with Nobrainer (PyTorch)
+# # Getting Started with Nobrainer
 #
-# Nobrainer is a deep learning framework for 3D brain image processing built
-# on PyTorch and MONAI. This tutorial covers:
+# Nobrainer is a deep learning framework for 3D brain image processing.
+# This tutorial shows the **estimator API** — a scikit-learn-style
+# interface that lets you train and predict in just a few lines.
 #
-# 1. Downloading sample brain MRI data
-# 2. Loading a T1-weighted volume
-# 3. Instantiating a segmentation model
-# 4. Running block-based inference
-# 5. Listing available model families
+# 1. Download sample brain MRI data
+# 2. Run 3-line segmentation on a real brain volume
+# 3. List available model families
 
 # %%
-# Install nobrainer (uncomment if needed)
-# !pip install nobrainer monai
+# Colab install (uncomment if needed)
+PRE_RELEASE = False
+try:
+    import subprocess
+
+    import google.colab  # noqa: F401
+
+    subprocess.run(
+        ["pip", "install", "nobrainer" + ("[dev]" if PRE_RELEASE else "")],
+        check=True,
+    )
+except ImportError:
+    pass
 
 # %%
-import nibabel as nib
-import numpy as np
-import torch
+import torch  # noqa: E402
 
-from nobrainer.io import read_csv
-from nobrainer.models.segmentation import unet
-from nobrainer.prediction import predict
-from nobrainer.utils import get_data
+from nobrainer.processing import Dataset, Segmentation  # noqa: E402
+from nobrainer.utils import get_data  # noqa: E402
 
 print(f"PyTorch version: {torch.__version__}")
-print(f"CUDA available: {torch.cuda.is_available()}")
+print(f"CUDA available:  {torch.cuda.is_available()}")
 
 # %% [markdown]
 # ## Download sample brain MRI data
 #
 # `get_data()` downloads 10 T1-weighted / FreeSurfer label pairs (~46 MB)
-# and returns a CSV path. We parse it with `read_csv()`.
+# and returns a CSV path.  `read_csv()` parses it into path tuples.
 
 # %%
+from nobrainer.io import read_csv  # noqa: E402
+
 csv_path = get_data()
 filepaths = read_csv(csv_path)
 print(f"Number of subjects: {len(filepaths)}")
-print(f"First pair: {filepaths[0]}")
+print(f"First pair:\n  image: {filepaths[0][0]}\n  label: {filepaths[0][1]}")
 
 # %% [markdown]
-# ## Load and inspect a T1-weighted volume
-
-# %%
-t1_path, label_path = filepaths[0]
-img = nib.load(t1_path)
-vol = np.asarray(img.dataobj, dtype=np.float32)
-
-print(f"Volume shape: {vol.shape}")
-print(f"Voxel range:  [{vol.min():.1f}, {vol.max():.1f}]")
-print(f"Affine:\n{img.affine}")
-
-# %% [markdown]
-# ## Instantiate and inspect a UNet
+# ## Three-line segmentation
 #
-# We create a small UNet (fewer channels) so this runs fast on CPU.
-
-# %%
-model = unet(n_classes=2, channels=(8, 16, 32), strides=(2, 2))
-n_params = sum(p.numel() for p in model.parameters())
-print(f"Model: {model.__class__.__name__}")
-print(f"Parameters: {n_params:,}")
-
-# Quick forward pass with a small block
-x = torch.randn(1, 1, 32, 32, 32)
-with torch.no_grad():
-    out = model(x)
-print(f"Input shape:  {x.shape}")
-print(f"Output shape: {out.shape}")
-
-# %% [markdown]
-# ## Run block-based prediction on a real brain volume
+# 1. Build a `Dataset` from the downloaded files
+# 2. Create a `Segmentation` estimator and `.fit()` it
+# 3. `.predict()` on an evaluation volume
 #
-# `predict()` splits the volume into blocks, runs inference, and
-# stitches the result back together. The model is randomly initialized
-# so predictions will not be meaningful.
+# The model is tiny (few channels) so it runs in seconds on CPU.
 
 # %%
-result = predict(
-    inputs=t1_path,
-    model=model,
-    block_shape=(32, 32, 32),
-    batch_size=4,
-    device="cpu",
-    return_labels=True,
+ds = (
+    Dataset.from_files(filepaths, block_shape=(32, 32, 32), n_classes=2)
+    .batch(2)
+    .augment()
 )
 
-pred = np.asarray(result.dataobj)
-print(f"Prediction shape: {pred.shape}")
-print(f"Unique labels: {np.unique(pred)}")
+seg = Segmentation("unet", model_args={"channels": (8, 16, 32), "strides": (2, 2)})
+seg.fit(ds, epochs=2)
+
+result = seg.predict(filepaths[0][0], block_shape=(32, 32, 32))
+print(f"Prediction shape: {result.shape}")
 
 # %% [markdown]
-# The model is randomly initialized so predictions won't be meaningful.
-# To get useful results, load trained weights:
-#
-# ```python
-# model.load_state_dict(torch.load("unet_brainmask.pth"))
-# ```
-#
-# Pre-trained models are available at
-# https://github.com/neuronets/trained-models
+# The model was only trained for 2 epochs on small patches, so
+# predictions will not be meaningful.  See `02_train_segmentation.py`
+# for a complete training loop with evaluation.
 
 # %% [markdown]
 # ## Available models
 #
-# Nobrainer provides several model families:
+# Nobrainer includes segmentation, Bayesian, and generative families:
 
 # %%
 from nobrainer.models import get as get_model  # noqa: E402
