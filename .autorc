@@ -1,5 +1,5 @@
 {
-    "onlyPublishWithReleaseLabel": true,
+    "onlyPublishWithReleaseLabel": false,
     "baseBranch": "master",
     "prereleaseBranches": ["alpha"],
     "author": "Nobrainer Bot <nobrainer@mit.edu>",
