@@ -87,9 +87,9 @@ def get_dataset(
         data = [{"image": str(img)} for img in image_paths]
         keys = ["image"]
 
-    # Core transforms
+    # Core transforms — use NibabelReader to support .mgz and other formats
     transforms: list[Any] = [
-        LoadImaged(keys=keys, image_only=False),
+        LoadImaged(keys=keys, image_only=False, reader="NibabelReader"),
         EnsureChannelFirstd(keys=keys),
         Orientationd(keys=keys, axcodes="RAS"),
         Spacingd(
