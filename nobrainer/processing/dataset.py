@@ -40,6 +40,8 @@ class Dataset:
         self._shuffle: bool = False
         self._augment: bool = False
         self._binarize: bool = False
+        self._streaming: bool = False
+        self._patches_per_volume: int = 10
         self._normalizer: Callable | None = None
         self._dataloader: DataLoader | None = None
 
@@ -134,6 +136,34 @@ class Dataset:
         self._dataloader = None
         return self
 
+    def streaming(self, patches_per_volume: int = 10) -> "Dataset":
+        """Use streaming patch extraction (no full-volume loading).
+
+        Instead of loading entire volumes and cropping in memory (MONAI
+        pipeline), patches are read directly from disk.  For Zarr stores,
+        only the chunks overlapping the requested patch are fetched —
+        enabling efficient cloud and large-dataset training.
+
+        Requires ``block_shape`` to be set via ``from_files()`` or
+        ``batch()`` first.
+
+        Parameters
+        ----------
+        patches_per_volume : int
+            Random patches per volume per epoch.
+
+        Example
+        -------
+        ::
+
+            ds = (Dataset.from_files(paths, block_shape=(64,64,64))
+                  .batch(4).binarize().streaming(patches_per_volume=20))
+        """
+        self._streaming = True
+        self._patches_per_volume = patches_per_volume
+        self._dataloader = None
+        return self
+
     def normalize(self, fn: Callable | None = None) -> "Dataset":
         """Set normalization function."""
         self._normalizer = fn
@@ -162,6 +192,23 @@ class Dataset:
     def dataloader(self) -> DataLoader:
         """Lazily build and return a PyTorch DataLoader."""
         if self._dataloader is not None:
+            return self._dataloader
+
+        # Streaming mode: use PatchDataset for on-the-fly patch extraction
+        if self._streaming:
+            patch_ds = PatchDataset(
+                data=self.data,
+                block_shape=self._block_shape or (32, 32, 32),
+                patches_per_volume=self._patches_per_volume,
+                binarize=self._binarize if self._binarize else None,
+            )
+            self._dataloader = DataLoader(
+                patch_ds,
+                batch_size=self._batch_size,
+                shuffle=self._shuffle,
+                num_workers=0,
+                pin_memory=torch.cuda.is_available(),
+            )
             return self._dataloader
 
         image_paths = [d["image"] for d in self.data]
@@ -290,3 +337,146 @@ def extract_patches(
             patches.append(img_patch)
 
     return patches
+
+
+class PatchDataset(torch.utils.data.Dataset):
+    """Streaming patch dataset — generates random patches on-the-fly.
+
+    Instead of pre-extracting patches or loading full volumes into memory,
+    this dataset lazily reads only the voxels needed for each patch.  For
+    Zarr v3 stores, this uses chunk-aligned partial I/O (only the chunks
+    overlapping the patch are read from disk/cloud).
+
+    Parameters
+    ----------
+    data : list of dicts
+        ``[{"image": path, "label": path}, ...]``.  Paths can be NIfTI
+        (``.nii``, ``.nii.gz``, ``.mgz``) or Zarr (``.zarr``).
+    block_shape : tuple
+        Spatial size of each patch ``(bD, bH, bW)``.
+    patches_per_volume : int
+        Number of random patches to yield per volume per epoch.
+    binarize : bool, set, callable, or None
+        Label remapping (see :func:`extract_patches`).
+    transforms : callable or None
+        Optional transform applied to each ``(image, label)`` dict after
+        extraction (e.g., normalization, augmentation).
+
+    Examples
+    --------
+    ::
+
+        from nobrainer.processing.dataset import PatchDataset
+
+        ds = PatchDataset(
+            data=[{"image": "sub-01.zarr", "label": "sub-01_label.zarr"}],
+            block_shape=(64, 64, 64),
+            patches_per_volume=10,
+            binarize=True,
+        )
+        loader = DataLoader(ds, batch_size=4, num_workers=2)
+
+    Each epoch yields ``len(data) * patches_per_volume`` patches, with
+    different random locations each time.
+    """
+
+    def __init__(
+        self,
+        data: list[dict[str, str]],
+        block_shape: tuple[int, int, int] = (32, 32, 32),
+        patches_per_volume: int = 10,
+        binarize: bool | set | Callable | None = None,
+        transforms: Callable | None = None,
+    ):
+        self.data = data
+        self.block_shape = block_shape
+        self.patches_per_volume = patches_per_volume
+        self.binarize = binarize
+        self.transforms = transforms
+
+        # Cache volume shapes to avoid repeated reads
+        self._shapes: list[tuple[int, ...]] = []
+        for item in data:
+            self._shapes.append(self._get_shape(item["image"]))
+
+    def __len__(self) -> int:
+        return len(self.data) * self.patches_per_volume
+
+    def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
+        vol_idx = idx // self.patches_per_volume
+        item = self.data[vol_idx]
+        shape = self._shapes[vol_idx]
+
+        # Random patch origin
+        bd, bh, bw = self.block_shape
+        d0 = np.random.randint(0, max(1, shape[0] - bd + 1))
+        h0 = np.random.randint(0, max(1, shape[1] - bh + 1))
+        w0 = np.random.randint(0, max(1, shape[2] - bw + 1))
+        slc = (slice(d0, d0 + bd), slice(h0, h0 + bh), slice(w0, w0 + bw))
+
+        # Read only the patch region
+        img_patch = self._read_region(item["image"], slc).astype(np.float32)
+
+        result: dict[str, torch.Tensor] = {
+            "image": torch.from_numpy(img_patch[None]),  # add channel dim
+        }
+
+        if "label" in item:
+            lbl_patch = self._read_region(item["label"], slc).astype(np.float32)
+            lbl_patch = self._apply_binarize(lbl_patch)
+            result["label"] = torch.from_numpy(lbl_patch[None])
+
+        if self.transforms is not None:
+            result = self.transforms(result)
+
+        return result
+
+    def _apply_binarize(self, lbl: np.ndarray) -> np.ndarray:
+        """Apply binarization to a label patch."""
+        if self.binarize is True:
+            return (lbl > 0).astype(np.float32)
+        elif isinstance(self.binarize, set):
+            mask = np.zeros_like(lbl)
+            for val in self.binarize:
+                mask = np.maximum(mask, (lbl == val).astype(np.float32))
+            return mask
+        elif callable(self.binarize):
+            return self.binarize(lbl)
+        return lbl
+
+    @staticmethod
+    def _get_shape(path: str) -> tuple[int, ...]:
+        """Get volume shape without loading full data."""
+        path = str(path)
+        if path.rstrip("/").endswith(".zarr"):
+            import zarr
+
+            store = zarr.open_group(path, mode="r")
+            return store["0"].shape
+        else:
+            import nibabel as nib
+
+            return nib.load(path).shape[:3]
+
+    @staticmethod
+    def _read_region(path: str, slc: tuple[slice, ...]) -> np.ndarray:
+        """Read a spatial region from a volume.
+
+        For Zarr stores, this is a true partial read (only chunks
+        overlapping the region are fetched from storage).
+        For NIfTI, the full volume header is read but only the
+        requested region is loaded into memory via nibabel's
+        array proxy.
+        """
+        path = str(path)
+        if path.rstrip("/").endswith(".zarr"):
+            import zarr
+
+            store = zarr.open_group(path, mode="r")
+            return np.asarray(store["0"][slc])
+        else:
+            import nibabel as nib
+
+            img = nib.load(path)
+            # Use dataobj proxy for memory-efficient slicing
+            return np.asarray(img.dataobj[slc])
