@@ -39,6 +39,7 @@ class Dataset:
         self._batch_size: int = 1
         self._shuffle: bool = False
         self._augment: bool = False
+        self._binarize: bool = False
         self._normalizer: Callable | None = None
         self._dataloader: DataLoader | None = None
 
@@ -91,6 +92,34 @@ class Dataset:
         """Set batch size."""
         self._batch_size = batch_size
         self._dataloader = None  # invalidate cache
+        return self
+
+    def binarize(self, labels: set[int] | Callable | None = None) -> "Dataset":
+        """Binarize or remap labels.
+
+        Parameters
+        ----------
+        labels : set of ints, callable, or None
+            - ``None`` (default): any non-zero value → 1
+            - ``set``: voxels with values in the set → 1, all others → 0
+            - ``callable``: custom function ``fn(label_tensor) → tensor``
+
+        Examples
+        --------
+        Brain extraction (any tissue)::
+
+            ds.binarize()
+
+        Select specific FreeSurfer regions (e.g., hippocampus L+R)::
+
+            ds.binarize(labels={17, 53})
+
+        Custom mapping::
+
+            ds.binarize(labels=lambda x: (x >= 1000).float())
+        """
+        self._binarize = labels if labels is not None else True
+        self._dataloader = None
         return self
 
     def shuffle(self, buffer_size: int = 100) -> "Dataset":
@@ -161,6 +190,7 @@ class Dataset:
                 block_shape=self._block_shape,
                 batch_size=self._batch_size,
                 augment=self._augment,
+                binarize_labels=self._binarize,
             )
 
         return self._dataloader

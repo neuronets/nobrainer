@@ -71,7 +71,11 @@ print(f"Volume: {vol_path}")
 # forward pass samples different weights.
 
 # %%
-ds = Dataset.from_files(filepaths[:1], block_shape=(32, 32, 32), n_classes=2).batch(2)
+ds = (
+    Dataset.from_files(filepaths[:1], block_shape=(32, 32, 32), n_classes=2)
+    .batch(2)
+    .binarize()
+)
 
 seg = Segmentation(
     "bayesian_vnet",

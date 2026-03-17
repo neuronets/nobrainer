@@ -66,13 +66,16 @@ eval_pair = filepaths[9]
 #
 # `Dataset.from_files()` accepts the list of (image, label) tuples.
 # Random 32^3 patches are extracted from the ~256^3 volumes at train
-# time.  Chaining `.batch()` and `.augment()` configures the pipeline.
+# time.  Chaining `.batch()`, `.augment()`, and `.binarize()` configures
+# the pipeline.  `.binarize()` converts multi-label parcellations to
+# binary brain masks (any non-zero label → 1).
 
 # %%
 ds_train = (
     Dataset.from_files(train_pairs, block_shape=(32, 32, 32), n_classes=2)
     .batch(2)
     .augment()
+    .binarize()
 )
 
 # %% [markdown]
