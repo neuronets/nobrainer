@@ -75,33 +75,25 @@ eval_pair = filepaths[9]
 # this automatically via the MONAI data pipeline.
 
 # %%
-BLOCK = 32
-N_PATCHES_PER_VOL = 2
+from nobrainer.processing.dataset import extract_patches  # noqa: E402
 
-
-def extract_random_patches(img_path, label_path, block=BLOCK, n=2):
-    """Load a volume pair and extract random cubic patches."""
-    vol = np.asarray(nib.load(img_path).dataobj, dtype=np.float32)
-    lab = np.asarray(nib.load(label_path).dataobj, dtype=np.int64)
-    lab = (lab > 0).astype(np.int64)  # binarize
-
-    xs, ys = [], []
-    for _ in range(n):
-        starts = [np.random.randint(0, max(s - block, 1)) for s in vol.shape[:3]]
-        sl = tuple(slice(s, s + block) for s in starts)
-        xs.append(vol[sl])
-        ys.append(lab[sl])
-    return xs, ys
-
+BLOCK = (32, 32, 32)
 
 all_x, all_y = [], []
 for img_path, label_path in train_pairs:
-    px, py = extract_random_patches(img_path, label_path)
-    all_x.extend(px)
-    all_y.extend(py)
+    patches = extract_patches(
+        img_path,
+        label_path,
+        block_shape=BLOCK,
+        n_patches=2,
+        binarize=True,
+    )
+    for img_patch, lbl_patch in patches:
+        all_x.append(img_patch)
+        all_y.append(lbl_patch)
 
 x_train = torch.from_numpy(np.stack(all_x)[:, None])  # (N,1,D,H,W)
-y_train = torch.from_numpy(np.stack(all_y))  # (N,D,H,W)
+y_train = torch.from_numpy(np.stack(all_y)).long()  # (N,D,H,W)
 print(f"Training patches: x={x_train.shape}, y={y_train.shape}")
 
 # %% [markdown]

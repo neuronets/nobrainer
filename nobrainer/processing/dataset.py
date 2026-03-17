@@ -208,3 +208,85 @@ class Dataset:
         from .croissant import write_dataset_croissant
 
         return write_dataset_croissant(output_path, self)
+
+
+def extract_patches(
+    volume: np.ndarray,
+    label: np.ndarray | None = None,
+    block_shape: tuple[int, int, int] = (32, 32, 32),
+    n_patches: int = 10,
+    binarize: bool | set | Callable | None = None,
+) -> list[tuple[np.ndarray, ...]] | list[np.ndarray]:
+    """Extract random patches from a 3D volume.
+
+    Parameters
+    ----------
+    volume : ndarray
+        3D volume of shape ``(D, H, W)`` or path loadable by nibabel.
+    label : ndarray or None
+        Corresponding label volume. If None, only image patches returned.
+    block_shape : tuple
+        Spatial size of each patch ``(bD, bH, bW)``.
+    n_patches : int
+        Number of random patches to extract.
+    binarize : bool, set, callable, or None
+        If not None, applied to label patches:
+        - ``True``: any non-zero → 1
+        - ``set``: voxels in set → 1
+        - ``callable``: custom ``fn(patch) → patch``
+
+    Returns
+    -------
+    list of tuples ``(image_patch, label_patch)`` if label given,
+    or list of ``image_patch`` arrays if label is None.
+
+    Examples
+    --------
+    ::
+
+        import nibabel as nib
+        vol = nib.load("brain.nii.gz").get_fdata()
+        lbl = nib.load("label.nii.gz").get_fdata()
+        patches = extract_patches(vol, lbl, block_shape=(32, 32, 32), n_patches=20)
+        # patches[0] = (image_patch, label_patch), each shape (32, 32, 32)
+    """
+    import nibabel as nib
+
+    # Load from path if needed
+    if isinstance(volume, (str, Path)):
+        volume = np.asarray(nib.load(str(volume)).dataobj, dtype=np.float32)
+    if isinstance(label, (str, Path)):
+        label = np.asarray(nib.load(str(label)).dataobj, dtype=np.float32)
+
+    vol = np.asarray(volume, dtype=np.float32)
+    bd, bh, bw = block_shape
+    D, H, W = vol.shape[:3]
+
+    patches = []
+    for _ in range(n_patches):
+        d0 = np.random.randint(0, max(1, D - bd + 1))
+        h0 = np.random.randint(0, max(1, H - bh + 1))
+        w0 = np.random.randint(0, max(1, W - bw + 1))
+
+        img_patch = vol[d0 : d0 + bd, h0 : h0 + bh, w0 : w0 + bw]
+
+        if label is not None:
+            lbl = np.asarray(label, dtype=np.float32)
+            lbl_patch = lbl[d0 : d0 + bd, h0 : h0 + bh, w0 : w0 + bw]
+
+            # Apply binarization
+            if binarize is True:
+                lbl_patch = (lbl_patch > 0).astype(np.float32)
+            elif isinstance(binarize, set):
+                mask = np.zeros_like(lbl_patch)
+                for val in binarize:
+                    mask = np.maximum(mask, (lbl_patch == val).astype(np.float32))
+                lbl_patch = mask
+            elif callable(binarize):
+                lbl_patch = binarize(lbl_patch)
+
+            patches.append((img_patch, lbl_patch))
+        else:
+            patches.append(img_patch)
+
+    return patches

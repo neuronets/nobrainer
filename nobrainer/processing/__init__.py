@@ -4,9 +4,9 @@ Provides high-level ``Segmentation``, ``Generation``, and ``Dataset``
 classes that wrap the lower-level PyTorch internals.
 """
 
-from .dataset import Dataset
+from .dataset import Dataset, extract_patches
 
-__all__ = ["Dataset"]
+__all__ = ["Dataset", "extract_patches"]
 
 # Optional: Segmentation (requires core models)
 try:
