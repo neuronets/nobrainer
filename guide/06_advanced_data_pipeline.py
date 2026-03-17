@@ -187,7 +187,8 @@ optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 criterion = torch.nn.CrossEntropyLoss()
 
 # Build a DataLoader from the Dataset builder
-loader = ds.batch(2).dataloader
+# .binarize() converts FreeSurfer labels to binary brain mask
+loader = ds.batch(2).binarize().dataloader
 
 gpus = torch.cuda.device_count()
 print(f"Available GPUs: {gpus}")
