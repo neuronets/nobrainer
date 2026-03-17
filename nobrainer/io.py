@@ -311,7 +311,7 @@ def nifti_to_zarr(
         import niizarr
 
         niizarr.nii2zarr(
-            img,
+            str(input_path),
             str(output_path),
             chunk=chunk_shape,
             shard=shard_shape,
