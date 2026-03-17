@@ -39,12 +39,12 @@ jobs:
             -m "not gpu" \
             --no-header
 
-      - name: Run tutorial scripts
+      - name: Run sr-tests (somewhat realistic tests)
         run: |
-          for script in guide/0*.py; do
-            echo "=== Running $script ==="
-            uv run python "$script"
-          done
+          uv run pytest nobrainer/sr-tests/ -v \
+            -m "not gpu" \
+            --no-header \
+            --tb=short
 
       - name: Research loop smoke test (5 min budget, no API key)
         run: |
