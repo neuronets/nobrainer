@@ -148,8 +148,10 @@ print(f"Zarr output: {zarr_path}")
 # Inspect the Zarr store
 import zarr  # noqa: E402
 
-z = zarr.open(str(zarr_path), mode="r")
-print(f"Zarr shape: {z.shape}, dtype: {z.dtype}, chunks: {z.chunks}")
+z = zarr.open_group(str(zarr_path), mode="r")
+arr = z["0"]  # Level 0 (full resolution)
+print(f"Zarr store keys: {list(z.keys())}")
+print(f"Level 0 shape: {arr.shape}, dtype: {arr.dtype}")
 
 # %% [markdown]
 # ## 3. Export Croissant-ML dataset metadata
