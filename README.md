@@ -95,6 +95,20 @@ docker run --rm neuronets/nobrainer:latest-cpu-pt predict --help
 
 ## Quick start
 
+### Tutorials
+
+See the [Nobrainer Book](https://neuronets.dev/nobrainer-book/) for 11
+progressive tutorials — from installation to contributing.
+
+### sr-tests (somewhat realistic tests)
+
+`nobrainer/sr-tests/` contains pytest integration tests that exercise the
+real API with real brain data. They run in CI on every push:
+
+```bash
+pytest nobrainer/sr-tests/ -v -m "not gpu" --tb=short
+```
+
 ### Simple API (3 lines)
 
 ```python
