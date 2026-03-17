@@ -95,6 +95,23 @@ docker run --rm neuronets/nobrainer:latest-cpu-pt predict --help
 
 ## Quick start
 
+### Simple API (3 lines)
+
+```python
+from nobrainer.processing import Segmentation, Dataset
+
+ds = Dataset.from_files(filepaths, block_shape=(128, 128, 128), n_classes=2).batch(2)
+result = Segmentation("unet").fit(ds, epochs=5).predict("brain.nii.gz")
+```
+
+Models are saved with [Croissant-ML](https://mlcommons.org/croissant/) metadata
+for reproducibility:
+
+```python
+seg.save("my_model")  # Creates model.pth + croissant.json
+seg = Segmentation.load("my_model")
+```
+
 ### Brain segmentation (CLI)
 
 ```bash

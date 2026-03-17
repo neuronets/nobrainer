@@ -1,157 +1,75 @@
-"""Base classes for all estimators."""
+"""Base estimator with Croissant-ML metadata persistence."""
 
-import inspect
-import os
+from __future__ import annotations
+
+import json
 from pathlib import Path
-import pickle as pk
+from typing import Any
 
-import tensorflow as tf
-
-
-def get_strategy(multi_gpu):
-    if multi_gpu:
-        return tf.distribute.MirroredStrategy()
-    return tf.distribute.get_strategy()
+import torch
+import torch.nn as nn
 
 
 class BaseEstimator:
-    """Base class for all high-level models in Nobrainer."""
+    """Base class for all nobrainer estimators.
 
-    state_variables = []
-    model_ = None
+    Provides ``save()`` / ``load()`` with Croissant-ML JSON-LD metadata,
+    and optional multi-GPU support via DDP.
+    """
 
-    def __init__(self, checkpoint_filepath=None, multi_gpu=True):
-        self.checkpoint_tracker = None
-        if checkpoint_filepath:
-            from .checkpoint import CheckpointTracker
+    state_variables: list[str] = []
+    model_: nn.Module | None = None
+    _training_result: dict | None = None
+    _dataset: Any = None
 
-            self.checkpoint_tracker = CheckpointTracker(self, checkpoint_filepath)
-
-        self.strategy = get_strategy(multi_gpu)
+    def __init__(
+        self,
+        checkpoint_filepath: str | Path | None = None,
+        multi_gpu: bool = True,
+    ):
+        self.checkpoint_filepath = checkpoint_filepath
+        self.multi_gpu = multi_gpu
 
     @property
-    def model(self):
+    def model(self) -> nn.Module:
+        if self.model_ is None:
+            raise RuntimeError("Model not trained. Call .fit() first.")
         return self.model_
 
-    def save(self, save_dir):
-        """Saves a trained model"""
-        if self.model_ is None:
-            raise ValueError("Model is undefined. Please train or load a model")
-        self.model_.save(save_dir)
-        model_info = {"classname": self.__class__.__name__, "__init__": {}}
-        for key in inspect.signature(self.__init__).parameters:
-            # TODO this assumes that all parameters passed to __init__
-            # are stored as members, which doesn't leave room for
-            # parameters that are specific to the runtime context.
-            # (e.g. multi_gpu).
-            if key == "multi_gpu" or key == "checkpoint_filepath":
-                continue
-            model_info["__init__"][key] = getattr(self, key)
-        for val in self.state_variables:
-            model_info[val] = getattr(self, val)
-        model_file = Path(save_dir) / "model_params.pkl"
-        with open(model_file, "wb") as fp:
-            pk.dump(model_info, fp)
+    def save(self, save_dir: str | Path) -> None:
+        """Save model.pth + croissant.json to directory."""
+        from .croissant import write_model_croissant
+
+        save_dir = Path(save_dir)
+        save_dir.mkdir(parents=True, exist_ok=True)
+        torch.save(self.model_.state_dict(), save_dir / "model.pth")
+        write_model_croissant(save_dir, self, self._training_result, self._dataset)
 
     @classmethod
-    def load(
-        cls,
-        model_dir,
-        multi_gpu=True,
-        custom_objects=None,
-        compile=False,
-    ):
-        """Loads a trained model from a save directory"""
-        model_dir = Path(str(model_dir).rstrip(os.pathsep))
-        assert model_dir.exists() and model_dir.is_dir()
-        model_file = model_dir / "model_params.pkl"
-        with open(model_file, "rb") as fp:
-            model_info = pk.load(fp)
-        if model_info["classname"] != cls.__name__:
-            raise ValueError(f"Model class does not match {cls.__name__}")
-        del model_info["classname"]
+    def load(cls, model_dir: str | Path, multi_gpu: bool = True) -> "BaseEstimator":
+        """Load estimator from directory with croissant.json metadata."""
+        model_dir = Path(model_dir)
+        metadata = json.loads((model_dir / "croissant.json").read_text())
+        prov = metadata.get("nobrainer:provenance", {})
 
-        klass = cls(**model_info["__init__"])
-        del model_info["__init__"]
-        for key, value in model_info.items():
-            setattr(klass, key, value)
+        est = cls.__new__(cls)
+        est.multi_gpu = multi_gpu
+        est.checkpoint_filepath = None
+        est._training_result = None
+        est._dataset = None
 
-        klass.strategy = get_strategy(multi_gpu)
-        with klass.strategy.scope():
-            klass.model_ = tf.keras.models.load_model(
-                model_dir,
-                custom_objects=custom_objects,
-                compile=compile,
-            )
-        return klass
-
-    @classmethod
-    def init_with_checkpoints(
-        cls,
-        model_name,
-        checkpoint_filepath,
-        multi_gpu=True,
-        custom_objects=None,
-        compile=False,
-        model_args=None,
-    ):
-        """Initialize a model for training, either from the latest
-        checkpoint found, or from scratch if no checkpoints are
-        found. This is useful for long-running model fits that may be
-        interrupted or preepmted during training and need to pick up
-        where they left off.
-
-        model_name: str or Module in nobrainer.models, the base model
-        for this estimator.
-
-        checkpoint_filepath: str, path to which checkpoints will be
-        saved and loaded. Supports the epoch and block flormating
-        parameters supported by tensorflows ModelCheckpoint,
-        e.g. <path_to_checkpoint_dir>/{epoch:03d}
-
-        """
-        from .checkpoint import CheckpointTracker
-
-        checkpoint_tracker = CheckpointTracker(cls, checkpoint_filepath)
-        estimator = checkpoint_tracker.load(
-            multi_gpu=multi_gpu,
-            custom_objects=custom_objects,
-            compile=compile,
+        # Subclass-specific reconstruction
+        est._restore_from_provenance(prov)
+        est.model_ = est._build_model()
+        est.model_.load_state_dict(
+            torch.load(model_dir / "model.pth", weights_only=True)
         )
-        if not estimator:
-            estimator = cls(model_name, model_args=model_args)
-        estimator.checkpoint_tracker = checkpoint_tracker
-        checkpoint_tracker.estimator = estimator
-        return estimator
+        return est
 
+    def _build_model(self) -> nn.Module:
+        """Reconstruct model architecture. Override in subclasses."""
+        raise NotImplementedError
 
-class TransformerMixin:
-    """Mixin class for all transformers in scikit-learn."""
-
-    def fit_transform(self, X, y=None, **fit_params):
-        """
-        Fit to data, then transform it.
-        Fits transformer to `X` and `y` with optional parameters `fit_params`
-        and returns a transformed version of `X`.
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Input samples.
-        y :  array-like of shape (n_samples,) or (n_samples, n_outputs), \
-                default=None
-            Target values (None for unsupervised transformations).
-        **fit_params : dict
-            Additional fit parameters.
-        Returns
-        -------
-        X_new : ndarray array of shape (n_samples, n_features_new)
-            Transformed array.
-        """
-        # non-optimized default implementation; override when a better
-        # method is possible for a given clustering algorithm
-        if y is None:
-            # fit method of arity 1 (unsupervised transformation)
-            return self.fit(X, **fit_params).transform(X)
-        else:
-            # fit method of arity 2 (supervised transformation)
-            return self.fit(X, y, **fit_params).transform(X)
+    def _restore_from_provenance(self, prov: dict) -> None:
+        """Restore state from provenance dict. Override in subclasses."""
+        raise NotImplementedError
