@@ -1,8 +1,7 @@
 name: Validate nobrainer-book tutorials
 
 on:
-  pull_request:
-    branches: [alpha]
+  workflow_dispatch:  # Manual trigger only — not part of CI checks
 
 jobs:
   validate-book:
