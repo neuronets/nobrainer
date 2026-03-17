@@ -87,6 +87,13 @@ def fit(
             else:
                 raise TypeError(f"Unsupported batch type: {type(batch)}")
 
+            # Squeeze channel dim from labels if present (MONAI adds it)
+            if labels.ndim == images.ndim and labels.shape[1] == 1:
+                labels = labels.squeeze(1)
+            # Ensure labels are long for CrossEntropyLoss
+            if labels.dtype in (torch.float32, torch.float64):
+                labels = labels.long()
+
             optimizer.zero_grad()
             pred = model(images)
             loss = criterion(pred, labels)

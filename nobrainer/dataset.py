@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from monai.data import CacheDataset, DataLoader
 from monai.transforms import (
@@ -28,6 +28,7 @@ def get_dataset(
     batch_size: int = 1,
     num_workers: int = 0,
     augment: bool = False,
+    binarize_labels: bool | set | Callable = False,
     target_spacing: tuple[float, float, float] = (1.0, 1.0, 1.0),
     cache_rate: float = 1.0,
     **kwargs: Any,
@@ -87,9 +88,9 @@ def get_dataset(
         data = [{"image": str(img)} for img in image_paths]
         keys = ["image"]
 
-    # Core transforms
+    # Core transforms — use NibabelReader to support .mgz and other formats
     transforms: list[Any] = [
-        LoadImaged(keys=keys, image_only=False),
+        LoadImaged(keys=keys, image_only=False, reader="NibabelReader"),
         EnsureChannelFirstd(keys=keys),
         Orientationd(keys=keys, axcodes="RAS"),
         Spacingd(
@@ -99,6 +100,27 @@ def get_dataset(
         ),
         NormalizeIntensityd(keys=["image"], nonzero=True, channel_wise=True),
     ]
+
+    # Optional label binarization (e.g., FreeSurfer parcellation → brain mask)
+    if binarize_labels and has_labels:
+        from monai.transforms import Lambdad
+
+        if callable(binarize_labels) and binarize_labels is not True:
+            transforms.append(Lambdad(keys=["label"], func=binarize_labels))
+        elif isinstance(binarize_labels, set):
+            label_set = binarize_labels
+
+            def _remap(x):
+                import torch
+
+                mask = torch.zeros_like(x)
+                for val in label_set:
+                    mask = mask | (x == val)
+                return mask.float()
+
+            transforms.append(Lambdad(keys=["label"], func=_remap))
+        else:
+            transforms.append(Lambdad(keys=["label"], func=lambda x: (x > 0).float()))
 
     # Optional augmentation
     if augment:

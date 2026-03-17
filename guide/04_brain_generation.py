@@ -11,30 +11,51 @@
 # ---
 
 # %% [markdown]
-# # Train a Progressive GAN for Brain Generation
+# # Train a Progressive GAN for Brain Generation (Estimator API)
 #
 # This tutorial trains a Progressive GAN on real brain MRI data using
-# PyTorch Lightning. The volumes are downsampled to 4^3 resolution for
-# fast CPU training.
+# the scikit-learn-style **Generation** estimator.  Volumes are
+# downsampled to 4^3 resolution for fast CPU training.
 #
-# We will:
-# 1. Download real brain MRI data
-# 2. Downsample volumes to small resolution
-# 3. Build a ProgressiveGAN model
-# 4. Train with PyTorch Lightning
-# 5. Generate synthetic volumes
+# 1. Download and prepare training data
+# 2. One-line GAN training with `Generation.fit()`
+# 3. Generate synthetic brain volumes with `.generate()`
 
 # %%
-import nibabel as nib
-import numpy as np
-import pytorch_lightning as pl
-from scipy.ndimage import zoom
-import torch
-from torch.utils.data import DataLoader, TensorDataset
+# Colab install (uncomment if needed)
+PRE_RELEASE = False
+try:
+    import subprocess
 
-from nobrainer.io import read_csv
-from nobrainer.models.generative import ProgressiveGAN
-from nobrainer.utils import get_data
+    import google.colab  # noqa: F401
+
+    subprocess.run(
+        [
+            "pip",
+            "install",
+            "-q",
+            "nobrainer[generative,dev]",
+            "monai",
+            "pytorch-lightning",
+            "nilearn",
+            "matplotlib",
+        ]
+        + (["--pre"] if PRE_RELEASE else []),
+        check=True,
+    )
+except ImportError:
+    pass
+
+# %%
+import nibabel as nib  # noqa: E402
+import numpy as np  # noqa: E402
+from scipy.ndimage import zoom  # noqa: E402
+import torch  # noqa: E402
+from torch.utils.data import DataLoader, TensorDataset  # noqa: E402
+
+from nobrainer.io import read_csv  # noqa: E402
+from nobrainer.processing import Generation  # noqa: E402
+from nobrainer.utils import get_data  # noqa: E402
 
 # %% [markdown]
 # ## Download and downsample real brain MRI data
@@ -52,95 +73,57 @@ print(f"Downloaded {len(filepaths)} subjects")
 volumes = []
 for img_path, _ in filepaths:
     vol = np.asarray(nib.load(img_path).dataobj, dtype=np.float32)
-    # Normalize to [0, 1]
     vmin, vmax = vol.min(), vol.max()
     if vmax > vmin:
         vol = (vol - vmin) / (vmax - vmin)
-    # Downsample to TARGET_SIZE^3
     factors = [TARGET_SIZE / s for s in vol.shape[:3]]
-    vol_small = zoom(vol, factors, order=1)
-    volumes.append(vol_small)
+    volumes.append(zoom(vol, factors, order=1))
 
 imgs = torch.from_numpy(np.stack(volumes)[:, None])  # (N, 1, 4, 4, 4)
 print(f"Training set: {imgs.shape[0]} volumes of shape {TARGET_SIZE}^3")
-print(f"Value range: [{imgs.min():.3f}, {imgs.max():.3f}]")
 
 # %%
 torch.manual_seed(42)
-
-BATCH_SIZE = 4
-loader = DataLoader(TensorDataset(imgs), batch_size=BATCH_SIZE, shuffle=True)
+loader = DataLoader(TensorDataset(imgs), batch_size=4, shuffle=True)
 
 # %% [markdown]
-# ## Build the ProgressiveGAN
+# ## Train the ProgressiveGAN
 #
-# We use a single resolution level (4) to keep this demo fast on CPU.
-# For multi-resolution training, pass e.g.
-# `resolution_schedule=[4, 8, 16, 32, 64]`.
+# We use a single resolution level (4) and minimal feature maps to
+# keep this demo fast on CPU.  The `Generation` estimator wraps
+# Lightning training internally.
 
 # %%
-model = ProgressiveGAN(
-    latent_size=64,
-    fmap_base=64,
-    fmap_max=64,
-    resolution_schedule=[TARGET_SIZE],
-    steps_per_phase=500,
-)
-
-n_params_g = sum(p.numel() for p in model.generator.parameters())
-n_params_d = sum(p.numel() for p in model.discriminator.parameters())
-print(f"Generator params:     {n_params_g:,}")
-print(f"Discriminator params: {n_params_d:,}")
-
-# %% [markdown]
-# ## Train with Lightning
-
-# %%
-trainer = pl.Trainer(
-    max_steps=100,
-    accelerator="auto",
-    devices=1,
-    enable_checkpointing=False,
-    logger=False,
-    enable_progress_bar=True,
-)
-
-trainer.fit(model, loader)
-print(f"Training complete: {model._step_count} steps")
+gen = Generation(
+    "progressivegan",
+    model_args={
+        "latent_size": 64,
+        "fmap_base": 64,
+        "fmap_max": 64,
+        "resolution_schedule": [4],
+        "steps_per_phase": 500,
+    },
+).fit(loader, epochs=100)
 
 # %% [markdown]
 # ## Generate synthetic volumes
+#
+# `.generate()` returns a list of NIfTI images.
 
 # %%
-model.eval()
-model.generator.current_level = 0
-model.generator.alpha = 1.0
+synth = gen.generate(n_images=4)
 
-with torch.no_grad():
-    z = torch.randn(4, 64, device=model.device)
-    generated = model.generator(z)
-
-gen_np = generated.cpu().numpy()
-print(f"Generated shape: {gen_np.shape}")
-print(f"Value range: [{gen_np.min():.3f}, {gen_np.max():.3f}]")
-print(f"Std: {gen_np.std():.4f}")
+for i, img in enumerate(synth):
+    arr = np.asarray(img.dataobj)
+    print(
+        f"  Volume {i}: shape={arr.shape}  " f"range=[{arr.min():.3f}, {arr.max():.3f}]"
+    )
 
 # %% [markdown]
-# ## Save and load
+# ## Save and reload
 #
 # ```python
-# # Save Lightning checkpoint
-# trainer.save_checkpoint("progressivegan.ckpt")
-#
-# # Load and generate
-# model = ProgressiveGAN.load_from_checkpoint("progressivegan.ckpt")
-# ```
-#
-# ## CLI generation
-#
-# ```bash
-# nobrainer generate \
-#   --model progressivegan.ckpt \
-#   --model-type progressivegan \
-#   output_brain.nii.gz
+# gen.save("my_gan")
+# gen2 = Generation.load("my_gan")
+# new_images = gen2.generate(n_images=2)
 # ```
