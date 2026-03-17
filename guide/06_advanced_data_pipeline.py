@@ -50,6 +50,7 @@ except ImportError:
 import json  # noqa: E402
 from pathlib import Path  # noqa: E402
 
+import nibabel as nib  # noqa: E402
 import torch  # noqa: E402
 
 from nobrainer.io import read_csv  # noqa: E402
@@ -133,6 +134,12 @@ zarr_dir.mkdir(parents=True, exist_ok=True)
 
 img_path = filepaths[0][0]
 zarr_path = zarr_dir / "subject_00.zarr"
+
+# Convert .mgz → .nii.gz first (niizarr requires NIfTI, not FreeSurfer MGH)
+if img_path.endswith(".mgz") or img_path.endswith(".mgh"):
+    nii_path = zarr_dir / "subject_00.nii.gz"
+    nib.save(nib.load(img_path), str(nii_path))
+    img_path = str(nii_path)
 
 nifti_to_zarr(img_path, zarr_path, chunk_shape=(64, 64, 64))
 print(f"Converted: {img_path}")
