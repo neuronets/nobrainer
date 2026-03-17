@@ -7,7 +7,7 @@ on:
   # This prevents untrusted PR code from executing on the self-hosted GPU runner.
   pull_request:
     branches: [main, master, alpha]
-    types: [labeled]
+    types: [labeled, synchronize]
 
 jobs:
   start-runner:
