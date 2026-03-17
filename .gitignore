@@ -142,3 +142,12 @@ cython_debug/
 
 # guide data
 guide/data/
+
+# Model artifacts
+*.pth
+brain_mask_extraction_model/
+data/
+
+# Model artifacts
+*.pth
+brain_mask_extraction_model/
