@@ -43,7 +43,7 @@ jobs:
 
       - name: Run book tutorials
         run: |
-          for script in /tmp/nobrainer-book/docs/nobrainer-guides/scripts/0[1-6]*.py; do
+          for script in /tmp/nobrainer-book/docs/nobrainer-guides/scripts/0*.py /tmp/nobrainer-book/docs/nobrainer-guides/scripts/1[01]*.py; do
             echo "=== Running $(basename $script) ==="
             uv run python "$script" || {
               echo "FAILED: $script"
