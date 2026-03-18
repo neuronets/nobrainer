@@ -112,15 +112,18 @@ class TestRunLoop:
         _write_train_script(tmp_path / "train.py")
         _write_val_dice(tmp_path / "val_dice.json", 0.9)
 
-        with patch(
-            "nobrainer.research.loop._propose_config",
-            side_effect=[
-                {"learning_rate": 5e-4, "batch_size": 4},
-            ]
-            * 5,
-        ), patch(
-            "nobrainer.research.loop.subprocess.run",
-        ) as mock_run:
+        with (
+            patch(
+                "nobrainer.research.loop._propose_config",
+                side_effect=[
+                    {"learning_rate": 5e-4, "batch_size": 4},
+                ]
+                * 5,
+            ),
+            patch(
+                "nobrainer.research.loop.subprocess.run",
+            ) as mock_run,
+        ):
             mock_run.return_value.returncode = 0
             mock_run.return_value.stdout = "training done\n"
             mock_run.return_value.stderr = ""
@@ -157,11 +160,12 @@ class TestRunLoop:
             r.stderr = ""
             return r
 
-        with patch(
-            "nobrainer.research.loop.subprocess.run", side_effect=_mock_run
-        ), patch(
-            "nobrainer.research.loop._propose_config",
-            side_effect=[{"learning_rate": 5e-4}] * 5,
+        with (
+            patch("nobrainer.research.loop.subprocess.run", side_effect=_mock_run),
+            patch(
+                "nobrainer.research.loop._propose_config",
+                side_effect=[{"learning_rate": 5e-4}] * 5,
+            ),
         ):
             results = run_loop(tmp_path, max_experiments=2, budget_hours=1.0)
 
@@ -173,11 +177,14 @@ class TestRunLoop:
         _write_train_script(tmp_path / "train.py")
         original = (tmp_path / "train.py").read_text()
 
-        with patch(
-            "nobrainer.research.loop.subprocess.run",
-        ) as mock_run, patch(
-            "nobrainer.research.loop._propose_config",
-            return_value={"learning_rate": 1e-3},
+        with (
+            patch(
+                "nobrainer.research.loop.subprocess.run",
+            ) as mock_run,
+            patch(
+                "nobrainer.research.loop._propose_config",
+                return_value={"learning_rate": 1e-3},
+            ),
         ):
             mock_run.return_value.returncode = 1
             mock_run.return_value.stdout = ""
@@ -191,11 +198,14 @@ class TestRunLoop:
     def test_run_summary_written(self, tmp_path):
         """run_summary.md is written after the loop."""
         _write_train_script(tmp_path / "train.py")
-        with patch(
-            "nobrainer.research.loop.subprocess.run",
-        ) as mock_run, patch(
-            "nobrainer.research.loop._propose_config",
-            return_value={"learning_rate": 1e-4},
+        with (
+            patch(
+                "nobrainer.research.loop.subprocess.run",
+            ) as mock_run,
+            patch(
+                "nobrainer.research.loop._propose_config",
+                return_value={"learning_rate": 1e-4},
+            ),
         ):
             mock_run.return_value.returncode = 1
             mock_run.return_value.stdout = ""
