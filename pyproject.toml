@@ -1,10 +1,85 @@
 [build-system]
-# Setuptools version should match setup.py; wheel because pip will insert it noisily
-requires = ["setuptools >= 38.3.0", "wheel"]
-build-backend = 'setuptools.build_meta'
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nobrainer"
+dynamic = ["version"]
+description = "A deep learning framework for 3D brain image processing."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">= 3.12"
+authors = [
+    { name = "Nobrainer Developers", email = "jakub.kaczmarzyk@gmail.com" },
+]
+maintainers = [
+    { name = "Satrajit Ghosh", email = "satrajit.ghosh@gmail.com" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Intended Audience :: Healthcare Industry",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "click",
+    "einops >= 0.7",
+    "fsspec",
+    "h5py >= 3.9",
+    "joblib",
+    "monai >= 1.3",
+    "nibabel >= 5.0",
+    "numpy",
+    "psutil",
+    "scikit-image",
+    "torch >= 2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/neuronets/nobrainer"
+Documentation = "https://neuronets.dev/nobrainer-book/"
+"Source Code" = "https://github.com/neuronets/nobrainer"
+"Bug Tracker" = "https://github.com/neuronets/helpdesk/issues"
+
+[project.scripts]
+nobrainer = "nobrainer.cli.main:cli"
+
+[project.optional-dependencies]
+bayesian = ["pyro-ppl >= 1.9"]
+generative = ["pytorch-lightning >= 2.0"]
+lightning = ["pytorch-lightning >= 2.0"]
+zarr = ["zarr >= 3.0", "nifti-zarr", "scipy >= 1.11"]
+croissant = ["mlcroissant"]
+versioning = ["datalad >= 0.19"]
+tfrecord = ["tfrecord >= 1.14"]
+dev = ["pre-commit", "pytest", "pytest-cov", "scipy"]
+all = [
+    "nobrainer[bayesian,generative,zarr,croissant,versioning,tfrecord,dev]",
+]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "nobrainer/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["nobrainer"]
 
 [tool.black]
-exclude='\.eggs|\.git|\.mypy_cache|\.tox|\.venv|_build|buck-out|build|dist|_version\.py|versioneer\.py'
+exclude = '\.eggs|\.git|\.mypy_cache|\.tox|\.venv|_build|buck-out|build|dist|_version\.py|versioneer\.py'
 
 [tool.isort]
 profile = "black"
@@ -19,5 +94,18 @@ markers = [
     "gpu: marks tests that require a CUDA-capable GPU (deselect with '-m not gpu')",
 ]
 
+[tool.coverage.run]
+branch = true
+omit = ["nobrainer/_version.py", "*/tests*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.",
+]
+ignore_errors = true
+
 [tool.codespell]
+skip = "nobrainer/_version.py,versioneer.py"
 ignore-words-list = "nd"
