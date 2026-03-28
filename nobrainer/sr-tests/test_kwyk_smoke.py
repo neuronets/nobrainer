@@ -5,14 +5,10 @@ the end-to-end pipeline works (loss is finite, prediction produces valid
 NIfTI output, warm-start transfers weights correctly).
 """
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-import nibabel as nib  # noqa: E402
-import numpy as np  # noqa: E402
-import pytest  # noqa: E402
-import torch  # noqa: E402
+import nibabel as nib
+import numpy as np
+import pytest
+import torch
 
 pyro = pytest.importorskip("pyro")
 
@@ -51,6 +47,11 @@ def _build_dataset(sample_data):
 
 def _plot_learning_curve(losses, output_path):
     """Save a simple learning curve figure."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt  # noqa: E402
+
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.plot(range(1, len(losses) + 1), losses, "b-o", markersize=4)
     ax.set_xlabel("Step")
