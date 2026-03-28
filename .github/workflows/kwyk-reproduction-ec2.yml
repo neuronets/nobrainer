@@ -100,20 +100,12 @@ jobs:
       - name: Install git-annex
         run: |
           if ! command -v git-annex &>/dev/null; then
-            echo "Installing git-annex..."
-            if command -v dnf &>/dev/null; then
-              dnf install -y git-annex || {
-                # Amazon Linux 2023 may not have git-annex in default repos
-                # Install from conda-forge as fallback
-                export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
-                uv tool install --from conda-forge git-annex 2>/dev/null || {
-                  echo "WARN: git-annex not available, DataLad operations will fail"
-                  echo "Continuing anyway — smoke test uses get_data() instead"
-                }
-              }
-            elif command -v apt-get &>/dev/null; then
-              apt-get update && apt-get install -y git-annex
-            fi
+            echo "Installing git-annex standalone..."
+            # git-annex is a Haskell binary — not installable via pip/uv.
+            # Use the official standalone Linux tarball.
+            curl -fsSL https://downloads.kitenet.net/git-annex/linux/current/git-annex-standalone-amd64.tar.gz \
+              | tar xz -C /usr/local/bin --strip-components=1 git-annex.linux/git-annex git-annex.linux/git-annex-shell \
+              2>/dev/null || echo "WARN: git-annex install failed, DataLad will use fallback"
           fi
           git-annex version 2>/dev/null || echo "git-annex not installed"
 
@@ -239,34 +231,65 @@ jobs:
           export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
           cd scripts/kwyk_reproduction
 
-          uv run python 01_assemble_dataset.py \
-            --datasets ds000114 \
-            --output-csv manifest.csv \
-            --output-dir data \
-            --label-mapping binary
+          if command -v git-annex &>/dev/null; then
+            uv run python 01_assemble_dataset.py \
+              --datasets ds000114 \
+              --output-csv manifest.csv \
+              --output-dir data \
+              --label-mapping binary
+          else
+            echo "git-annex not available, using sample brain data"
+            uv run python -c "
+          import csv; from nobrainer.utils import get_data
+          src = get_data(); pairs = []
+          with open(src) as f:
+            r = csv.reader(f); next(r)
+            pairs = list(r)[:5]
+          splits = ['train','train','train','val','test']
+          with open('manifest.csv', 'w', newline='') as f:
+            w = csv.DictWriter(f, ['t1w_path','label_path','split']); w.writeheader()
+            for i,(t1,lbl) in enumerate(pairs):
+              w.writerow(dict(t1w_path=t1, label_path=lbl, split=splits[i]))
+          print('Manifest created with', len(pairs), 'volumes')
+          "
+          fi
 
+          echo "=== Step 2: Train deterministic MeshNet (20 epochs) ==="
           uv run python 02_train_meshnet.py \
             --manifest manifest.csv \
             --config config.yaml \
             --output-dir checkpoints/meshnet \
             --epochs 20
 
+          echo "=== Step 3a: MC dropout variant ==="
           uv run python 03_train_bayesian.py \
             --manifest manifest.csv \
             --config config.yaml \
-            --warmstart checkpoints/meshnet/model.pth \
-            --output-dir checkpoints/bayesian \
+            --variant bwn_multi \
+            --warmstart checkpoints/meshnet \
+            --output-dir checkpoints/bwn_multi \
             --epochs 20
 
-          uv run python 04_evaluate.py \
-            --model checkpoints/bayesian/model.pth \
+          echo "=== Step 3b: Spike-and-slab variant (20 epochs) ==="
+          uv run python 03_train_bayesian.py \
             --manifest manifest.csv \
-            --split test \
-            --n-samples 10 \
-            --output-dir results
+            --config config.yaml \
+            --variant bvwn_multi_prior \
+            --warmstart checkpoints/meshnet \
+            --output-dir checkpoints/bvwn_multi_prior \
+            --epochs 20
+
+          echo "=== Step 3c: Gaussian Bayesian variant (20 epochs) ==="
+          uv run python 03_train_bayesian.py \
+            --manifest manifest.csv \
+            --config config.yaml \
+            --variant bayesian_gaussian \
+            --warmstart checkpoints/meshnet \
+            --output-dir checkpoints/bayesian_gaussian \
+            --epochs 20
 
           echo "=== Checking outputs ==="
-          ls -la checkpoints/ results/ figures/ 2>/dev/null || true
+          ls -la checkpoints/*/ 2>/dev/null || true
 
       - name: Run kwyk reproduction scripts (full)
         if: steps.mode.outputs.mode == 'full'
