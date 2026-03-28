@@ -95,7 +95,8 @@ jobs:
           uv pip install \
             ".[bayesian,generative,dev]" \
             monai \
-            pyro-ppl
+            pyro-ppl \
+            matplotlib
 
       - name: Verify GPU access
         run: |
