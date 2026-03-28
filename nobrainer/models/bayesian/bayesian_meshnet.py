@@ -36,6 +36,7 @@ class _BayesConvBNActDrop(PyroModule):
         activation: str,
         dropout_rate: float,
         prior_type: str,
+        **sas_kwargs,
     ) -> None:
         super().__init__()
         padding = dilation  # same-size output for 3×3×3 kernel
@@ -47,6 +48,7 @@ class _BayesConvBNActDrop(PyroModule):
             dilation=dilation,
             bias=False,
             prior_type=prior_type,
+            **sas_kwargs,
         )
         self.bn = nn.BatchNorm3d(out_ch)
         self.act_fn = {"relu": F.relu, "elu": F.elu}[activation.lower()]
@@ -77,10 +79,16 @@ class BayesianMeshNet(PyroModule):
     dropout_rate : float
         Spatial dropout probability (0 = disabled).
     prior_type : str
-        ``"standard_normal"`` or ``"laplace"``.
+        ``"standard_normal"``, ``"laplace"``, or ``"spike_and_slab"``.
     kl_weight : float
         Scalar applied to the summed KL when computing the ELBO.
         Stored as an attribute; not used internally during forward.
+    spike_sigma : float
+        Spike component σ for spike-and-slab prior (default 0.001).
+    slab_sigma : float
+        Slab component σ for spike-and-slab prior (default 1.0).
+    prior_pi : float
+        Prior probability of the spike component (default 0.5).
     """
 
     def __init__(
@@ -93,6 +101,9 @@ class BayesianMeshNet(PyroModule):
         dropout_rate: float = 0.25,
         prior_type: str = "standard_normal",
         kl_weight: float = 1.0,
+        spike_sigma: float = 0.001,
+        slab_sigma: float = 1.0,
+        prior_pi: float = 0.5,
     ) -> None:
         super().__init__()
         if receptive_field not in _DILATION_SCHEDULES:
@@ -101,15 +112,31 @@ class BayesianMeshNet(PyroModule):
                 f"got {receptive_field}"
             )
         self.kl_weight = kl_weight
+        self.prior_type = prior_type
         dilations = _DILATION_SCHEDULES[receptive_field]
         self._n_layers = len(dilations)
+
+        # Extra kwargs for spike-and-slab layers
+        sas_kwargs = {}
+        if prior_type == "spike_and_slab":
+            sas_kwargs = {
+                "spike_sigma": spike_sigma,
+                "slab_sigma": slab_sigma,
+                "prior_pi": prior_pi,
+            }
 
         # Register each Bayesian layer as a named attribute so Pyro assigns
         # unique sample site names (nn.ModuleList does not propagate names).
         for i, dil in enumerate(dilations):
             in_ch = in_channels if i == 0 else filters
             layer = _BayesConvBNActDrop(
-                in_ch, filters, dil, activation, dropout_rate, prior_type
+                in_ch,
+                filters,
+                dil,
+                activation,
+                dropout_rate,
+                prior_type,
+                **sas_kwargs,
             )
             setattr(self, f"layer_{i}", layer)
 
@@ -132,6 +159,9 @@ def bayesian_meshnet(
     dropout_rate: float = 0.25,
     prior_type: str = "standard_normal",
     kl_weight: float = 1.0,
+    spike_sigma: float = 0.001,
+    slab_sigma: float = 1.0,
+    prior_pi: float = 0.5,
     **kwargs,
 ) -> BayesianMeshNet:
     """Factory function for :class:`BayesianMeshNet`."""
@@ -144,6 +174,9 @@ def bayesian_meshnet(
         dropout_rate=dropout_rate,
         prior_type=prior_type,
         kl_weight=kl_weight,
+        spike_sigma=spike_sigma,
+        slab_sigma=slab_sigma,
+        prior_pi=prior_pi,
     )
 
 

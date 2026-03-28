@@ -1,14 +1,23 @@
 #!/usr/bin/env python
 """Train a Bayesian MeshNet with optional warm-start from deterministic weights.
 
-Usage:
-    # With warm-start from a trained deterministic MeshNet
-    python 03_train_bayesian.py --manifest manifest.csv --config config.yaml \
-        --warmstart checkpoints/meshnet
+Supports the three kwyk model variants:
+  - bvwn_multi_prior: Spike-and-slab dropout (default)
+  - bayesian_gaussian: Standard Gaussian prior
+  - bwn_multi: MC Bernoulli dropout (deterministic model, dropout at inference)
 
-    # Without warm-start (train from scratch)
+Usage:
+    # Spike-and-slab (original kwyk variant)
     python 03_train_bayesian.py --manifest manifest.csv --config config.yaml \
-        --no-warmstart
+        --variant bvwn_multi_prior --warmstart checkpoints/meshnet
+
+    # Standard Gaussian prior
+    python 03_train_bayesian.py --manifest manifest.csv --config config.yaml \
+        --variant bayesian_gaussian --warmstart checkpoints/meshnet
+
+    # MC Bernoulli dropout (copies deterministic weights, uses dropout at inference)
+    python 03_train_bayesian.py --manifest manifest.csv --config config.yaml \
+        --variant bwn_multi --warmstart checkpoints/meshnet
 
     # Override epochs
     python 03_train_bayesian.py --manifest manifest.csv --config config.yaml \
@@ -89,6 +98,16 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default="checkpoints/bayesian",
         help="Directory for saving model checkpoints and figures",
+    )
+    parser.add_argument(
+        "--variant",
+        type=str,
+        default="bvwn_multi_prior",
+        choices=["bvwn_multi_prior", "bayesian_gaussian", "bwn_multi"],
+        help=(
+            "Model variant: bvwn_multi_prior (spike-and-slab, default), "
+            "bayesian_gaussian (Gaussian prior), bwn_multi (MC Bernoulli dropout)"
+        ),
     )
     parser.add_argument(
         "--warmstart",
@@ -406,6 +425,111 @@ def train_bayesian(
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+def _train_mc_dropout(args, config, train_pairs, val_pairs, output_dir):
+    """Train MC Bernoulli dropout variant (bwn_multi).
+
+    This variant uses the deterministic MeshNet but keeps dropout enabled
+    at inference time to generate MC samples for uncertainty estimation.
+    It's trained identically to the deterministic model; the difference
+    is only at inference time.
+    """
+    from nobrainer.processing.dataset import Dataset
+    from nobrainer.processing.segmentation import Segmentation
+
+    epochs = (
+        args.epochs if args.epochs is not None else config.get("pretrain_epochs", 50)
+    )
+    n_classes = config["n_classes"]
+    block_shape = tuple(config["block_shape"])
+    batch_size = config["batch_size"]
+    lr = config.get("lr", 1e-4)
+    label_mapping = config.get("label_mapping", "binary")
+
+    model_args = {
+        "n_classes": n_classes,
+        "filters": config.get("filters", 96),
+        "receptive_field": config.get("receptive_field", 37),
+        "dropout_rate": config.get("dropout_rate", 0.25),
+    }
+
+    use_warmstart = args.warmstart is not None and not args.no_warmstart
+
+    if use_warmstart:
+        # For bwn_multi, warm-start means copying the deterministic weights directly
+        warmstart_dir = Path(args.warmstart)
+        det_weights_path = warmstart_dir / "model.pth"
+
+        if not det_weights_path.exists():
+            log.error("Warm-start weights not found at %s", det_weights_path)
+            return
+
+        from nobrainer.models import get as get_model
+
+        model = get_model("meshnet")(**model_args)
+        model.load_state_dict(torch.load(det_weights_path, weights_only=True))
+        log.info(
+            "MC dropout variant: loaded deterministic weights from %s",
+            det_weights_path,
+        )
+
+        # Save directly — the model is already trained, just used with
+        # dropout at inference time
+        torch.save(model.state_dict(), output_dir / "model.pth")
+
+        # Also save metadata indicating this is an MC dropout model
+        seg = Segmentation(base_model="meshnet", model_args=model_args)
+        seg.model_ = model
+        seg.block_shape_ = block_shape
+        seg.n_classes_ = n_classes
+        seg._optimizer_class = "Adam"
+        seg._optimizer_args = {"lr": lr}
+        seg._loss_name = "CrossEntropyLoss"
+        seg._training_result = {
+            "variant": "bwn_multi",
+            "mc_dropout": True,
+            "source_weights": str(det_weights_path),
+        }
+        seg.save(output_dir)
+        log.info(
+            "MC dropout model saved to %s (uses dropout at inference for MC samples)",
+            output_dir,
+        )
+    else:
+        # Train from scratch — same as deterministic but we'll use
+        # dropout at inference time
+        log.info("Training MC dropout variant from scratch")
+
+        ds_train = (
+            Dataset.from_files(
+                train_pairs, block_shape=block_shape, n_classes=n_classes
+            )
+            .batch(batch_size)
+            .binarize(label_mapping)
+        )
+
+        seg = Segmentation(
+            base_model="meshnet",
+            model_args=model_args,
+            checkpoint_filepath=str(output_dir),
+        )
+
+        train_losses = []
+
+        def _record_loss(epoch, loss, model):
+            train_losses.append(loss)
+            log.info("Epoch %d/%d: loss=%.6f", epoch + 1, epochs, loss)
+
+        seg.fit(
+            dataset_train=ds_train,
+            epochs=epochs,
+            optimizer=torch.optim.Adam,
+            opt_args={"lr": lr},
+            callbacks=[_record_loss],
+        )
+        seg.save(output_dir)
+        log.info("MC dropout model trained and saved to %s", output_dir)
+
+
 def main() -> None:
     """Train Bayesian MeshNet with optional warm-start."""
     args = parse_args()
@@ -420,7 +544,6 @@ def main() -> None:
     block_shape = tuple(config["block_shape"])
     batch_size = config["batch_size"]
     lr = config.get("lr", 1e-4)
-    kl_weight = config.get("kl_weight", 1.0)
     initial_rho = config.get("initial_rho", -3.0)
     n_samples = config.get("n_samples", 10)
     label_mapping = config.get("label_mapping", "binary")
@@ -429,13 +552,34 @@ def main() -> None:
 
     use_warmstart = args.warmstart is not None and not args.no_warmstart
 
+    # ---- Load variant config from config.yaml variants section --------------
+    variant = args.variant
+    variants = config.get("variants", {})
+    variant_config = variants.get(variant, {})
+    log.info("Model variant: %s — %s", variant, variant_config.get("description", ""))
+
+    # ---- MC Bernoulli dropout shortcut (no Bayesian training needed) ---------
+    if variant == "bwn_multi":
+        train_pairs = load_manifest(args.manifest, split="train")
+        val_pairs = load_manifest(args.manifest, split="val")
+        _train_mc_dropout(args, config, train_pairs, val_pairs, output_dir)
+        elapsed = time.time() - t_start
+        log.info("MC dropout variant complete in %.1f s", elapsed)
+        return
+
+    # ---- Determine prior type from variant config ---------------------------
+    prior_type = variant_config.get("prior_type", "standard_normal")
+    kl_weight = variant_config.get("kl_weight", config.get("kl_weight", 1.0))
+
     log.info("Config loaded from %s", args.config)
     log.info(
-        "Training Bayesian MeshNet: epochs=%d, n_classes=%d, "
-        "block_shape=%s, kl_weight=%.4f, warmstart=%s",
+        "Training Bayesian MeshNet (%s): epochs=%d, n_classes=%d, "
+        "block_shape=%s, prior=%s, kl_weight=%.4f, warmstart=%s",
+        variant,
         epochs,
         n_classes,
         block_shape,
+        prior_type,
         kl_weight,
         use_warmstart,
     )
@@ -476,12 +620,22 @@ def main() -> None:
         "filters": config.get("filters", 96),
         "receptive_field": config.get("receptive_field", 37),
         "dropout_rate": config.get("dropout_rate", 0.25),
+        "prior_type": prior_type,
+        "kl_weight": kl_weight,
     }
+
+    # Add spike-and-slab specific params if applicable
+    if prior_type == "spike_and_slab":
+        model_args["spike_sigma"] = variant_config.get("spike_sigma", 0.001)
+        model_args["slab_sigma"] = variant_config.get("slab_sigma", 1.0)
+        model_args["prior_pi"] = variant_config.get("prior_pi", 0.5)
+
     log.info("Model args: %s", model_args)
 
     bayesian_model = get_model("bayesian_meshnet")(**model_args)
     log.info(
-        "Bayesian MeshNet created: %d parameters",
+        "Bayesian MeshNet (%s) created: %d parameters",
+        variant,
         sum(p.numel() for p in bayesian_model.parameters()),
     )
 
@@ -501,7 +655,13 @@ def main() -> None:
         log.info("Loading deterministic weights from %s", det_weights_path)
 
         # Build a deterministic MeshNet with matching architecture
-        det_model = get_model("meshnet")(**model_args)
+        det_model_args = {
+            k: v
+            for k, v in model_args.items()
+            if k
+            not in ("prior_type", "kl_weight", "spike_sigma", "slab_sigma", "prior_pi")
+        }
+        det_model = get_model("meshnet")(**det_model_args)
         det_model.load_state_dict(torch.load(det_weights_path, weights_only=True))
 
         from nobrainer.models.bayesian.warmstart import (
@@ -566,6 +726,8 @@ def main() -> None:
     seg._optimizer_args = {"lr": lr}
     seg._loss_name = "ELBOLoss"
     seg._training_result = {
+        "variant": variant,
+        "prior_type": prior_type,
         "final_loss": result["train_losses"][-1] if result["train_losses"] else 0.0,
         "best_loss": result["best_loss"],
         "epochs_completed": result["epochs_completed"],
@@ -581,8 +743,10 @@ def main() -> None:
         result["val_dice_means"][-1] if result["val_dice_means"] else float("nan")
     )
     log.info("=" * 60)
-    log.info("Bayesian MeshNet training complete")
+    log.info("Bayesian MeshNet training complete (%s)", variant)
     log.info("  Output directory : %s", output_dir)
+    log.info("  Variant          : %s", variant)
+    log.info("  Prior type       : %s", prior_type)
     log.info("  Epochs           : %d", epochs)
     log.info("  Warm-start       : %s", "yes" if use_warmstart else "no")
     log.info("  KL weight        : %.4f", kl_weight)

@@ -97,36 +97,65 @@ run_data() {
 
 # --- Step: Training ---
 run_train() {
-    log "Step 2: Training deterministic MeshNet (warm-start)..."
+    log "Step 2: Training deterministic MeshNet (warm-start foundation)..."
     python 02_train_meshnet.py \
         --manifest manifest.csv \
         --config config.yaml \
         --output-dir checkpoints/meshnet \
         $EXTRA_ARGS
-    log "Deterministic MeshNet trained"
+    log "Deterministic MeshNet trained (bwn / MAP variant)"
 
-    log "Step 3: Training Bayesian MeshNet with warm-start..."
+    log "Step 3a: MC Bernoulli dropout variant (bwn_multi)..."
     python 03_train_bayesian.py \
         --manifest manifest.csv \
         --config config.yaml \
-        --warmstart checkpoints/meshnet/model.pth \
-        --output-dir checkpoints/bayesian \
+        --variant bwn_multi \
+        --warmstart checkpoints/meshnet \
+        --output-dir checkpoints/bwn_multi \
         $EXTRA_ARGS
-    log "Bayesian MeshNet trained"
+    log "MC Bernoulli dropout variant saved"
+
+    log "Step 3b: Spike-and-slab dropout variant (bvwn_multi_prior)..."
+    python 03_train_bayesian.py \
+        --manifest manifest.csv \
+        --config config.yaml \
+        --variant bvwn_multi_prior \
+        --warmstart checkpoints/meshnet \
+        --output-dir checkpoints/bvwn_multi_prior \
+        $EXTRA_ARGS
+    log "Spike-and-slab dropout variant trained"
+
+    log "Step 3c: Standard Gaussian Bayesian variant (for comparison)..."
+    python 03_train_bayesian.py \
+        --manifest manifest.csv \
+        --config config.yaml \
+        --variant bayesian_gaussian \
+        --warmstart checkpoints/meshnet \
+        --output-dir checkpoints/bayesian_gaussian \
+        $EXTRA_ARGS
+    log "Gaussian Bayesian variant trained"
 }
 
 # --- Step: Evaluate ---
 run_evaluate() {
-    log "Step 4: Evaluating on test set..."
-    if [ -f scripts/kwyk_reproduction/04_evaluate.py ]; then
-        python 04_evaluate.py \
-            --model checkpoints/bayesian/model.pth \
-            --manifest manifest.csv \
-            --split test \
-            --n-samples 10 \
-            --output-dir results
+    log "Step 4: Evaluating all model variants on test set..."
+    if [ -f 04_evaluate.py ]; then
+        for variant_dir in checkpoints/meshnet checkpoints/bwn_multi checkpoints/bvwn_multi_prior checkpoints/bayesian_gaussian; do
+            variant_name=$(basename "$variant_dir")
+            if [ -f "$variant_dir/model.pth" ]; then
+                log "  Evaluating $variant_name..."
+                python 04_evaluate.py \
+                    --model "$variant_dir/model.pth" \
+                    --manifest manifest.csv \
+                    --split test \
+                    --n-samples 10 \
+                    --output-dir "results/$variant_name"
+            else
+                warn "  Skipping $variant_name (no model.pth found)"
+            fi
+        done
     else
-        warn "04_evaluate.py not yet implemented"
+        warn "04_evaluate.py not found"
     fi
 }
 

@@ -55,22 +55,39 @@ priors for the Bayesian model in Step 3.
 
 **Output**: `checkpoints/meshnet/model.pth`, `figures/meshnet_learning_curve.png`
 
-### Step 3: Train Bayesian MeshNet
+### Step 3: Train All Model Variants
+
+The original kwyk study trained 3 model variants. Use `--variant` to select:
 
 ```bash
-# With warm-start (recommended — faster convergence)
+# 3a. MC Bernoulli dropout (bwn_multi) — copies deterministic weights,
+#     uses dropout at inference for MC sampling
 python 03_train_bayesian.py \
-  --manifest manifest.csv \
-  --warmstart checkpoints/meshnet/model.pth \
+  --manifest manifest.csv --variant bwn_multi \
+  --warmstart checkpoints/meshnet --output-dir checkpoints/bwn_multi
+
+# 3b. Spike-and-slab dropout (bvwn_multi_prior) — the flagship kwyk model
+python 03_train_bayesian.py \
+  --manifest manifest.csv --variant bvwn_multi_prior \
+  --warmstart checkpoints/meshnet --output-dir checkpoints/bvwn_multi_prior \
   --epochs 50
 
-# Without warm-start (for comparison)
-python 03_train_bayesian.py --manifest manifest.csv --no-warmstart --epochs 50
+# 3c. Standard Gaussian Bayesian (for comparison, not in original kwyk)
+python 03_train_bayesian.py \
+  --manifest manifest.csv --variant bayesian_gaussian \
+  --warmstart checkpoints/meshnet --output-dir checkpoints/bayesian_gaussian \
+  --epochs 50
 ```
 
-Uses ELBO loss (CrossEntropy + KL divergence). The warm-start transfers
-deterministic weights to `weight_mu` and initializes `weight_rho` to -3.0
-(low initial uncertainty), based on the MOPED method.
+| Variant | kwyk ID | Prior | Inference | Description |
+|---------|---------|-------|-----------|-------------|
+| `bwn` (step 2) | bwn | N/A (MAP) | Deterministic | Maximum a-posteriori, no uncertainty |
+| `bwn_multi` | bwn_multi | N/A | MC Bernoulli dropout | Dropout enabled at inference time |
+| `bvwn_multi_prior` | bvwn_multi_prior | Spike-and-slab | Variational | π·N(0,σ₁) + (1-π)·N(0,σ₂) mixture prior |
+| `bayesian_gaussian` | — | N(0,1) | Variational | Standard Bayes-by-backprop (comparison) |
+
+The warm-start transfers deterministic weights to `weight_mu` and initializes
+`weight_rho` to -3.0 (low initial uncertainty), based on the MOPED method.
 
 **Output**: `checkpoints/bayesian/model.pth`, `checkpoints/bayesian/croissant.json`,
 `figures/bayesian_learning_curve.png`
@@ -209,6 +226,10 @@ Edit `config.yaml` to change default hyperparameters:
 | lr | 0.0001 | 0.0001 | Adam learning rate |
 | kl_weight | 1.0 | implicit | KL divergence scaling |
 | dropout_rate | 0.25 | 0.25 | Spatial dropout |
+| prior_type | spike_and_slab | spike_and_slab | SSD: π·N(0,0.001) + (1-π)·N(0,1) |
+| spike_sigma | 0.001 | ~0 | Spike component σ |
+| slab_sigma | 1.0 | ~1 | Slab component σ |
+| prior_pi | 0.5 | 0.5 | Spike probability |
 | n_classes | 2 | 50 | Binary brain extraction (kwyk used 50-class) |
 | label_mapping | binary | N/A | Also supports 6/50/115-class |
 
