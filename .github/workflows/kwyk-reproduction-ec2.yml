@@ -99,15 +99,12 @@ jobs:
 
       - name: Install git-annex
         run: |
+          export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
           if ! command -v git-annex &>/dev/null; then
-            echo "Installing git-annex standalone..."
-            # git-annex is a Haskell binary — not installable via pip/uv.
-            # Use the official standalone Linux tarball.
-            curl -fsSL https://downloads.kitenet.net/git-annex/linux/current/git-annex-standalone-amd64.tar.gz \
-              | tar xz -C /usr/local/bin --strip-components=1 git-annex.linux/git-annex git-annex.linux/git-annex-shell \
-              2>/dev/null || echo "WARN: git-annex install failed, DataLad will use fallback"
+            echo "Installing git-annex via uv..."
+            uv tool install git-annex
           fi
-          git-annex version 2>/dev/null || echo "git-annex not installed"
+          git-annex version
 
       - name: Set up venv from pre-installed base
         run: |
