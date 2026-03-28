@@ -1,0 +1,305 @@
+name: KWYK Reproduction - EC2 GPU
+run-name: ${{ github.ref_name }} - KWYK Reproduction
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode"
+        required: true
+        default: "smoke-test"
+        type: choice
+        options:
+          - smoke-test
+          - small-train
+          - full
+      instance_type:
+        description: "EC2 instance type"
+        required: false
+        default: ""
+        type: string
+      on_demand:
+        description: "Use on-demand pricing (not spot)"
+        required: false
+        default: false
+        type: boolean
+  pull_request:
+    branches: [main, master, alpha]
+    types: [labeled, synchronize]
+
+jobs:
+  start-runner:
+    name: Start self-hosted EC2 runner
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+       contains(github.event.pull_request.labels.*.name, 'kwyk-gpu-test'))
+    outputs:
+      label: ${{ steps.start-ec2-runner.outputs.label }}
+      ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
+    steps:
+      - name: Determine instance config
+        id: gpu-config
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            INSTANCE="${{ inputs.instance_type }}"
+            if [ "${{ inputs.on_demand }}" = "true" ]; then
+              MARKET=""
+            else
+              MARKET="spot"
+            fi
+          else
+            # PR: parse labels
+            LABELS='${{ toJSON(github.event.pull_request.labels.*.name) }}'
+            INSTANCE=$(echo "$LABELS" | jq -r '[.[] | select(startswith("gpu-instance:"))] | if length > 0 then .[0] | split(":")[1] else "" end')
+            ONDEMAND=$(echo "$LABELS" | jq -r '[.[] | select(. == "gpu-ondemand:true")] | if length > 0 then "true" else "" end')
+            if [ -n "$ONDEMAND" ]; then MARKET=""; else MARKET="spot"; fi
+          fi
+          echo "instance=${INSTANCE}" >> $GITHUB_OUTPUT
+          echo "market_type=${MARKET}" >> $GITHUB_OUTPUT
+          echo "Config: instance=${INSTANCE:-default}, market=${MARKET:-spot}"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_KEY_SECRET }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Start EC2 runner
+        id: start-ec2-runner
+        uses: machulav/ec2-github-runner@v2.5.2
+        with:
+          mode: start
+          github-token: ${{ secrets.GH_TOKEN }}
+          ec2-image-id: ${{ vars.AWS_IMAGE_ID }}
+          ec2-instance-type: ${{ steps.gpu-config.outputs.instance || vars.AWS_INSTANCE_TYPE }}
+          subnet-id: ${{ vars.AWS_SUBNET }}
+          security-group-id: ${{ vars.AWS_SECURITY_GROUP }}
+          market-type: ${{ steps.gpu-config.outputs.market_type || 'spot' }}
+
+  kwyk-reproduction:
+    needs: start-runner
+    runs-on: ${{ needs.start-runner.outputs.label }}
+    timeout-minutes: 120
+    env:
+      EC2_USER_HOME: /home/ec2-user
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Log GPU runner config
+        run: |
+          echo "Instance type: $(curl -s http://169.254.169.254/latest/meta-data/instance-type 2>/dev/null || echo 'unknown')"
+          echo "Market type: $(curl -s http://169.254.169.254/latest/meta-data/instance-life-cycle 2>/dev/null || echo 'unknown')"
+
+      - name: Set up venv from pre-installed base
+        run: |
+          set -ex
+          BASE_VENV="${EC2_USER_HOME}/nobrainer-env"
+          export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
+
+          if [ -d "$BASE_VENV" ]; then
+            echo "Found pre-installed base venv at $BASE_VENV"
+            cp -a "$BASE_VENV" .venv
+          else
+            echo "No base venv found — creating from scratch"
+            uv venv --python 3.14
+          fi
+
+          uv pip install \
+            ".[bayesian,generative,zarr,versioning,dev]" \
+            monai pyro-ppl datalad matplotlib pyyaml scipy nibabel
+
+      - name: Verify GPU access
+        run: |
+          export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
+          uv run python -c "
+          import torch
+          assert torch.cuda.is_available(), 'CUDA not available'
+          print(f'GPU: {torch.cuda.get_device_name(0)}')
+          print(f'CUDA: {torch.version.cuda}')
+          print(f'PyTorch: {torch.__version__}')
+          print(f'Memory: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB')
+          "
+
+      - name: Cache sample brain data
+        uses: actions/cache@v4
+        with:
+          path: /tmp/nobrainer-data
+          key: nobrainer-sample-data-v1
+
+      - name: Run kwyk sr-tests smoke test
+        run: |
+          export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
+          uv run pytest nobrainer/sr-tests/test_kwyk_smoke.py -v \
+            --no-header \
+            --tb=short
+
+      - name: Determine run mode
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "mode=${{ inputs.mode }}" >> $GITHUB_OUTPUT
+          else
+            echo "mode=smoke-test" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run kwyk reproduction scripts (smoke test)
+        if: steps.mode.outputs.mode == 'smoke-test'
+        run: |
+          set -ex
+          export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
+          cd scripts/kwyk_reproduction
+
+          echo "=== Step 1: Assemble dataset (smoke: ds000114 only) ==="
+          uv run python 01_assemble_dataset.py \
+            --datasets ds000114 \
+            --output-csv manifest.csv \
+            --output-dir data \
+            --label-mapping binary
+
+          echo "=== Step 2: Train deterministic MeshNet (2 epochs) ==="
+          uv run python 02_train_meshnet.py \
+            --manifest manifest.csv \
+            --config config.yaml \
+            --output-dir checkpoints/meshnet \
+            --epochs 2
+
+          echo "=== Step 3: Train Bayesian MeshNet with warm-start (2 epochs) ==="
+          uv run python 03_train_bayesian.py \
+            --manifest manifest.csv \
+            --config config.yaml \
+            --warmstart checkpoints/meshnet/model.pth \
+            --output-dir checkpoints/bayesian \
+            --epochs 2
+
+          echo "=== Step 4: Evaluate ==="
+          uv run python 04_evaluate.py \
+            --model checkpoints/bayesian/model.pth \
+            --manifest manifest.csv \
+            --split test \
+            --n-samples 3 \
+            --output-dir results
+
+          echo "=== Checking outputs ==="
+          ls -la checkpoints/meshnet/ checkpoints/bayesian/ results/ figures/ 2>/dev/null || true
+
+      - name: Run kwyk reproduction scripts (small training)
+        if: steps.mode.outputs.mode == 'small-train'
+        run: |
+          set -ex
+          export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
+          cd scripts/kwyk_reproduction
+
+          uv run python 01_assemble_dataset.py \
+            --datasets ds000114 \
+            --output-csv manifest.csv \
+            --output-dir data \
+            --label-mapping binary
+
+          uv run python 02_train_meshnet.py \
+            --manifest manifest.csv \
+            --config config.yaml \
+            --output-dir checkpoints/meshnet \
+            --epochs 20
+
+          uv run python 03_train_bayesian.py \
+            --manifest manifest.csv \
+            --config config.yaml \
+            --warmstart checkpoints/meshnet/model.pth \
+            --output-dir checkpoints/bayesian \
+            --epochs 20
+
+          uv run python 04_evaluate.py \
+            --model checkpoints/bayesian/model.pth \
+            --manifest manifest.csv \
+            --split test \
+            --n-samples 10 \
+            --output-dir results
+
+          echo "=== Checking outputs ==="
+          ls -la checkpoints/ results/ figures/ 2>/dev/null || true
+
+      - name: Run kwyk reproduction scripts (full)
+        if: steps.mode.outputs.mode == 'full'
+        timeout-minutes: 1440
+        run: |
+          set -ex
+          export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
+          cd scripts/kwyk_reproduction
+
+          uv run python 01_assemble_dataset.py \
+            --datasets ds000114 ds000228 ds002609 ds001021 ds002105 \
+            --output-csv manifest.csv \
+            --output-dir data \
+            --label-mapping binary --conform
+
+          uv run python 02_train_meshnet.py \
+            --manifest manifest.csv \
+            --config config.yaml \
+            --output-dir checkpoints/meshnet \
+            --epochs 50
+
+          uv run python 03_train_bayesian.py \
+            --manifest manifest.csv \
+            --config config.yaml \
+            --warmstart checkpoints/meshnet/model.pth \
+            --output-dir checkpoints/bayesian \
+            --epochs 50
+
+          uv run python 04_evaluate.py \
+            --model checkpoints/bayesian/model.pth \
+            --manifest manifest.csv \
+            --split test \
+            --n-samples 10 \
+            --output-dir results
+
+          uv run python 05_compare_kwyk.py \
+            --new-model checkpoints/bayesian/model.pth \
+            --kwyk-dir ../../kwyk \
+            --manifest manifest.csv \
+            --output-dir results/comparison || echo "WARN: kwyk comparison failed (container may not be available)"
+
+          uv run python 06_block_size_sweep.py \
+            --manifest manifest.csv \
+            --block-sizes 32 64 128 \
+            --output-dir results/sweep
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kwyk-reproduction-${{ steps.mode.outputs.mode }}
+          path: |
+            scripts/kwyk_reproduction/figures/
+            scripts/kwyk_reproduction/results/
+            scripts/kwyk_reproduction/checkpoints/*/croissant.json
+          retention-days: 30
+          if-no-files-found: warn
+
+  stop-runner:
+    name: Stop self-hosted EC2 runner
+    needs:
+      - start-runner
+      - kwyk-reproduction
+    runs-on: ubuntu-latest
+    if: ${{ always() && needs.start-runner.result == 'success' }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_KEY_SECRET }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Stop EC2 runner
+        uses: machulav/ec2-github-runner@v2.5.2
+        with:
+          mode: stop
+          github-token: ${{ secrets.GH_TOKEN }}
+          label: ${{ needs.start-runner.outputs.label }}
+          ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
