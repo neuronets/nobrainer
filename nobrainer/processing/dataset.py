@@ -10,6 +10,71 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
+# Named label mapping CSV locations (relative to package or absolute)
+_NAMED_MAPPINGS = {
+    "6-class": "6-class-mapping.csv",
+    "50-class": "50-class-mapping.csv",
+    "115-class": "115-class-mapping.csv",
+}
+
+
+def _load_label_mapping(name_or_path: str) -> Callable:
+    """Load a label mapping CSV and return a remap function.
+
+    Accepts named mappings ("6-class", "50-class", "115-class") or a
+    path to a CSV with ``original`` and ``new`` columns.
+    """
+    import csv as csv_mod
+
+    if name_or_path in _NAMED_MAPPINGS:
+        # Search for CSV in known locations
+        csv_name = _NAMED_MAPPINGS[name_or_path]
+        candidates = [
+            Path(__file__).parent.parent.parent
+            / "scripts"
+            / "kwyk_reproduction"
+            / "label_mappings"
+            / csv_name,
+            Path.home()
+            / "software"
+            / "neuronets"
+            / "nobrainer_training_scripts"
+            / "csv-files"
+            / csv_name,
+        ]
+        csv_path = None
+        for c in candidates:
+            if c.exists():
+                csv_path = c
+                break
+        if csv_path is None:
+            raise FileNotFoundError(
+                f"Label mapping '{name_or_path}' not found. "
+                f"Searched: {[str(c) for c in candidates]}"
+            )
+    else:
+        csv_path = Path(name_or_path)
+        if not csv_path.exists():
+            raise FileNotFoundError(f"Label mapping CSV not found: {csv_path}")
+
+    # Parse CSV: build original → new lookup
+    lookup = {}
+    with open(csv_path) as f:
+        reader = csv_mod.DictReader(f)
+        for row in reader:
+            orig = int(row["original"])
+            new = int(row["new"])
+            lookup[orig] = new
+
+    def _remap(x):
+        """Remap FreeSurfer labels using lookup table."""
+        result = torch.zeros_like(x)
+        for orig_val, new_val in lookup.items():
+            result[x == orig_val] = new_val
+        return result.float()
+
+    return _remap
+
 
 class Dataset:
     """Fluent dataset builder wrapping the nobrainer data pipeline.
@@ -96,15 +161,20 @@ class Dataset:
         self._dataloader = None  # invalidate cache
         return self
 
-    def binarize(self, labels: set[int] | Callable | None = None) -> "Dataset":
+    def binarize(self, labels: str | set[int] | Callable | None = None) -> "Dataset":
         """Binarize or remap labels.
 
         Parameters
         ----------
-        labels : set of ints, callable, or None
+        labels : str, set of ints, callable, or None
             - ``None`` (default): any non-zero value → 1
+            - ``"binary"``: same as None (any non-zero → 1)
+            - ``"6-class"``, ``"50-class"``, ``"115-class"``: named
+              parcellation from nobrainer_training_scripts mapping CSVs
             - ``set``: voxels with values in the set → 1, all others → 0
-            - ``callable``: custom function ``fn(label_tensor) → tensor``
+            - ``callable``: custom ``fn(label_tensor) → tensor``
+            - ``str`` (path): path to a custom mapping CSV with
+              ``original,new`` columns
 
         Examples
         --------
@@ -112,15 +182,25 @@ class Dataset:
 
             ds.binarize()
 
+        Named parcellation::
+
+            ds.binarize(labels="50-class")
+
         Select specific FreeSurfer regions (e.g., hippocampus L+R)::
 
             ds.binarize(labels={17, 53})
 
-        Custom mapping::
+        Custom mapping CSV::
 
-            ds.binarize(labels=lambda x: (x >= 1000).float())
+            ds.binarize(labels="/path/to/mapping.csv")
         """
-        self._binarize = labels if labels is not None else True
+        if isinstance(labels, str) and labels not in ("binary",):
+            # Named mapping or CSV path
+            self._binarize = _load_label_mapping(labels)
+        elif labels is not None:
+            self._binarize = labels
+        else:
+            self._binarize = True
         self._dataloader = None
         return self
 

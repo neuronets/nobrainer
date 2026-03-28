@@ -1,0 +1,44 @@
+# KWYK Brain Extraction Reproduction - Default Configuration
+# Based on: McClure et al., Frontiers in Neuroinformatics 2019
+
+# Model architecture
+model: bayesian_meshnet
+filters: 96
+receptive_field: 37  # dilation schedule [1,1,1,2,4,8,1]
+dropout_rate: 0.25
+prior_type: standard_normal
+
+# Training
+block_shape: [32, 32, 32]
+lr: 0.0001
+kl_weight: 1.0
+batch_size: 32
+n_classes: 2  # binary brain extraction
+label_mapping: binary  # binary, 6-class, 50-class, 115-class
+
+# Warm-start (deterministic → Bayesian)
+pretrain_epochs: 50
+bayesian_epochs: 50
+initial_rho: -3.0  # softplus(-3) ≈ 0.05 std
+
+# Inference
+n_samples: 10  # MC inference samples
+
+# Data augmentation
+augmentation: real  # real, synthetic, mixed
+
+# Data assembly
+datasets:
+  - ds000114
+  - ds000228
+  - ds002609
+split: [80, 10, 10]  # train/val/test percentages
+
+# Smoke test overrides
+smoke_test:
+  filters: 16
+  block_shape: [16, 16, 16]
+  pretrain_epochs: 1
+  bayesian_epochs: 1
+  batch_size: 2
+  n_samples: 3
