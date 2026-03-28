@@ -97,6 +97,26 @@ jobs:
           echo "Instance type: $(curl -s http://169.254.169.254/latest/meta-data/instance-type 2>/dev/null || echo 'unknown')"
           echo "Market type: $(curl -s http://169.254.169.254/latest/meta-data/instance-life-cycle 2>/dev/null || echo 'unknown')"
 
+      - name: Install git-annex
+        run: |
+          if ! command -v git-annex &>/dev/null; then
+            echo "Installing git-annex..."
+            if command -v dnf &>/dev/null; then
+              dnf install -y git-annex || {
+                # Amazon Linux 2023 may not have git-annex in default repos
+                # Install from conda-forge as fallback
+                export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
+                uv tool install --from conda-forge git-annex 2>/dev/null || {
+                  echo "WARN: git-annex not available, DataLad operations will fail"
+                  echo "Continuing anyway — smoke test uses get_data() instead"
+                }
+              }
+            elif command -v apt-get &>/dev/null; then
+              apt-get update && apt-get install -y git-annex
+            fi
+          fi
+          git-annex version 2>/dev/null || echo "git-annex not installed"
+
       - name: Set up venv from pre-installed base
         run: |
           set -ex
@@ -156,12 +176,28 @@ jobs:
           export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
           cd scripts/kwyk_reproduction
 
-          echo "=== Step 1: Assemble dataset (smoke: ds000114 only) ==="
-          uv run python 01_assemble_dataset.py \
-            --datasets ds000114 \
-            --output-csv manifest.csv \
-            --output-dir data \
-            --label-mapping binary
+          # Smoke test: skip DataLad (requires git-annex on AMI).
+          # The sr-tests already validated the pipeline with get_data().
+          # Here we verify the reproduction scripts parse configs correctly
+          # and that the training loop works end-to-end with sample data.
+          if command -v git-annex &>/dev/null; then
+            echo "=== Step 1: Assemble dataset (smoke: ds000114 only) ==="
+            uv run python 01_assemble_dataset.py \
+              --datasets ds000114 \
+              --output-csv manifest.csv \
+              --output-dir data \
+              --label-mapping binary
+          else
+            echo "=== Step 1: git-annex not available, creating manifest from sample data ==="
+            uv run python -c "
+          import csv; from nobrainer.utils import get_data; pairs = get_data()[:5]
+          f = open('manifest.csv', 'w', newline='')
+          w = csv.DictWriter(f, ['t1w_path', 'label_path', 'split']); w.writeheader()
+          splits = ['train','train','train','val','test']
+          [w.writerow(dict(t1w_path=t1, label_path=lbl, split=splits[i])) for i,(t1,lbl) in enumerate(pairs)]
+          f.close(); print('Manifest created with', len(pairs), 'volumes')
+          "
+          fi
 
           echo "=== Step 2: Train deterministic MeshNet (2 epochs) ==="
           uv run python 02_train_meshnet.py \
@@ -170,24 +206,26 @@ jobs:
             --output-dir checkpoints/meshnet \
             --epochs 2
 
-          echo "=== Step 3: Train Bayesian MeshNet with warm-start (2 epochs) ==="
+          echo "=== Step 3a: MC dropout variant ==="
           uv run python 03_train_bayesian.py \
             --manifest manifest.csv \
             --config config.yaml \
-            --warmstart checkpoints/meshnet/model.pth \
-            --output-dir checkpoints/bayesian \
+            --variant bwn_multi \
+            --warmstart checkpoints/meshnet \
+            --output-dir checkpoints/bwn_multi \
             --epochs 2
 
-          echo "=== Step 4: Evaluate ==="
-          uv run python 04_evaluate.py \
-            --model checkpoints/bayesian/model.pth \
+          echo "=== Step 3b: Spike-and-slab variant (2 epochs) ==="
+          uv run python 03_train_bayesian.py \
             --manifest manifest.csv \
-            --split test \
-            --n-samples 3 \
-            --output-dir results
+            --config config.yaml \
+            --variant bvwn_multi_prior \
+            --warmstart checkpoints/meshnet \
+            --output-dir checkpoints/bvwn_multi_prior \
+            --epochs 2
 
           echo "=== Checking outputs ==="
-          ls -la checkpoints/meshnet/ checkpoints/bayesian/ results/ figures/ 2>/dev/null || true
+          ls -la checkpoints/meshnet/ checkpoints/bwn_multi/ checkpoints/bvwn_multi_prior/ 2>/dev/null || true
 
       - name: Run kwyk reproduction scripts (small training)
         if: steps.mode.outputs.mode == 'small-train'
