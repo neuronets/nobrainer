@@ -190,12 +190,17 @@ jobs:
           else
             echo "=== Step 1: git-annex not available, creating manifest from sample data ==="
             uv run python -c "
-          import csv; from nobrainer.utils import get_data; pairs = get_data()[:5]
-          f = open('manifest.csv', 'w', newline='')
-          w = csv.DictWriter(f, ['t1w_path', 'label_path', 'split']); w.writeheader()
+          import csv; from nobrainer.utils import get_data
+          src = get_data(); pairs = []
+          with open(src) as f:
+            r = csv.reader(f); next(r)
+            pairs = list(r)[:5]
           splits = ['train','train','train','val','test']
-          [w.writerow(dict(t1w_path=t1, label_path=lbl, split=splits[i])) for i,(t1,lbl) in enumerate(pairs)]
-          f.close(); print('Manifest created with', len(pairs), 'volumes')
+          with open('manifest.csv', 'w', newline='') as f:
+            w = csv.DictWriter(f, ['t1w_path','label_path','split']); w.writeheader()
+            for i,(t1,lbl) in enumerate(pairs):
+              w.writerow(dict(t1w_path=t1, label_path=lbl, split=splits[i]))
+          print('Manifest created with', len(pairs), 'volumes')
           "
           fi
 
