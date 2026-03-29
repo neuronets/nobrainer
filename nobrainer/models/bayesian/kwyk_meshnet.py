@@ -1,11 +1,13 @@
 """KWYK MeshNet variants — matching McClure et al. (2019) architecture.
 
-All three kwyk models use Variational Weight Normalization (VWN)
-convolutions.  They differ only in the dropout layer:
+All three kwyk models use Fully Factorized Gaussian (FFG) convolutions
+with learned per-weight μ and σ, and the local reparameterization trick
+(Kingma et al. 2015).  They differ in the dropout layer:
 
-* **bwn** / **bwn_multi**: VWN conv + Bernoulli dropout
+* **bwn** / **bwn_multi**: FFG conv + Bernoulli dropout
   (``bwn`` disables dropout at inference; ``bwn_multi`` keeps it on)
-* **bvwn_multi_prior**: VWN conv + Concrete dropout (learned per-filter rate)
+* **bvwn_multi_prior**: FFG conv + Concrete dropout (learned per-filter rate)
+  This is the "spike-and-slab dropout" (SSD) model from the paper.
 
 Reference
 ---------
@@ -19,7 +21,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .vwn_layers import ConcreteDropout3d, VWNConv3d
+from .vwn_layers import ConcreteDropout3d, FFGConv3d
 
 _DILATION_SCHEDULES: dict[int, list[int]] = {
     37: [1, 1, 1, 2, 4, 8, 1],
@@ -40,7 +42,7 @@ class _VWNLayerBernoulli(nn.Module):
         sigma_init: float,
     ) -> None:
         super().__init__()
-        self.conv = VWNConv3d(
+        self.conv = FFGConv3d(
             in_ch,
             out_ch,
             kernel_size=3,
@@ -71,7 +73,7 @@ class _VWNLayerConcrete(nn.Module):
         concrete_init_p: float = 0.9,
     ) -> None:
         super().__init__()
-        self.conv = VWNConv3d(
+        self.conv = FFGConv3d(
             in_ch,
             out_ch,
             kernel_size=3,
@@ -186,7 +188,7 @@ class KWYKMeshNet(nn.Module):
         """Sum KL divergence from all VWN conv layers."""
         kl = torch.tensor(0.0, device=next(self.parameters()).device)
         for m in self.modules():
-            if isinstance(m, VWNConv3d):
+            if isinstance(m, FFGConv3d):
                 kl = kl + m.kl
         return kl
 

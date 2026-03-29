@@ -1,17 +1,25 @@
-"""Variational Weight Normalization (VWN) layers — matching kwyk architecture.
+"""Fully Factorized Gaussian (FFG) layers with local reparameterization.
 
-These layers implement the convolution used in McClure et al. (2019):
+These layers implement the convolution used in McClure et al. (2019),
+Section 2.2.3.2 ("Spike-and-Slab Dropout with Learned Model Uncertainty"):
 
-* **Weight normalization**: ``kernel = g · v / ||v||`` (Salimans & Kingma 2016)
-* **Learned sigma**: each weight has a learnable ``kernel_sigma = |kernel_a|``
-* **Local reparameterization**: during MC inference the output is sampled as
-  ``mean + sqrt(var + ε) · noise`` where ``mean = conv(x, kernel_m)`` and
-  ``var = conv(x², kernel_sigma²)``.
+* Each weight has learnable mean ``μ_{f,t}`` and std ``σ_{f,t}``
+* **Local reparameterization trick** (Kingma et al. 2015): instead of
+  sampling weights, the output distribution is computed directly:
+  ``output ~ N(conv(x, μ), conv(x², σ²))``  (Eqs. 12-14)
+* The **spike-and-slab dropout (SSD)** model combines this with
+  **concrete dropout** (Gal et al. 2017): ``output_v = b_f · (g_f * h)_v``
+  where ``b_f`` is a per-filter concrete dropout mask (Eq. 11).
 
-Three dropout variants sit on top of the VWN conv:
+The KL divergence has two terms (Eq. 16 in paper):
+  1. Bernoulli KL for concrete dropout gates (Eq. 17)
+  2. Gaussian KL for each weight: ``KL(N(μ,σ) || N(μ_prior, σ_prior))`` (Eq. 18)
 
-* **Bernoulli dropout** — standard ``nn.Dropout3d``, controlled by ``mc`` flag
-* **Concrete dropout** — per-filter learnable drop rate (Gal et al. 2017)
+Prior parameters from the paper: ``p_prior=0.5, μ_prior=0, σ_prior=0.1``
+
+Two dropout variants:
+* **Bernoulli dropout** — standard ``nn.Dropout3d``, fixed rate (BD model)
+* **Concrete dropout** — per-filter learnable drop rate (SSD model)
 """
 
 from __future__ import annotations
@@ -23,15 +31,18 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class VWNConv3d(nn.Module):
-    """3-D convolution with variational weight normalization.
+class FFGConv3d(nn.Module):
+    """3-D convolution with Fully Factorized Gaussian (FFG) weights.
 
-    Weights are parameterized as ``g · v / ||v||`` (mean) with a separate
-    learned ``kernel_sigma = |kernel_a|`` for the variance.  During
-    stochastic forward passes (``mc=True``), the output uses the local
-    reparameterization trick:
+    Each weight has a learnable mean ``μ`` and std ``σ = |a|``.  During
+    stochastic forward passes (``mc=True``), the **local reparameterization
+    trick** (Kingma et al. 2015) computes the output distribution directly:
 
-        ``output = conv(x, kernel_m) + sqrt(conv(x², sigma²) + ε) · noise``
+        ``μ* = conv(x, μ)``
+        ``σ*² = conv(x², σ²)``
+        ``output = μ* + σ* · ε,  ε ~ N(0, 1)``
+
+    This matches Eqs. 12-14 of McClure et al. (2019).
 
     In deterministic mode (``mc=False``) only the mean path is used.
 
@@ -46,7 +57,11 @@ class VWNConv3d(nn.Module):
     bias : bool
         Whether to include a bias term (with its own sigma).
     sigma_init : float
-        Initial value for ``|kernel_a|`` (default 1e-4, matching kwyk).
+        Initial value for ``|a|`` (default 1e-4, matching kwyk code).
+    prior_mu : float
+        Prior mean (default 0.0).
+    prior_sigma : float
+        Prior std (default 0.1, matching paper Section 2.2.3.2).
     """
 
     def __init__(
@@ -59,6 +74,8 @@ class VWNConv3d(nn.Module):
         dilation: int = 1,
         bias: bool = True,
         sigma_init: float = 1e-4,
+        prior_mu: float = 0.0,
+        prior_sigma: float = 0.1,
     ) -> None:
         super().__init__()
         self.in_channels = in_channels
@@ -67,42 +84,34 @@ class VWNConv3d(nn.Module):
         self.stride = stride
         self.padding = padding
         self.dilation = dilation
+        self.prior_mu = prior_mu
+        self.prior_sigma = prior_sigma
 
         k = kernel_size
         weight_shape = (out_channels, in_channels, k, k, k)
-        # g has one scalar per output filter
-        g_shape = (out_channels, 1, 1, 1, 1)
 
-        # Weight normalization parameters: kernel = g * v / ||v||
-        self.v = nn.Parameter(torch.empty(weight_shape))
-        nn.init.kaiming_normal_(self.v, mode="fan_in", nonlinearity="relu")
+        # Learnable mean μ_{f,t} per weight
+        self.weight_mu = nn.Parameter(torch.empty(weight_shape))
+        nn.init.kaiming_normal_(self.weight_mu, mode="fan_in", nonlinearity="relu")
 
-        self.g = nn.Parameter(torch.full(g_shape, math.sqrt(2.0)))
-
-        # Learned sigma (variational): sigma = |a|
-        self.kernel_a = nn.Parameter(torch.full(weight_shape, sigma_init))
+        # Learnable sigma: σ_{f,t} = |weight_a|
+        # Initialized small so initial behavior is near-deterministic
+        self.weight_a = nn.Parameter(torch.full(weight_shape, sigma_init))
 
         if bias:
-            self.bias_m = nn.Parameter(torch.zeros(out_channels))
+            self.bias_mu = nn.Parameter(torch.zeros(out_channels))
             self.bias_a = nn.Parameter(torch.full((out_channels,), sigma_init))
         else:
-            self.register_parameter("bias_m", None)
+            self.register_parameter("bias_mu", None)
             self.register_parameter("bias_a", None)
 
-        # Accumulated KL (for compatibility with accumulate_kl)
+        # Accumulated KL (updated each forward pass)
         self.kl: torch.Tensor = torch.tensor(0.0)
 
     @property
-    def kernel_m(self) -> torch.Tensor:
-        """Mean weight: ``g · v / ||v||``."""
-        # Normalize v over all dims except output channels (dim 0)
-        v_norm = F.normalize(self.v.flatten(1), dim=1).view_as(self.v)
-        return self.g * v_norm
-
-    @property
-    def kernel_sigma(self) -> torch.Tensor:
-        """Weight std: ``|kernel_a|``."""
-        return torch.abs(self.kernel_a)
+    def weight_sigma(self) -> torch.Tensor:
+        """Weight std: ``|weight_a|``."""
+        return torch.abs(self.weight_a)
 
     def forward(self, x: torch.Tensor, mc: bool = True) -> torch.Tensor:
         """Forward pass with optional stochastic sampling.
@@ -115,48 +124,57 @@ class VWNConv3d(nn.Module):
             If True, use local reparameterization (stochastic).
             If False, use only the mean path (deterministic).
         """
-        km = self.kernel_m
+        mu = self.weight_mu
         out_mean = F.conv3d(
-            x, km, self.bias_m, self.stride, self.padding, self.dilation
+            x, mu, self.bias_mu, self.stride, self.padding, self.dilation
         )
 
         if not mc:
             return out_mean
 
-        # Local reparameterization trick
-        ks = self.kernel_sigma
+        # Local reparameterization trick (Eqs. 12-14 in McClure et al.)
+        sigma = self.weight_sigma
         out_var = F.conv3d(
-            x.pow(2), ks.pow(2), None, self.stride, self.padding, self.dilation
+            x.pow(2), sigma.pow(2), None, self.stride, self.padding, self.dilation
         )
         if self.bias_a is not None:
             bias_sigma = torch.abs(self.bias_a)
             out_var = out_var + bias_sigma.pow(2).view(1, -1, 1, 1, 1)
 
-        # Noise shape matches g: one random scalar per filter, broadcast over spatial
         noise = torch.randn_like(out_mean)
         out = out_mean + torch.sqrt(out_var + 1e-8) * noise
 
-        # KL: approximate KL for Gaussian posterior vs N(0, 1) prior
-        # KL(N(mu, sigma) || N(0, 1)) for monitoring
-        self.kl = (0.5 * (km.pow(2) + ks.pow(2) - 2 * torch.log(ks + 1e-8) - 1)).sum()
+        # KL(N(μ, σ) || N(μ_prior, σ_prior)) — Eq. 18
+        self.kl = (
+            torch.log(self.prior_sigma / (sigma + 1e-8))
+            + (sigma.pow(2) + (mu - self.prior_mu).pow(2)) / (2 * self.prior_sigma**2)
+            - 0.5
+        ).sum()
 
         return out
+
+
+# Backward-compatible alias
+VWNConv3d = FFGConv3d
 
 
 class ConcreteDropout3d(nn.Module):
     """Concrete dropout (Gal et al. 2017) with per-filter learnable rate.
 
     Instead of a fixed dropout probability, each output filter learns its
-    own drop rate ``p`` via a continuous relaxation of Bernoulli sampling.
+    own drop rate ``p`` via a continuous relaxation of Bernoulli sampling
+    (Eq. 10 in McClure et al. 2019).
 
     Parameters
     ----------
     n_filters : int
         Number of filters (one ``p`` per filter).
     temperature : float
-        Concrete distribution temperature (default 0.02).
+        Concrete distribution temperature (default 0.02, matching paper).
     init_p : float
-        Initial dropout probability (default 0.9, matching kwyk).
+        Initial dropout probability (default 0.9, matching kwyk code).
+    prior_p : float
+        Prior dropout probability for KL (default 0.5, matching paper).
     """
 
     def __init__(
@@ -164,9 +182,11 @@ class ConcreteDropout3d(nn.Module):
         n_filters: int,
         temperature: float = 0.02,
         init_p: float = 0.9,
+        prior_p: float = 0.5,
     ) -> None:
         super().__init__()
         self.temperature = temperature
+        self.prior_p = prior_p
         # Store as raw logit; p = sigmoid(p_logit) to keep in (0, 1)
         init_logit = math.log(init_p / (1 - init_p + 1e-8))
         self.p_logit = nn.Parameter(torch.full((n_filters,), init_logit))
@@ -177,7 +197,7 @@ class ConcreteDropout3d(nn.Module):
         return torch.sigmoid(self.p_logit).clamp(0.05, 0.95)
 
     def forward(self, x: torch.Tensor, mc: bool = True) -> torch.Tensor:
-        """Apply concrete dropout.
+        """Apply concrete dropout (Eq. 10).
 
         Parameters
         ----------
@@ -192,7 +212,7 @@ class ConcreteDropout3d(nn.Module):
         if not mc:
             return x * p
 
-        # Sample from concrete distribution (continuous relaxation)
+        # Concrete relaxation of Bernoulli (Eq. 10)
         eps = 1e-8
         noise = torch.rand_like(x[:1])  # (1, C, D, H, W)
         z = torch.sigmoid(
@@ -206,7 +226,16 @@ class ConcreteDropout3d(nn.Module):
         )
         return x * z
 
-    def regularization(self) -> torch.Tensor:
-        """Concrete dropout regularization term (entropy of Bernoulli)."""
+    def kl_divergence(self) -> torch.Tensor:
+        """KL(q_p || p_prior) for Bernoulli distributions (Eq. 17)."""
         p = self.p
-        return -(p * torch.log(p + 1e-8) + (1 - p) * torch.log(1 - p + 1e-8)).sum()
+        pp = self.prior_p
+        eps = 1e-8
+        return (
+            p * torch.log(p / (pp + eps) + eps)
+            + (1 - p) * torch.log((1 - p) / (1 - pp + eps) + eps)
+        ).sum()
+
+    def regularization(self) -> torch.Tensor:
+        """Alias for kl_divergence (backward compat)."""
+        return self.kl_divergence()

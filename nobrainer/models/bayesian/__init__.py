@@ -14,7 +14,7 @@ from .bayesian_vnet import BayesianVNet, bayesian_vnet
 from .kwyk_meshnet import KWYKMeshNet, kwyk_meshnet
 from .layers import BayesianConv3d, BayesianLinear
 from .utils import accumulate_kl
-from .vwn_layers import ConcreteDropout3d, VWNConv3d
+from .vwn_layers import ConcreteDropout3d, FFGConv3d, VWNConv3d
 
 __all__ = [
     "BayesianConv3d",
@@ -22,6 +22,7 @@ __all__ = [
     "BayesianMeshNet",
     "BayesianVNet",
     "ConcreteDropout3d",
+    "FFGConv3d",
     "KWYKMeshNet",
     "VWNConv3d",
     "accumulate_kl",

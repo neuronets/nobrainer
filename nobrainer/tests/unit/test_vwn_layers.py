@@ -4,18 +4,18 @@ from __future__ import annotations
 
 import torch
 
-from nobrainer.models.bayesian.vwn_layers import ConcreteDropout3d, VWNConv3d
+from nobrainer.models.bayesian.vwn_layers import ConcreteDropout3d, FFGConv3d
 
 
-class TestVWNConv3d:
+class TestFFGConv3d:
     def test_output_shape(self):
-        layer = VWNConv3d(1, 4, kernel_size=3, padding=1)
+        layer = FFGConv3d(1, 4, kernel_size=3, padding=1)
         x = torch.randn(2, 1, 8, 8, 8)
         out = layer(x, mc=True)
         assert out.shape == (2, 4, 8, 8, 8)
 
     def test_deterministic_mode(self):
-        layer = VWNConv3d(1, 4, kernel_size=3, padding=1)
+        layer = FFGConv3d(1, 4, kernel_size=3, padding=1)
         x = torch.randn(2, 1, 8, 8, 8)
         layer.eval()
         out1 = layer(x, mc=False)
@@ -23,7 +23,7 @@ class TestVWNConv3d:
         assert torch.allclose(out1, out2)
 
     def test_stochastic_mode_varies(self):
-        layer = VWNConv3d(1, 4, kernel_size=3, padding=1)
+        layer = FFGConv3d(1, 4, kernel_size=3, padding=1)
         x = torch.randn(2, 1, 8, 8, 8)
         out1 = layer(x, mc=True)
         out2 = layer(x, mc=True)
@@ -31,27 +31,25 @@ class TestVWNConv3d:
         assert not torch.allclose(out1, out2)
 
     def test_kl_populated_after_mc(self):
-        layer = VWNConv3d(1, 4, kernel_size=3, padding=1)
+        layer = FFGConv3d(1, 4, kernel_size=3, padding=1)
         x = torch.randn(2, 1, 8, 8, 8)
         layer(x, mc=True)
         assert layer.kl.item() > 0
 
-    def test_weight_normalization(self):
-        layer = VWNConv3d(1, 4, kernel_size=3, padding=1)
-        km = layer.kernel_m
-        # kernel_m = g * v/||v||, so each filter should have norm ~ |g|
-        assert km.shape == (4, 1, 3, 3, 3)
+    def test_weight_mu_shape(self):
+        layer = FFGConv3d(1, 4, kernel_size=3, padding=1)
+        assert layer.weight_mu.shape == (4, 1, 3, 3, 3)
 
     def test_no_bias(self):
-        layer = VWNConv3d(1, 4, kernel_size=3, padding=1, bias=False)
-        assert layer.bias_m is None
+        layer = FFGConv3d(1, 4, kernel_size=3, padding=1, bias=False)
+        assert layer.bias_mu is None
         x = torch.randn(2, 1, 8, 8, 8)
         out = layer(x, mc=True)
         assert out.shape == (2, 4, 8, 8, 8)
 
     def test_sigma_positive(self):
-        layer = VWNConv3d(1, 4, kernel_size=3, padding=1)
-        assert (layer.kernel_sigma >= 0).all()
+        layer = FFGConv3d(1, 4, kernel_size=3, padding=1)
+        assert (layer.weight_sigma >= 0).all()
 
 
 class TestConcreteDropout3d:
