@@ -173,15 +173,14 @@ jobs:
           # The sr-tests already validated the pipeline with get_data().
           # Here we verify the reproduction scripts parse configs correctly
           # and that the training loop works end-to-end with sample data.
-          if command -v git-annex &>/dev/null; then
-            echo "=== Step 1: Assemble dataset (smoke: ds000114 only) ==="
-            uv run python 01_assemble_dataset.py \
-              --datasets ds000114 \
-              --output-csv manifest.csv \
-              --output-dir data \
-              --label-mapping binary
-          else
-            echo "=== Step 1: git-annex not available, creating manifest from sample data ==="
+          # Try DataLad first; fall back to sample brain data if it fails
+          uv run python 01_assemble_dataset.py \
+            --datasets ds000114 \
+            --output-csv manifest.csv \
+            --output-dir data \
+            --label-mapping binary \
+          || {
+            echo "DataLad assembly failed, falling back to sample brain data"
             uv run python -c "
           import csv; from nobrainer.utils import get_data
           src = get_data(); pairs = []
@@ -195,7 +194,7 @@ jobs:
               w.writerow(dict(t1w_path=t1, label_path=lbl, split=splits[i]))
           print('Manifest created with', len(pairs), 'volumes')
           "
-          fi
+          }
 
           echo "=== Step 2: Train deterministic MeshNet (2 epochs) ==="
           uv run python 02_train_meshnet.py \
@@ -232,14 +231,14 @@ jobs:
           export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
           cd scripts/kwyk_reproduction
 
-          if command -v git-annex &>/dev/null; then
-            uv run python 01_assemble_dataset.py \
-              --datasets ds000114 \
-              --output-csv manifest.csv \
-              --output-dir data \
-              --label-mapping binary
-          else
-            echo "git-annex not available, using sample brain data"
+          # Try DataLad first; fall back to sample brain data if it fails
+          uv run python 01_assemble_dataset.py \
+            --datasets ds000114 \
+            --output-csv manifest.csv \
+            --output-dir data \
+            --label-mapping binary \
+          || {
+            echo "DataLad assembly failed, falling back to sample brain data"
             uv run python -c "
           import csv; from nobrainer.utils import get_data
           src = get_data(); pairs = []
@@ -253,7 +252,7 @@ jobs:
               w.writerow(dict(t1w_path=t1, label_path=lbl, split=splits[i]))
           print('Manifest created with', len(pairs), 'volumes')
           "
-          fi
+          }
 
           echo "=== Step 2: Train deterministic MeshNet (20 epochs) ==="
           uv run python 02_train_meshnet.py \
