@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
 from pathlib import Path
 import time
 
@@ -35,7 +36,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
-from utils import compute_dice, load_config, save_figure, setup_logging
+from utils import (
+    SlurmPreemptionHandler,
+    compute_dice,
+    load_config,
+    load_training_checkpoint,
+    save_figure,
+    save_training_checkpoint,
+    setup_logging,
+)
 
 log = setup_logging(__name__)
 
@@ -292,26 +301,45 @@ def train_bayesian(
     n_samples: int,
     label_mapping: str | None,
     checkpoint_dir: Path,
+    preemption_handler: SlurmPreemptionHandler | None = None,
 ) -> dict:
     """Custom training loop for Bayesian MeshNet with ELBO loss.
 
-    We use a custom per-epoch loop to track KL divergence and perform
-    periodic MC validation with uncertainty estimation.
+    Supports checkpoint/resume for SLURM preemptible jobs.  When a
+    preemption signal is received, the loop checkpoints and exits so
+    the job can be requeued.
     """
-    # Accumulators for plotting
-    train_losses: list[float] = []
-    val_losses_list: list[float] = []
-    val_dice_means: list[float] = []
-    val_dice_stds: list[float] = []
-    kl_terms: list[float] = []
-
     from nobrainer.training import get_device
 
     device = get_device()
     model = model.to(device)
-    best_loss = float("inf")
 
-    for epoch in range(epochs):
+    # -- Resume from checkpoint if available --------------------------------
+    start_epoch, prev_metrics = load_training_checkpoint(
+        checkpoint_dir, model, optimizer
+    )
+
+    # Restore accumulated metrics from prior runs
+    train_losses: list[float] = prev_metrics.get("train_losses", [])
+    val_losses_list: list[float] = prev_metrics.get("val_losses", [])
+    val_dice_means: list[float] = prev_metrics.get("val_dice_means", [])
+    val_dice_stds: list[float] = prev_metrics.get("val_dice_stds", [])
+    kl_terms: list[float] = prev_metrics.get("kl_terms", [])
+    best_loss: float = prev_metrics.get("best_loss", float("inf"))
+
+    if start_epoch >= epochs:
+        log.info("Already completed %d/%d epochs — nothing to do", start_epoch, epochs)
+        return {
+            "train_losses": train_losses,
+            "val_losses": val_losses_list,
+            "val_dice_means": val_dice_means,
+            "val_dice_stds": val_dice_stds,
+            "kl_terms": kl_terms,
+            "best_loss": best_loss,
+            "epochs_completed": start_epoch,
+        }
+
+    for epoch in range(start_epoch, epochs):
         t_epoch = time.time()
 
         # -- Train one epoch --------------------------------------------------
@@ -389,7 +417,6 @@ def train_bayesian(
             val_dice_means.append(overall_mean)
             val_dice_stds.append(overall_std)
         else:
-            # Carry forward last value for continuity in plots
             if val_dice_means:
                 val_dice_means.append(val_dice_means[-1])
                 val_dice_stds.append(val_dice_stds[-1])
@@ -400,8 +427,18 @@ def train_bayesian(
         # -- Checkpoint best --------------------------------------------------
         if avg_loss < best_loss:
             best_loss = avg_loss
-            ckpt_path = checkpoint_dir / "best_model.pth"
-            torch.save(model.state_dict(), ckpt_path)
+            torch.save(model.state_dict(), checkpoint_dir / "best_model.pth")
+
+        # -- Always save resumable checkpoint ---------------------------------
+        metrics = {
+            "train_losses": train_losses,
+            "val_losses": val_losses_list,
+            "val_dice_means": val_dice_means,
+            "val_dice_stds": val_dice_stds,
+            "kl_terms": kl_terms,
+            "best_loss": best_loss,
+        }
+        save_training_checkpoint(checkpoint_dir, model, optimizer, epoch, metrics)
 
         elapsed = time.time() - t_epoch
         log.info(
@@ -415,6 +452,14 @@ def train_bayesian(
             elapsed,
         )
 
+        # -- Check for SLURM preemption signal --------------------------------
+        if preemption_handler and preemption_handler.preempted:
+            log.warning(
+                "Preemption detected after epoch %d — exiting for requeue",
+                epoch + 1,
+            )
+            break
+
     return {
         "train_losses": train_losses,
         "val_losses": val_losses_list,
@@ -422,7 +467,7 @@ def train_bayesian(
         "val_dice_stds": val_dice_stds,
         "kl_terms": kl_terms,
         "best_loss": best_loss,
-        "epochs_completed": epochs,
+        "epochs_completed": epoch + 1,
     }
 
 
@@ -686,6 +731,11 @@ def main() -> None:
     elbo_loss = ELBOLoss(bayesian_model, kl_weight=kl_weight)
     optimizer = torch.optim.Adam(bayesian_model.parameters(), lr=lr)
 
+    # ---- SLURM preemption handler (no-op if not on SLURM) -----------------
+    preemption = None
+    if os.environ.get("SLURM_JOB_ID"):
+        preemption = SlurmPreemptionHandler()
+
     # ---- Train --------------------------------------------------------------
     result = train_bayesian(
         model=bayesian_model,
@@ -699,6 +749,7 @@ def main() -> None:
         n_samples=n_samples,
         label_mapping=label_mapping,
         checkpoint_dir=output_dir,
+        preemption_handler=preemption,
     )
 
     # ---- Learning curve with uncertainty bands ------------------------------

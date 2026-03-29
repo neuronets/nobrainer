@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
+import signal
 from typing import Any
 
 import numpy as np
+import torch
 
 
 def load_config(path: str | Path) -> dict[str, Any]:
@@ -131,3 +134,142 @@ def apply_label_mapping(
 
     mapper = np.vectorize(lambda v: lookup.get(v, 0))
     return mapper(label_vol)
+
+
+# ---------------------------------------------------------------------------
+# Checkpoint / resume for SLURM preemptible jobs
+# ---------------------------------------------------------------------------
+
+_logger = logging.getLogger(__name__)
+
+
+class SlurmPreemptionHandler:
+    """Handle SLURM preemption signals for graceful checkpoint-and-exit.
+
+    SLURM sends SIGUSR1 (or the signal specified by ``--signal``) before
+    killing a preempted job.  This handler sets a flag so the training
+    loop can checkpoint and exit cleanly.  The ``--requeue`` sbatch flag
+    then re-submits the job, and the training resumes from the checkpoint.
+
+    Usage::
+
+        handler = SlurmPreemptionHandler()
+        for epoch in range(start_epoch, total_epochs):
+            train_one_epoch(...)
+            save_checkpoint(...)
+            if handler.preempted:
+                log.info("Preempted — exiting for requeue")
+                sys.exit(0)
+    """
+
+    def __init__(self, sig: int = signal.SIGUSR1) -> None:
+        self.preempted = False
+        self._sig = sig
+        signal.signal(sig, self._handle)
+        _logger.info("SLURM preemption handler registered (signal=%s)", sig.name)
+
+    def _handle(self, signum: int, frame: Any) -> None:
+        _logger.warning(
+            "Received preemption signal %d — will checkpoint and exit", signum
+        )
+        self.preempted = True
+
+
+def save_training_checkpoint(
+    checkpoint_dir: Path,
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    epoch: int,
+    metrics: dict[str, Any],
+) -> Path:
+    """Save a resumable training checkpoint.
+
+    Writes ``checkpoint.pt`` containing model weights, optimizer state,
+    epoch number, and accumulated metrics (losses, Dice scores, etc.).
+    Also writes ``checkpoint_meta.json`` with human-readable status.
+
+    Parameters
+    ----------
+    checkpoint_dir : Path
+        Directory to save checkpoint files.
+    model : torch.nn.Module
+        Model to checkpoint.
+    optimizer : torch.optim.Optimizer
+        Optimizer to checkpoint (includes momentum, lr schedule state).
+    epoch : int
+        Completed epoch number (0-indexed).
+    metrics : dict
+        Accumulated training metrics to persist across restarts.
+
+    Returns
+    -------
+    Path
+        Path to the written checkpoint file.
+    """
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    ckpt_path = checkpoint_dir / "checkpoint.pt"
+
+    torch.save(
+        {
+            "epoch": epoch,
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "metrics": metrics,
+        },
+        ckpt_path,
+    )
+
+    # Human-readable metadata
+    meta = {
+        "epoch": epoch,
+        "best_loss": metrics.get("best_loss", None),
+        "train_losses": metrics.get("train_losses", [])[-3:],
+    }
+    with open(checkpoint_dir / "checkpoint_meta.json", "w") as f:
+        json.dump(meta, f, indent=2, default=str)
+
+    _logger.info("Checkpoint saved: epoch %d → %s", epoch, ckpt_path)
+    return ckpt_path
+
+
+def load_training_checkpoint(
+    checkpoint_dir: Path,
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer | None = None,
+) -> tuple[int, dict[str, Any]]:
+    """Load a training checkpoint and return (start_epoch, metrics).
+
+    Parameters
+    ----------
+    checkpoint_dir : Path
+        Directory containing ``checkpoint.pt``.
+    model : torch.nn.Module
+        Model to load weights into.
+    optimizer : torch.optim.Optimizer or None
+        Optimizer to restore state into.  If None, only model is loaded.
+
+    Returns
+    -------
+    start_epoch : int
+        The next epoch to train (checkpoint epoch + 1).
+    metrics : dict
+        Accumulated metrics from previous training.
+    """
+    ckpt_path = checkpoint_dir / "checkpoint.pt"
+    if not ckpt_path.exists():
+        _logger.info("No checkpoint found at %s — starting from scratch", ckpt_path)
+        return 0, {}
+
+    ckpt = torch.load(ckpt_path, weights_only=False)
+    model.load_state_dict(ckpt["model_state_dict"])
+    if optimizer is not None and "optimizer_state_dict" in ckpt:
+        optimizer.load_state_dict(ckpt["optimizer_state_dict"])
+
+    start_epoch = ckpt["epoch"] + 1
+    metrics = ckpt.get("metrics", {})
+    _logger.info(
+        "Resumed from checkpoint: epoch %d, best_loss=%.6f",
+        ckpt["epoch"],
+        metrics.get("best_loss", float("inf")),
+    )
+    return start_epoch, metrics
