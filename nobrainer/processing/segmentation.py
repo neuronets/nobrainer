@@ -10,6 +10,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from nobrainer.training import get_device
+
 from .base import BaseEstimator
 
 
@@ -149,7 +151,7 @@ class Segmentation(BaseEstimator):
         metrics: Callable | None = None,
     ) -> dict:
         """Evaluate model on a dataset. Returns dict with loss and metrics."""
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = get_device()
         self.model_.to(device).eval()
         criterion = nn.CrossEntropyLoss()
 

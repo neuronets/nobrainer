@@ -17,6 +17,7 @@ from nobrainer.models.bayesian.warmstart import (  # noqa: E402
     warmstart_bayesian_from_deterministic,
 )
 from nobrainer.processing import Dataset, Segmentation  # noqa: E402
+from nobrainer.training import get_device  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Shared constants for tiny model
@@ -98,7 +99,7 @@ class TestKwykSmoke:
 
         # First train a deterministic model
         det_model = get_model("meshnet")(**MODEL_ARGS)
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = get_device()
         det_model = det_model.to(device)
         det_model.train()
 

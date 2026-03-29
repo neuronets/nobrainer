@@ -25,6 +25,7 @@ from nobrainer.dataset import get_dataset
 from nobrainer.losses import dice as dice_loss_fn
 from nobrainer.losses import elbo
 from nobrainer.models.bayesian import BayesianVNet
+from nobrainer.training import get_device
 
 
 def main() -> None:
@@ -44,7 +45,7 @@ def main() -> None:
     kl_weight: float = config.get("kl_weight", 1e-4)
 
     set_determinism(seed=42)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = get_device()
 
     # ------------------------------------------------------------------ #
     # Data loading                                                         #

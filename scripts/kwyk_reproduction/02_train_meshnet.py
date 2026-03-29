@@ -78,7 +78,9 @@ def evaluate_val_dice(
     from nobrainer.prediction import predict
 
     dice_scores = []
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    from nobrainer.training import get_device
+
+    device = get_device()
     model = seg.model_.to(device)
     model.eval()
 

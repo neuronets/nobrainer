@@ -164,7 +164,9 @@ def evaluate_mc_dice(
     mean_dices: list[float] = []
     std_dices: list[float] = []
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    from nobrainer.training import get_device
+
+    device = get_device()
     model = model.to(device)
 
     for img_path, lbl_path in val_pairs:
@@ -303,7 +305,9 @@ def train_bayesian(
     val_dice_stds: list[float] = []
     kl_terms: list[float] = []
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    from nobrainer.training import get_device
+
+    device = get_device()
     model = model.to(device)
     best_loss = float("inf")
 
