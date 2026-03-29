@@ -7,10 +7,10 @@ Neuroinformatics 2019) using the refactored PyTorch nobrainer.
 
 ## Current Status
 
-The reproduction pipeline (scripts, infrastructure, CI smoke test) is
-**code-complete and CI-verified**. The actual GPU training and comparison
-have **not yet been run** — the scripts need to be executed on a machine
-with a GPU and sufficient time/data. See "Next Steps" below.
+The reproduction pipeline is **code-complete and CI-verified** (smoke test
++ small-scale 20-epoch training on T4 GPU with real OpenNeuro data).
+Full-scale reproduction with 50+ epochs and 100+ subjects has **not yet
+been run**. See "Next Steps" below.
 
 ## Quick Setup
 
@@ -23,6 +23,28 @@ cd scripts/kwyk_reproduction
 # Option B: Manual setup
 uv venv --python 3.14 && source .venv/bin/activate
 uv pip install -e "../../[bayesian,versioning,dev]" monai pyro-ppl datalad matplotlib pyyaml scipy
+uv tool install git-annex  # required for DataLad content retrieval
+```
+
+## Programmatic API
+
+The dataset fetching is also available as a library:
+
+```python
+from nobrainer.datasets.openneuro import (
+    install_derivatives,
+    find_subject_pairs,
+    write_manifest,
+)
+
+# Clone fmriprep derivatives (metadata only, fast)
+ds = install_derivatives("ds000114", "/tmp/data")
+
+# Discover + download T1w + aparc+aseg pairs per subject
+pairs = find_subject_pairs(ds)
+
+# Write manifest CSV with train/val/test split
+write_manifest(pairs, "manifest.csv")
 ```
 
 ## Pipeline Steps
@@ -89,15 +111,19 @@ python 03_train_bayesian.py \
 The warm-start transfers deterministic weights to `weight_mu` and initializes
 `weight_rho` to -3.0 (low initial uncertainty), based on the MOPED method.
 
-**Output**: `checkpoints/bayesian/model.pth`, `checkpoints/bayesian/croissant.json`,
-`figures/bayesian_learning_curve.png`
+**Output**: `checkpoints/<variant>/model.pth`, `checkpoints/<variant>/croissant.json`,
+`checkpoints/<variant>/learning_curve.png`
 
 ### Step 4: Evaluate
 
 ```bash
-python 04_evaluate.py \
-  --model checkpoints/bayesian/model.pth \
-  --manifest manifest.csv --split test --n-samples 10
+# Evaluate each variant
+for variant in meshnet bwn_multi bvwn_multi_prior bayesian_gaussian; do
+  python 04_evaluate.py \
+    --model checkpoints/$variant/model.pth \
+    --manifest manifest.csv --split test --n-samples 10 \
+    --output-dir results/$variant
+done
 ```
 
 Computes per-volume Dice, saves variance + entropy maps as NIfTI.
@@ -106,7 +132,7 @@ Computes per-volume Dice, saves variance + entropy maps as NIfTI.
 
 ```bash
 python 05_compare_kwyk.py \
-  --new-model checkpoints/bayesian/model.pth \
+  --new-model checkpoints/bvwn_multi_prior/model.pth \
   --kwyk-dir ../../kwyk \
   --manifest manifest.csv
 ```
@@ -141,14 +167,15 @@ Verify the pipeline works end-to-end with tiny models. Check
 ```bash
 python 01_assemble_dataset.py --datasets ds000114 --output-csv manifest.csv
 python 02_train_meshnet.py --manifest manifest.csv --epochs 20
-python 03_train_bayesian.py --manifest manifest.csv \
-  --warmstart checkpoints/meshnet/model.pth --epochs 20
-python 04_evaluate.py --model checkpoints/bayesian/model.pth \
-  --manifest manifest.csv --split test --n-samples 10
+# Train all 3 Bayesian variants
+for variant in bwn_multi bvwn_multi_prior bayesian_gaussian; do
+  python 03_train_bayesian.py --manifest manifest.csv \
+    --variant $variant --warmstart checkpoints/meshnet \
+    --output-dir checkpoints/$variant --epochs 20
+done
 ```
 
 **Expected**: Validation Dice ≥0.80 for brain extraction on 10 subjects.
-Check `figures/bayesian_learning_curve.png` for convergence.
 
 ### Phase 3: Full Reproduction (8-24 hours, V100 16GB+)
 
@@ -157,16 +184,17 @@ python 01_assemble_dataset.py \
   --datasets ds000114 ds000228 ds002609 ds001021 ds002105 \
   --output-csv manifest.csv --conform
 python 02_train_meshnet.py --manifest manifest.csv --epochs 50
-python 03_train_bayesian.py --manifest manifest.csv \
-  --warmstart checkpoints/meshnet/model.pth --epochs 50
-python 04_evaluate.py --model checkpoints/bayesian/model.pth \
-  --manifest manifest.csv --split test --n-samples 10
-python 05_compare_kwyk.py --new-model checkpoints/bayesian/model.pth \
+for variant in bwn_multi bvwn_multi_prior bayesian_gaussian; do
+  python 03_train_bayesian.py --manifest manifest.csv \
+    --variant $variant --warmstart checkpoints/meshnet \
+    --output-dir checkpoints/$variant --epochs 50
+done
+python 05_compare_kwyk.py \
+  --new-model checkpoints/bvwn_multi_prior/model.pth \
   --kwyk-dir ../../kwyk --manifest manifest.csv
 ```
 
 **Target**: Validation Dice ≥0.90 (kwyk achieved 0.97+ with 11,000 subjects).
-Check `figures/dice_scatter.png` for kwyk comparison.
 
 ### Phase 4: Scale and Optimize
 
@@ -253,11 +281,17 @@ aparc+aseg codes to target classes:
 | Block sweep 64³ | 64³ | 96 | ≥16 GB | ~4 hr |
 | Full-brain 256³ | 256³ | 96 | ≥24 GB | N/A |
 
+## What Has Been Verified
+
+- [x] Smoke test on EC2 T4 GPU (2 epochs, all 3 variants)
+- [x] Small-scale training on EC2 T4 GPU (20 epochs, 10 subjects from ds000114, all 3 variants)
+- [x] DataLad + git-annex data pipeline (OpenNeuro fmriprep derivatives)
+- [x] Spike-and-slab prior, MC dropout, and Gaussian Bayesian variants
+
 ## What Has NOT Been Done Yet
 
-- [ ] Actual GPU training (smoke test passes in CI, but full training needs GPU time)
-- [ ] Comparison against kwyk container (requires trained model from Steps 2-3)
-- [ ] Full-scale reproduction with 100+ subjects
+- [ ] Full-scale reproduction with 50+ epochs and 100+ subjects
+- [ ] Comparison against kwyk container (requires converged model)
 - [ ] Block size sweep results
 - [ ] SynthSeg augmentation experiments
 - [ ] Autoresearch hyperparameter optimization

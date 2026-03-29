@@ -311,22 +311,29 @@ jobs:
             --output-dir checkpoints/meshnet \
             --epochs 50
 
-          uv run python 03_train_bayesian.py \
-            --manifest manifest.csv \
-            --config config.yaml \
-            --warmstart checkpoints/meshnet/model.pth \
-            --output-dir checkpoints/bayesian \
-            --epochs 50
+          for variant in bwn_multi bvwn_multi_prior bayesian_gaussian; do
+            echo "=== Training $variant (50 epochs) ==="
+            uv run python 03_train_bayesian.py \
+              --manifest manifest.csv \
+              --config config.yaml \
+              --variant $variant \
+              --warmstart checkpoints/meshnet \
+              --output-dir checkpoints/$variant \
+              --epochs 50
+          done
 
-          uv run python 04_evaluate.py \
-            --model checkpoints/bayesian/model.pth \
-            --manifest manifest.csv \
-            --split test \
-            --n-samples 10 \
-            --output-dir results
+          for variant in meshnet bwn_multi bvwn_multi_prior bayesian_gaussian; do
+            echo "=== Evaluating $variant ==="
+            uv run python 04_evaluate.py \
+              --model checkpoints/$variant/model.pth \
+              --manifest manifest.csv \
+              --split test \
+              --n-samples 10 \
+              --output-dir results/$variant
+          done
 
           uv run python 05_compare_kwyk.py \
-            --new-model checkpoints/bayesian/model.pth \
+            --new-model checkpoints/bvwn_multi_prior/model.pth \
             --kwyk-dir ../../kwyk \
             --manifest manifest.csv \
             --output-dir results/comparison || echo "WARN: kwyk comparison failed (container may not be available)"
