@@ -95,7 +95,8 @@ jobs:
           uv pip install \
             ".[bayesian,generative,dev]" \
             monai \
-            pyro-ppl
+            pyro-ppl \
+            matplotlib
 
       - name: Verify GPU access
         run: |
@@ -111,7 +112,7 @@ jobs:
       - name: Run full test suite (including GPU)
         run: |
           export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
-          uv run pytest nobrainer/tests/ -v \
+          uv run pytest nobrainer/tests/ nobrainer/sr-tests/ -v \
             --no-header \
             --tb=short
 

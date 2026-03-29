@@ -1,0 +1,87 @@
+# KWYK Brain Extraction Reproduction - Default Configuration
+# Based on: McClure et al., Frontiers in Neuroinformatics 2019
+#
+# The original kwyk study trained 3 model variants:
+#   1. bwn       — MAP (deterministic MeshNet, no uncertainty)
+#   2. bwn_multi — MC Bernoulli dropout (deterministic + dropout at inference)
+#   3. bvwn_multi_prior — Spike-and-slab dropout (Bayesian variational)
+
+# ---------------------------------------------------------------------------
+# Shared architecture (all 3 variants use identical structure)
+# ---------------------------------------------------------------------------
+filters: 96
+receptive_field: 37  # dilation schedule [1,1,1,2,4,8,1]
+dropout_rate: 0.25
+
+# Training
+block_shape: [32, 32, 32]
+lr: 0.0001
+batch_size: 32
+n_classes: 2  # binary brain extraction
+label_mapping: binary  # binary, 6-class, 50-class, 115-class
+
+# Warm-start (deterministic → Bayesian)
+pretrain_epochs: 50
+bayesian_epochs: 50
+initial_rho: -3.0  # softplus(-3) ≈ 0.05 std
+
+# Inference
+n_samples: 10  # MC inference samples
+
+# Data augmentation
+augmentation: real  # real, synthetic, mixed
+
+# Data assembly
+datasets:
+  - ds000114
+  - ds000228
+  - ds002609
+split: [80, 10, 10]  # train/val/test percentages
+
+# ---------------------------------------------------------------------------
+# Model variant configurations (matching original kwyk)
+# ---------------------------------------------------------------------------
+variants:
+  # 1. MAP — maximum a-posteriori, deterministic inference
+  bwn:
+    model: meshnet
+    mc_dropout: false
+    description: "Deterministic MeshNet (MAP estimate)"
+
+  # 2. MC Bernoulli dropout — same deterministic model but with
+  #    dropout enabled at inference time for MC sampling
+  bwn_multi:
+    model: meshnet
+    mc_dropout: true
+    description: "MeshNet with MC Bernoulli dropout at inference"
+
+  # 3. Spike-and-slab dropout (SSD) — Bayesian variational with
+  #    mixture prior: pi*N(0,spike_sigma) + (1-pi)*N(0,slab_sigma)
+  bvwn_multi_prior:
+    model: bayesian_meshnet
+    prior_type: spike_and_slab
+    spike_sigma: 0.001
+    slab_sigma: 1.0
+    prior_pi: 0.5
+    kl_weight: 1.0
+    mc_dropout: false
+    description: "Bayesian MeshNet with spike-and-slab dropout (SSD)"
+
+  # Additional: standard Bayesian with Gaussian prior (for comparison)
+  bayesian_gaussian:
+    model: bayesian_meshnet
+    prior_type: standard_normal
+    kl_weight: 1.0
+    mc_dropout: false
+    description: "Bayesian MeshNet with standard Normal prior"
+
+# ---------------------------------------------------------------------------
+# Smoke test overrides
+# ---------------------------------------------------------------------------
+smoke_test:
+  filters: 16
+  block_shape: [16, 16, 16]
+  pretrain_epochs: 1
+  bayesian_epochs: 1
+  batch_size: 2
+  n_samples: 3

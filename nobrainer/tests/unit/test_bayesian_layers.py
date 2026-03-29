@@ -59,6 +59,18 @@ class TestBayesianConv3d:
         self._forward(layer, x)
         assert layer.kl.item() > 0
 
+    def test_prior_spike_and_slab(self):
+        layer = BayesianConv3d(
+            1, 4, kernel_size=3, padding=1, prior_type="spike_and_slab"
+        )
+        x = torch.zeros(2, 1, 8, 8, 8)
+        out = self._forward(layer, x)
+        assert out.shape == (2, 4, 8, 8, 8)
+        assert isinstance(layer.kl, torch.Tensor)
+        assert torch.isfinite(layer.kl)
+        # Check that z_logit parameter exists
+        assert hasattr(layer, "z_logit")
+
     def test_no_bias(self):
         layer = BayesianConv3d(1, 4, kernel_size=3, padding=1, bias=False)
         assert layer.bias_mu is None
@@ -109,6 +121,14 @@ class TestBayesianLinear:
         x = torch.zeros(4, 16)
         self._forward(layer, x)
         assert layer.kl.item() > 0
+
+    def test_prior_spike_and_slab(self):
+        layer = BayesianLinear(16, 8, prior_type="spike_and_slab")
+        x = torch.zeros(4, 16)
+        out = self._forward(layer, x)
+        assert out.shape == (4, 8)
+        assert torch.isfinite(layer.kl)
+        assert hasattr(layer, "z_logit")
 
 
 # ---------------------------------------------------------------------------

@@ -71,6 +71,7 @@ all = [
 
 [tool.hatch.version]
 source = "vcs"
+fallback-version = "0.0.0.dev0"
 
 [tool.hatch.build.hooks.vcs]
 version-file = "nobrainer/_version.py"

@@ -10,6 +10,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from nobrainer.training import get_device
+
 
 def _pad_to_multiple(
     arr: np.ndarray, block_shape: tuple[int, int, int]
@@ -107,7 +109,7 @@ def predict(
         input NIfTI.
     """
     if device is None:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = get_device()
     device = torch.device(device)
 
     # Multi-GPU: distribute blocks across GPUs when device="cuda" and >1 GPU
@@ -218,7 +220,7 @@ def predict_with_uncertainty(
         Predictive entropy of the mean softmax distribution.
     """
     if device is None:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = get_device()
     device = torch.device(device)
 
     affine = np.eye(4)

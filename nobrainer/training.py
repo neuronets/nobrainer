@@ -13,6 +13,15 @@ from torch.utils.data import DataLoader
 logger = logging.getLogger(__name__)
 
 
+def get_device() -> torch.device:
+    """Select the best available device: CUDA > MPS > CPU."""
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
 def fit(
     model: nn.Module,
     loader: DataLoader,
@@ -49,7 +58,7 @@ def fit(
     -------
     dict with keys: final_loss, best_loss, epochs_completed, checkpoint_path
     """
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = get_device()
 
     if gpus > 1 and torch.cuda.device_count() >= gpus:
         return _fit_ddp(
