@@ -13,7 +13,6 @@ import argparse
 import csv
 import logging
 from pathlib import Path
-import subprocess
 import sys
 
 import nibabel as nib
@@ -27,7 +26,9 @@ log = logging.getLogger(__name__)
 
 
 def install_dataset(dataset_id: str, base_dir: Path) -> Path:
-    """Install an OpenNeuro fmriprep derivative via DataLad."""
+    """Install an OpenNeuro fmriprep derivative via DataLad Python API."""
+    import datalad.api as dl
+
     repo_url = f"https://github.com/OpenNeuroDerivatives/{dataset_id}-fmriprep.git"
     dest = base_dir / f"{dataset_id}-fmriprep"
 
@@ -36,84 +37,109 @@ def install_dataset(dataset_id: str, base_dir: Path) -> Path:
         return dest
 
     log.info("Installing %s from %s", dataset_id, repo_url)
-    subprocess.run(
-        ["datalad", "install", "--source", repo_url, str(dest)],
-        check=True,
-    )
+    dl.install(source=repo_url, path=str(dest))
     return dest
 
 
-def get_files(dataset_dir: Path, pattern: str) -> list[Path]:
-    """Get specific files via datalad get with glob pattern."""
-    log.info("Getting files matching %s in %s", pattern, dataset_dir.name)
-    result = subprocess.run(
-        ["datalad", "get", "-d", str(dataset_dir), pattern],
-        capture_output=True,
-        text=True,
-        cwd=str(dataset_dir),
-    )
-    if result.returncode != 0:
-        log.warning(
-            "datalad get returned %d: %s", result.returncode, result.stderr[:200]
-        )
+def datalad_get(paths: list[str | Path], dataset_dir: str | Path) -> None:
+    """Download file content via DataLad Python API."""
+    import datalad.api as dl
 
-    return sorted(dataset_dir.glob(pattern))
+    try:
+        dl.get([str(p) for p in paths], dataset=str(dataset_dir))
+    except Exception as exc:
+        log.warning("datalad get failed: %s", exc)
 
 
-def find_subject_pairs(
-    dataset_dir: Path,
-) -> list[dict[str, str]]:
-    """Find T1w + aparc+aseg pairs for all subjects."""
-    pairs = []
+def _file_accessible(p: Path) -> bool:
+    """Check that *p* is a real file with content (not a broken annex symlink)."""
+    try:
+        return p.stat().st_size > 0
+    except OSError:
+        return False
 
-    # Try common fmriprep output patterns
-    t1w_patterns = [
-        "sub-*/anat/*desc-preproc_T1w.nii.gz",
-        "sub-*/anat/*space-MNI152NLin2009cAsym_desc-preproc_T1w.nii.gz",
-        "sub-*/anat/*_T1w.nii.gz",
-    ]
+
+def _extract_subject_id(path: Path) -> str:
+    """Extract the subject ID (e.g. 'sub-01') from a BIDS-style path."""
+    for part in path.parts:
+        if part.startswith("sub-"):
+            return part
+    return path.stem.split("_")[0]
+
+
+def find_subject_pairs(dataset_dir: Path) -> list[dict[str, str]]:
+    """Find T1w + aparc+aseg pairs, discover patterns, and download per subject.
+
+    Strategy:
+    1. Inspect the dataset tree (git metadata only, no content yet) to
+       find which aparc+aseg pattern exists.
+    2. For each subject with an aparc+aseg, find the matching native-space
+       T1w (same subject, no ``space-`` in filename).
+    3. Download each (T1w, label) pair via ``datalad get``.
+    """
+    pairs: list[dict[str, str]] = []
+
+    # --- Discover label pattern -------------------------------------------
     label_patterns = [
         "sub-*/anat/*desc-aparcaseg_dseg.nii.gz",
         "sub-*/anat/*desc-aseg_dseg.nii.gz",
     ]
-
-    t1w_files = []
-    for pat in t1w_patterns:
-        t1w_files = get_files(dataset_dir, pat)
-        if t1w_files:
-            break
-
-    label_files = []
+    label_files: list[Path] = []
+    label_pat_used = ""
     for pat in label_patterns:
-        label_files = get_files(dataset_dir, pat)
+        label_files = sorted(dataset_dir.glob(pat))
         if label_files:
+            label_pat_used = pat
+            log.info("Found %d label files matching %s", len(label_files), pat)
             break
 
-    if not t1w_files:
-        log.warning("No T1w files found in %s", dataset_dir)
+    if not label_files:
+        log.warning("No aparc+aseg / aseg labels found in %s", dataset_dir)
         return pairs
 
-    # Match by subject ID
-    t1w_by_sub = {}
-    for f in t1w_files:
-        sub = f.parts[-3] if "sub-" in f.parts[-3] else f.stem.split("_")[0]
-        t1w_by_sub[sub] = f
+    # --- For each subject, find its native-space T1w ----------------------
+    for label_path in label_files:
+        sub_id = _extract_subject_id(label_path)
+        anat_dir = label_path.parent
 
-    label_by_sub = {}
-    for f in label_files:
-        sub = f.parts[-3] if "sub-" in f.parts[-3] else f.stem.split("_")[0]
-        label_by_sub[sub] = f
+        # Native-space T1w: no 'space-' token in the filename
+        t1w_candidates = [
+            p
+            for p in anat_dir.glob(f"{sub_id}*desc-preproc_T1w.nii.gz")
+            if "space-" not in p.name
+        ]
+        if not t1w_candidates:
+            # Fall back to any T1w for this subject
+            t1w_candidates = sorted(anat_dir.glob(f"{sub_id}*_T1w.nii.gz"))[:1]
 
-    for sub in sorted(set(t1w_by_sub) & set(label_by_sub)):
-        pairs.append(
-            {
-                "subject_id": sub,
-                "t1w_path": str(t1w_by_sub[sub]),
-                "label_path": str(label_by_sub[sub]),
-            }
-        )
+        if not t1w_candidates:
+            log.warning("No T1w found for %s in %s", sub_id, anat_dir)
+            continue
 
-    log.info("Found %d subject pairs in %s", len(pairs), dataset_dir.name)
+        t1w_path = t1w_candidates[0]
+
+        # Download this pair
+        log.info("Downloading pair for %s", sub_id)
+        datalad_get([t1w_path, label_path], dataset_dir)
+
+        # Verify content is accessible
+        if _file_accessible(t1w_path) and _file_accessible(label_path):
+            pairs.append(
+                {
+                    "subject_id": sub_id,
+                    "t1w_path": str(t1w_path),
+                    "label_path": str(label_path),
+                }
+            )
+        else:
+            log.warning("Skipping %s: files not accessible after datalad get", sub_id)
+
+    log.info(
+        "Found %d subject pairs in %s (label pattern: %s)",
+        len(pairs),
+        dataset_dir.name,
+        label_pat_used,
+    )
     return pairs
 
 
