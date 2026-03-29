@@ -606,28 +606,21 @@ def main() -> None:
     variant_config = variants.get(variant, {})
     log.info("Model variant: %s — %s", variant, variant_config.get("description", ""))
 
-    # ---- MC Bernoulli dropout shortcut (no Bayesian training needed) ---------
-    if variant == "bwn_multi":
-        train_pairs = load_manifest(args.manifest, split="train")
-        val_pairs = load_manifest(args.manifest, split="val")
-        _train_mc_dropout(args, config, train_pairs, val_pairs, output_dir)
-        elapsed = time.time() - t_start
-        log.info("MC dropout variant complete in %.1f s", elapsed)
-        return
+    # Note: bwn_multi is NOT a shortcut — it's a full VWN model trained with
+    # Bernoulli dropout, same architecture as bvwn_multi_prior but without
+    # concrete dropout. All 3 kwyk models are independently trained.
 
-    # ---- Determine prior type from variant config ---------------------------
-    prior_type = variant_config.get("prior_type", "standard_normal")
+    # ---- Determine KL weight from config ------------------------------------
     kl_weight = variant_config.get("kl_weight", config.get("kl_weight", 1.0))
 
     log.info("Config loaded from %s", args.config)
     log.info(
-        "Training Bayesian MeshNet (%s): epochs=%d, n_classes=%d, "
-        "block_shape=%s, prior=%s, kl_weight=%.4f, warmstart=%s",
+        "Training KWYK MeshNet (%s): epochs=%d, n_classes=%d, "
+        "block_shape=%s, kl_weight=%.4f, warmstart=%s",
         variant,
         epochs,
         n_classes,
         block_shape,
-        prior_type,
         kl_weight,
         use_warmstart,
     )
@@ -773,7 +766,7 @@ def main() -> None:
     seg._loss_name = "ELBOLoss"
     seg._training_result = {
         "variant": variant,
-        "prior_type": prior_type,
+        "dropout_type": dropout_type,
         "final_loss": result["train_losses"][-1] if result["train_losses"] else 0.0,
         "best_loss": result["best_loss"],
         "epochs_completed": result["epochs_completed"],
@@ -792,7 +785,7 @@ def main() -> None:
     log.info("Bayesian MeshNet training complete (%s)", variant)
     log.info("  Output directory : %s", output_dir)
     log.info("  Variant          : %s", variant)
-    log.info("  Prior type       : %s", prior_type)
+    log.info("  Dropout type     : %s", dropout_type)
     log.info("  Epochs           : %d", epochs)
     log.info("  Warm-start       : %s", "yes" if use_warmstart else "no")
     log.info("  KL weight        : %.4f", kl_weight)

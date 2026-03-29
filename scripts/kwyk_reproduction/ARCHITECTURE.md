@@ -36,6 +36,23 @@ layer_1/concrete_dropout/p:0: [96]         # per-filter dropout rate
 This confirms **weight normalization** (`v`, `g`) is used, not the direct
 `μ` parameterization described in the paper's equations.
 
+### Key finding: all 3 models are independently trained VWN models
+
+All 3 saved models have the **same layer structure** (`v`, `g`, `kernel_a`,
+`bias_m`, `bias_a`) — including the MAP model (`all_50_wn`).  They are
+**not** weight-sharing variants; they were trained independently:
+
+| Model | Total variables | Extra per layer | Timestamp |
+|-------|----------------|----------------|-----------|
+| all_50_wn (MAP) | 41 | — | 1555341859 |
+| all_50_bwn_09_multi (BD) | 41 | — | 1555963478 |
+| all_50_bvwn_multi_prior (SSD) | 48 | `concrete_dropout/p` | 1556816070 |
+
+The MAP and BD models have identical parameterization (both have `kernel_a`
+for learned sigma).  The only difference is whether MC sampling is enabled
+at inference time.  The SSD model additionally has 7 `concrete_dropout/p`
+parameters (one per conv layer) for learned per-filter dropout rates.
+
 ### Verified from source code
 
 Commit `4dd379c` in `neuronets/kwyk` repo (Patrick McClure, 2019-02-28):
