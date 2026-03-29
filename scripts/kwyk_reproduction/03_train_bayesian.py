@@ -593,7 +593,6 @@ def main() -> None:
     block_shape = tuple(config["block_shape"])
     batch_size = config["batch_size"]
     lr = config.get("lr", 1e-4)
-    initial_rho = config.get("initial_rho", -3.0)
     n_samples = config.get("n_samples", 10)
     label_mapping = config.get("label_mapping", "binary")
     output_dir = Path(args.output_dir)
@@ -661,30 +660,33 @@ def main() -> None:
         )
         val_loader = ds_val.dataloader
 
-    # ---- Build Bayesian MeshNet ---------------------------------------------
+    # ---- Build KWYK MeshNet (VWN + dropout variant) --------------------------
     from nobrainer.models import get as get_model
 
+    dropout_type = variant_config.get("dropout_type", "bernoulli")
     model_args = {
         "n_classes": n_classes,
         "filters": config.get("filters", 96),
         "receptive_field": config.get("receptive_field", 37),
+        "dropout_type": dropout_type,
         "dropout_rate": config.get("dropout_rate", 0.25),
-        "prior_type": prior_type,
-        "kl_weight": kl_weight,
+        "sigma_init": config.get("sigma_init", 1e-4),
     }
 
-    # Add spike-and-slab specific params if applicable
-    if prior_type == "spike_and_slab":
-        model_args["spike_sigma"] = variant_config.get("spike_sigma", 0.001)
-        model_args["slab_sigma"] = variant_config.get("slab_sigma", 1.0)
-        model_args["prior_pi"] = variant_config.get("prior_pi", 0.5)
+    # Concrete dropout specific params
+    if dropout_type == "concrete":
+        model_args["concrete_temperature"] = variant_config.get(
+            "concrete_temperature", 0.02
+        )
+        model_args["concrete_init_p"] = variant_config.get("concrete_init_p", 0.9)
 
     log.info("Model args: %s", model_args)
 
-    bayesian_model = get_model("bayesian_meshnet")(**model_args)
+    bayesian_model = get_model("kwyk_meshnet")(**model_args)
     log.info(
-        "Bayesian MeshNet (%s) created: %d parameters",
+        "KWYK MeshNet (%s, %s) created: %d parameters",
         variant,
+        dropout_type,
         sum(p.numel() for p in bayesian_model.parameters()),
     )
 
@@ -703,29 +705,18 @@ def main() -> None:
 
         log.info("Loading deterministic weights from %s", det_weights_path)
 
-        # Build a deterministic MeshNet with matching architecture
-        det_model_args = {
-            k: v
-            for k, v in model_args.items()
-            if k
-            not in ("prior_type", "kl_weight", "spike_sigma", "slab_sigma", "prior_pi")
-        }
-        det_model = get_model("meshnet")(**det_model_args)
-        det_model.load_state_dict(torch.load(det_weights_path, weights_only=True))
-
         from nobrainer.models.bayesian.warmstart import (
-            warmstart_bayesian_from_deterministic,
+            warmstart_kwyk_from_deterministic,
         )
 
-        n_transferred = warmstart_bayesian_from_deterministic(
+        n_transferred = warmstart_kwyk_from_deterministic(
             bayesian_model,
-            det_model,
-            initial_rho=initial_rho,
+            det_weights_path,
+            get_model,
         )
         log.info("Warm-started %d layers from deterministic model", n_transferred)
-        del det_model  # free memory
     else:
-        log.info("Training Bayesian MeshNet from scratch (no warm-start)")
+        log.info("Training KWYK MeshNet from scratch (no warm-start)")
 
     # ---- ELBO loss and optimiser --------------------------------------------
     elbo_loss = ELBOLoss(bayesian_model, kl_weight=kl_weight)
@@ -771,7 +762,7 @@ def main() -> None:
     from nobrainer.processing.segmentation import Segmentation
 
     seg = Segmentation(
-        base_model="bayesian_meshnet",
+        base_model="kwyk_meshnet",
         model_args=model_args,
     )
     seg.model_ = bayesian_model

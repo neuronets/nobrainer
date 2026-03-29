@@ -32,17 +32,24 @@ import torch.nn.functional as F
 
 
 class FFGConv3d(nn.Module):
-    """3-D convolution with Fully Factorized Gaussian (FFG) weights.
+    """3-D convolution with Variational Weight Normalization + learned sigma.
 
-    Each weight has a learnable mean ``μ`` and std ``σ = |a|``.  During
-    stochastic forward passes (``mc=True``), the **local reparameterization
-    trick** (Kingma et al. 2015) computes the output distribution directly:
+    Verified against the actual kwyk trained model (``neuronets/kwyk:latest``).
+    Each layer stores: ``v``, ``g``, ``kernel_a``, ``bias_m``, ``bias_a``.
 
-        ``μ* = conv(x, μ)``
-        ``σ*² = conv(x², σ²)``
+    **Mean weights** use weight normalization (Salimans & Kingma 2016):
+        ``kernel_m = g · v / ||v||``
+
+    **Sigma** is learned per weight:
+        ``kernel_sigma = |kernel_a|``
+
+    During stochastic forward passes (``mc=True``), the **local
+    reparameterization trick** (Kingma et al. 2015, Eqs. 12-14 in
+    McClure et al. 2019) computes the output distribution directly:
+
+        ``μ* = conv(x, kernel_m)``
+        ``σ*² = conv(x², kernel_sigma²)``
         ``output = μ* + σ* · ε,  ε ~ N(0, 1)``
-
-    This matches Eqs. 12-14 of McClure et al. (2019).
 
     In deterministic mode (``mc=False``) only the mean path is used.
 
@@ -57,11 +64,11 @@ class FFGConv3d(nn.Module):
     bias : bool
         Whether to include a bias term (with its own sigma).
     sigma_init : float
-        Initial value for ``|a|`` (default 1e-4, matching kwyk code).
+        Initial value for ``|kernel_a|`` (default 1e-4, matching kwyk).
     prior_mu : float
-        Prior mean (default 0.0).
+        Prior mean for KL (default 0.0).
     prior_sigma : float
-        Prior std (default 0.1, matching paper Section 2.2.3.2).
+        Prior std for KL (default 0.1, matching paper Eq. 18).
     """
 
     def __init__(
@@ -89,50 +96,48 @@ class FFGConv3d(nn.Module):
 
         k = kernel_size
         weight_shape = (out_channels, in_channels, k, k, k)
+        g_shape = (out_channels, 1, 1, 1, 1)
 
-        # Learnable mean μ_{f,t} per weight
-        self.weight_mu = nn.Parameter(torch.empty(weight_shape))
-        nn.init.kaiming_normal_(self.weight_mu, mode="fan_in", nonlinearity="relu")
+        # Weight normalization: kernel_m = g * v / ||v||
+        self.v = nn.Parameter(torch.empty(weight_shape))
+        nn.init.kaiming_normal_(self.v, mode="fan_in", nonlinearity="relu")
+        self.g = nn.Parameter(torch.full(g_shape, math.sqrt(2.0)))
 
-        # Learnable sigma: σ_{f,t} = |weight_a|
-        # Initialized small so initial behavior is near-deterministic
-        self.weight_a = nn.Parameter(torch.full(weight_shape, sigma_init))
+        # Learned sigma: kernel_sigma = |kernel_a|
+        self.kernel_a = nn.Parameter(torch.full(weight_shape, sigma_init))
 
         if bias:
-            self.bias_mu = nn.Parameter(torch.zeros(out_channels))
+            self.bias_m = nn.Parameter(torch.zeros(out_channels))
             self.bias_a = nn.Parameter(torch.full((out_channels,), sigma_init))
         else:
-            self.register_parameter("bias_mu", None)
+            self.register_parameter("bias_m", None)
             self.register_parameter("bias_a", None)
 
         # Accumulated KL (updated each forward pass)
         self.kl: torch.Tensor = torch.tensor(0.0)
 
     @property
+    def kernel_m(self) -> torch.Tensor:
+        """Mean weight: ``g · v / ||v||``."""
+        v_norm = F.normalize(self.v.flatten(1), dim=1).view_as(self.v)
+        return self.g * v_norm
+
+    @property
     def weight_sigma(self) -> torch.Tensor:
-        """Weight std: ``|weight_a|``."""
-        return torch.abs(self.weight_a)
+        """Weight std: ``|kernel_a|``."""
+        return torch.abs(self.kernel_a)
 
     def forward(self, x: torch.Tensor, mc: bool = True) -> torch.Tensor:
-        """Forward pass with optional stochastic sampling.
-
-        Parameters
-        ----------
-        x : Tensor
-            Input tensor ``(B, C, D, H, W)``.
-        mc : bool
-            If True, use local reparameterization (stochastic).
-            If False, use only the mean path (deterministic).
-        """
-        mu = self.weight_mu
+        """Forward pass with optional stochastic sampling."""
+        km = self.kernel_m
         out_mean = F.conv3d(
-            x, mu, self.bias_mu, self.stride, self.padding, self.dilation
+            x, km, self.bias_m, self.stride, self.padding, self.dilation
         )
 
         if not mc:
             return out_mean
 
-        # Local reparameterization trick (Eqs. 12-14 in McClure et al.)
+        # Local reparameterization trick (Eqs. 12-14)
         sigma = self.weight_sigma
         out_var = F.conv3d(
             x.pow(2), sigma.pow(2), None, self.stride, self.padding, self.dilation
@@ -144,10 +149,10 @@ class FFGConv3d(nn.Module):
         noise = torch.randn_like(out_mean)
         out = out_mean + torch.sqrt(out_var + 1e-8) * noise
 
-        # KL(N(μ, σ) || N(μ_prior, σ_prior)) — Eq. 18
+        # KL(N(kernel_m, sigma) || N(prior_mu, prior_sigma)) — Eq. 18
         self.kl = (
             torch.log(self.prior_sigma / (sigma + 1e-8))
-            + (sigma.pow(2) + (mu - self.prior_mu).pow(2)) / (2 * self.prior_sigma**2)
+            + (sigma.pow(2) + (km - self.prior_mu).pow(2)) / (2 * self.prior_sigma**2)
             - 0.5
         ).sum()
 
