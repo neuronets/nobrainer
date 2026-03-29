@@ -99,12 +99,16 @@ jobs:
 
       - name: Install git-annex
         run: |
-          export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
+          # Runner runs as root but EC2_USER_HOME points to ec2-user.
+          # Add both possible bin dirs to PATH.
+          export PATH="/root/.local/bin:${EC2_USER_HOME}/.local/bin:$PATH"
           if ! command -v git-annex &>/dev/null; then
             echo "Installing git-annex via uv..."
             uv tool install git-annex
           fi
           git-annex version
+          # Persist PATH for subsequent steps
+          echo "/root/.local/bin" >> $GITHUB_PATH
 
       - name: Set up venv from pre-installed base
         run: |
