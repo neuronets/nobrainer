@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from monai.metrics import DiceMetric, HausdorffDistanceMetric, MeanIoU
+import torch
 
 # ---------------------------------------------------------------------------
 # Factory functions returning configured MONAI metric objects
@@ -108,6 +109,38 @@ def hausdorff_metric(
     )
 
 
+def hamming_metric(reduction: str = "mean") -> "HammingMetric":
+    """Return a Hamming distance metric (fraction of misclassified voxels).
+
+    Unlike MONAI metrics, this is a simple callable that takes
+    ``(y_pred, y_true)`` integer label tensors and returns the mean
+    fraction of disagreeing voxels.
+    """
+    return HammingMetric(reduction=reduction)
+
+
+class HammingMetric:
+    """Hamming distance metric: fraction of voxels where prediction != label."""
+
+    def __init__(self, reduction: str = "mean") -> None:
+        self.reduction = reduction
+
+    def __call__(
+        self,
+        y_pred: torch.Tensor,
+        y_true: torch.Tensor,
+    ) -> torch.Tensor:
+        ne = (y_pred != y_true).float()
+        # Average over spatial dims per sample
+        spatial = list(range(1, ne.ndim))
+        per_sample = ne.mean(dim=spatial)
+        if self.reduction == "mean":
+            return per_sample.mean()
+        if self.reduction == "sum":
+            return per_sample.sum()
+        return per_sample  # "none"
+
+
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
@@ -118,6 +151,7 @@ _metrics = {
     "jaccard": jaccard_metric,
     "tversky": tversky_metric,
     "hausdorff": hausdorff_metric,
+    "hamming": hamming_metric,
 }
 
 
