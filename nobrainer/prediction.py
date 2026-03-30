@@ -271,26 +271,29 @@ def predict_with_uncertainty(
                 m2_probs += delta * delta2
 
     var_probs = m2_probs / max(n_samples, 1)  # population variance
+    del m2_probs
     n_classes = mean_probs.shape[1]
 
-    # Reconstruct full volumes
-    full_mean = _stitch_blocks(
-        mean_probs, grid, block_shape, pad, orig_shape, n_classes
-    )
-    full_var = _stitch_blocks(var_probs, grid, block_shape, pad, orig_shape, n_classes)
-
-    # Mean variance across classes
-    mean_var = full_var.mean(axis=0)  # (D, H, W)
-
-    # Predictive entropy: -sum(p * log(p + eps), axis=classes)
-    eps = 1e-8
-    entropy = -(full_mean * np.log(full_mean + eps)).sum(axis=0)  # (D, H, W)
-
-    # Label = argmax of mean softmax
+    # Reduce per-block before stitching to avoid materialising full (C, D, H, W)
+    # Labels: argmax over classes per block → (N_blocks, 1, bD, bH, bW)
     if n_classes == 1:
-        labels = (full_mean[0] > 0.5).astype(np.float32)
+        block_labels = (mean_probs[:, 0:1] > 0.5).astype(np.float32)
     else:
-        labels = full_mean.argmax(axis=0).astype(np.float32)
+        block_labels = mean_probs.argmax(axis=1, keepdims=True).astype(np.float32)
+
+    # Mean variance across classes per block → (N_blocks, 1, bD, bH, bW)
+    block_var = var_probs.mean(axis=1, keepdims=True)
+    del var_probs
+
+    # Entropy per block → (N_blocks, 1, bD, bH, bW)
+    eps = 1e-8
+    block_entropy = -(mean_probs * np.log(mean_probs + eps)).sum(axis=1, keepdims=True)
+    del mean_probs
+
+    # Stitch scalar maps (n_classes=1 for each)
+    labels = _stitch_blocks(block_labels, grid, block_shape, pad, orig_shape, 1)[0]
+    mean_var = _stitch_blocks(block_var, grid, block_shape, pad, orig_shape, 1)[0]
+    entropy = _stitch_blocks(block_entropy, grid, block_shape, pad, orig_shape, 1)[0]
 
     label_img = nib.Nifti1Image(labels, affine)
     var_img = nib.Nifti1Image(mean_var.astype(np.float32), affine)
