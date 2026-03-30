@@ -212,6 +212,157 @@ def gradient_penalty(
 
 
 # ---------------------------------------------------------------------------
+# Class weights and weighted losses
+# ---------------------------------------------------------------------------
+
+
+def compute_class_weights(
+    label_paths: list[str],
+    n_classes: int,
+    label_mapping: str | None = None,
+    method: str = "inverse_frequency",
+    max_samples: int | None = None,
+) -> torch.Tensor:
+    """Compute per-class weights from label volumes.
+
+    Scans label files to count voxel frequencies per class, then converts
+    to weights.  Useful for imbalanced segmentation (e.g., 50-class brain
+    parcellation where small structures are underrepresented).
+
+    Parameters
+    ----------
+    label_paths : list of str
+        Paths to label NIfTI/MGZ files.
+    n_classes : int
+        Number of target classes.
+    label_mapping : str or None
+        Label mapping name (e.g., ``"50-class"``) or CSV path.
+        If None, labels are used as-is.
+    method : str
+        ``"inverse_frequency"`` (1/freq, normalized) or
+        ``"median_frequency"`` (median_freq/freq, as in SegNet).
+    max_samples : int or None
+        Limit scanning to this many files (for speed).
+
+    Returns
+    -------
+    torch.Tensor
+        Shape ``(n_classes,)`` float tensor of weights.
+    """
+    import nibabel as nib
+    import numpy as np
+
+    counts = np.zeros(n_classes, dtype=np.float64)
+    paths = label_paths[:max_samples] if max_samples else label_paths
+
+    remap_fn = None
+    if label_mapping is not None:
+        from nobrainer.processing.dataset import _load_label_mapping
+
+        remap_fn = _load_label_mapping(label_mapping)
+
+    for path in paths:
+        arr = np.asarray(nib.load(path).dataobj, dtype=np.int32)
+        if remap_fn is not None:
+            arr = remap_fn(arr)
+        for c in range(n_classes):
+            counts[c] += (arr == c).sum()
+
+    # Avoid division by zero
+    counts = np.maximum(counts, 1.0)
+    total = counts.sum()
+
+    if method == "median_frequency":
+        freqs = counts / total
+        median_freq = np.median(freqs[freqs > 0])
+        weights = median_freq / freqs
+    else:
+        # inverse_frequency: weight = total / (n_classes * count)
+        weights = total / (n_classes * counts)
+
+    # Normalize so mean weight = 1
+    weights = weights / weights.mean()
+
+    return torch.tensor(weights, dtype=torch.float32)
+
+
+def weighted_cross_entropy(
+    weight: torch.Tensor | None = None,
+    label_smoothing: float = 0.0,
+) -> torch.nn.CrossEntropyLoss:
+    """Return a ``CrossEntropyLoss`` with optional per-class weights.
+
+    Parameters
+    ----------
+    weight : torch.Tensor or None
+        Per-class weights, shape ``(n_classes,)``.
+    label_smoothing : float
+        Label smoothing factor (default 0).
+    """
+    return torch.nn.CrossEntropyLoss(
+        weight=weight,
+        label_smoothing=label_smoothing,
+    )
+
+
+class DiceCELoss(torch.nn.Module):
+    """Combined Dice + weighted CrossEntropy loss.
+
+    Commonly used for imbalanced segmentation tasks.  The Dice component
+    is inherently class-balanced; the CE component can use per-class
+    weights.
+
+    Parameters
+    ----------
+    weight : torch.Tensor or None
+        Per-class weights for the CE term.
+    dice_weight : float
+        Relative weight of the Dice term (default 1.0).
+    ce_weight : float
+        Relative weight of the CE term (default 1.0).
+    softmax : bool
+        Apply softmax to predictions for the Dice term.
+    label_smoothing : float
+        Label smoothing for the CE term.
+    """
+
+    def __init__(
+        self,
+        weight: torch.Tensor | None = None,
+        dice_weight: float = 1.0,
+        ce_weight: float = 1.0,
+        softmax: bool = True,
+        label_smoothing: float = 0.0,
+    ) -> None:
+        super().__init__()
+        self.dice_loss = DiceLoss(softmax=softmax, to_onehot_y=True)
+        self.ce_loss = torch.nn.CrossEntropyLoss(
+            weight=weight, label_smoothing=label_smoothing
+        )
+        self.dice_weight = dice_weight
+        self.ce_weight = ce_weight
+
+    def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        # Dice expects target with channel dim
+        if target.ndim == pred.ndim - 1:
+            target_dice = target.unsqueeze(1)
+        else:
+            target_dice = target
+        d = self.dice_loss(pred, target_dice)
+
+        # CE expects target without channel dim, as long
+        if target.ndim == pred.ndim:
+            target_ce = target.squeeze(1)
+        else:
+            target_ce = target
+        if target_ce.dtype != torch.long:
+            target_ce = target_ce.long()
+        ce = self.ce_loss(pred, target_ce)
+
+        return self.dice_weight * d + self.ce_weight * ce
+
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 
@@ -223,6 +374,8 @@ _losses = {
     "elbo": elbo,
     "wasserstein": wasserstein,
     "gradient_penalty": gradient_penalty,
+    "weighted_cross_entropy": weighted_cross_entropy,
+    "dice_ce": DiceCELoss,
 }
 
 

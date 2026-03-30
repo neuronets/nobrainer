@@ -61,9 +61,14 @@ class ELBOLoss(nn.Module):
         the regularisation (cold posterior).
     """
 
-    def __init__(self, model: nn.Module, kl_weight: float = 1.0) -> None:
+    def __init__(
+        self,
+        model: nn.Module,
+        kl_weight: float = 1.0,
+        class_weights: torch.Tensor | None = None,
+    ) -> None:
         super().__init__()
-        self.ce = nn.CrossEntropyLoss()
+        self.ce = nn.CrossEntropyLoss(weight=class_weights)
         self.model = model
         self.kl_weight = kl_weight
         self._last_kl: float = 0.0
@@ -297,6 +302,7 @@ def train_bayesian(
     label_mapping: str | None,
     checkpoint_dir: Path,
     preemption_handler: SlurmPreemptionHandler | None = None,
+    callbacks: list | None = None,
 ) -> dict:
     """Custom training loop for Bayesian MeshNet with ELBO loss.
 
@@ -444,6 +450,10 @@ def train_bayesian(
             val_dice_means[-1] if val_dice_means else 0.0,
             elapsed,
         )
+
+        # -- Callbacks -----------------------------------------------------------
+        for cb in callbacks or []:
+            cb(epoch, avg_loss, model)
 
         # -- Check for SLURM preemption signal --------------------------------
         if preemption_handler and preemption_handler.preempted:
@@ -727,14 +737,64 @@ def main() -> None:
     else:
         log.info("Training KWYK MeshNet from scratch (no warm-start)")
 
+    # ---- Class weights (important for 50-class parcellation) -----------------
+    class_weights = None
+    weight_method = config.get("class_weight_method")
+    if weight_method and weight_method != "null":
+        from nobrainer.losses import compute_class_weights
+
+        label_paths = [p[1] for p in train_pairs]
+        class_weights = compute_class_weights(
+            label_paths,
+            n_classes,
+            label_mapping=label_mapping,
+            method=weight_method,
+            max_samples=50,
+        )
+        log.info(
+            "Class weights computed (%s): min=%.3f, max=%.3f, mean=%.3f",
+            weight_method,
+            class_weights.min(),
+            class_weights.max(),
+            class_weights.mean(),
+        )
+        # Move weights to device
+        from nobrainer.training import get_device
+
+        class_weights = class_weights.to(get_device())
+
     # ---- ELBO loss and optimiser --------------------------------------------
-    elbo_loss = ELBOLoss(bayesian_model, kl_weight=kl_weight)
+    elbo_loss = ELBOLoss(
+        bayesian_model, kl_weight=kl_weight, class_weights=class_weights
+    )
     optimizer = torch.optim.Adam(bayesian_model.parameters(), lr=lr)
 
     # ---- SLURM preemption handler (no-op if not on SLURM) -----------------
     preemption = None
     if os.environ.get("SLURM_JOB_ID"):
         preemption = SlurmPreemptionHandler()
+
+    # ---- Experiment tracker (local + optional W&B) -------------------------
+    from nobrainer.experiment import ExperimentTracker
+
+    tracker = ExperimentTracker(
+        output_dir=output_dir,
+        config={
+            "variant": variant,
+            "dropout_type": dropout_type,
+            "n_classes": n_classes,
+            "filters": config.get("filters", 96),
+            "block_shape": list(block_shape),
+            "batch_size": batch_size,
+            "lr": lr,
+            "kl_weight": kl_weight,
+            "epochs": epochs,
+            "warmstart": use_warmstart,
+        },
+        project="kwyk-reproduction",
+        name=variant,
+        tags=[variant, f"{n_classes}-class"],
+    )
 
     # ---- Train --------------------------------------------------------------
     result = train_bayesian(
@@ -750,6 +810,7 @@ def main() -> None:
         label_mapping=label_mapping,
         checkpoint_dir=output_dir,
         preemption_handler=preemption,
+        callbacks=[tracker.callback(variant=variant)],
     )
 
     # ---- Learning curve with uncertainty bands ------------------------------
@@ -814,6 +875,8 @@ def main() -> None:
     log.info("  MC samples       : %d", n_samples)
     log.info("  Elapsed time     : %.1f s", elapsed)
     log.info("=" * 60)
+
+    tracker.finish()
 
 
 if __name__ == "__main__":
