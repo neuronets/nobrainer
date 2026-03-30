@@ -36,15 +36,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
-from utils import (
-    SlurmPreemptionHandler,
-    compute_dice,
-    load_config,
-    load_training_checkpoint,
-    save_figure,
-    save_training_checkpoint,
-    setup_logging,
-)
+from utils import compute_dice, load_config, save_figure, setup_logging
+
+from nobrainer.gpu import auto_batch_size, gpu_count
+from nobrainer.slurm import SlurmPreemptionHandler, load_checkpoint, save_checkpoint
 
 log = setup_logging(__name__)
 
@@ -315,9 +310,7 @@ def train_bayesian(
     model = model.to(device)
 
     # -- Resume from checkpoint if available --------------------------------
-    start_epoch, prev_metrics = load_training_checkpoint(
-        checkpoint_dir, model, optimizer
-    )
+    start_epoch, prev_metrics = load_checkpoint(checkpoint_dir, model, optimizer)
 
     # Restore accumulated metrics from prior runs
     train_losses: list[float] = prev_metrics.get("train_losses", [])
@@ -438,7 +431,7 @@ def train_bayesian(
             "kl_terms": kl_terms,
             "best_loss": best_loss,
         }
-        save_training_checkpoint(checkpoint_dir, model, optimizer, epoch, metrics)
+        save_checkpoint(checkpoint_dir, model, optimizer, epoch, metrics)
 
         elapsed = time.time() - t_epoch
         log.info(
@@ -634,27 +627,9 @@ def main() -> None:
         log.error("No training volumes found in manifest. Exiting.")
         return
 
-    from nobrainer.processing.dataset import Dataset
-
-    ds_train = (
-        Dataset.from_files(train_pairs, block_shape=block_shape, n_classes=n_classes)
-        .batch(batch_size)
-        .binarize(label_mapping)
-    )
-    train_loader = ds_train.dataloader
-
-    ds_val = None
-    val_loader = None
-    if val_pairs:
-        ds_val = (
-            Dataset.from_files(val_pairs, block_shape=block_shape, n_classes=n_classes)
-            .batch(batch_size)
-            .binarize(label_mapping)
-        )
-        val_loader = ds_val.dataloader
-
-    # ---- Build KWYK MeshNet (VWN + dropout variant) --------------------------
+    # ---- Build KWYK MeshNet first (needed for auto batch size) ----------------
     from nobrainer.models import get as get_model
+    from nobrainer.processing.dataset import Dataset
 
     dropout_type = variant_config.get("dropout_type", "bernoulli")
     model_args = {
@@ -682,6 +657,47 @@ def main() -> None:
         dropout_type,
         sum(p.numel() for p in bayesian_model.parameters()),
     )
+
+    # ---- Auto batch size + multi-GPU scaling --------------------------------
+    n_gpus = gpu_count()
+    if n_gpus > 0:
+        optimal_per_gpu = auto_batch_size(
+            bayesian_model,
+            block_shape,
+            n_classes=n_classes,
+            target_memory_fraction=0.80,
+        )
+        effective_batch = optimal_per_gpu * max(n_gpus, 1)
+        log.info(
+            "GPU batch scaling: %d GPU(s) × %d per-GPU = %d effective "
+            "(config batch_size=%d)",
+            n_gpus,
+            optimal_per_gpu,
+            effective_batch,
+            batch_size,
+        )
+        batch_size = optimal_per_gpu  # per-GPU batch for DataLoader
+    else:
+        log.info("No GPU detected — using config batch_size=%d", batch_size)
+
+    # ---- Build datasets with optimized batch size ----------------------------
+
+    ds_train = (
+        Dataset.from_files(train_pairs, block_shape=block_shape, n_classes=n_classes)
+        .batch(batch_size)
+        .binarize(label_mapping)
+    )
+    train_loader = ds_train.dataloader
+
+    ds_val = None
+    val_loader = None
+    if val_pairs:
+        ds_val = (
+            Dataset.from_files(val_pairs, block_shape=block_shape, n_classes=n_classes)
+            .batch(batch_size)
+            .binarize(label_mapping)
+        )
+        val_loader = ds_val.dataloader
 
     # ---- Optional warm-start ------------------------------------------------
     if use_warmstart:

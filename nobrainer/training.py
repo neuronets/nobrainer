@@ -14,12 +14,14 @@ logger = logging.getLogger(__name__)
 
 
 def get_device() -> torch.device:
-    """Select the best available device: CUDA > MPS > CPU."""
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        return torch.device("mps")
-    return torch.device("cpu")
+    """Select the best available device: CUDA > MPS > CPU.
+
+    .. note::
+       Also available as :func:`nobrainer.gpu.get_device`.
+    """
+    from nobrainer.gpu import get_device as _get_device
+
+    return _get_device()
 
 
 def fit(
