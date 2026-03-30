@@ -13,6 +13,17 @@ from torch.utils.data import DataLoader
 logger = logging.getLogger(__name__)
 
 
+def get_device() -> torch.device:
+    """Select the best available device: CUDA > MPS > CPU.
+
+    .. note::
+       Also available as :func:`nobrainer.gpu.get_device`.
+    """
+    from nobrainer.gpu import get_device as _get_device
+
+    return _get_device()
+
+
 def fit(
     model: nn.Module,
     loader: DataLoader,
@@ -49,7 +60,7 @@ def fit(
     -------
     dict with keys: final_loss, best_loss, epochs_completed, checkpoint_path
     """
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = get_device()
 
     if gpus > 1 and torch.cuda.device_count() >= gpus:
         return _fit_ddp(

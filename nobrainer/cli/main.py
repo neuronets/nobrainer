@@ -14,6 +14,7 @@ import torch
 
 from .. import __version__
 from ..prediction import predict as _predict
+from ..training import get_device
 
 _option_kwds = {"show_default": True}
 
@@ -126,7 +127,7 @@ def predict(
 
     # Resolve device
     if device == "auto":
-        _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        _device = get_device()
     else:
         _device = torch.device(device)
 
@@ -307,7 +308,7 @@ def generate(
     import os
 
     if device == "auto":
-        _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        _device = get_device()
     else:
         _device = torch.device(device)
 

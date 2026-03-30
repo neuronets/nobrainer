@@ -10,6 +10,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from nobrainer.training import get_device
+
 
 def _pad_to_multiple(
     arr: np.ndarray, block_shape: tuple[int, int, int]
@@ -107,7 +109,7 @@ def predict(
         input NIfTI.
     """
     if device is None:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = get_device()
     device = torch.device(device)
 
     # Multi-GPU: distribute blocks across GPUs when device="cuda" and >1 GPU
@@ -218,7 +220,7 @@ def predict_with_uncertainty(
         Predictive entropy of the mean softmax distribution.
     """
     if device is None:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = get_device()
     device = torch.device(device)
 
     affine = np.eye(4)
@@ -243,9 +245,13 @@ def predict_with_uncertainty(
     # Keep model in train mode so dropout / Pyro sampling remains stochastic
     model.train()
 
-    sample_probs: list[np.ndarray] = []  # each entry: (N_blocks, C, bD, bH, bW)
+    # Welford's online algorithm: accumulate mean and M2 incrementally
+    # so we only keep 2 block-level arrays in memory, not n_samples copies.
+    mean_probs: np.ndarray | None = None  # running mean
+    m2_probs: np.ndarray | None = None  # running sum of squared deviations
+
     with torch.no_grad():
-        for _ in range(n_samples):
+        for sample_idx in range(n_samples):
             preds: list[np.ndarray] = []
             for start in range(0, n_blocks, batch_size):
                 chunk = blocks[start : start + batch_size]
@@ -253,12 +259,18 @@ def predict_with_uncertainty(
                 out = model(tensor)
                 probs = torch.softmax(out, dim=1).cpu().numpy()
                 preds.append(probs)
-            sample_probs.append(np.concatenate(preds, axis=0))
+            sample = np.concatenate(preds, axis=0)  # (N_blocks, C, bD, bH, bW)
 
-    # Stack → (n_samples, N_blocks, C, bD, bH, bW)
-    stacked = np.stack(sample_probs, axis=0)
-    mean_probs = stacked.mean(axis=0)  # (N_blocks, C, bD, bH, bW)
-    var_probs = stacked.var(axis=0)  # (N_blocks, C, bD, bH, bW)
+            if mean_probs is None:
+                mean_probs = sample.copy()
+                m2_probs = np.zeros_like(sample)
+            else:
+                delta = sample - mean_probs
+                mean_probs += delta / (sample_idx + 1)
+                delta2 = sample - mean_probs
+                m2_probs += delta * delta2
+
+    var_probs = m2_probs / max(n_samples, 1)  # population variance
     n_classes = mean_probs.shape[1]
 
     # Reconstruct full volumes

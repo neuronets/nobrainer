@@ -10,6 +10,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from nobrainer.training import get_device
+
 from .base import BaseEstimator
 
 
@@ -56,10 +58,19 @@ class Segmentation(BaseEstimator):
         optimizer: type = torch.optim.Adam,
         opt_args: dict | None = None,
         loss: Callable | nn.Module | None = None,
+        class_weights: torch.Tensor | str | None = None,
         metrics: Callable | None = None,
         callbacks: list | None = None,
     ) -> "Segmentation":
-        """Train the model and return self for chaining."""
+        """Train the model and return self for chaining.
+
+        Parameters
+        ----------
+        class_weights : Tensor, str, or None
+            Per-class weights for CrossEntropyLoss.  Pass a tensor of
+            shape ``(n_classes,)``, ``"auto"`` to compute from training
+            labels via inverse frequency, or None (default, no weighting).
+        """
         from nobrainer.models import get as get_model
         from nobrainer.training import fit as training_fit
 
@@ -79,10 +90,36 @@ class Segmentation(BaseEstimator):
         self._optimizer_class = optimizer.__name__
         self._optimizer_args = opt_args
 
+        # Configure class weights
+        weights_tensor = None
+        if class_weights is not None:
+            if isinstance(class_weights, str) and class_weights == "auto":
+                from nobrainer.losses import compute_class_weights
+
+                label_paths = [
+                    p[1] if isinstance(p, (list, tuple)) else p.get("label", p)
+                    for p in getattr(dataset_train, "data", [])
+                ]
+                label_mapping = getattr(dataset_train, "_binarize_name", None)
+                weights_tensor = compute_class_weights(
+                    label_paths,
+                    self.n_classes_,
+                    label_mapping=label_mapping,
+                    max_samples=50,
+                )
+            elif isinstance(class_weights, torch.Tensor):
+                weights_tensor = class_weights
+            if weights_tensor is not None:
+                self._class_weights = weights_tensor
+
         # Configure loss
         if loss is None:
-            loss = nn.CrossEntropyLoss()
-            self._loss_name = "CrossEntropyLoss"
+            loss = nn.CrossEntropyLoss(weight=weights_tensor)
+            self._loss_name = (
+                "WeightedCrossEntropyLoss"
+                if weights_tensor is not None
+                else "CrossEntropyLoss"
+            )
         elif callable(loss):
             self._loss_name = getattr(loss, "__name__", type(loss).__name__)
             if not isinstance(loss, nn.Module):
@@ -149,7 +186,7 @@ class Segmentation(BaseEstimator):
         metrics: Callable | None = None,
     ) -> dict:
         """Evaluate model on a dataset. Returns dict with loss and metrics."""
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = get_device()
         self.model_.to(device).eval()
         criterion = nn.CrossEntropyLoss()
 

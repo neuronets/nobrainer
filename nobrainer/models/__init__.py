@@ -31,6 +31,11 @@ try:
 except ImportError:
     pass
 
+# KWYK MeshNet (VWN-based, no Pyro dependency)
+from .bayesian.kwyk_meshnet import kwyk_meshnet  # noqa: E402
+
+_models["kwyk_meshnet"] = kwyk_meshnet
+
 # Optional: Generative models (require pytorch-lightning)
 try:
     from .generative import dcgan, progressivegan
