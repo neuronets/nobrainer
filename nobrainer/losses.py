@@ -305,6 +305,50 @@ def weighted_cross_entropy(
     )
 
 
+class HammingLoss(torch.nn.Module):
+    """Hamming loss: fraction of misclassified voxels.
+
+    A differentiable approximation of Hamming distance using soft
+    predictions: ``g·(1-p) + (1-g)·p`` averaged over spatial dims.
+
+    For use as a loss function with logits, set ``from_logits=True``
+    to apply softmax first.
+
+    Parameters
+    ----------
+    from_logits : bool
+        Apply softmax to predictions (default True).
+    """
+
+    def __init__(self, from_logits: bool = True) -> None:
+        super().__init__()
+        self.from_logits = from_logits
+
+    def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        if self.from_logits:
+            pred = torch.softmax(pred, dim=1)
+
+        # One-hot encode target if needed
+        if target.ndim == pred.ndim - 1:
+            n_classes = pred.shape[1]
+            target_oh = (
+                torch.nn.functional.one_hot(target.long(), n_classes)
+                .permute(0, 4, 1, 2, 3)
+                .float()
+            )
+        else:
+            target_oh = target.float()
+
+        # Hamming: g*(1-p) + (1-g)*p = fraction of disagreement
+        loss = target_oh * (1 - pred) + (1 - target_oh) * pred
+        return loss.mean()
+
+
+def hamming(from_logits: bool = True) -> HammingLoss:
+    """Return a :class:`HammingLoss` instance."""
+    return HammingLoss(from_logits=from_logits)
+
+
 class DiceCELoss(torch.nn.Module):
     """Combined Dice + weighted CrossEntropy loss.
 
@@ -374,6 +418,7 @@ _losses = {
     "elbo": elbo,
     "wasserstein": wasserstein,
     "gradient_penalty": gradient_penalty,
+    "hamming": hamming,
     "weighted_cross_entropy": weighted_cross_entropy,
     "dice_ce": DiceCELoss,
 }
