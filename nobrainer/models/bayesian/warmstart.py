@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
+import torch
 import torch.nn as nn
 
 from nobrainer.models.bayesian.layers import BayesianConv3d
+from nobrainer.models.bayesian.vwn_layers import FFGConv3d
 
 logger = logging.getLogger(__name__)
 
@@ -193,3 +196,74 @@ def _transfer_pair(
         return 1
 
     return 0
+
+
+# ---------------------------------------------------------------------------
+# KWYK MeshNet warm-start (VWN-based, no Pyro)
+# ---------------------------------------------------------------------------
+
+
+def warmstart_kwyk_from_deterministic(
+    kwyk_model: nn.Module,
+    det_weights_path: str | Path,
+    get_model_fn=None,
+) -> int:
+    """Transfer deterministic MeshNet weights to a KWYKMeshNet.
+
+    For each VWN conv layer, the deterministic weight ``w`` is decomposed
+    into weight normalization form: ``v = w``, ``g = ||w||`` per filter.
+    The sigma parameters (``kernel_a``) are left at their initial values.
+
+    Parameters
+    ----------
+    kwyk_model : nn.Module
+        Target KWYKMeshNet.
+    det_weights_path : str or Path
+        Path to a deterministic MeshNet ``model.pth``.
+    get_model_fn : callable, optional
+        Model factory (``nobrainer.models.get``).  If None, imported lazily.
+
+    Returns
+    -------
+    int
+        Number of layers transferred.
+    """
+    if get_model_fn is None:
+        from nobrainer.models import get as get_model_fn
+
+    det_weights_path = Path(det_weights_path)
+    state = torch.load(det_weights_path, weights_only=True)
+
+    # Extract conv weights from deterministic state dict
+    det_convs = [
+        (k, v) for k, v in sorted(state.items()) if "weight" in k and v.ndim == 5
+    ]
+
+    # Collect FFGConv3d layers from the kwyk model
+    kwyk_convs = [
+        (n, m) for n, m in kwyk_model.named_modules() if isinstance(m, FFGConv3d)
+    ]
+
+    transferred = 0
+    for (det_name, det_w), (kwyk_name, kwyk_conv) in zip(det_convs, kwyk_convs):
+        if det_w.shape != kwyk_conv.v.shape:
+            logger.warning(
+                "Shape mismatch: %s %s vs %s %s",
+                det_name,
+                det_w.shape,
+                kwyk_name,
+                kwyk_conv.v.shape,
+            )
+            continue
+
+        # Decompose w into weight-norm form: v = w, g = ||w|| per filter
+        kwyk_conv.v.data.copy_(det_w)
+        # g = ||v|| per output filter (over in_channels * k * k * k)
+        norms = det_w.flatten(1).norm(dim=1).view_as(kwyk_conv.g)
+        kwyk_conv.g.data.copy_(norms)
+
+        transferred += 1
+        logger.debug("Transferred Conv3d %s -> %s", det_name, kwyk_name)
+
+    logger.info("Warm-started %d VWN layers from deterministic model.", transferred)
+    return transferred

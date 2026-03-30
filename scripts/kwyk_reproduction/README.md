@@ -79,37 +79,35 @@ priors for the Bayesian model in Step 3.
 
 ### Step 3: Train All Model Variants
 
-The original kwyk study trained 3 model variants. Use `--variant` to select:
+All 3 kwyk models use **Variational Weight Normalization (VWN)** convolutions
+with per-weight learned sigma and the local reparameterization trick. They
+differ only in the dropout layer. See [ARCHITECTURE.md](ARCHITECTURE.md)
+for the full verification against the paper, code, and trained weights.
+
+Use `--variant` to select:
 
 ```bash
-# 3a. MC Bernoulli dropout (bwn_multi) — copies deterministic weights,
-#     uses dropout at inference for MC sampling
+# 3a. MC Bernoulli dropout (bwn_multi) — VWN conv + dropout at inference
 python 03_train_bayesian.py \
   --manifest manifest.csv --variant bwn_multi \
-  --warmstart checkpoints/meshnet --output-dir checkpoints/bwn_multi
+  --warmstart checkpoints/meshnet --output-dir checkpoints/bwn_multi \
+  --epochs 50
 
-# 3b. Spike-and-slab dropout (bvwn_multi_prior) — the flagship kwyk model
+# 3b. Spike-and-slab dropout (bvwn_multi_prior) — VWN conv + concrete dropout
 python 03_train_bayesian.py \
   --manifest manifest.csv --variant bvwn_multi_prior \
   --warmstart checkpoints/meshnet --output-dir checkpoints/bvwn_multi_prior \
   --epochs 50
-
-# 3c. Standard Gaussian Bayesian (for comparison, not in original kwyk)
-python 03_train_bayesian.py \
-  --manifest manifest.csv --variant bayesian_gaussian \
-  --warmstart checkpoints/meshnet --output-dir checkpoints/bayesian_gaussian \
-  --epochs 50
 ```
 
-| Variant | kwyk ID | Prior | Inference | Description |
-|---------|---------|-------|-----------|-------------|
-| `bwn` (step 2) | bwn | N/A (MAP) | Deterministic | Maximum a-posteriori, no uncertainty |
-| `bwn_multi` | bwn_multi | N/A | MC Bernoulli dropout | Dropout enabled at inference time |
-| `bvwn_multi_prior` | bvwn_multi_prior | Spike-and-slab | Variational | π·N(0,σ₁) + (1-π)·N(0,σ₂) mixture prior |
-| `bayesian_gaussian` | — | N(0,1) | Variational | Standard Bayes-by-backprop (comparison) |
+| Variant | kwyk ID | Conv | Dropout | MC at inference |
+|---------|---------|------|---------|-----------------|
+| `bwn` (step 2) | all_50_wn | VWN | Bernoulli (fixed) | No (MAP) |
+| `bwn_multi` | all_50_bwn_09_multi | VWN | Bernoulli (fixed) | Yes |
+| `bvwn_multi_prior` | all_50_bvwn_multi_prior | VWN | Concrete (learned) | Yes |
 
-The warm-start transfers deterministic weights to `weight_mu` and initializes
-`weight_rho` to -3.0 (low initial uncertainty), based on the MOPED method.
+The warm-start decomposes deterministic Conv3d weights into weight
+normalization form (`v`, `g`) for the VWN layers.
 
 **Output**: `checkpoints/<variant>/model.pth`, `checkpoints/<variant>/croissant.json`,
 `checkpoints/<variant>/learning_curve.png`

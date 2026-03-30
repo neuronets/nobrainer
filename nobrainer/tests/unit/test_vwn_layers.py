@@ -36,13 +36,13 @@ class TestFFGConv3d:
         layer(x, mc=True)
         assert layer.kl.item() > 0
 
-    def test_weight_mu_shape(self):
+    def test_kernel_m_shape(self):
         layer = FFGConv3d(1, 4, kernel_size=3, padding=1)
-        assert layer.weight_mu.shape == (4, 1, 3, 3, 3)
+        assert layer.kernel_m.shape == (4, 1, 3, 3, 3)
 
     def test_no_bias(self):
         layer = FFGConv3d(1, 4, kernel_size=3, padding=1, bias=False)
-        assert layer.bias_mu is None
+        assert layer.bias_m is None
         x = torch.randn(2, 1, 8, 8, 8)
         out = layer(x, mc=True)
         assert out.shape == (2, 4, 8, 8, 8)
