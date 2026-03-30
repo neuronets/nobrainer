@@ -68,7 +68,7 @@ def _load_label_mapping(name_or_path: str) -> Callable:
         result = torch.zeros_like(x)
         for orig_val, new_val in lookup.items():
             result[x == orig_val] = new_val
-        return result.float()
+        return result.long()
 
     return _remap
 
