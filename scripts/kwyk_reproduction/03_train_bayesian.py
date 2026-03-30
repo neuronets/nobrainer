@@ -477,109 +477,6 @@ def train_bayesian(
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
-def _train_mc_dropout(args, config, train_pairs, val_pairs, output_dir):
-    """Train MC Bernoulli dropout variant (bwn_multi).
-
-    This variant uses the deterministic MeshNet but keeps dropout enabled
-    at inference time to generate MC samples for uncertainty estimation.
-    It's trained identically to the deterministic model; the difference
-    is only at inference time.
-    """
-    from nobrainer.processing.dataset import Dataset
-    from nobrainer.processing.segmentation import Segmentation
-
-    epochs = (
-        args.epochs if args.epochs is not None else config.get("pretrain_epochs", 50)
-    )
-    n_classes = config["n_classes"]
-    block_shape = tuple(config["block_shape"])
-    batch_size = config["batch_size"]
-    lr = config.get("lr", 1e-4)
-    label_mapping = config.get("label_mapping", "binary")
-
-    model_args = {
-        "n_classes": n_classes,
-        "filters": config.get("filters", 96),
-        "receptive_field": config.get("receptive_field", 37),
-        "dropout_rate": config.get("dropout_rate", 0.25),
-    }
-
-    use_warmstart = args.warmstart is not None and not args.no_warmstart
-
-    if use_warmstart:
-        # For bwn_multi, warm-start means copying the deterministic weights directly
-        warmstart_dir = Path(args.warmstart)
-        det_weights_path = warmstart_dir / "model.pth"
-
-        if not det_weights_path.exists():
-            log.error("Warm-start weights not found at %s", det_weights_path)
-            return
-
-        from nobrainer.models import get as get_model
-
-        model = get_model("meshnet")(**model_args)
-        model.load_state_dict(torch.load(det_weights_path, weights_only=True))
-        log.info(
-            "MC dropout variant: loaded deterministic weights from %s",
-            det_weights_path,
-        )
-
-        # Save directly — the model is already trained, just used with
-        # dropout at inference time
-        torch.save(model.state_dict(), output_dir / "model.pth")
-
-        # Also save metadata indicating this is an MC dropout model
-        seg = Segmentation(base_model="meshnet", model_args=model_args)
-        seg.model_ = model
-        seg.block_shape_ = block_shape
-        seg.n_classes_ = n_classes
-        seg._optimizer_class = "Adam"
-        seg._optimizer_args = {"lr": lr}
-        seg._loss_name = "CrossEntropyLoss"
-        seg._training_result = {
-            "variant": "bwn_multi",
-            "mc_dropout": True,
-            "source_weights": str(det_weights_path),
-        }
-        seg.save(output_dir)
-        log.info(
-            "MC dropout model saved to %s (uses dropout at inference for MC samples)",
-            output_dir,
-        )
-    else:
-        # Train from scratch — same as deterministic but we'll use
-        # dropout at inference time
-        log.info("Training MC dropout variant from scratch")
-
-        ds_train = (
-            Dataset.from_files(
-                train_pairs, block_shape=block_shape, n_classes=n_classes
-            )
-            .batch(batch_size)
-            .binarize(label_mapping)
-        )
-
-        seg = Segmentation(
-            base_model="meshnet",
-            model_args=model_args,
-            checkpoint_filepath=str(output_dir),
-        )
-
-        train_losses = []
-
-        def _record_loss(epoch, loss, model):
-            train_losses.append(loss)
-            log.info("Epoch %d/%d: loss=%.6f", epoch + 1, epochs, loss)
-
-        seg.fit(
-            dataset_train=ds_train,
-            epochs=epochs,
-            optimizer=torch.optim.Adam,
-            opt_args={"lr": lr},
-            callbacks=[_record_loss],
-        )
-        seg.save(output_dir)
-        log.info("MC dropout model trained and saved to %s", output_dir)
 
 
 def main() -> None:
@@ -608,10 +505,6 @@ def main() -> None:
     variants = config.get("variants", {})
     variant_config = variants.get(variant, {})
     log.info("Model variant: %s — %s", variant, variant_config.get("description", ""))
-
-    # Note: bwn_multi is NOT a shortcut — it's a full VWN model trained with
-    # Bernoulli dropout, same architecture as bvwn_multi_prior but without
-    # concrete dropout. All 3 kwyk models are independently trained.
 
     # ---- Determine KL weight from config ------------------------------------
     kl_weight = variant_config.get("kl_weight", config.get("kl_weight", 1.0))

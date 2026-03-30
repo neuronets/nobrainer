@@ -128,7 +128,9 @@ def train_and_evaluate(
     }
     model = get_model("bayesian_meshnet")(**model_args)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    from nobrainer.gpu import get_device
+
+    device = get_device()
     model = model.to(device)
 
     ce_loss = torch.nn.CrossEntropyLoss()
