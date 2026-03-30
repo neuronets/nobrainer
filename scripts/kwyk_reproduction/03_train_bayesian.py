@@ -302,6 +302,7 @@ def train_bayesian(
     label_mapping: str | None,
     checkpoint_dir: Path,
     preemption_handler: SlurmPreemptionHandler | None = None,
+    callbacks: list | None = None,
 ) -> dict:
     """Custom training loop for Bayesian MeshNet with ELBO loss.
 
@@ -449,6 +450,10 @@ def train_bayesian(
             val_dice_means[-1] if val_dice_means else 0.0,
             elapsed,
         )
+
+        # -- Callbacks -----------------------------------------------------------
+        for cb in callbacks or []:
+            cb(epoch, avg_loss, model)
 
         # -- Check for SLURM preemption signal --------------------------------
         if preemption_handler and preemption_handler.preempted:
@@ -769,6 +774,28 @@ def main() -> None:
     if os.environ.get("SLURM_JOB_ID"):
         preemption = SlurmPreemptionHandler()
 
+    # ---- Experiment tracker (local + optional W&B) -------------------------
+    from nobrainer.experiment import ExperimentTracker
+
+    tracker = ExperimentTracker(
+        output_dir=output_dir,
+        config={
+            "variant": variant,
+            "dropout_type": dropout_type,
+            "n_classes": n_classes,
+            "filters": config.get("filters", 96),
+            "block_shape": list(block_shape),
+            "batch_size": batch_size,
+            "lr": lr,
+            "kl_weight": kl_weight,
+            "epochs": epochs,
+            "warmstart": use_warmstart,
+        },
+        project="kwyk-reproduction",
+        name=variant,
+        tags=[variant, f"{n_classes}-class"],
+    )
+
     # ---- Train --------------------------------------------------------------
     result = train_bayesian(
         model=bayesian_model,
@@ -783,6 +810,7 @@ def main() -> None:
         label_mapping=label_mapping,
         checkpoint_dir=output_dir,
         preemption_handler=preemption,
+        callbacks=[tracker.callback(variant=variant)],
     )
 
     # ---- Learning curve with uncertainty bands ------------------------------
@@ -847,6 +875,8 @@ def main() -> None:
     log.info("  MC samples       : %d", n_samples)
     log.info("  Elapsed time     : %.1f s", elapsed)
     log.info("=" * 60)
+
+    tracker.finish()
 
 
 if __name__ == "__main__":
