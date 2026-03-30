@@ -1,4 +1,10 @@
-"""Tests for Bayesian segmentation with uncertainty quantification."""
+"""Tests for Bayesian segmentation with uncertainty quantification.
+
+These tests train a BayesianVNet and run MC prediction on real brain
+data, which takes 4+ minutes on CPU.  They are marked ``@pytest.mark.gpu``
+so they only run on the EC2 GPU runner (where they take <30s).
+The same functionality is also covered by ``test_kwyk_smoke.py``.
+"""
 
 import nibabel as nib
 import numpy as np
@@ -9,6 +15,7 @@ pyro = pytest.importorskip("pyro")  # noqa: F841
 from nobrainer.processing import Dataset, Segmentation  # noqa: E402
 
 
+@pytest.mark.gpu
 class TestBayesianUncertainty:
     """Test Bayesian model produces uncertainty estimates."""
 
