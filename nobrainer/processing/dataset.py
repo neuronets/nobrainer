@@ -27,21 +27,18 @@ def _load_label_mapping(name_or_path: str) -> Callable:
     import csv as csv_mod
 
     if name_or_path in _NAMED_MAPPINGS:
-        # Search for CSV in known locations
         csv_name = _NAMED_MAPPINGS[name_or_path]
-        candidates = [
+        # Primary: inside the nobrainer package (works with pip install)
+        pkg_data = Path(__file__).parent.parent / "data" / "label_mappings" / csv_name
+        # Fallback: scripts dir (editable installs / development)
+        scripts_data = (
             Path(__file__).parent.parent.parent
             / "scripts"
             / "kwyk_reproduction"
             / "label_mappings"
-            / csv_name,
-            Path.home()
-            / "software"
-            / "neuronets"
-            / "nobrainer_training_scripts"
-            / "csv-files"
-            / csv_name,
-        ]
+            / csv_name
+        )
+        candidates = [pkg_data, scripts_data]
         csv_path = None
         for c in candidates:
             if c.exists():
