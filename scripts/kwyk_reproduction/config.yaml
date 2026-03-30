@@ -1,4 +1,4 @@
-# KWYK Brain Extraction Reproduction - Default Configuration
+# KWYK Brain Segmentation Reproduction - Default Configuration
 # Based on: McClure et al., Frontiers in Neuroinformatics 2019
 #
 # The original kwyk study trained 3 model variants, all using
@@ -18,9 +18,17 @@ sigma_init: 0.0001  # initial |kernel_a| for VWN weight sigma
 # Training
 block_shape: [32, 32, 32]
 lr: 0.0001
-batch_size: 32
-n_classes: 2  # binary brain extraction
-label_mapping: binary  # binary, 6-class, 50-class, 115-class
+batch_size: 32  # per-GPU; auto-optimized when GPU available
+n_classes: 50   # 50-class FreeSurfer parcellation (matching paper)
+label_mapping: 50-class  # uses label_mappings/50-class-mapping.csv
+
+# Class weighting — the original paper used unweighted CrossEntropyLoss.
+# Set to "auto" or "median_frequency" for experiments with class balancing.
+# Options: null (paper default), "auto" (inverse frequency), "median_frequency"
+class_weight_method: null
+
+# Loss function: "cross_entropy" (paper default) or "dice_ce" (Dice + weighted CE)
+loss: cross_entropy
 
 # Warm-start (deterministic → VWN)
 pretrain_epochs: 50
@@ -67,8 +75,16 @@ variants:
     description: "VWN MeshNet, Concrete dropout (learned rates)"
 
 # ---------------------------------------------------------------------------
-# Smoke test overrides
+# Presets for different scales
 # ---------------------------------------------------------------------------
+
+# Quick binary brain extraction (for initial testing)
+binary_preset:
+  n_classes: 2
+  label_mapping: binary
+  class_weight_method: null
+
+# Smoke test overrides
 smoke_test:
   filters: 16
   block_shape: [16, 16, 16]
@@ -76,3 +92,6 @@ smoke_test:
   bayesian_epochs: 1
   batch_size: 2
   n_samples: 3
+  n_classes: 2
+  label_mapping: binary
+  class_weight_method: null

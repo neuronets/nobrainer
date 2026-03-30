@@ -61,9 +61,14 @@ class ELBOLoss(nn.Module):
         the regularisation (cold posterior).
     """
 
-    def __init__(self, model: nn.Module, kl_weight: float = 1.0) -> None:
+    def __init__(
+        self,
+        model: nn.Module,
+        kl_weight: float = 1.0,
+        class_weights: torch.Tensor | None = None,
+    ) -> None:
         super().__init__()
-        self.ce = nn.CrossEntropyLoss()
+        self.ce = nn.CrossEntropyLoss(weight=class_weights)
         self.model = model
         self.kl_weight = kl_weight
         self._last_kl: float = 0.0
@@ -727,8 +732,36 @@ def main() -> None:
     else:
         log.info("Training KWYK MeshNet from scratch (no warm-start)")
 
+    # ---- Class weights (important for 50-class parcellation) -----------------
+    class_weights = None
+    weight_method = config.get("class_weight_method")
+    if weight_method and weight_method != "null":
+        from nobrainer.losses import compute_class_weights
+
+        label_paths = [p[1] for p in train_pairs]
+        class_weights = compute_class_weights(
+            label_paths,
+            n_classes,
+            label_mapping=label_mapping,
+            method=weight_method,
+            max_samples=50,
+        )
+        log.info(
+            "Class weights computed (%s): min=%.3f, max=%.3f, mean=%.3f",
+            weight_method,
+            class_weights.min(),
+            class_weights.max(),
+            class_weights.mean(),
+        )
+        # Move weights to device
+        from nobrainer.training import get_device
+
+        class_weights = class_weights.to(get_device())
+
     # ---- ELBO loss and optimiser --------------------------------------------
-    elbo_loss = ELBOLoss(bayesian_model, kl_weight=kl_weight)
+    elbo_loss = ELBOLoss(
+        bayesian_model, kl_weight=kl_weight, class_weights=class_weights
+    )
     optimizer = torch.optim.Adam(bayesian_model.parameters(), lr=lr)
 
     # ---- SLURM preemption handler (no-op if not on SLURM) -----------------
