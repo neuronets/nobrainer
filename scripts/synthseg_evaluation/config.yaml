@@ -1,0 +1,46 @@
+# SynthSeg Evaluation Pipeline Configuration
+
+data:
+  datasets: [ds000114]
+  n_classes: 50
+  label_mapping: 50-class
+  block_shape: [32, 32, 32]
+  batch_size: 32
+  split: [80, 10, 10]
+
+synthseg:
+  n_samples_per_map: 20
+  elastic_std: 4.0
+  rotation_range: 15.0
+  scaling_bounds: 0.2
+  flipping: true
+  randomize_resolution: true
+  resolution_range: [1.0, 3.0]
+  bias_field_std: 0.7
+  noise_std: 0.1
+  intensity_prior: [0, 250]
+  std_prior: [0, 35]
+
+training:
+  modes: [real, synthetic, mixed]
+  mixed_ratio: 0.3
+  epochs: 50
+  lr: 0.0001
+  augmentation_profile: standard
+
+models:
+  - unet
+  - swin_unetr
+  - kwyk_meshnet
+
+evaluation:
+  n_samples: 10
+  metrics: [per_class_dice, mean_dice]
+
+smoke_test:
+  epochs: 2
+  n_samples_per_map: 2
+  batch_size: 2
+  block_shape: [16, 16, 16]
+  models: [unet]
+  modes: [real, mixed]

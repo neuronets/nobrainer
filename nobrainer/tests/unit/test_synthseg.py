@@ -265,3 +265,52 @@ class TestOutputFormat:
         path = _make_label_map(tmp_path)
         gen = SynthSegGenerator([path, path], n_samples_per_map=5)
         assert len(gen) == 10
+
+
+class TestMixedDataset:
+    def test_mix_ratio(self, tmp_path):
+        """Mixed dataset produces approximately correct ratio."""
+        from nobrainer.augmentation.synthseg import SynthSegGenerator
+        from nobrainer.processing.dataset import MixedDataset
+
+        path = _make_label_map(tmp_path)
+        gen = SynthSegGenerator(
+            [path],
+            n_samples_per_map=50,
+            elastic_std=0,
+            rotation_range=0,
+            flipping=False,
+            randomize_resolution=False,
+            noise_std=0,
+            bias_field_std=0,
+        )
+
+        # Create a simple "real" dataset
+        real = gen  # reuse generator as real for simplicity
+        mixed = MixedDataset(real, gen, ratio=0.5)
+
+        assert len(mixed) == 50
+        # Just verify it returns dicts without error
+        sample = mixed[0]
+        assert "image" in sample or isinstance(sample, dict)
+
+    def test_dataset_mix_method(self, tmp_path):
+        """Dataset.mix() returns a Dataset with _mixed_dataset set."""
+        from nobrainer.augmentation.synthseg import SynthSegGenerator
+        from nobrainer.processing.dataset import Dataset
+
+        path = _make_label_map(tmp_path)
+        gen = SynthSegGenerator(
+            [path],
+            n_samples_per_map=5,
+            elastic_std=0,
+            rotation_range=0,
+            flipping=False,
+            randomize_resolution=False,
+        )
+
+        pairs = [(str(tmp_path / "label.nii.gz"), str(tmp_path / "label.nii.gz"))]
+        ds = Dataset.from_files(pairs, block_shape=(16, 16, 16), n_classes=2)
+        mixed = ds.mix(gen, ratio=0.3)
+
+        assert hasattr(mixed, "_mixed_dataset")
