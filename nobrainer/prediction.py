@@ -13,6 +13,16 @@ import torch.nn as nn
 from nobrainer.training import get_device
 
 
+def _forward(model: nn.Module, tensor: torch.Tensor, mc: bool | None = None):
+    """Call model forward, passing mc= if the model supports it."""
+    if mc is not None:
+        try:
+            return model(tensor, mc=mc)
+        except TypeError:
+            pass
+    return model(tensor)
+
+
 def _pad_to_multiple(
     arr: np.ndarray, block_shape: tuple[int, int, int]
 ) -> tuple[np.ndarray, tuple[int, ...]]:
@@ -157,10 +167,10 @@ def predict(
                 gpu_idx = (start // batch_size) % n_gpus
                 dev = torch.device(f"cuda:{gpu_idx}")
                 tensor = torch.from_numpy(chunk[:, None]).to(dev)
-                out = models[gpu_idx](tensor)
+                out = _forward(models[gpu_idx], tensor, mc=False)
             else:
                 tensor = torch.from_numpy(chunk[:, None]).to(device)
-                out = model(tensor)
+                out = _forward(model, tensor, mc=False)
 
             if return_labels:
                 out = out.argmax(dim=1, keepdim=True).float()
@@ -256,7 +266,7 @@ def predict_with_uncertainty(
             for start in range(0, n_blocks, batch_size):
                 chunk = blocks[start : start + batch_size]
                 tensor = torch.from_numpy(chunk[:, None]).to(device)
-                out = model(tensor)
+                out = _forward(model, tensor, mc=True)
                 probs = torch.softmax(out, dim=1).cpu().numpy()
                 preds.append(probs)
             sample = np.concatenate(preds, axis=0)  # (N_blocks, C, bD, bH, bW)
