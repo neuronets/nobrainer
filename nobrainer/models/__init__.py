@@ -5,7 +5,7 @@ from pprint import pprint
 from .autoencoder import autoencoder
 from .highresnet import highresnet
 from .meshnet import meshnet
-from .segmentation import attention_unet, unet, unetr, vnet
+from .segmentation import attention_unet, segresnet, swin_unetr, unet, unetr, vnet
 from .simsiam import simsiam
 
 __all__ = ["get", "list_available_models"]
@@ -20,6 +20,8 @@ _models = {
     "highresnet": highresnet,
     "autoencoder": autoencoder,
     "simsiam": simsiam,
+    "swin_unetr": swin_unetr,
+    "segresnet": segresnet,
 }
 
 # Optional: Bayesian models (require pyro-ppl)

@@ -294,6 +294,43 @@ class Dataset:
         self._dataloader = None
         return self
 
+    def mix(
+        self,
+        generator: "torch.utils.data.Dataset",
+        ratio: float = 0.3,
+    ) -> "Dataset":
+        """Combine this dataset with a synthetic data generator.
+
+        Creates a mixed dataset where each sample is drawn from either
+        the real data (this dataset) or the synthetic generator, based
+        on the ratio.
+
+        Parameters
+        ----------
+        generator : torch.utils.data.Dataset
+            Synthetic data source (e.g., ``SynthSegGenerator``).
+            Must return ``{"image": Tensor, "label": Tensor}`` dicts.
+        ratio : float
+            Fraction of samples drawn from the generator (default 0.3 = 30%).
+
+        Returns
+        -------
+        Dataset
+            A new Dataset wrapping a ``MixedDataset``.
+        """
+
+        mixed = MixedDataset(self, generator, ratio=ratio)
+        new_ds = Dataset(
+            data=self.data, volume_shape=self.volume_shape, n_classes=self.n_classes
+        )
+        new_ds._block_shape = self._block_shape
+        new_ds._batch_size = self._batch_size
+        new_ds._augment = self._augment
+        new_ds._augment_profile = self._augment_profile
+        new_ds._mixed_dataset = mixed
+        new_ds._dataloader = None
+        return new_ds
+
     def streaming(self, patches_per_volume: int = 10) -> "Dataset":
         """Use streaming patch extraction (no full-volume loading).
 
@@ -638,3 +675,51 @@ class PatchDataset(torch.utils.data.Dataset):
             img = nib.load(path)
             # Use dataobj proxy for memory-efficient slicing
             return np.asarray(img.dataobj[slc])
+
+
+class MixedDataset(torch.utils.data.Dataset):
+    """Combine a real dataset with a synthetic generator at a given ratio.
+
+    Each ``__getitem__`` call randomly selects from either the real data
+    or the generator based on the ratio.
+
+    Parameters
+    ----------
+    real_dataset : Dataset or torch.utils.data.Dataset
+        The real data source.
+    generator : torch.utils.data.Dataset
+        Synthetic data source (e.g., ``SynthSegGenerator``).
+    ratio : float
+        Fraction of samples from the generator (0.3 = 30% synthetic).
+    """
+
+    def __init__(
+        self,
+        real_dataset: "Dataset | torch.utils.data.Dataset",
+        generator: torch.utils.data.Dataset,
+        ratio: float = 0.3,
+    ) -> None:
+        self.real_dataset = real_dataset
+        self.generator = generator
+        self.ratio = ratio
+        # Total length is the max of real and synthetic
+        self._real_len = len(real_dataset) if hasattr(real_dataset, "__len__") else 0
+        self._gen_len = len(generator)
+
+    def __len__(self) -> int:
+        return max(self._real_len, self._gen_len)
+
+    def __getitem__(self, idx: int) -> dict:
+        import random
+
+        if random.random() < self.ratio:
+            # Synthetic sample
+            gen_idx = idx % self._gen_len
+            return self.generator[gen_idx]
+        else:
+            # Real sample
+            real_idx = idx % max(self._real_len, 1)
+            if hasattr(self.real_dataset, "dataloader"):
+                # Dataset object — use underlying data
+                return self.real_dataset.data[real_idx]
+            return self.real_dataset[real_idx]
