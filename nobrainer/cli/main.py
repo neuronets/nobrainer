@@ -244,6 +244,61 @@ def convert_tfrecords(*, input_paths, output_dir, output_format, verbose):
 
 
 @cli.command()
+@click.argument("output", type=click.Path())
+@click.option(
+    "-i",
+    "--images",
+    multiple=True,
+    type=click.Path(exists=True),
+    required=True,
+    help="Image NIfTI files.",
+    **_option_kwds,
+)
+@click.option(
+    "-l",
+    "--labels",
+    multiple=True,
+    type=click.Path(exists=True),
+    required=True,
+    help="Label NIfTI files (same order as --images).",
+    **_option_kwds,
+)
+@click.option(
+    "--chunk-shape",
+    default="32,32,32",
+    help="Chunk shape (comma-separated).",
+    **_option_kwds,
+)
+@click.option("--no-conform", is_flag=True, help="Disable auto-conforming.")
+@click.option("-v", "--verbose", is_flag=True, help="Print progress.")
+def convert_to_zarr(*, output, images, labels, chunk_shape, no_conform, verbose):
+    """Convert NIfTI image+label pairs to a sharded Zarr3 store."""
+    from ..datasets.zarr_store import create_zarr_store
+
+    if len(images) != len(labels):
+        click.echo(
+            click.style(
+                f"Error: {len(images)} images but {len(labels)} labels.", fg="red"
+            )
+        )
+        sys.exit(1)
+
+    pairs = list(zip(images, labels))
+    chunks = tuple(int(x) for x in chunk_shape.split(","))
+
+    if verbose:
+        click.echo(f"Converting {len(pairs)} pairs → {output}")
+
+    store_path = create_zarr_store(
+        pairs,
+        output,
+        chunk_shape=chunks,
+        conform=not no_conform,
+    )
+    click.echo(click.style(f"Zarr store created: {store_path}", fg="green"))
+
+
+@cli.command()
 def merge():
     """Merge multiple models trained with variational weights."""
     click.echo("Not implemented yet.")

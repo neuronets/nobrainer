@@ -37,8 +37,15 @@ bayesian_epochs: 50
 # Inference
 n_samples: 10  # MC inference samples
 
-# Data augmentation
-augmentation: real  # real, synthetic, mixed
+# Data augmentation (profile: none, light, standard, heavy)
+augmentation_profile: standard
+
+# Zarr optimization (optional — convert NIfTI to Zarr for faster I/O)
+# zarr_store: null  # path like "data/brain_store.zarr"
+# zarr_chunk_shape: [32, 32, 32]
+
+# Stride for patch extraction (null = random, or [sD, sH, sW] for grid)
+# stride: null
 
 # Data assembly
 datasets:
