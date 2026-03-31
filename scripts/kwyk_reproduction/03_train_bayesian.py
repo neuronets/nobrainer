@@ -158,37 +158,45 @@ def evaluate_mc_dice(
     block_shape: tuple[int, int, int],
     n_samples: int,
     label_mapping: str | None,
+    n_classes: int = 2,
 ) -> tuple[list[float], list[float]]:
     """Run MC inference on each validation volume.
 
     Returns
     -------
     mean_dices : list[float]
-        Mean Dice across MC samples for each volume.
+        Mean class Dice across MC samples for each volume.
     std_dices : list[float]
         Std of Dice across MC samples for each volume.
     """
+    import nibabel as nib
+
     from nobrainer.prediction import predict
+    from nobrainer.training import get_device
+
+    # Load remap function for multi-class label mappings
+    remap_fn = None
+    if label_mapping and label_mapping != "binary":
+        from nobrainer.processing.dataset import _load_label_mapping
+
+        remap_fn = _load_label_mapping(label_mapping)
 
     mean_dices: list[float] = []
     std_dices: list[float] = []
-
-    from nobrainer.training import get_device
 
     device = get_device()
     model = model.to(device)
 
     for img_path, lbl_path in val_pairs:
-        import nibabel as nib
-
-        gt_arr = np.asarray(nib.load(lbl_path).dataobj, dtype=np.float32)
-        if label_mapping is None or label_mapping == "binary":
-            gt_arr = (gt_arr > 0).astype(np.float32)
+        gt_arr = np.asarray(nib.load(lbl_path).dataobj, dtype=np.int32)
+        if remap_fn is not None:
+            gt_arr = remap_fn(torch.from_numpy(gt_arr)).numpy()
+        elif label_mapping is None or label_mapping == "binary":
+            gt_arr = (gt_arr > 0).astype(np.int32)
 
         # Multiple stochastic forward passes
         sample_dices: list[float] = []
         for s in range(n_samples):
-            # Keep model in train mode for stochastic sampling
             model.train()
             pred_img = predict(
                 inputs=img_path,
@@ -197,12 +205,19 @@ def evaluate_mc_dice(
                 batch_size=4,
                 return_labels=True,
             )
-            pred_arr = np.asarray(pred_img.dataobj).astype(np.float32)
+            pred_arr = np.asarray(pred_img.dataobj, dtype=np.int32)
             if label_mapping is None or label_mapping == "binary":
-                pred_arr = (pred_arr > 0).astype(np.float32)
+                pred_arr = (pred_arr > 0).astype(np.int32)
 
-            dice = compute_dice(pred_arr, gt_arr)
-            sample_dices.append(dice)
+            # Per-class Dice (skip background)
+            class_dices = []
+            for c in range(1, n_classes):
+                pred_c = (pred_arr == c)
+                gt_c = (gt_arr == c)
+                intersection = (pred_c & gt_c).sum()
+                total = pred_c.sum() + gt_c.sum()
+                class_dices.append(2.0 * intersection / total if total > 0 else 1.0)
+            sample_dices.append(float(np.mean(class_dices)))
 
         vol_mean = float(np.mean(sample_dices))
         vol_std = float(np.std(sample_dices))
@@ -300,6 +315,7 @@ def train_bayesian(
     block_shape: tuple[int, int, int],
     n_samples: int,
     label_mapping: str | None,
+    n_classes: int,
     checkpoint_dir: Path,
     preemption_handler: SlurmPreemptionHandler | None = None,
     callbacks: list | None = None,
@@ -364,7 +380,12 @@ def train_bayesian(
                 labels = labels.long()
 
             optimizer.zero_grad()
-            pred = model(images)
+            # Use mc=False for stable gradient flow during training;
+            # mc=True only at inference for uncertainty estimation.
+            try:
+                pred = model(images, mc=False)
+            except TypeError:
+                pred = model(images)
             loss = elbo_loss(pred, labels)
             loss.backward()
             optimizer.step()
@@ -399,7 +420,10 @@ def train_bayesian(
                     if labels.dtype in (torch.float32, torch.float64):
                         labels = labels.long()
 
-                    pred = model(images)
+                    try:
+                        pred = model(images, mc=False)
+                    except TypeError:
+                        pred = model(images)
                     loss = elbo_loss(pred, labels)
                     val_loss += loss.item()
                     n_val += 1
@@ -409,7 +433,7 @@ def train_bayesian(
         # -- MC Dice evaluation (every 10 epochs or last epoch) ---------------
         if val_pairs and (epoch == epochs - 1 or (epoch + 1) % 10 == 0):
             mean_dices, std_dices = evaluate_mc_dice(
-                model, val_pairs, block_shape, n_samples, label_mapping
+                model, val_pairs, block_shape, n_samples, label_mapping, n_classes
             )
             overall_mean = float(np.mean(mean_dices)) if mean_dices else 0.0
             overall_std = float(np.mean(std_dices)) if std_dices else 0.0
@@ -701,6 +725,7 @@ def main() -> None:
         block_shape=block_shape,
         n_samples=n_samples,
         label_mapping=label_mapping,
+        n_classes=n_classes,
         checkpoint_dir=output_dir,
         preemption_handler=preemption,
         callbacks=[tracker.callback(variant=variant)],
