@@ -84,13 +84,17 @@ class TrainableCompose(Compose):
             raise ValueError(f"mode must be 'train' or 'predict', got '{value}'")
         self._mode = value
 
-    def __call__(self, data: Any, mode: str | None = None) -> Any:
-        """Apply transforms, skipping augmentation in predict mode."""
+    def __call__(self, data: Any, mode: str | None = None, **kwargs) -> Any:
+        """Apply transforms, skipping augmentation in predict mode.
+
+        Extra keyword arguments (e.g., ``end``, ``threading``) are passed
+        through to MONAI's ``Compose.__call__`` for CacheDataset compat.
+        """
         active_mode = mode or self._mode
 
         if active_mode == "train":
-            # All transforms run
-            return super().__call__(data)
+            # All transforms run — pass through MONAI kwargs
+            return super().__call__(data, **kwargs)
 
         # Predict mode: skip augmentation transforms
         result = data
