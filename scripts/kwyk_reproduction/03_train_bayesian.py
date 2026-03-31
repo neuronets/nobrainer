@@ -212,8 +212,8 @@ def evaluate_mc_dice(
             # Per-class Dice (skip background)
             class_dices = []
             for c in range(1, n_classes):
-                pred_c = (pred_arr == c)
-                gt_c = (gt_arr == c)
+                pred_c = pred_arr == c
+                gt_c = gt_arr == c
                 intersection = (pred_c & gt_c).sum()
                 total = pred_c.sum() + gt_c.sum()
                 class_dices.append(2.0 * intersection / total if total > 0 else 1.0)
