@@ -636,14 +636,41 @@ class PatchDataset(torch.utils.data.Dataset):
                 mask = np.maximum(mask, (lbl == val).astype(np.float32))
             return mask
         elif callable(self.binarize):
-            return self.binarize(lbl)
+            # Remap functions may expect torch tensors (e.g., _load_label_mapping)
+            t = torch.from_numpy(lbl.astype(np.int32))
+            result = self.binarize(t)
+            return result.numpy().astype(np.float32)
         return lbl
+
+    @staticmethod
+    def _parse_zarr_path(path: str) -> tuple[str, str] | None:
+        """Parse zarr://store_path#array/index into (store_path, key).
+
+        Returns None if path is not a zarr:// URI.
+        """
+        if path.startswith("zarr://"):
+            rest = path[len("zarr://"):]
+            if "#" in rest:
+                store_path, key = rest.split("#", 1)
+                return store_path, key
+            return rest, "0"
+        if ".zarr" in path and "#" in path:
+            store_path, key = path.rsplit("#", 1)
+            return store_path, key
+        return None
 
     @staticmethod
     def _get_shape(path: str) -> tuple[int, ...]:
         """Get volume shape without loading full data."""
         path = str(path)
-        if path.rstrip("/").endswith(".zarr"):
+        parsed = PatchDataset._parse_zarr_path(path)
+        if parsed is not None:
+            import zarr
+
+            store_path, key = parsed
+            store = zarr.open_group(store_path, mode="r")
+            return store[key].shape
+        elif path.rstrip("/").endswith(".zarr"):
             import zarr
 
             store = zarr.open_group(path, mode="r")
@@ -664,7 +691,14 @@ class PatchDataset(torch.utils.data.Dataset):
         array proxy.
         """
         path = str(path)
-        if path.rstrip("/").endswith(".zarr"):
+        parsed = PatchDataset._parse_zarr_path(path)
+        if parsed is not None:
+            import zarr
+
+            store_path, key = parsed
+            store = zarr.open_group(store_path, mode="r")
+            return np.asarray(store[key][slc])
+        elif path.rstrip("/").endswith(".zarr"):
             import zarr
 
             store = zarr.open_group(path, mode="r")

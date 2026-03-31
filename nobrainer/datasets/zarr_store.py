@@ -148,21 +148,36 @@ def create_zarr_store(
     D, H, W = target_shape
     full_chunk = (1, *chunk_shape)  # one subject per chunk along axis 0
 
+    # Shard shape: group all chunks into a single shard file per array.
+    # With chunks=(1,32,32,32) and shards=(N,D,H,W), zarr writes one
+    # monolithic shard file containing all chunks — optimal for HPC
+    # parallel filesystems that perform poorly with many small files.
+    if shard_shape is not None:
+        full_shard = (1, *shard_shape)
+    else:
+        full_shard = (n_subjects, D, H, W)
+
     # Create store
     store = zarr.open_group(str(output_path), mode="w")
 
-    # Create stacked 4D arrays
+    # Create sharded 4D arrays
     images_arr = store.create_array(
         "images",
         shape=(n_subjects, D, H, W),
         chunks=full_chunk,
+        shards=full_shard,
         dtype=np.float32,
     )
     labels_arr = store.create_array(
         "labels",
         shape=(n_subjects, D, H, W),
         chunks=full_chunk,
+        shards=full_shard,
         dtype=np.int32,
+    )
+    logger.info(
+        "Created sharded Zarr3: shape=%s, chunks=%s, shards=%s",
+        (n_subjects, D, H, W), full_chunk, full_shard,
     )
 
     # Write volumes
