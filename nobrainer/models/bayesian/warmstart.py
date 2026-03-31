@@ -234,10 +234,20 @@ def warmstart_kwyk_from_deterministic(
     det_weights_path = Path(det_weights_path)
     state = torch.load(det_weights_path, weights_only=True)
 
-    # Extract conv weights from deterministic state dict
-    det_convs = [
-        (k, v) for k, v in sorted(state.items()) if "weight" in k and v.ndim == 5
-    ]
+    # Separate encoder conv weights from classifier — sorted() puts
+    # "classifier" before "encoder" alphabetically, so we must filter
+    # to avoid misaligning the layer pairing.
+    encoder_convs = []
+    classifier_w = None
+    classifier_b = None
+    for k in sorted(state.keys()):
+        v = state[k]
+        if k == "classifier.weight" and v.ndim == 5:
+            classifier_w = v
+        elif k == "classifier.bias":
+            classifier_b = v
+        elif "weight" in k and v.ndim == 5:
+            encoder_convs.append((k, v))
 
     # Collect FFGConv3d layers from the kwyk model
     kwyk_convs = [
@@ -245,7 +255,7 @@ def warmstart_kwyk_from_deterministic(
     ]
 
     transferred = 0
-    for (det_name, det_w), (kwyk_name, kwyk_conv) in zip(det_convs, kwyk_convs):
+    for (det_name, det_w), (kwyk_name, kwyk_conv) in zip(encoder_convs, kwyk_convs):
         if det_w.shape != kwyk_conv.v.shape:
             logger.warning(
                 "Shape mismatch: %s %s vs %s %s",
@@ -265,5 +275,13 @@ def warmstart_kwyk_from_deterministic(
         transferred += 1
         logger.debug("Transferred Conv3d %s -> %s", det_name, kwyk_name)
 
-    logger.info("Warm-started %d VWN layers from deterministic model.", transferred)
+    # Transfer classifier separately (regular Conv3d, not FFGConv3d)
+    if classifier_w is not None and hasattr(kwyk_model, "classifier"):
+        kwyk_model.classifier.weight.data.copy_(classifier_w)
+        if classifier_b is not None and kwyk_model.classifier.bias is not None:
+            kwyk_model.classifier.bias.data.copy_(classifier_b)
+        transferred += 1
+        logger.debug("Transferred classifier")
+
+    logger.info("Warm-started %d layers from deterministic model.", transferred)
     return transferred
