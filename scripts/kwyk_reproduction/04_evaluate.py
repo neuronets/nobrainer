@@ -23,6 +23,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import nibabel as nib
 import numpy as np
+import torch
 from utils import load_config, save_figure, setup_logging
 
 log = setup_logging(__name__)
@@ -241,7 +242,8 @@ def main() -> None:
         # Load and remap ground truth
         gt_arr = np.asarray(nib.load(lbl_path).dataobj, dtype=np.int32)
         if remap_fn is not None:
-            gt_arr = remap_fn(gt_arr)
+            gt_tensor = torch.from_numpy(gt_arr)
+            gt_arr = remap_fn(gt_tensor).numpy().astype(np.int32)
         elif label_mapping == "binary":
             gt_arr = (gt_arr > 0).astype(np.int32)
 
@@ -326,13 +328,56 @@ def main() -> None:
     log.info("  Class Dice        : %.4f ± %.4f", np.mean(avg_dices), np.std(avg_dices))
     log.info("  Min volume Dice   : %.4f", np.min(avg_dices))
     log.info("  Max volume Dice   : %.4f", np.max(avg_dices))
+
+    # Per-class summary: median and range across volumes
+    mean_per_class = class_dice_matrix.mean(axis=0)  # (n_classes-1,)
+    log.info(
+        "  Per-class Dice    : median=%.4f, range=[%.4f, %.4f]",
+        np.median(mean_per_class),
+        mean_per_class.min(),
+        mean_per_class.max(),
+    )
     if class_names:
-        mean_per_class = class_dice_matrix.mean(axis=0)
         worst_5 = np.argsort(mean_per_class)[:5]
+        best_5 = np.argsort(mean_per_class)[-5:][::-1]
         log.info(
             "  Worst 5 classes   : %s",
             ", ".join(f"{class_names[i]}={mean_per_class[i]:.3f}" for i in worst_5),
         )
+        log.info(
+            "  Best 5 classes    : %s",
+            ", ".join(f"{class_names[i]}={mean_per_class[i]:.3f}" for i in best_5),
+        )
+
+    # Save per-class summary CSV
+    per_class_csv = output_dir / "per_class_dice_summary.csv"
+    with open(per_class_csv, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [
+                "class_id",
+                "class_name",
+                "mean_dice",
+                "median_dice",
+                "min_dice",
+                "max_dice",
+            ]
+        )
+        for i in range(len(mean_per_class)):
+            name = class_names[i] if class_names else str(i + 1)
+            col = class_dice_matrix[:, i]
+            writer.writerow(
+                [
+                    i + 1,
+                    name,
+                    f"{col.mean():.4f}",
+                    f"{np.median(col):.4f}",
+                    f"{col.min():.4f}",
+                    f"{col.max():.4f}",
+                ]
+            )
+    log.info("  Per-class summary : %s", per_class_csv)
+
     log.info("  Output            : %s", output_dir)
     log.info("=" * 60)
 
