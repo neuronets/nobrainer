@@ -137,6 +137,99 @@ def fit(
     }
 
 
+def _ddp_worker(
+    rank: int,
+    world_size: int,
+    model: nn.Module,
+    dataset,
+    batch_size: int,
+    num_workers: int,
+    criterion: nn.Module,
+    optimizer: torch.optim.Optimizer,
+    max_epochs: int,
+    checkpoint_dir: str | Path | None,
+    callbacks: list[Any] | None,
+    result_dict: dict,
+) -> None:
+    """Single DDP worker — must be a top-level function for mp.spawn."""
+    import torch.distributed as dist
+    from torch.nn.parallel import DistributedDataParallel as DDP
+    from torch.utils.data.distributed import DistributedSampler
+
+    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+    torch.cuda.set_device(rank)
+    device = torch.device(f"cuda:{rank}")
+
+    local_model = model.to(device)
+    ddp_model = DDP(local_model, device_ids=[rank])
+
+    sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank)
+    ddp_loader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        sampler=sampler,
+        num_workers=num_workers,
+        pin_memory=True,
+    )
+
+    best_loss = float("inf")
+    final_loss = 0.0
+    ckpt_path = None
+
+    if checkpoint_dir is not None and rank == 0:
+        Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
+
+    for epoch in range(max_epochs):
+        sampler.set_epoch(epoch)
+        ddp_model.train()
+        epoch_loss = 0.0
+        n_batches = 0
+
+        for batch in ddp_loader:
+            if isinstance(batch, dict):
+                images = batch["image"].to(device)
+                labels = batch["label"].to(device)
+            elif isinstance(batch, (list, tuple)):
+                images = batch[0].to(device)
+                labels = batch[1].to(device)
+            else:
+                raise TypeError(f"Unsupported batch type: {type(batch)}")
+
+            optimizer.zero_grad()
+            pred = ddp_model(images)
+            loss = criterion(pred, labels)
+            loss.backward()
+            optimizer.step()
+
+            epoch_loss += loss.item()
+            n_batches += 1
+
+        avg_loss = epoch_loss / max(n_batches, 1)
+        final_loss = avg_loss
+
+        if rank == 0 and avg_loss < best_loss:
+            best_loss = avg_loss
+            if checkpoint_dir is not None:
+                ckpt_path = str(Path(checkpoint_dir) / "best_model.pth")
+                torch.save(ddp_model.module.state_dict(), ckpt_path)
+
+        if rank == 0 and callbacks:
+            for cb in callbacks:
+                cb(epoch, avg_loss, ddp_model.module)
+
+    if rank == 0:
+        result_dict.update(
+            {
+                "final_loss": final_loss,
+                "best_loss": best_loss,
+                "epochs_completed": max_epochs,
+                "checkpoint_path": ckpt_path,
+            }
+        )
+
+    dist.destroy_process_group()
+
+
 def _fit_ddp(
     model: nn.Module,
     loader: DataLoader,
@@ -152,90 +245,34 @@ def _fit_ddp(
     Launches ``gpus`` processes via ``mp.spawn``.  Each process trains
     on its assigned GPU with a ``DistributedSampler``.
     """
-    import torch.distributed as dist
-    import torch.multiprocessing as mp
-    from torch.nn.parallel import DistributedDataParallel as DDP
-    from torch.utils.data.distributed import DistributedSampler
-
-    results: dict = {}
-
-    def _worker(rank: int) -> None:
-        dist.init_process_group("nccl", rank=rank, world_size=gpus)
-        torch.cuda.set_device(rank)
-        device = torch.device(f"cuda:{rank}")
-
-        local_model = model.to(device)
-        ddp_model = DDP(local_model, device_ids=[rank])
-
-        sampler = DistributedSampler(loader.dataset, num_replicas=gpus, rank=rank)
-        ddp_loader = DataLoader(
-            loader.dataset,
-            batch_size=loader.batch_size,
-            sampler=sampler,
-            num_workers=loader.num_workers,
-            pin_memory=True,
-        )
-
-        best_loss = float("inf")
-        final_loss = 0.0
-        ckpt_path = None
-
-        if checkpoint_dir is not None and rank == 0:
-            Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
-
-        for epoch in range(max_epochs):
-            sampler.set_epoch(epoch)
-            ddp_model.train()
-            epoch_loss = 0.0
-            n_batches = 0
-
-            for batch in ddp_loader:
-                if isinstance(batch, dict):
-                    images = batch["image"].to(device)
-                    labels = batch["label"].to(device)
-                elif isinstance(batch, (list, tuple)):
-                    images = batch[0].to(device)
-                    labels = batch[1].to(device)
-                else:
-                    raise TypeError(f"Unsupported batch type: {type(batch)}")
-
-                optimizer.zero_grad()
-                pred = ddp_model(images)
-                loss = criterion(pred, labels)
-                loss.backward()
-                optimizer.step()
-
-                epoch_loss += loss.item()
-                n_batches += 1
-
-            avg_loss = epoch_loss / max(n_batches, 1)
-            final_loss = avg_loss
-
-            if rank == 0 and avg_loss < best_loss:
-                best_loss = avg_loss
-                if checkpoint_dir is not None:
-                    ckpt_path = str(Path(checkpoint_dir) / "best_model.pth")
-                    torch.save(ddp_model.module.state_dict(), ckpt_path)
-
-        if rank == 0:
-            results.update(
-                {
-                    "final_loss": final_loss,
-                    "best_loss": best_loss,
-                    "epochs_completed": max_epochs,
-                    "checkpoint_path": ckpt_path,
-                }
-            )
-
-        dist.destroy_process_group()
-
     import os
+
+    import torch.multiprocessing as mp
 
     os.environ.setdefault("MASTER_ADDR", "localhost")
     os.environ.setdefault("MASTER_PORT", "29500")
 
-    mp.spawn(_worker, nprocs=gpus, join=True)
-    return results
+    results: dict = mp.Manager().dict()
+
+    mp.spawn(
+        _ddp_worker,
+        args=(
+            gpus,
+            model,
+            loader.dataset,
+            loader.batch_size,
+            loader.num_workers,
+            criterion,
+            optimizer,
+            max_epochs,
+            checkpoint_dir,
+            callbacks,
+            results,
+        ),
+        nprocs=gpus,
+        join=True,
+    )
+    return dict(results)
 
 
 __all__ = ["fit"]

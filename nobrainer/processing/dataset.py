@@ -397,11 +397,24 @@ class Dataset:
 
         # Streaming mode: use PatchDataset for on-the-fly patch extraction
         if self._streaming:
+            # Build augmentation transforms if enabled
+            transforms = None
+            if self._augment:
+                from nobrainer.augmentation.profiles import get_augmentation_profile
+                from monai.transforms import Compose
+
+                aug_transforms = get_augmentation_profile(
+                    self._augment_profile, keys=["image", "label"]
+                )
+                if aug_transforms:
+                    transforms = Compose(aug_transforms)
+
             patch_ds = PatchDataset(
                 data=self.data,
                 block_shape=self._block_shape or (32, 32, 32),
                 patches_per_volume=self._patches_per_volume,
                 binarize=self._binarize if self._binarize else None,
+                transforms=transforms,
             )
             # Use multiple workers for I/O prefetching — each worker loads
             # patches independently while GPU processes the current batch.
