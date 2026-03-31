@@ -53,11 +53,17 @@ class _VWNLayerBernoulli(nn.Module):
         )
         self.dropout = nn.Dropout3d(p=dropout_rate)
 
-    def forward(self, x: torch.Tensor, mc: bool = True) -> torch.Tensor:
-        h = F.relu(self.conv(x, mc=mc))
-        if mc:
+    def forward(
+        self,
+        x: torch.Tensor,
+        mc_vwn: bool = True,
+        mc_dropout: bool = True,
+    ) -> torch.Tensor:
+        # Original TF order: conv -> dropout -> relu (meshnetbwn.py:59-61)
+        h = self.conv(x, mc=mc_vwn)
+        if mc_dropout:
             h = self.dropout(h)
-        return h
+        return F.relu(h)
 
 
 class _VWNLayerConcrete(nn.Module):
@@ -88,10 +94,16 @@ class _VWNLayerConcrete(nn.Module):
             init_p=concrete_init_p,
         )
 
-    def forward(self, x: torch.Tensor, mc: bool = True) -> torch.Tensor:
-        h = F.relu(self.conv(x, mc=mc))
-        h = self.dropout(h, mc=mc)
-        return h
+    def forward(
+        self,
+        x: torch.Tensor,
+        mc_vwn: bool = True,
+        mc_dropout: bool = True,
+    ) -> torch.Tensor:
+        # Original TF order: conv -> dropout -> relu (meshnetbvwn.py:54-55)
+        h = self.conv(x, mc=mc_vwn)
+        h = self.dropout(h, mc=mc_dropout)
+        return F.relu(h)
 
 
 class KWYKMeshNet(nn.Module):
@@ -168,20 +180,41 @@ class KWYKMeshNet(nn.Module):
 
         self.classifier = nn.Conv3d(filters, n_classes, kernel_size=1)
 
-    def forward(self, x: torch.Tensor, mc: bool = True) -> torch.Tensor:
+    def forward(
+        self,
+        x: torch.Tensor,
+        mc: bool | None = None,
+        mc_vwn: bool = True,
+        mc_dropout: bool = True,
+    ) -> torch.Tensor:
         """Forward pass.
 
         Parameters
         ----------
         x : Tensor
             Input ``(B, 1, D, H, W)``.
-        mc : bool
-            If True, stochastic forward pass (variational + dropout).
-            If False, deterministic (mean weights, no dropout).
+        mc : bool or None
+            Legacy convenience flag.  If provided, sets both ``mc_vwn``
+            and ``mc_dropout`` to the same value (backward compat).
+        mc_vwn : bool
+            If True, use stochastic VWN reparameterization.
+            If False, use deterministic mean weights only.
+        mc_dropout : bool
+            If True, apply stochastic dropout.
+            If False, skip dropout (Bernoulli) or use expectation (Concrete).
+
+        Note
+        ----
+        The original TF bwn model trains with ``mc_vwn=False, mc_dropout=True``
+        (deterministic weights + stochastic dropout).
         """
+        if mc is not None:
+            mc_vwn = mc
+            mc_dropout = mc
+
         h = x
         for i in range(self._n_layers):
-            h = getattr(self, f"layer_{i}")(h, mc=mc)
+            h = getattr(self, f"layer_{i}")(h, mc_vwn=mc_vwn, mc_dropout=mc_dropout)
         return self.classifier(h)
 
     def kl_divergence(self) -> torch.Tensor:
