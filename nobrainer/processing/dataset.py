@@ -101,6 +101,7 @@ class Dataset:
         self._batch_size: int = 1
         self._shuffle: bool = False
         self._augment: bool = False
+        self._augment_profile: str = "standard"
         self._binarize: bool = False
         self._streaming: bool = False
         self._patches_per_volume: int = 10
@@ -148,6 +149,71 @@ class Dataset:
 
         ds = cls(data=data, volume_shape=volume_shape, n_classes=n_classes)
         ds._block_shape = block_shape
+        return ds
+
+    @classmethod
+    def from_zarr(
+        cls,
+        store_path: str | Path,
+        block_shape: tuple[int, int, int] | None = None,
+        n_classes: int = 1,
+        partition: str | None = None,
+        partition_path: str | Path | None = None,
+    ) -> "Dataset":
+        """Create a Dataset from a Zarr3 store.
+
+        Parameters
+        ----------
+        store_path : str or Path
+            Path to a Zarr store created by
+            :func:`nobrainer.datasets.zarr_store.create_zarr_store`.
+        block_shape : tuple or None
+            Spatial patch size.
+        n_classes : int
+            Number of label classes.
+        partition : str or None
+            Partition to use: ``"train"``, ``"val"``, ``"test"``, or None (all).
+        partition_path : str or Path or None
+            Path to partition JSON.  If None and partition is set, looks for
+            ``<store_path>_partition.json``.
+        """
+        from nobrainer.datasets.zarr_store import load_partition, store_info
+
+        store_path = Path(store_path)
+        info = store_info(store_path)
+        subject_ids = info["subject_ids"]
+        volume_shape = tuple(info["volume_shape"])
+
+        # Filter by partition
+        if partition is not None:
+            if partition_path is None:
+                partition_path = Path(str(store_path) + "_partition.json")
+            parts = load_partition(partition_path)
+            if partition not in parts:
+                raise ValueError(
+                    f"Partition '{partition}' not found. "
+                    f"Available: {list(parts.keys())}"
+                )
+            subject_ids = parts[partition]
+
+        # Build data list referencing zarr indices
+        id_to_idx = {sid: i for i, sid in enumerate(info["subject_ids"])}
+        data = []
+        for sid in subject_ids:
+            idx = id_to_idx[sid]
+            data.append(
+                {
+                    "image": f"zarr://{store_path}#images/{idx}",
+                    "label": f"zarr://{store_path}#labels/{idx}",
+                    "_zarr_store": str(store_path),
+                    "_zarr_index": idx,
+                    "_subject_id": sid,
+                }
+            )
+
+        ds = cls(data=data, volume_shape=volume_shape, n_classes=n_classes)
+        ds._block_shape = block_shape
+        ds._zarr_store_path = str(store_path)
         return ds
 
     # --- Fluent API ---
@@ -207,9 +273,24 @@ class Dataset:
         self._dataloader = None
         return self
 
-    def augment(self) -> "Dataset":
-        """Enable data augmentation."""
-        self._augment = True
+    def augment(self, profile: str | bool = True) -> "Dataset":
+        """Enable data augmentation.
+
+        Parameters
+        ----------
+        profile : str or bool
+            ``True`` or ``"standard"`` for the standard profile.
+            Named profiles: ``"none"``, ``"light"``, ``"standard"``, ``"heavy"``.
+            ``False`` disables augmentation.
+        """
+        if profile is False or profile == "none":
+            self._augment = False
+        elif profile is True:
+            self._augment = True
+            self._augment_profile = "standard"
+        elif isinstance(profile, str):
+            self._augment = True
+            self._augment_profile = profile
         self._dataloader = None
         return self
 
