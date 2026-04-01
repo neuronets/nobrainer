@@ -61,6 +61,7 @@ class Segmentation(BaseEstimator):
         class_weights: torch.Tensor | str | None = None,
         metrics: Callable | None = None,
         callbacks: list | None = None,
+        **kwargs,
     ) -> "Segmentation":
         """Train the model and return self for chaining.
 
@@ -151,6 +152,7 @@ class Segmentation(BaseEstimator):
             checkpoint_dir=self.checkpoint_filepath,
             callbacks=callbacks,
             val_loader=val_loader,
+            checkpoint_freq=kwargs.get("checkpoint_freq", 0),
         )
         self._dataset = dataset_train
         return self

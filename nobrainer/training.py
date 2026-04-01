@@ -74,6 +74,7 @@ def fit(
     checkpoint_dir: str | Path | None = None,
     callbacks: list[Any] | None = None,
     val_loader: DataLoader | None = None,
+    checkpoint_freq: int = 0,
 ) -> dict:
     """Train a model with optional multi-GPU DDP.
 
@@ -100,11 +101,15 @@ def fit(
     val_loader : DataLoader or None
         Validation data loader. If provided, validation loss and accuracy
         are computed each epoch and included in the logs dict.
+    checkpoint_freq : int
+        Save a checkpoint every N epochs (in addition to best model).
+        0 = only save best model. Checkpoints are saved as
+        ``epoch_NNN.pth`` in checkpoint_dir.
 
     Returns
     -------
     dict with keys: final_loss, best_loss, epochs_completed, checkpoint_path,
-    train_losses, val_losses
+    train_losses, val_losses, checkpoint_epochs
     """
     device = get_device()
 
@@ -119,6 +124,7 @@ def fit(
             checkpoint_dir,
             callbacks,
             val_loader,
+            checkpoint_freq,
         )
 
     model = model.to(device)
@@ -127,6 +133,7 @@ def fit(
     ckpt_path = None
     train_losses: list[float] = []
     val_losses: list[float] = []
+    checkpoint_epochs: list[int] = []
 
     if checkpoint_dir is not None:
         checkpoint_dir = Path(checkpoint_dir)
@@ -181,6 +188,25 @@ def fit(
                 ckpt_path = str(checkpoint_dir / "best_model.pth")
                 torch.save(model.state_dict(), ckpt_path)
 
+        # Periodic checkpoint (resumable for SLURM preemption)
+        if (
+            checkpoint_dir is not None
+            and checkpoint_freq > 0
+            and (epoch + 1) % checkpoint_freq == 0
+        ):
+            epoch_ckpt = str(checkpoint_dir / f"epoch_{epoch + 1:03d}.pth")
+            torch.save(
+                {
+                    "epoch": epoch + 1,
+                    "model_state_dict": model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "loss": avg_loss,
+                },
+                epoch_ckpt,
+            )
+            checkpoint_epochs.append(epoch + 1)
+            logger.info("Checkpoint saved: %s", epoch_ckpt)
+
         if callbacks:
             for cb in callbacks:
                 cb(epoch, logs, model)
@@ -202,6 +228,7 @@ def fit(
         "checkpoint_path": ckpt_path,
         "train_losses": train_losses,
         "val_losses": val_losses,
+        "checkpoint_epochs": checkpoint_epochs,
     }
 
 
@@ -217,6 +244,7 @@ def _ddp_worker(
     optimizer: torch.optim.Optimizer,
     max_epochs: int,
     checkpoint_dir: str | Path | None,
+    checkpoint_freq: int,
     result_dict: dict,
 ) -> None:
     """Single DDP worker — module-level function for mp.spawn pickling."""
@@ -256,6 +284,7 @@ def _ddp_worker(
     ckpt_path = None
     train_losses: list[float] = []
     val_losses: list[float] = []
+    checkpoint_epochs: list[int] = []
 
     if checkpoint_dir is not None and rank == 0:
         Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
@@ -313,6 +342,27 @@ def _ddp_worker(
                 if checkpoint_dir is not None:
                     ckpt_path = str(Path(checkpoint_dir) / "best_model.pth")
                     torch.save(ddp_model.module.state_dict(), ckpt_path)
+
+            # Periodic checkpoint (also serves as resumable state for preemption)
+            if (
+                checkpoint_dir is not None
+                and checkpoint_freq > 0
+                and (epoch + 1) % checkpoint_freq == 0
+            ):
+                epoch_ckpt = str(
+                    Path(checkpoint_dir) / f"epoch_{epoch + 1:03d}.pth"
+                )
+                torch.save(
+                    {
+                        "epoch": epoch + 1,
+                        "model_state_dict": ddp_model.module.state_dict(),
+                        "optimizer_state_dict": optimizer.state_dict(),
+                        "loss": avg_loss,
+                    },
+                    epoch_ckpt,
+                )
+                checkpoint_epochs.append(epoch + 1)
+
             logger.info(
                 "Epoch %d/%d: loss=%.4f%s",
                 epoch + 1,
@@ -330,6 +380,7 @@ def _ddp_worker(
                 "checkpoint_path": ckpt_path,
                 "train_losses": train_losses,
                 "val_losses": val_losses,
+                "checkpoint_epochs": checkpoint_epochs,
             }
         )
 
@@ -346,6 +397,7 @@ def _fit_ddp(
     checkpoint_dir: str | Path | None,
     callbacks: list[Any] | None,
     val_loader: DataLoader | None = None,
+    checkpoint_freq: int = 0,
 ) -> dict:
     """Multi-GPU training via DistributedDataParallel.
 
@@ -378,6 +430,7 @@ def _fit_ddp(
             optimizer,
             max_epochs,
             checkpoint_dir,
+            checkpoint_freq,
             results,
         ),
         nprocs=gpus,
