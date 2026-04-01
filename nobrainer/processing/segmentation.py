@@ -155,6 +155,7 @@ class Segmentation(BaseEstimator):
             checkpoint_freq=kwargs.get("checkpoint_freq", 0),
             gradient_checkpointing=kwargs.get("gradient_checkpointing", False),
             model_parallel=kwargs.get("model_parallel", False),
+            resume_from=kwargs.get("resume_from"),
         )
         self._dataset = dataset_train
         return self

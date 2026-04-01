@@ -213,6 +213,7 @@ def fit(
     checkpoint_freq: int = 0,
     gradient_checkpointing: bool = False,
     model_parallel: bool = False,
+    resume_from: str | Path | None = None,
 ) -> dict:
     """Train a model with optional multi-GPU DDP or model parallelism.
 
@@ -286,18 +287,40 @@ def fit(
 
     if not model_parallel:
         model = model.to(device)
+
     best_loss = float("inf")
-    final_loss = 0.0
     ckpt_path = None
-    train_losses: list[float] = []
-    val_losses: list[float] = []
-    checkpoint_epochs: list[int] = []
+    history: list[dict[str, Any]] = []  # one entry per epoch
+    start_epoch = 0
 
     if checkpoint_dir is not None:
         checkpoint_dir = Path(checkpoint_dir)
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-    for epoch in range(max_epochs):
+    # Resume from checkpoint (auto-detect or explicit path)
+    resume_path = None
+    if resume_from is not None:
+        resume_path = Path(resume_from)
+    elif checkpoint_dir is not None and (checkpoint_dir / "checkpoint.pt").exists():
+        resume_path = checkpoint_dir / "checkpoint.pt"
+
+    if resume_path is not None and resume_path.exists():
+        from nobrainer.slurm import load_checkpoint as _load_ckpt
+
+        ckpt_dir = (
+            resume_path.parent
+            if resume_path.name == "checkpoint.pt"
+            else checkpoint_dir
+        )
+        start_epoch, prev_metrics = _load_ckpt(ckpt_dir, model, optimizer)
+        history = prev_metrics.get("history", [])
+        best_loss = min((h["loss"] for h in history), default=float("inf"))
+        logger.info(
+            "Resumed from epoch %d (%d history entries, best_loss=%.4f)",
+            start_epoch, len(history), best_loss,
+        )
+
+    for epoch in range(start_epoch, max_epochs):
         model.train()
         epoch_loss = 0.0
         n_batches = 0
@@ -319,7 +342,6 @@ def fit(
 
             optimizer.zero_grad()
             pred = model(images)
-            # For model parallel, pred may be on a different device than labels
             if pred.device != labels.device:
                 labels = labels.to(pred.device)
             loss = criterion(pred, labels)
@@ -330,69 +352,48 @@ def fit(
             n_batches += 1
 
         avg_loss = epoch_loss / max(n_batches, 1)
-        final_loss = avg_loss
-        train_losses.append(avg_loss)
 
-        # Build logs dict for callbacks
-        logs: dict[str, Any] = {"loss": avg_loss, "epoch": epoch}
+        # Epoch metrics
+        logs: dict[str, Any] = {"epoch": epoch + 1, "loss": avg_loss}
 
-        # Validation (built-in, no callback needed)
         if val_loader is not None:
-            val_metrics = _run_validation(model, val_loader, criterion, device)
-            logs.update(val_metrics)
-            val_losses.append(val_metrics["val_loss"])
+            logs.update(_run_validation(model, val_loader, criterion, device))
             model.train()
 
+        history.append(logs)
+
+        # Best model
         if avg_loss < best_loss:
             best_loss = avg_loss
             if checkpoint_dir is not None:
                 ckpt_path = str(checkpoint_dir / "best_model.pth")
                 torch.save(model.state_dict(), ckpt_path)
 
-        # Periodic checkpoint (resumable for SLURM preemption)
+        # Resumable checkpoint (every epoch)
+        if checkpoint_dir is not None:
+            from nobrainer.slurm import save_checkpoint as _save_ckpt
+
+            _save_ckpt(checkpoint_dir, model, optimizer, epoch + 1,
+                       {"history": history})
+
+        # Named checkpoint (for post-hoc Dice eval)
         if (
             checkpoint_dir is not None
             and checkpoint_freq > 0
             and (epoch + 1) % checkpoint_freq == 0
         ):
-            epoch_ckpt = str(checkpoint_dir / f"epoch_{epoch + 1:03d}.pth")
-            torch.save(
-                {
-                    "epoch": epoch + 1,
-                    "model_state_dict": model.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                    "loss": avg_loss,
-                },
-                epoch_ckpt,
-            )
-            checkpoint_epochs.append(epoch + 1)
-            logger.info("Checkpoint saved: %s", epoch_ckpt)
+            epoch_ckpt = checkpoint_dir / f"epoch_{epoch + 1:03d}.pth"
+            torch.save(model.state_dict(), epoch_ckpt)
 
         if callbacks:
             for cb in callbacks:
                 cb(epoch, logs, model)
 
-        logger.debug(
-            "Epoch %d/%d: loss=%.4f%s",
-            epoch + 1,
-            max_epochs,
-            avg_loss,
-            f" val_loss={logs['val_loss']:.4f}"
-            f" val_acc={logs['val_acc']:.4f}"
-            f" bal_acc={logs['val_bal_acc']:.4f}"
-            if "val_loss" in logs
-            else "",
-        )
+        logger.debug("Epoch %d/%d: %s", epoch + 1, max_epochs,
+                     " ".join(f"{k}={v:.4f}" for k, v in logs.items()
+                              if isinstance(v, float)))
 
-    return {
-        "final_loss": final_loss,
-        "best_loss": best_loss,
-        "epochs_completed": max_epochs,
-        "checkpoint_path": ckpt_path,
-        "train_losses": train_losses,
-        "val_losses": val_losses,
-        "checkpoint_epochs": checkpoint_epochs,
-    }
+    return {"history": history, "checkpoint_path": ckpt_path}
 
 
 def _ddp_worker(
@@ -443,16 +444,18 @@ def _ddp_worker(
         )
 
     best_loss = float("inf")
-    final_loss = 0.0
     ckpt_path = None
-    train_losses: list[float] = []
-    val_losses: list[float] = []
-    val_accs: list[float] = []
-    val_bal_accs: list[float] = []
-    checkpoint_epochs: list[int] = []
+    history: list[dict[str, Any]] = []
 
     if checkpoint_dir is not None and rank == 0:
         Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
+
+    # ExperimentTracker for live metrics (rank 0 only)
+    tracker = None
+    if rank == 0 and checkpoint_dir is not None:
+        from nobrainer.experiment import ExperimentTracker
+
+        tracker = ExperimentTracker(output_dir=checkpoint_dir)
 
     for epoch in range(max_epochs):
         sampler.set_epoch(epoch)
@@ -485,96 +488,52 @@ def _ddp_worker(
             n_batches += 1
 
         avg_loss = epoch_loss / max(n_batches, 1)
-        final_loss = avg_loss
-        train_losses.append(avg_loss)
-
-        # Validation on rank 0
-        val_msg = ""
-        if rank == 0 and val_loader is not None:
-            val_metrics = _run_validation(
-                ddp_model.module, val_loader, criterion, device
-            )
-            val_losses.append(val_metrics["val_loss"])
-            val_accs.append(val_metrics["val_acc"])
-            val_bal_accs.append(val_metrics["val_bal_acc"])
-            val_msg = (
-                f" val_loss={val_metrics['val_loss']:.4f}"
-                f" val_acc={val_metrics['val_acc']:.4f}"
-                f" val_bal_acc={val_metrics['val_bal_acc']:.4f}"
-            )
-            ddp_model.train()
+        logs: dict[str, Any] = {"epoch": epoch + 1, "loss": avg_loss}
 
         if rank == 0:
+            if val_loader is not None:
+                logs.update(_run_validation(
+                    ddp_model.module, val_loader, criterion, device
+                ))
+                ddp_model.train()
+
+            history.append(logs)
+
             if avg_loss < best_loss:
                 best_loss = avg_loss
                 if checkpoint_dir is not None:
                     ckpt_path = str(Path(checkpoint_dir) / "best_model.pth")
                     torch.save(ddp_model.module.state_dict(), ckpt_path)
 
-            # Periodic checkpoint (also serves as resumable state for preemption)
+            # Resumable checkpoint
+            if checkpoint_dir is not None:
+                from nobrainer.slurm import save_checkpoint as _save_ckpt
+
+                _save_ckpt(checkpoint_dir, ddp_model.module, optimizer,
+                           epoch + 1, {"history": history})
+
+            # Named checkpoint for post-hoc Dice eval
             if (
                 checkpoint_dir is not None
                 and checkpoint_freq > 0
                 and (epoch + 1) % checkpoint_freq == 0
             ):
-                epoch_ckpt = str(
-                    Path(checkpoint_dir) / f"epoch_{epoch + 1:03d}.pth"
-                )
-                torch.save(
-                    {
-                        "epoch": epoch + 1,
-                        "model_state_dict": ddp_model.module.state_dict(),
-                        "optimizer_state_dict": optimizer.state_dict(),
-                        "loss": avg_loss,
-                    },
-                    epoch_ckpt,
-                )
-                checkpoint_epochs.append(epoch + 1)
+                torch.save(ddp_model.module.state_dict(),
+                           Path(checkpoint_dir) / f"epoch_{epoch + 1:03d}.pth")
 
-            # Write metrics via ExperimentTracker (metrics.jsonl + metrics.csv)
-            # so progress is visible during DDP (worker stdout doesn't reach SLURM)
-            if checkpoint_dir is not None:
-                from nobrainer.experiment import ExperimentTracker
+            if tracker is not None:
+                tracker.log(logs)
 
-                if not hasattr(_ddp_worker, "_tracker"):
-                    _ddp_worker._tracker = ExperimentTracker(
-                        output_dir=checkpoint_dir
-                    )
-                entry = {"epoch": epoch + 1, "train_loss": avg_loss}
-                if val_losses:
-                    entry["val_loss"] = val_losses[-1]
-                if val_accs:
-                    entry["val_acc"] = val_accs[-1]
-                if val_bal_accs:
-                    entry["val_bal_acc"] = val_bal_accs[-1]
-                _ddp_worker._tracker.log(entry)
-
-            logger.info(
-                "Epoch %d/%d: loss=%.4f%s",
-                epoch + 1,
-                max_epochs,
-                avg_loss,
-                val_msg,
-            )
+            logger.info("Epoch %d/%d: %s", epoch + 1, max_epochs,
+                        " ".join(f"{k}={v:.4f}" for k, v in logs.items()
+                                 if isinstance(v, float)))
 
     if rank == 0:
-        result_dict.update(
-            {
-                "final_loss": final_loss,
-                "best_loss": best_loss,
-                "epochs_completed": max_epochs,
-                "checkpoint_path": ckpt_path,
-                "train_losses": train_losses,
-                "val_losses": val_losses,
-                "val_accs": val_accs,
-                "val_bal_accs": val_bal_accs,
-                "checkpoint_epochs": checkpoint_epochs,
-            }
-        )
+        result_dict["history"] = history
+        result_dict["checkpoint_path"] = ckpt_path
 
-    if rank == 0 and hasattr(_ddp_worker, "_tracker"):
-        _ddp_worker._tracker.finish()
-        del _ddp_worker._tracker
+    if tracker is not None:
+        tracker.finish()
 
     dist.destroy_process_group()
 
@@ -630,20 +589,8 @@ def _fit_ddp(
     )
 
     result = dict(results)
-
-    # Run callbacks on the returned results (in parent process, no pickling needed)
-    if callbacks and result.get("train_losses"):
-        for epoch, loss in enumerate(result["train_losses"]):
-            logs = {"loss": loss, "epoch": epoch}
-            if result.get("val_losses") and epoch < len(result["val_losses"]):
-                logs["val_loss"] = result["val_losses"][epoch]
-            if result.get("val_accs") and epoch < len(result["val_accs"]):
-                logs["val_acc"] = result["val_accs"][epoch]
-            if result.get("val_bal_accs") and epoch < len(result["val_bal_accs"]):
-                logs["val_bal_acc"] = result["val_bal_accs"][epoch]
-            for cb in callbacks:
-                cb(epoch, logs, model)
-
+    if "history" in result:
+        result["history"] = list(result["history"])
     return result
 
 
