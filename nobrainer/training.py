@@ -419,6 +419,7 @@ def _ddp_worker(
     ckpt_path = None
     train_losses: list[float] = []
     val_losses: list[float] = []
+    val_accs: list[float] = []
     checkpoint_epochs: list[int] = []
 
     if checkpoint_dir is not None and rank == 0:
@@ -465,6 +466,7 @@ def _ddp_worker(
                 ddp_model.module, val_loader, criterion, device
             )
             val_losses.append(val_metrics["val_loss"])
+            val_accs.append(val_metrics["val_acc"])
             val_msg = (
                 f" val_loss={val_metrics['val_loss']:.4f}"
                 f" val_acc={val_metrics['val_acc']:.4f}"
@@ -515,6 +517,7 @@ def _ddp_worker(
                 "checkpoint_path": ckpt_path,
                 "train_losses": train_losses,
                 "val_losses": val_losses,
+                "val_accs": val_accs,
                 "checkpoint_epochs": checkpoint_epochs,
             }
         )
@@ -580,6 +583,8 @@ def _fit_ddp(
             logs = {"loss": loss, "epoch": epoch}
             if result.get("val_losses") and epoch < len(result["val_losses"]):
                 logs["val_loss"] = result["val_losses"][epoch]
+            if result.get("val_accs") and epoch < len(result["val_accs"]):
+                logs["val_acc"] = result["val_accs"][epoch]
             for cb in callbacks:
                 cb(epoch, logs, model)
 
