@@ -30,12 +30,19 @@ def _run_validation(
     criterion: nn.Module,
     device: torch.device,
 ) -> dict[str, float]:
-    """Run one validation pass. Returns dict with val_loss and val_acc."""
+    """Run one validation pass.
+
+    Returns dict with val_loss, val_acc (overall), and val_bal_acc
+    (balanced accuracy — mean of per-class recall).
+    """
     model.eval()
     total_loss = 0.0
     n_correct = 0
     n_total = 0
     n_batches = 0
+    # Per-class correct/total for balanced accuracy
+    class_correct: dict[int, int] = {}
+    class_total: dict[int, int] = {}
 
     with torch.no_grad():
         for batch in val_loader:
@@ -58,13 +65,32 @@ def _run_validation(
             if pred.device != labels.device:
                 labels = labels.to(pred.device)
             total_loss += criterion(pred, labels).item()
-            n_correct += (pred.argmax(1) == labels).sum().item()
+
+            pred_labels = pred.argmax(1)
+            correct_mask = pred_labels == labels
+            n_correct += correct_mask.sum().item()
             n_total += labels.numel()
             n_batches += 1
 
+            # Accumulate per-class stats
+            for c in labels.unique().tolist():
+                mask = labels == c
+                cc = correct_mask[mask].sum().item()
+                ct = mask.sum().item()
+                class_correct[c] = class_correct.get(c, 0) + cc
+                class_total[c] = class_total.get(c, 0) + ct
+
     val_loss = total_loss / max(n_batches, 1)
     val_acc = n_correct / max(n_total, 1)
-    return {"val_loss": val_loss, "val_acc": val_acc}
+
+    # Balanced accuracy: mean recall per class
+    per_class_recall = []
+    for c in sorted(class_total.keys()):
+        if class_total[c] > 0:
+            per_class_recall.append(class_correct[c] / class_total[c])
+    val_bal_acc = sum(per_class_recall) / max(len(per_class_recall), 1)
+
+    return {"val_loss": val_loss, "val_acc": val_acc, "val_bal_acc": val_bal_acc}
 
 
 def _apply_gradient_checkpointing(model: nn.Module) -> None:
@@ -351,7 +377,9 @@ def fit(
             epoch + 1,
             max_epochs,
             avg_loss,
-            f" val_loss={logs['val_loss']:.4f} val_acc={logs['val_acc']:.4f}"
+            f" val_loss={logs['val_loss']:.4f}"
+            f" val_acc={logs['val_acc']:.4f}"
+            f" bal_acc={logs['val_bal_acc']:.4f}"
             if "val_loss" in logs
             else "",
         )
@@ -420,6 +448,7 @@ def _ddp_worker(
     train_losses: list[float] = []
     val_losses: list[float] = []
     val_accs: list[float] = []
+    val_bal_accs: list[float] = []
     checkpoint_epochs: list[int] = []
 
     if checkpoint_dir is not None and rank == 0:
@@ -467,9 +496,11 @@ def _ddp_worker(
             )
             val_losses.append(val_metrics["val_loss"])
             val_accs.append(val_metrics["val_acc"])
+            val_bal_accs.append(val_metrics["val_bal_acc"])
             val_msg = (
                 f" val_loss={val_metrics['val_loss']:.4f}"
                 f" val_acc={val_metrics['val_acc']:.4f}"
+                f" val_bal_acc={val_metrics['val_bal_acc']:.4f}"
             )
             ddp_model.train()
 
@@ -518,6 +549,7 @@ def _ddp_worker(
                 "train_losses": train_losses,
                 "val_losses": val_losses,
                 "val_accs": val_accs,
+                "val_bal_accs": val_bal_accs,
                 "checkpoint_epochs": checkpoint_epochs,
             }
         )
@@ -585,6 +617,8 @@ def _fit_ddp(
                 logs["val_loss"] = result["val_losses"][epoch]
             if result.get("val_accs") and epoch < len(result["val_accs"]):
                 logs["val_acc"] = result["val_accs"][epoch]
+            if result.get("val_bal_accs") and epoch < len(result["val_bal_accs"]):
+                logs["val_bal_acc"] = result["val_bal_accs"][epoch]
             for cb in callbacks:
                 cb(epoch, logs, model)
 
