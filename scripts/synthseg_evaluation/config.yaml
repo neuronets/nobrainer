@@ -31,6 +31,8 @@ training:
 models:
   - unet
   - swin_unetr
+  - segresnet
+  - segformer3d
   - kwyk_meshnet
 
 evaluation:

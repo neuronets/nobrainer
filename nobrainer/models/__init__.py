@@ -5,6 +5,7 @@ from pprint import pprint
 from .autoencoder import autoencoder
 from .highresnet import highresnet
 from .meshnet import meshnet
+from .segformer3d import segformer3d
 from .segmentation import attention_unet, segresnet, swin_unetr, unet, unetr, vnet
 from .simsiam import simsiam
 
@@ -22,6 +23,7 @@ _models = {
     "simsiam": simsiam,
     "swin_unetr": swin_unetr,
     "segresnet": segresnet,
+    "segformer3d": segformer3d,
 }
 
 # Optional: Bayesian models (require pyro-ppl)
