@@ -148,45 +148,72 @@ def create_zarr_store(
     D, H, W = target_shape
     full_chunk = (1, *chunk_shape)  # one subject per chunk along axis 0
 
+    # Shard shape: group subjects into shards for balanced write parallelism
+    # and read efficiency.  Default: ~50 subjects per shard → manageable
+    # file count while allowing parallel writes across shards.
+    subjects_per_shard = 50
+    if shard_shape is not None:
+        full_shard = shard_shape
+    else:
+        full_shard = (min(subjects_per_shard, n_subjects), D, H, W)
+
     # Create store
     store = zarr.open_group(str(output_path), mode="w")
 
-    # Create stacked 4D arrays
+    # Create sharded 4D arrays
+    n_shards = int(np.ceil(n_subjects / full_shard[0]))
     images_arr = store.create_array(
         "images",
         shape=(n_subjects, D, H, W),
         chunks=full_chunk,
+        shards=full_shard,
         dtype=np.float32,
     )
     labels_arr = store.create_array(
         "labels",
         shape=(n_subjects, D, H, W),
         chunks=full_chunk,
+        shards=full_shard,
         dtype=np.int32,
     )
+    logger.info(
+        "Created sharded Zarr3: shape=%s, chunks=%s, shards=%s (%d shard files)",
+        (n_subjects, D, H, W), full_chunk, full_shard, n_shards,
+    )
 
-    # Write volumes
-    for i, (img_path, lbl_path) in enumerate(image_label_pairs):
-        img = nib.load(img_path)
-        lbl = nib.load(lbl_path)
+    # Write volumes — parallel across shards.
+    # Each shard is independent, so we can write to different shards
+    # concurrently.  Within a shard, writes are sequential.
+    import concurrent.futures
+    import os
 
-        if conform:
-            img = _conform_volume(img, target_shape, target_voxel_size)
-            lbl = _conform_volume(lbl, target_shape, target_voxel_size)
+    n_workers = min(os.cpu_count() or 1, n_shards, 8)
 
-        img_data = np.asarray(img.dataobj, dtype=np.float32)
-        lbl_data = np.asarray(lbl.dataobj, dtype=np.int32)
+    def _write_shard_group(shard_idx):
+        """Load and write all subjects belonging to one shard."""
+        start = shard_idx * full_shard[0]
+        end = min(start + full_shard[0], n_subjects)
+        for i in range(start, end):
+            img_path, lbl_path = image_label_pairs[i]
+            img = nib.load(img_path)
+            lbl = nib.load(lbl_path)
+            if conform:
+                img = _conform_volume(img, target_shape, target_voxel_size)
+                lbl = _conform_volume(lbl, target_shape, target_voxel_size)
+            images_arr[i] = np.asarray(img.dataobj, dtype=np.float32)[:D, :H, :W]
+            labels_arr[i] = np.asarray(lbl.dataobj, dtype=np.int32)[:D, :H, :W]
+        return end - start
 
-        # Ensure shape matches (conforming may produce slightly different shapes)
-        if img_data.shape[:3] != target_shape:
-            img_data = img_data[:D, :H, :W]
-        if lbl_data.shape[:3] != target_shape:
-            lbl_data = lbl_data[:D, :H, :W]
-
-        images_arr[i] = img_data[:D, :H, :W]
-        labels_arr[i] = lbl_data[:D, :H, :W]
-
-        logger.info("Stored subject %d/%d: %s", i + 1, n_subjects, subject_ids[i])
+    logger.info(
+        "Writing %d volumes across %d shards with %d workers...",
+        n_subjects, n_shards, n_workers,
+    )
+    with concurrent.futures.ThreadPoolExecutor(max_workers=n_workers) as pool:
+        futures = [pool.submit(_write_shard_group, s) for s in range(n_shards)]
+        done = 0
+        for future in concurrent.futures.as_completed(futures):
+            done += future.result()
+            logger.info("Stored %d/%d volumes", done, n_subjects)
 
     # Store metadata
     store.attrs["n_subjects"] = n_subjects

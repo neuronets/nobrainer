@@ -83,6 +83,7 @@ def _estimate_memory_per_sample(
     n_classes: int = 2,
     in_channels: int = 1,
     dtype: torch.dtype = torch.float32,
+    forward_kwargs: dict | None = None,
 ) -> float:
     """Estimate GPU memory (bytes) for one training sample.
 
@@ -107,6 +108,9 @@ def _estimate_memory_per_sample(
     float
         Estimated bytes per sample (forward + backward + optimizer overhead).
     """
+    if forward_kwargs is None:
+        forward_kwargs = {}
+
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA required for memory estimation")
 
@@ -122,7 +126,11 @@ def _estimate_memory_per_sample(
     x = torch.randn(1, in_channels, *block_shape, device=device, dtype=dtype)
     labels = torch.randint(0, n_classes, (1, *block_shape), device=device)
 
-    out = model(x)
+    # Pass forward_kwargs if model accepts them (e.g. mc_vwn, mc_dropout)
+    try:
+        out = model(x, **forward_kwargs)
+    except TypeError:
+        out = model(x)
     loss = nn.CrossEntropyLoss()(out, labels)
     loss.backward()
 
@@ -145,7 +153,8 @@ def auto_batch_size(
     target_memory_fraction: float = 0.85,
     gpu_id: int = 0,
     min_batch: int = 1,
-    max_batch: int = 256,
+    max_batch: int = 512,
+    forward_kwargs: dict | None = None,
 ) -> int:
     """Estimate the largest batch size that fits in GPU memory.
 
@@ -185,7 +194,8 @@ def auto_batch_size(
 
     try:
         mem_per_sample = _estimate_memory_per_sample(
-            model, block_shape, n_classes, in_channels
+            model, block_shape, n_classes, in_channels,
+            forward_kwargs=forward_kwargs,
         )
     except RuntimeError as e:
         logger.warning("Memory estimation failed: %s — returning min_batch", e)

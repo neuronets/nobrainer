@@ -63,14 +63,20 @@ def _load_label_mapping(name_or_path: str) -> Callable:
             new = int(row["new"])
             lookup[orig] = new
 
-    def _remap(x):
-        """Remap FreeSurfer labels using lookup table."""
+    return _LabelRemap(lookup)
+
+
+class _LabelRemap:
+    """Picklable label remapping callable (needed for DataLoader workers)."""
+
+    def __init__(self, lookup: dict[int, int]):
+        self.lookup = lookup
+
+    def __call__(self, x):
         result = torch.zeros_like(x)
-        for orig_val, new_val in lookup.items():
+        for orig_val, new_val in self.lookup.items():
             result[x == orig_val] = new_val
         return result.long()
-
-    return _remap
 
 
 class Dataset:
@@ -391,17 +397,40 @@ class Dataset:
 
         # Streaming mode: use PatchDataset for on-the-fly patch extraction
         if self._streaming:
+            # Build augmentation transforms if enabled
+            transforms = None
+            if self._augment:
+                from nobrainer.augmentation.profiles import get_augmentation_profile
+                from monai.transforms import Compose
+
+                aug_transforms = get_augmentation_profile(
+                    self._augment_profile, keys=["image", "label"]
+                )
+                if aug_transforms:
+                    transforms = Compose(aug_transforms)
+
             patch_ds = PatchDataset(
                 data=self.data,
                 block_shape=self._block_shape or (32, 32, 32),
                 patches_per_volume=self._patches_per_volume,
                 binarize=self._binarize if self._binarize else None,
+                transforms=transforms,
             )
+            # Use multiple workers for I/O prefetching — each worker loads
+            # patches independently while GPU processes the current batch.
+            # Respect SLURM allocation or fall back to cpu_count.
+            import os
+
+            slurm_cpus = os.environ.get("SLURM_CPUS_PER_TASK")
+            max_cpus = int(slurm_cpus) if slurm_cpus else (os.cpu_count() or 1)
+            n_workers = max(1, max_cpus - 1)  # leave 1 CPU for main process
             self._dataloader = DataLoader(
                 patch_ds,
                 batch_size=self._batch_size,
                 shuffle=self._shuffle,
-                num_workers=0,
+                num_workers=n_workers,
+                prefetch_factor=2,
+                persistent_workers=True if n_workers > 0 else False,
                 pin_memory=torch.cuda.is_available(),
             )
             return self._dataloader
@@ -589,10 +618,20 @@ class PatchDataset(torch.utils.data.Dataset):
         self.binarize = binarize
         self.transforms = transforms
 
-        # Cache volume shapes to avoid repeated reads
+        # Cache zarr store handles (opened once, reused for all reads)
+        self._zarr_cache: dict[str, "zarr.Group"] = {}
+
+        # Cache volume shapes — use zarr metadata when available (fast)
         self._shapes: list[tuple[int, ...]] = []
-        for item in data:
-            self._shapes.append(self._get_shape(item["image"]))
+        first_parsed = self._parse_zarr_path(str(data[0]["image"])) if data else None
+        if first_parsed is not None:
+            # All items share the same zarr store — read shape once
+            store = self._get_zarr_store(first_parsed[0])
+            spatial_shape = store[first_parsed[1]].shape[1:]  # (D, H, W)
+            self._shapes = [spatial_shape] * len(data)
+        else:
+            for item in data:
+                self._shapes.append(self._get_shape(item["image"]))
 
     def __len__(self) -> int:
         return len(self.data) * self.patches_per_volume
@@ -609,15 +648,15 @@ class PatchDataset(torch.utils.data.Dataset):
         w0 = np.random.randint(0, max(1, shape[2] - bw + 1))
         slc = (slice(d0, d0 + bd), slice(h0, h0 + bh), slice(w0, w0 + bw))
 
-        # Read only the patch region
-        img_patch = self._read_region(item["image"], slc).astype(np.float32)
+        # Read only the patch region (cached zarr handles for speed)
+        img_patch = self._read_region_cached(item["image"], slc).astype(np.float32)
 
         result: dict[str, torch.Tensor] = {
             "image": torch.from_numpy(img_patch[None]),  # add channel dim
         }
 
         if "label" in item:
-            lbl_patch = self._read_region(item["label"], slc).astype(np.float32)
+            lbl_patch = self._read_region_cached(item["label"], slc).astype(np.float32)
             lbl_patch = self._apply_binarize(lbl_patch)
             result["label"] = torch.from_numpy(lbl_patch[None])
 
@@ -636,14 +675,42 @@ class PatchDataset(torch.utils.data.Dataset):
                 mask = np.maximum(mask, (lbl == val).astype(np.float32))
             return mask
         elif callable(self.binarize):
-            return self.binarize(lbl)
+            # Remap functions may expect torch tensors (e.g., _load_label_mapping)
+            t = torch.from_numpy(lbl.astype(np.int32))
+            result = self.binarize(t)
+            return result.numpy().astype(np.float32)
         return lbl
+
+    @staticmethod
+    def _parse_zarr_path(path: str) -> tuple[str, str, int] | None:
+        """Parse zarr://store_path#array_name/subject_index.
+
+        Returns ``(store_path, array_name, subject_index)`` or None.
+        """
+        if path.startswith("zarr://"):
+            rest = path[len("zarr://"):]
+            if "#" in rest:
+                store_path, fragment = rest.split("#", 1)
+                parts = fragment.rsplit("/", 1)
+                if len(parts) == 2:
+                    return store_path, parts[0], int(parts[1])
+                return store_path, fragment, 0
+            return rest, "images", 0
+        return None
 
     @staticmethod
     def _get_shape(path: str) -> tuple[int, ...]:
         """Get volume shape without loading full data."""
         path = str(path)
-        if path.rstrip("/").endswith(".zarr"):
+        parsed = PatchDataset._parse_zarr_path(path)
+        if parsed is not None:
+            import zarr
+
+            store_path, array_name, idx = parsed
+            store = zarr.open_group(store_path, mode="r")
+            # Shape of the 4D array is (N, D, H, W); return spatial (D, H, W)
+            return store[array_name].shape[1:]
+        elif path.rstrip("/").endswith(".zarr"):
             import zarr
 
             store = zarr.open_group(path, mode="r")
@@ -653,18 +720,38 @@ class PatchDataset(torch.utils.data.Dataset):
 
             return nib.load(path).shape[:3]
 
+    def _get_zarr_store(self, store_path: str):
+        """Get or create a cached zarr group handle."""
+        if store_path not in self._zarr_cache:
+            import zarr
+
+            self._zarr_cache[store_path] = zarr.open_group(store_path, mode="r")
+        return self._zarr_cache[store_path]
+
+    def _read_region_cached(self, path: str, slc: tuple[slice, ...]) -> np.ndarray:
+        """Read a spatial region, using cached zarr handles."""
+        path = str(path)
+        parsed = self._parse_zarr_path(path)
+        if parsed is not None:
+            store_path, array_name, idx = parsed
+            store = self._get_zarr_store(store_path)
+            sd, sh, sw = slc
+            return np.asarray(store[array_name][idx, sd, sh, sw])
+        return self._read_region(path, slc)
+
     @staticmethod
     def _read_region(path: str, slc: tuple[slice, ...]) -> np.ndarray:
-        """Read a spatial region from a volume.
-
-        For Zarr stores, this is a true partial read (only chunks
-        overlapping the region are fetched from storage).
-        For NIfTI, the full volume header is read but only the
-        requested region is loaded into memory via nibabel's
-        array proxy.
-        """
+        """Read a spatial region from a volume (static, no caching)."""
         path = str(path)
-        if path.rstrip("/").endswith(".zarr"):
+        parsed = PatchDataset._parse_zarr_path(path)
+        if parsed is not None:
+            import zarr
+
+            store_path, array_name, idx = parsed
+            store = zarr.open_group(store_path, mode="r")
+            sd, sh, sw = slc
+            return np.asarray(store[array_name][idx, sd, sh, sw])
+        elif path.rstrip("/").endswith(".zarr"):
             import zarr
 
             store = zarr.open_group(path, mode="r")
@@ -673,7 +760,6 @@ class PatchDataset(torch.utils.data.Dataset):
             import nibabel as nib
 
             img = nib.load(path)
-            # Use dataobj proxy for memory-efficient slicing
             return np.asarray(img.dataobj[slc])
 
 

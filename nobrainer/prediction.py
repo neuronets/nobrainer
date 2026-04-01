@@ -246,10 +246,15 @@ def predict(
     n_blocks = blocks.shape[0]
 
     if use_multi_gpu:
-        # Replicate model to each GPU
-        models = [model.to(torch.device(f"cuda:{i}")) for i in range(n_gpus)]
-        for m in models:
+        # Replicate model to each GPU (deep copy to avoid moving the original)
+        import copy
+
+        base_state = model.state_dict()
+        models = []
+        for i in range(n_gpus):
+            m = copy.deepcopy(model).to(torch.device(f"cuda:{i}"))
             m.eval()
+            models.append(m)
     else:
         model = model.to(device)
         model.eval()

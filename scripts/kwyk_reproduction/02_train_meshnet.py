@@ -51,6 +51,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Override number of training epochs from config",
     )
+    parser.add_argument(
+        "--resume",
+        type=str,
+        default=None,
+        help="Path to checkpoint .pth file to resume from",
+    )
     return parser.parse_args()
 
 
@@ -70,45 +76,61 @@ def evaluate_val_dice(
     val_pairs: list[tuple[str, str]],
     block_shape: tuple[int, int, int],
     label_mapping: str | None,
+    n_classes: int = 2,
 ) -> list[float]:
-    """Compute per-volume Dice on validation set.
+    """Compute per-volume mean class Dice on validation set.
 
-    Returns a list of Dice scores, one per validation volume.
+    Returns a list of mean Dice scores (averaged across classes), one per volume.
     """
-    from nobrainer.prediction import predict
+    import nibabel as nib
 
-    dice_scores = []
+    from nobrainer.prediction import predict
     from nobrainer.training import get_device
 
+    # Load remap function for multi-class label mappings
+    remap_fn = None
+    if label_mapping and label_mapping != "binary":
+        from nobrainer.processing.dataset import _load_label_mapping
+
+        remap_fn = _load_label_mapping(label_mapping)
+
+    dice_scores = []
     device = get_device()
     model = seg.model_.to(device)
     model.eval()
 
     for img_path, lbl_path in val_pairs:
-        # Predict labels for this volume
         pred_img = predict(
             inputs=img_path,
             model=model,
             block_shape=block_shape,
-            batch_size=4,
+            batch_size=128,
             return_labels=True,
         )
-        pred_arr = np.asarray(pred_img.dataobj).astype(np.float32)
+        pred_arr = np.asarray(pred_img.dataobj, dtype=np.int32)
 
-        # Load ground-truth and apply same binarisation
-        import nibabel as nib
+        gt_arr = np.asarray(nib.load(lbl_path).dataobj, dtype=np.int32)
+        if remap_fn is not None:
+            gt_arr = remap_fn(torch.from_numpy(gt_arr)).numpy()
+        elif label_mapping is None or label_mapping == "binary":
+            gt_arr = (gt_arr > 0).astype(np.int32)
+            pred_arr = (pred_arr > 0).astype(np.int32)
 
-        gt_arr = np.asarray(nib.load(lbl_path).dataobj, dtype=np.float32)
-        if label_mapping is None or label_mapping == "binary":
-            gt_arr = (gt_arr > 0).astype(np.float32)
-            pred_arr = (pred_arr > 0).astype(np.float32)
+        # Per-class Dice (skip background class 0)
+        class_dices = []
+        for c in range(1, n_classes):
+            pred_c = (pred_arr == c)
+            gt_c = (gt_arr == c)
+            intersection = (pred_c & gt_c).sum()
+            total = pred_c.sum() + gt_c.sum()
+            class_dices.append(2.0 * intersection / total if total > 0 else 1.0)
 
-        dice = compute_dice(pred_arr, gt_arr)
-        dice_scores.append(dice)
+        mean_dice = float(np.mean(class_dices))
+        dice_scores.append(mean_dice)
         log.info(
             "  Val volume %s: Dice=%.4f",
             Path(img_path).name,
-            dice,
+            mean_dice,
         )
 
     return dice_scores
@@ -188,11 +210,69 @@ def main() -> None:
 
     from nobrainer.processing.dataset import Dataset
 
-    ds_train = (
-        Dataset.from_files(train_pairs, block_shape=block_shape, n_classes=n_classes)
-        .batch(batch_size)
-        .binarize(label_mapping)
+    # Auto-scale batch size to GPU memory
+    from nobrainer.gpu import auto_batch_size as _auto_bs, gpu_count
+
+    if gpu_count() > 0:
+        from nobrainer.models import get as get_model
+
+        _tmp_model = get_model("meshnet")(
+            n_classes=n_classes,
+            filters=config.get("filters", 96),
+            receptive_field=config.get("receptive_field", 37),
+            dropout_rate=config.get("dropout_rate", 0.25),
+        )
+        batch_size = _auto_bs(
+            _tmp_model, block_shape, n_classes=n_classes,
+            target_memory_fraction=0.90,
+        )
+        del _tmp_model
+        log.info("Auto batch size: %d (target 90%% GPU memory)", batch_size)
+
+    patches_per_volume = config.get("patches_per_volume", 50)
+    zarr_store = config.get("zarr_store")
+
+    if zarr_store and Path(zarr_store).exists():
+        log.info("Using Zarr store: %s", zarr_store)
+        ds_train = (
+            Dataset.from_zarr(zarr_store, block_shape=block_shape,
+                              n_classes=n_classes, partition="train")
+            .batch(batch_size)
+            .binarize(label_mapping)
+            .streaming(patches_per_volume=patches_per_volume)
+        )
+    else:
+        ds_train = (
+            Dataset.from_files(train_pairs, block_shape=block_shape, n_classes=n_classes)
+            .batch(batch_size)
+            .binarize(label_mapping)
+            .streaming(patches_per_volume=patches_per_volume)
+        )
+
+    n_train = len(ds_train.data) if hasattr(ds_train, "data") else len(train_pairs)
+    log.info(
+        "Training data: %d volumes × %d patches = %d blocks/epoch, batch_size=%d",
+        n_train, patches_per_volume, n_train * patches_per_volume, batch_size,
     )
+
+    # ---- Build validation dataset for per-epoch block-level metrics ----------
+    ds_val = None
+    if val_pairs:
+        if zarr_store and Path(zarr_store).exists():
+            ds_val = (
+                Dataset.from_zarr(zarr_store, block_shape=block_shape,
+                                  n_classes=n_classes, partition="val")
+                .batch(batch_size)
+                .binarize(label_mapping)
+                .streaming(patches_per_volume=patches_per_volume)
+            )
+        else:
+            ds_val = (
+                Dataset.from_files(val_pairs, block_shape=block_shape, n_classes=n_classes)
+                .batch(batch_size)
+                .binarize(label_mapping)
+                .streaming(patches_per_volume=patches_per_volume)
+            )
 
     # ---- Train with Segmentation estimator ----------------------------------
     from nobrainer.processing.segmentation import Segmentation
@@ -212,50 +292,67 @@ def main() -> None:
         checkpoint_filepath=str(output_dir),
     )
 
-    # Collect per-epoch losses via a callback
-    train_losses: list[float] = []
+    val_dice_per_epoch: list[float] = []
+    val_dice_freq = config.get("val_dice_freq", 5)
 
-    def _record_loss(epoch: int, loss: float, model: torch.nn.Module) -> None:
-        train_losses.append(loss)
-        log.info("Epoch %d/%d: train_loss=%.6f", epoch + 1, epochs, loss)
+    # Simple logging callback (picklable — no closures)
+    def _log_cb(epoch, logs, model):
+        msg = f"Epoch {epoch + 1}/{epochs}: train_loss={logs['loss']:.6f}"
+        if "val_loss" in logs:
+            msg += f" val_loss={logs['val_loss']:.6f}"
+        if "val_acc" in logs:
+            msg += f" val_acc={logs['val_acc']:.4f}"
+        if "val_bal_acc" in logs:
+            msg += f" bal_acc={logs['val_bal_acc']:.4f}"
+        log.info(msg)
 
     seg.fit(
         dataset_train=ds_train,
+        dataset_validate=ds_val,
         epochs=epochs,
         optimizer=torch.optim.Adam,
         opt_args={"lr": lr},
-        callbacks=[_record_loss],
+        callbacks=[_log_cb],
+        checkpoint_freq=val_dice_freq,
+        gradient_checkpointing=config.get("gradient_checkpointing", False),
+        model_parallel=config.get("model_parallel", False),
+        resume_from=args.resume,
     )
 
-    log.info(
-        "Training complete. Final loss=%.6f", train_losses[-1] if train_losses else 0.0
-    )
+    history = seg._training_result.get("history", [])
 
-    # ---- Evaluate on validation set -----------------------------------------
-    val_dice_per_epoch: list[float] = []
+    if history:
+        last = history[-1]
+        log.info("Training complete. %s",
+                 " ".join(f"{k}={v:.4f}" for k, v in last.items() if isinstance(v, float)))
+    else:
+        log.info("Training complete (no history).")
+
+    # Ensure model is on the right device after DDP
+    from nobrainer.training import get_device
+    seg.model_.to(get_device())
+
+    # Evaluate full-volume Dice on each checkpointed epoch
     if val_pairs:
-        log.info("Evaluating on %d validation volumes...", len(val_pairs))
-        dice_scores = evaluate_val_dice(seg, val_pairs, block_shape, label_mapping)
-        mean_dice = float(np.mean(dice_scores)) if dice_scores else 0.0
-        val_dice_per_epoch = [mean_dice]  # single evaluation at end
-        log.info(
-            "Validation Dice: mean=%.4f, std=%.4f, min=%.4f, max=%.4f",
-            mean_dice,
-            float(np.std(dice_scores)) if dice_scores else 0.0,
-            float(np.min(dice_scores)) if dice_scores else 0.0,
-            float(np.max(dice_scores)) if dice_scores else 0.0,
-        )
+        for epoch_idx in range(len(history)):
+            epoch_num = history[epoch_idx].get("epoch", epoch_idx + 1)
+            ckpt_file = output_dir / f"epoch_{epoch_num:03d}.pth"
+            if ckpt_file.exists():
+                log.info("Evaluating Dice at epoch %d...", epoch_num)
+                seg.model_.load_state_dict(
+                    torch.load(ckpt_file, map_location=get_device(), weights_only=True)
+                )
+                dice_scores = evaluate_val_dice(
+                    seg, val_pairs, block_shape, label_mapping, n_classes
+                )
+                mean_dice = float(np.mean(dice_scores)) if dice_scores else 0.0
+                history[epoch_idx]["val_dice"] = mean_dice
+                log.info("  Epoch %d Dice: %.4f", epoch_num, mean_dice)
 
-    # ---- Learning curve figure ----------------------------------------------
-    # For the Dice axis, pad with NaN so lengths match (evaluated only at end)
-    val_dice_for_plot = [float("nan")] * (len(train_losses) - 1) + val_dice_per_epoch
-    if len(val_dice_for_plot) < len(train_losses):
-        val_dice_for_plot = val_dice_for_plot + [float("nan")] * (
-            len(train_losses) - len(val_dice_for_plot)
-        )
-
+    train_losses = [h["loss"] for h in history]
+    val_dice_per_epoch = [h.get("val_dice", float("nan")) for h in history]
     fig_path = output_dir / "learning_curve.png"
-    plot_learning_curve(train_losses, val_dice_for_plot, fig_path)
+    plot_learning_curve(train_losses, val_dice_per_epoch, fig_path)
 
     # ---- Save model with Croissant-ML metadata ------------------------------
     seg.save(output_dir)
@@ -268,8 +365,11 @@ def main() -> None:
     log.info("  Output directory : %s", output_dir)
     log.info("  Epochs           : %d", epochs)
     log.info("  Final train loss : %.6f", train_losses[-1] if train_losses else 0.0)
-    if val_dice_per_epoch:
-        log.info("  Val Dice (mean)  : %.4f", val_dice_per_epoch[-1])
+    if val_losses:
+        log.info("  Final val loss   : %.6f", val_losses[-1])
+    final_dice = [d for d in val_dice_per_epoch if not np.isnan(d)]
+    if final_dice:
+        log.info("  Val Dice (mean)  : %.4f", final_dice[-1])
     log.info("  Elapsed time     : %.1f s", elapsed)
     log.info("=" * 60)
 
