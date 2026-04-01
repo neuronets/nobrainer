@@ -24,6 +24,46 @@ def get_device() -> torch.device:
     return _get_device()
 
 
+def _run_validation(
+    model: nn.Module,
+    val_loader: DataLoader,
+    criterion: nn.Module,
+    device: torch.device,
+) -> dict[str, float]:
+    """Run one validation pass. Returns dict with val_loss and val_acc."""
+    model.eval()
+    total_loss = 0.0
+    n_correct = 0
+    n_total = 0
+    n_batches = 0
+
+    with torch.no_grad():
+        for batch in val_loader:
+            if isinstance(batch, dict):
+                images = batch["image"].to(device)
+                labels = batch["label"].to(device)
+            elif isinstance(batch, (list, tuple)):
+                images = batch[0].to(device)
+                labels = batch[1].to(device)
+            else:
+                continue
+
+            if labels.ndim == images.ndim and labels.shape[1] == 1:
+                labels = labels.squeeze(1)
+            if labels.dtype in (torch.float32, torch.float64):
+                labels = labels.long()
+
+            pred = model(images)
+            total_loss += criterion(pred, labels).item()
+            n_correct += (pred.argmax(1) == labels).sum().item()
+            n_total += labels.numel()
+            n_batches += 1
+
+    val_loss = total_loss / max(n_batches, 1)
+    val_acc = n_correct / max(n_total, 1)
+    return {"val_loss": val_loss, "val_acc": val_acc}
+
+
 def fit(
     model: nn.Module,
     loader: DataLoader,
@@ -33,6 +73,7 @@ def fit(
     gpus: int = 1,
     checkpoint_dir: str | Path | None = None,
     callbacks: list[Any] | None = None,
+    val_loader: DataLoader | None = None,
 ) -> dict:
     """Train a model with optional multi-GPU DDP.
 
@@ -54,11 +95,16 @@ def fit(
         Directory for saving checkpoints. None disables checkpointing.
     callbacks : list or None
         Optional callback functions called after each epoch with
-        signature ``callback(epoch, loss, model)``.
+        signature ``callback(epoch, logs, model)`` where logs is a dict
+        containing at minimum ``{"loss": float}``.
+    val_loader : DataLoader or None
+        Validation data loader. If provided, validation loss and accuracy
+        are computed each epoch and included in the logs dict.
 
     Returns
     -------
-    dict with keys: final_loss, best_loss, epochs_completed, checkpoint_path
+    dict with keys: final_loss, best_loss, epochs_completed, checkpoint_path,
+    train_losses, val_losses
     """
     device = get_device()
 
@@ -72,12 +118,15 @@ def fit(
             gpus,
             checkpoint_dir,
             callbacks,
+            val_loader,
         )
 
     model = model.to(device)
     best_loss = float("inf")
     final_loss = 0.0
     ckpt_path = None
+    train_losses: list[float] = []
+    val_losses: list[float] = []
 
     if checkpoint_dir is not None:
         checkpoint_dir = Path(checkpoint_dir)
@@ -98,10 +147,8 @@ def fit(
             else:
                 raise TypeError(f"Unsupported batch type: {type(batch)}")
 
-            # Squeeze channel dim from labels if present (MONAI adds it)
             if labels.ndim == images.ndim and labels.shape[1] == 1:
                 labels = labels.squeeze(1)
-            # Ensure labels are long for CrossEntropyLoss
             if labels.dtype in (torch.float32, torch.float64):
                 labels = labels.long()
 
@@ -116,6 +163,17 @@ def fit(
 
         avg_loss = epoch_loss / max(n_batches, 1)
         final_loss = avg_loss
+        train_losses.append(avg_loss)
+
+        # Build logs dict for callbacks
+        logs: dict[str, Any] = {"loss": avg_loss, "epoch": epoch}
+
+        # Validation (built-in, no callback needed)
+        if val_loader is not None:
+            val_metrics = _run_validation(model, val_loader, criterion, device)
+            logs.update(val_metrics)
+            val_losses.append(val_metrics["val_loss"])
+            model.train()
 
         if avg_loss < best_loss:
             best_loss = avg_loss
@@ -125,15 +183,25 @@ def fit(
 
         if callbacks:
             for cb in callbacks:
-                cb(epoch, avg_loss, model)
+                cb(epoch, logs, model)
 
-        logger.debug("Epoch %d/%d: loss=%.4f", epoch + 1, max_epochs, avg_loss)
+        logger.debug(
+            "Epoch %d/%d: loss=%.4f%s",
+            epoch + 1,
+            max_epochs,
+            avg_loss,
+            f" val_loss={logs['val_loss']:.4f} val_acc={logs['val_acc']:.4f}"
+            if "val_loss" in logs
+            else "",
+        )
 
     return {
         "final_loss": final_loss,
         "best_loss": best_loss,
         "epochs_completed": max_epochs,
         "checkpoint_path": ckpt_path,
+        "train_losses": train_losses,
+        "val_losses": val_losses,
     }
 
 
@@ -141,17 +209,17 @@ def _ddp_worker(
     rank: int,
     world_size: int,
     model: nn.Module,
-    dataset,
+    train_dataset,
+    val_dataset,
     batch_size: int,
     num_workers: int,
     criterion: nn.Module,
     optimizer: torch.optim.Optimizer,
     max_epochs: int,
     checkpoint_dir: str | Path | None,
-    callbacks: list[Any] | None,
     result_dict: dict,
 ) -> None:
-    """Single DDP worker — must be a top-level function for mp.spawn."""
+    """Single DDP worker — module-level function for mp.spawn pickling."""
     import torch.distributed as dist
     from torch.nn.parallel import DistributedDataParallel as DDP
     from torch.utils.data.distributed import DistributedSampler
@@ -163,18 +231,31 @@ def _ddp_worker(
     local_model = model.to(device)
     ddp_model = DDP(local_model, device_ids=[rank])
 
-    sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank)
+    sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank)
     ddp_loader = DataLoader(
-        dataset,
+        train_dataset,
         batch_size=batch_size,
         sampler=sampler,
         num_workers=num_workers,
         pin_memory=True,
     )
 
+    # Validation loader on rank 0 only (no DDP sampler needed)
+    val_loader = None
+    if val_dataset is not None and rank == 0:
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=num_workers,
+            pin_memory=True,
+        )
+
     best_loss = float("inf")
     final_loss = 0.0
     ckpt_path = None
+    train_losses: list[float] = []
+    val_losses: list[float] = []
 
     if checkpoint_dir is not None and rank == 0:
         Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
@@ -195,6 +276,11 @@ def _ddp_worker(
             else:
                 raise TypeError(f"Unsupported batch type: {type(batch)}")
 
+            if labels.ndim == images.ndim and labels.shape[1] == 1:
+                labels = labels.squeeze(1)
+            if labels.dtype in (torch.float32, torch.float64):
+                labels = labels.long()
+
             optimizer.zero_grad()
             pred = ddp_model(images)
             loss = criterion(pred, labels)
@@ -206,16 +292,34 @@ def _ddp_worker(
 
         avg_loss = epoch_loss / max(n_batches, 1)
         final_loss = avg_loss
+        train_losses.append(avg_loss)
 
-        if rank == 0 and avg_loss < best_loss:
-            best_loss = avg_loss
-            if checkpoint_dir is not None:
-                ckpt_path = str(Path(checkpoint_dir) / "best_model.pth")
-                torch.save(ddp_model.module.state_dict(), ckpt_path)
+        # Validation on rank 0
+        val_msg = ""
+        if rank == 0 and val_loader is not None:
+            val_metrics = _run_validation(
+                ddp_model.module, val_loader, criterion, device
+            )
+            val_losses.append(val_metrics["val_loss"])
+            val_msg = (
+                f" val_loss={val_metrics['val_loss']:.4f}"
+                f" val_acc={val_metrics['val_acc']:.4f}"
+            )
+            ddp_model.train()
 
-        if rank == 0 and callbacks:
-            for cb in callbacks:
-                cb(epoch, avg_loss, ddp_model.module)
+        if rank == 0:
+            if avg_loss < best_loss:
+                best_loss = avg_loss
+                if checkpoint_dir is not None:
+                    ckpt_path = str(Path(checkpoint_dir) / "best_model.pth")
+                    torch.save(ddp_model.module.state_dict(), ckpt_path)
+            logger.info(
+                "Epoch %d/%d: loss=%.4f%s",
+                epoch + 1,
+                max_epochs,
+                avg_loss,
+                val_msg,
+            )
 
     if rank == 0:
         result_dict.update(
@@ -224,6 +328,8 @@ def _ddp_worker(
                 "best_loss": best_loss,
                 "epochs_completed": max_epochs,
                 "checkpoint_path": ckpt_path,
+                "train_losses": train_losses,
+                "val_losses": val_losses,
             }
         )
 
@@ -239,11 +345,12 @@ def _fit_ddp(
     gpus: int,
     checkpoint_dir: str | Path | None,
     callbacks: list[Any] | None,
+    val_loader: DataLoader | None = None,
 ) -> dict:
     """Multi-GPU training via DistributedDataParallel.
 
-    Launches ``gpus`` processes via ``mp.spawn``.  Each process trains
-    on its assigned GPU with a ``DistributedSampler``.
+    Launches ``gpus`` processes via ``mp.spawn``.  Validation runs on
+    rank 0 inside the worker — no callbacks needed for val metrics.
     """
     import os
 
@@ -254,25 +361,41 @@ def _fit_ddp(
 
     results: dict = mp.Manager().dict()
 
+    # Extract datasets (picklable) — not DataLoaders (may have closures)
+    train_dataset = loader.dataset
+    val_dataset = val_loader.dataset if val_loader is not None else None
+
     mp.spawn(
         _ddp_worker,
         args=(
             gpus,
             model,
-            loader.dataset,
+            train_dataset,
+            val_dataset,
             loader.batch_size,
             loader.num_workers,
             criterion,
             optimizer,
             max_epochs,
             checkpoint_dir,
-            callbacks,
             results,
         ),
         nprocs=gpus,
         join=True,
     )
-    return dict(results)
+
+    result = dict(results)
+
+    # Run callbacks on the returned results (in parent process, no pickling needed)
+    if callbacks and result.get("train_losses"):
+        for epoch, loss in enumerate(result["train_losses"]):
+            logs = {"loss": loss, "epoch": epoch}
+            if result.get("val_losses") and epoch < len(result["val_losses"]):
+                logs["val_loss"] = result["val_losses"][epoch]
+            for cb in callbacks:
+                cb(epoch, logs, model)
+
+    return result
 
 
 __all__ = ["fit"]

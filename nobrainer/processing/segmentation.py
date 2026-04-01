@@ -134,6 +134,13 @@ class Segmentation(BaseEstimator):
             if hasattr(dataset_train, "dataloader")
             else dataset_train
         )
+        val_loader = None
+        if dataset_validate is not None:
+            val_loader = (
+                dataset_validate.dataloader
+                if hasattr(dataset_validate, "dataloader")
+                else dataset_validate
+            )
         self._training_result = training_fit(
             model=self.model_,
             loader=loader,
@@ -143,6 +150,7 @@ class Segmentation(BaseEstimator):
             gpus=gpus,
             checkpoint_dir=self.checkpoint_filepath,
             callbacks=callbacks,
+            val_loader=val_loader,
         )
         self._dataset = dataset_train
         return self
