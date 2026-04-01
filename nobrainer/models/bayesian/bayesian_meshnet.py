@@ -143,7 +143,9 @@ class BayesianMeshNet(PyroModule):
         # Final 1×1×1 classifier — deterministic
         self.classifier = nn.Conv3d(filters, n_classes, kernel_size=1)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    supports_mc = True
+
+    def forward(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
         h = x
         for i in range(self._n_layers):
             h = getattr(self, f"layer_{i}")(h)

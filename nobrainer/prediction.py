@@ -15,11 +15,10 @@ from nobrainer.training import get_device
 
 def _forward(model: nn.Module, tensor: torch.Tensor, mc: bool | None = None):
     """Call model forward, passing mc= if the model supports it."""
-    if mc is not None:
-        try:
-            return model(tensor, mc=mc)
-        except TypeError:
-            pass
+    from nobrainer.models._utils import model_supports_mc
+
+    if mc is not None and model_supports_mc(model):
+        return model(tensor, mc=mc)
     return model(tensor)
 
 
@@ -249,7 +248,7 @@ def predict(
         # Replicate model to each GPU (deep copy to avoid moving the original)
         import copy
 
-        base_state = model.state_dict()
+        _ = model.state_dict()
         models = []
         for i in range(n_gpus):
             m = copy.deepcopy(model).to(torch.device(f"cuda:{i}"))
@@ -356,8 +355,10 @@ def predict_with_uncertainty(
     n_blocks = blocks.shape[0]
 
     model = model.to(device)
-    # Keep model in train mode so dropout / Pyro sampling remains stochastic
-    model.train()
+    # Use eval mode to preserve BatchNorm statistics.
+    # Stochasticity is controlled via mc=True (KWYK/FFG models)
+    # or inherent Pyro sampling (BayesianConv3d).
+    model.eval()
 
     # Welford's online algorithm: accumulate mean and M2 incrementally
     # so we only keep 2 block-level arrays in memory, not n_samples copies.
