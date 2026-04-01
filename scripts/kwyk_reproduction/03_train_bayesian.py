@@ -202,7 +202,7 @@ def evaluate_mc_dice(
                 inputs=img_path,
                 model=model,
                 block_shape=block_shape,
-                batch_size=4,
+                batch_size=128,
                 return_labels=True,
             )
             pred_arr = np.asarray(pred_img.dataobj, dtype=np.int32)
@@ -212,8 +212,8 @@ def evaluate_mc_dice(
             # Per-class Dice (skip background)
             class_dices = []
             for c in range(1, n_classes):
-                pred_c = pred_arr == c
-                gt_c = gt_arr == c
+                pred_c = (pred_arr == c)
+                gt_c = (gt_arr == c)
                 intersection = (pred_c & gt_c).sum()
                 total = pred_c.sum() + gt_c.sum()
                 class_dices.append(2.0 * intersection / total if total > 0 else 1.0)
@@ -380,10 +380,10 @@ def train_bayesian(
                 labels = labels.long()
 
             optimizer.zero_grad()
-            # Use mc=False for stable gradient flow during training;
-            # mc=True only at inference for uncertainty estimation.
+            # Match original TF: deterministic VWN weights + stochastic dropout
+            # (is_mc_v=False, is_mc_b=True in meshnetbwn.py)
             try:
-                pred = model(images, mc=False)
+                pred = model(images, mc_vwn=False, mc_dropout=True)
             except TypeError:
                 pred = model(images)
             loss = elbo_loss(pred, labels)
@@ -421,7 +421,7 @@ def train_bayesian(
                         labels = labels.long()
 
                     try:
-                        pred = model(images, mc=False)
+                        pred = model(images, mc_vwn=False, mc_dropout=False)
                     except TypeError:
                         pred = model(images)
                     loss = elbo_loss(pred, labels)
@@ -585,45 +585,71 @@ def main() -> None:
         sum(p.numel() for p in bayesian_model.parameters()),
     )
 
-    # ---- Auto batch size + multi-GPU scaling --------------------------------
+    # ---- Auto batch size with training-mode profiling -------------------------
     n_gpus = gpu_count()
     if n_gpus > 0:
         optimal_per_gpu = auto_batch_size(
             bayesian_model,
             block_shape,
             n_classes=n_classes,
-            target_memory_fraction=0.80,
+            target_memory_fraction=0.90,
+            forward_kwargs={"mc_vwn": False, "mc_dropout": True},
         )
-        effective_batch = optimal_per_gpu * max(n_gpus, 1)
         log.info(
-            "GPU batch scaling: %d GPU(s) × %d per-GPU = %d effective "
-            "(config batch_size=%d)",
-            n_gpus,
-            optimal_per_gpu,
-            effective_batch,
-            batch_size,
+            "Auto batch size: %d (profiled with mc_vwn=False, mc_dropout=True, "
+            "config batch_size=%d)",
+            optimal_per_gpu, batch_size,
         )
-        batch_size = optimal_per_gpu  # per-GPU batch for DataLoader
-    else:
-        log.info("No GPU detected — using config batch_size=%d", batch_size)
+        batch_size = optimal_per_gpu
 
     # ---- Build datasets with optimized batch size ----------------------------
 
-    ds_train = (
-        Dataset.from_files(train_pairs, block_shape=block_shape, n_classes=n_classes)
-        .batch(batch_size)
-        .binarize(label_mapping)
-    )
+    # Use streaming mode: extract multiple patches per volume to fill GPU.
+    # Use Zarr store if available, else fall back to NIfTI with streaming
+    patches_per_volume = config.get("patches_per_volume", 50)
+    zarr_store = config.get("zarr_store")
+
+    if zarr_store and Path(zarr_store).exists():
+        log.info("Using Zarr store: %s", zarr_store)
+        ds_train = (
+            Dataset.from_zarr(zarr_store, block_shape=block_shape,
+                              n_classes=n_classes, partition="train")
+            .batch(batch_size)
+            .binarize(label_mapping)
+            .streaming(patches_per_volume=patches_per_volume)
+        )
+    else:
+        ds_train = (
+            Dataset.from_files(train_pairs, block_shape=block_shape, n_classes=n_classes)
+            .batch(batch_size)
+            .binarize(label_mapping)
+            .streaming(patches_per_volume=patches_per_volume)
+        )
     train_loader = ds_train.dataloader
+    n_train = len(ds_train.data) if hasattr(ds_train, 'data') else len(train_pairs)
+    log.info(
+        "Training data: %d volumes × %d patches = %d blocks/epoch, batch_size=%d",
+        n_train, patches_per_volume, n_train * patches_per_volume, batch_size,
+    )
 
     ds_val = None
     val_loader = None
     if val_pairs:
-        ds_val = (
-            Dataset.from_files(val_pairs, block_shape=block_shape, n_classes=n_classes)
-            .batch(batch_size)
-            .binarize(label_mapping)
-        )
+        if zarr_store and Path(zarr_store).exists():
+            ds_val = (
+                Dataset.from_zarr(zarr_store, block_shape=block_shape,
+                                  n_classes=n_classes, partition="val")
+                .batch(batch_size)
+                .binarize(label_mapping)
+                .streaming(patches_per_volume=patches_per_volume)
+            )
+        else:
+            ds_val = (
+                Dataset.from_files(val_pairs, block_shape=block_shape, n_classes=n_classes)
+                .batch(batch_size)
+                .binarize(label_mapping)
+                .streaming(patches_per_volume=patches_per_volume)
+            )
         val_loader = ds_val.dataloader
 
     # ---- Optional warm-start ------------------------------------------------

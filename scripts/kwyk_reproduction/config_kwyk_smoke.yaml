@@ -12,16 +12,23 @@ sigma_init: 0.0001  # initial |kernel_a| for VWN weight sigma
 # Training
 block_shape: [32, 32, 32]
 lr: 0.0001
-batch_size: 32
+batch_size: 256
 n_classes: 50  # 50-class FreeSurfer parcellation
-label_mapping: /orcd/scratch/orcd/013/satra/kwyk_reproduction/label_mappings/50-class-mapping.csv
+label_mapping: 50-class
+patches_per_volume: 50  # random patches per volume per epoch (GPU utilization)
 
 # Warm-start (deterministic → VWN)
 pretrain_epochs: 50
 bayesian_epochs: 50
 
+# Validation
+val_dice_freq: 5  # full-volume Dice every N epochs (block-level metrics every epoch)
+
 # Inference
 n_samples: 10  # MC inference samples
+
+# Zarr store (fast chunk-aligned I/O, created by slurm_convert_zarr.sbatch)
+zarr_store: /orcd/scratch/orcd/013/satra/kwyk_reproduction/data/kwyk_500.zarr
 
 # Data augmentation
 augmentation: real  # real, synthetic, mixed
