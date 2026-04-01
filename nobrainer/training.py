@@ -531,6 +531,25 @@ def _ddp_worker(
                 )
                 checkpoint_epochs.append(epoch + 1)
 
+            # Write metrics to file so progress is visible during DDP
+            # (spawned worker stdout/stderr doesn't reach SLURM logs)
+            if checkpoint_dir is not None:
+                import json as _json
+
+                metrics_path = Path(checkpoint_dir) / "training_log.jsonl"
+                entry = {
+                    "epoch": epoch + 1,
+                    "train_loss": avg_loss,
+                }
+                if val_losses:
+                    entry["val_loss"] = val_losses[-1]
+                if val_accs:
+                    entry["val_acc"] = val_accs[-1]
+                if val_bal_accs:
+                    entry["val_bal_acc"] = val_bal_accs[-1]
+                with open(metrics_path, "a") as _f:
+                    _f.write(_json.dumps(entry) + "\n")
+
             logger.info(
                 "Epoch %d/%d: loss=%.4f%s",
                 epoch + 1,
