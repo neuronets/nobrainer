@@ -54,6 +54,9 @@ def _run_validation(
                 labels = labels.long()
 
             pred = model(images)
+            # Handle model parallel: pred may be on different device
+            if pred.device != labels.device:
+                labels = labels.to(pred.device)
             total_loss += criterion(pred, labels).item()
             n_correct += (pred.argmax(1) == labels).sum().item()
             n_total += labels.numel()
@@ -62,6 +65,113 @@ def _run_validation(
     val_loss = total_loss / max(n_batches, 1)
     val_acc = n_correct / max(n_total, 1)
     return {"val_loss": val_loss, "val_acc": val_acc}
+
+
+def _apply_gradient_checkpointing(model: nn.Module) -> None:
+    """Enable gradient checkpointing on sequential layers to save memory.
+
+    Wraps each layer's forward in ``torch.utils.checkpoint.checkpoint``
+    so intermediate activations are recomputed during backward instead
+    of stored. Roughly halves activation memory at ~30% compute cost.
+    """
+    from torch.utils.checkpoint import checkpoint
+
+    for name, module in model.named_children():
+        orig_forward = module.forward
+
+        def _make_ckpt_forward(fwd):
+            def _ckpt_forward(*args, **kwargs):
+                # checkpoint requires at least one tensor with requires_grad
+                def run(*a):
+                    return fwd(*a, **kwargs)
+
+                tensors = [a for a in args if isinstance(a, torch.Tensor)]
+                if tensors and any(t.requires_grad for t in tensors):
+                    return checkpoint(run, *args, use_reentrant=False)
+                return fwd(*args, **kwargs)
+
+            return _ckpt_forward
+
+        module.forward = _make_ckpt_forward(orig_forward)
+    logger.info("Gradient checkpointing enabled on %d modules", len(list(model.children())))
+
+
+def _apply_model_parallel(model: nn.Module, gpus: int) -> nn.Module:
+    """Distribute model layers across multiple GPUs (pipeline parallelism).
+
+    Splits the model's children into ``gpus`` roughly equal groups and
+    places each group on a different GPU. Inserts device-transfer hooks
+    between groups so tensors move between GPUs automatically.
+
+    Parameters
+    ----------
+    model : nn.Module
+        Model with sequential children (e.g., KWYKMeshNet).
+    gpus : int
+        Number of GPUs to distribute across.
+
+    Returns
+    -------
+    nn.Module
+        The model with layers placed on different GPUs and transfer hooks.
+    """
+    children = list(model.named_children())
+    if not children:
+        logger.warning("Model has no children — placing on GPU 0")
+        return model.to("cuda:0")
+
+    # Split children into roughly equal groups
+    n = len(children)
+    group_size = max(1, (n + gpus - 1) // gpus)
+    groups: list[list[tuple[str, nn.Module]]] = []
+    for i in range(0, n, group_size):
+        groups.append(children[i : i + group_size])
+
+    # Place each group on its GPU
+    device_map: dict[str, int] = {}
+    for gpu_idx, group in enumerate(groups):
+        device = torch.device(f"cuda:{gpu_idx}")
+        for name, module in group:
+            module.to(device)
+            device_map[name] = gpu_idx
+    logger.info(
+        "Model parallel: %d layers across %d GPUs: %s",
+        n,
+        min(gpus, len(groups)),
+        {k: f"cuda:{v}" for k, v in device_map.items()},
+    )
+
+    # Wrap forward to move tensors between devices
+    orig_forward = model.forward
+
+    def _mp_forward(*args, **kwargs):
+        # Move input to first device
+        first_device = torch.device(f"cuda:{groups[0][0][1].weight.device.index if hasattr(groups[0][0][1], 'weight') else 0}")
+        new_args = tuple(
+            a.to(first_device) if isinstance(a, torch.Tensor) else a for a in args
+        )
+        return orig_forward(*new_args, **kwargs)
+
+    model.forward = _mp_forward
+
+    # Add hooks to move activations between GPUs at group boundaries
+    for gpu_idx, group in enumerate(groups):
+        if gpu_idx == 0:
+            continue
+        target_device = torch.device(f"cuda:{gpu_idx}")
+        first_module = group[0][1]
+
+        def _make_hook(dev):
+            def _hook(module, inputs):
+                return tuple(
+                    x.to(dev) if isinstance(x, torch.Tensor) else x for x in inputs
+                )
+
+            return _hook
+
+        first_module.register_forward_pre_hook(_make_hook(target_device))
+
+    return model
 
 
 def fit(
@@ -75,8 +185,10 @@ def fit(
     callbacks: list[Any] | None = None,
     val_loader: DataLoader | None = None,
     checkpoint_freq: int = 0,
+    gradient_checkpointing: bool = False,
+    model_parallel: bool = False,
 ) -> dict:
-    """Train a model with optional multi-GPU DDP.
+    """Train a model with optional multi-GPU DDP or model parallelism.
 
     Parameters
     ----------
@@ -91,7 +203,7 @@ def fit(
     max_epochs : int
         Number of training epochs.
     gpus : int
-        Number of GPUs to use (1 = single GPU/CPU, >1 = DDP).
+        Number of GPUs to use (1 = single GPU/CPU, >1 = DDP or model parallel).
     checkpoint_dir : path or None
         Directory for saving checkpoints. None disables checkpointing.
     callbacks : list or None
@@ -105,6 +217,13 @@ def fit(
         Save a checkpoint every N epochs (in addition to best model).
         0 = only save best model. Checkpoints are saved as
         ``epoch_NNN.pth`` in checkpoint_dir.
+    gradient_checkpointing : bool
+        If True, trade compute for memory by recomputing activations
+        during backward. Roughly halves activation memory.
+    model_parallel : bool
+        If True and gpus > 1, distribute layers across GPUs (pipeline
+        parallelism) instead of DDP. Useful when a single batch is too
+        large for one GPU.
 
     Returns
     -------
@@ -113,21 +232,34 @@ def fit(
     """
     device = get_device()
 
-    if gpus > 1 and torch.cuda.device_count() >= gpus:
-        return _fit_ddp(
-            model,
-            loader,
-            criterion,
-            optimizer,
-            max_epochs,
-            gpus,
-            checkpoint_dir,
-            callbacks,
-            val_loader,
-            checkpoint_freq,
-        )
+    # Apply gradient checkpointing if requested
+    if gradient_checkpointing:
+        _apply_gradient_checkpointing(model)
 
-    model = model.to(device)
+    # Multi-GPU dispatch
+    if gpus > 1 and torch.cuda.device_count() >= gpus:
+        if model_parallel:
+            # Pipeline parallelism: split layers across GPUs
+            model = _apply_model_parallel(model, gpus)
+            device = torch.device("cuda:0")  # input goes to first GPU
+            # Fall through to single-process training loop below
+        else:
+            # Data parallelism: DDP
+            return _fit_ddp(
+                model,
+                loader,
+                criterion,
+                optimizer,
+                max_epochs,
+                gpus,
+                checkpoint_dir,
+                callbacks,
+                val_loader,
+                checkpoint_freq,
+            )
+
+    if not model_parallel:
+        model = model.to(device)
     best_loss = float("inf")
     final_loss = 0.0
     ckpt_path = None
@@ -161,6 +293,9 @@ def fit(
 
             optimizer.zero_grad()
             pred = model(images)
+            # For model parallel, pred may be on a different device than labels
+            if pred.device != labels.device:
+                labels = labels.to(pred.device)
             loss = criterion(pred, labels)
             loss.backward()
             optimizer.step()
