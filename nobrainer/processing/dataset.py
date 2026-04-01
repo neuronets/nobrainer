@@ -400,8 +400,9 @@ class Dataset:
             # Build augmentation transforms if enabled
             transforms = None
             if self._augment:
-                from nobrainer.augmentation.profiles import get_augmentation_profile
                 from monai.transforms import Compose
+
+                from nobrainer.augmentation.profiles import get_augmentation_profile
 
                 aug_transforms = get_augmentation_profile(
                     self._augment_profile, keys=["image", "label"]
@@ -688,7 +689,7 @@ class PatchDataset(torch.utils.data.Dataset):
         Returns ``(store_path, array_name, subject_index)`` or None.
         """
         if path.startswith("zarr://"):
-            rest = path[len("zarr://"):]
+            rest = path[len("zarr://") :]
             if "#" in rest:
                 store_path, fragment = rest.split("#", 1)
                 parts = fragment.rsplit("/", 1)

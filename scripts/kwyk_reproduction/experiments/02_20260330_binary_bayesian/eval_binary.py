@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import csv
-import sys
 from pathlib import Path
+import sys
 
 import nibabel as nib
 import numpy as np
@@ -22,7 +22,7 @@ WORK_DIR = EXP_DIR.parent.parent
 
 def predict_volume(model, img_path, block_shape, mc=False):
     """Block-based prediction with mc control."""
-    from nobrainer.prediction import _pad_to_multiple, _extract_blocks, _stitch_blocks
+    from nobrainer.prediction import _extract_blocks, _pad_to_multiple, _stitch_blocks
     from nobrainer.training import get_device
 
     device = get_device()
@@ -38,9 +38,9 @@ def predict_volume(model, img_path, block_shape, mc=False):
     all_preds = []
     with torch.no_grad():
         for start in range(0, len(blocks), 4):
-            chunk = blocks[start:start + 4]
+            chunk = blocks[start : start + 4]
             tensor = torch.from_numpy(chunk[:, None]).to(device)
-            if hasattr(model, 'forward') and 'mc' in model.forward.__code__.co_varnames:
+            if hasattr(model, "forward") and "mc" in model.forward.__code__.co_varnames:
                 out = model(tensor, mc=mc)
             else:
                 out = model(tensor)
@@ -84,13 +84,19 @@ def main():
 
             for idx, (img_path, lbl_path) in enumerate(pairs):
                 pred = predict_volume(model, img_path, block_shape, mc=mc_mode)
-                gt = (np.asarray(nib.load(lbl_path).dataobj, dtype=np.float32) > 0).astype(np.float32)
+                gt = (
+                    np.asarray(nib.load(lbl_path).dataobj, dtype=np.float32) > 0
+                ).astype(np.float32)
                 dice = compute_dice(pred, gt)
                 dices.append(dice)
-                log.info("  [%s/%s] vol %d: Dice=%.4f", variant, mode_name, idx + 1, dice)
+                log.info(
+                    "  [%s/%s] vol %d: Dice=%.4f", variant, mode_name, idx + 1, dice
+                )
 
             mean_d = float(np.mean(dices))
-            results.append({"variant": variant, "mode": mode_name, "mean_dice": f"{mean_d:.4f}"})
+            results.append(
+                {"variant": variant, "mode": mode_name, "mean_dice": f"{mean_d:.4f}"}
+            )
             log.info("  [%s/%s] MEAN DICE: %.4f", variant, mode_name, mean_d)
 
     out_path = EXP_DIR / "results.csv"

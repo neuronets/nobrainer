@@ -14,8 +14,8 @@ from __future__ import annotations
 
 import argparse
 import csv
-import random
 from pathlib import Path
+import random
 
 
 def main():
@@ -88,11 +88,7 @@ def main():
     n_val = int(n * val_pct / 100)
     # rest goes to test
 
-    splits = (
-        ["train"] * n_train
-        + ["val"] * n_val
-        + ["test"] * (n - n_train - n_val)
-    )
+    splits = ["train"] * n_train + ["val"] * n_val + ["test"] * (n - n_train - n_val)
 
     # Write manifest
     output_csv = Path(args.output_csv)
@@ -104,9 +100,12 @@ def main():
 
     # Summary
     from collections import Counter
+
     split_counts = Counter(splits)
     print(f"Manifest written to {output_csv}")
-    print(f"  train: {split_counts['train']}, val: {split_counts['val']}, test: {split_counts['test']}")
+    print(
+        f"  train: {split_counts['train']}, val: {split_counts['val']}, test: {split_counts['test']}"
+    )
 
 
 if __name__ == "__main__":

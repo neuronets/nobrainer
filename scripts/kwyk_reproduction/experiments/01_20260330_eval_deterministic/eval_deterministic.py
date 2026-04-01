@@ -7,8 +7,8 @@ Quick diagnostic: do the weights contain useful information that MC noise destro
 from __future__ import annotations
 
 import csv
-import sys
 from pathlib import Path
+import sys
 
 import nibabel as nib
 import numpy as np
@@ -24,8 +24,8 @@ def per_class_dice(pred: np.ndarray, gt: np.ndarray, n_classes: int) -> np.ndarr
     """Per-class Dice for classes 1..n_classes-1."""
     dice = np.zeros(n_classes - 1)
     for c in range(1, n_classes):
-        p = (pred == c)
-        g = (gt == c)
+        p = pred == c
+        g = gt == c
         inter = (p & g).sum()
         total = p.sum() + g.sum()
         dice[c - 1] = 2.0 * inter / total if total > 0 else 1.0
@@ -34,7 +34,7 @@ def per_class_dice(pred: np.ndarray, gt: np.ndarray, n_classes: int) -> np.ndarr
 
 def predict_volume(model, img_path, block_shape, mc=False):
     """Block-based prediction on a single volume."""
-    from nobrainer.prediction import _pad_to_multiple, _extract_blocks, _stitch_blocks
+    from nobrainer.prediction import _extract_blocks, _pad_to_multiple, _stitch_blocks
     from nobrainer.training import get_device
 
     device = get_device()
@@ -50,7 +50,7 @@ def predict_volume(model, img_path, block_shape, mc=False):
     all_preds = []
     with torch.no_grad():
         for start in range(0, len(blocks), 4):
-            chunk = blocks[start:start + 4]
+            chunk = blocks[start : start + 4]
             tensor = torch.from_numpy(chunk[:, None]).to(device)
             out = model(tensor, mc=mc)
             labels = out.argmax(dim=1, keepdim=True).float()
@@ -62,8 +62,8 @@ def predict_volume(model, img_path, block_shape, mc=False):
 
 
 def main():
-    from nobrainer.processing.segmentation import Segmentation
     from nobrainer.processing.dataset import _load_label_mapping
+    from nobrainer.processing.segmentation import Segmentation
 
     work_dir = Path(__file__).parent.parent.parent
     manifest_path = work_dir / "kwyk_manifest.csv"
@@ -110,10 +110,18 @@ def main():
                 cd = per_class_dice(pred_arr, gt_arr, n_classes)
                 avg = float(cd.mean())
                 all_dice.append(avg)
-                log.info("  [%s] vol %d: avg_dice=%.4f max=%.4f", mode_name, idx + 1, avg, cd.max())
+                log.info(
+                    "  [%s] vol %d: avg_dice=%.4f max=%.4f",
+                    mode_name,
+                    idx + 1,
+                    avg,
+                    cd.max(),
+                )
 
             mean_dice = float(np.mean(all_dice))
-            results.append({"variant": variant, "mode": mode_name, "mean_dice": mean_dice})
+            results.append(
+                {"variant": variant, "mode": mode_name, "mean_dice": mean_dice}
+            )
             log.info("  [%s] MEAN: %.4f", mode_name, mean_dice)
 
     # Save results

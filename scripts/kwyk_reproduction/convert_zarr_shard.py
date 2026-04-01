@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import argparse
 import csv
-import time
 from pathlib import Path
+import time
 
 import nibabel as nib
 import numpy as np
@@ -26,8 +26,11 @@ def main():
     parser.add_argument("--zarr-store", required=True)
     parser.add_argument("--shard-idx", type=int, required=True)
     parser.add_argument("--subjects-per-shard", type=int, default=50)
-    parser.add_argument("--create", action="store_true",
-                        help="Create the store (only shard 0 should do this)")
+    parser.add_argument(
+        "--create",
+        action="store_true",
+        help="Create the store (only shard 0 should do this)",
+    )
     args = parser.parse_args()
 
     # Read manifest
@@ -75,6 +78,7 @@ def main():
 
         # Write partition JSON
         import json
+
         partitions = {"train": [], "val": [], "test": []}
         with open(args.manifest) as f:
             for row in csv.DictReader(f):
@@ -103,12 +107,16 @@ def main():
         if (i - start + 1) % 10 == 0:
             elapsed = time.time() - t0
             rate = (i - start + 1) / elapsed
-            print(f"  Shard {args.shard_idx}: {i - start + 1}/{end - start} "
-                  f"({rate:.1f} vol/s, {elapsed:.0f}s)")
+            print(
+                f"  Shard {args.shard_idx}: {i - start + 1}/{end - start} "
+                f"({rate:.1f} vol/s, {elapsed:.0f}s)"
+            )
 
     elapsed = time.time() - t0
-    print(f"Shard {args.shard_idx}: wrote {end - start} volumes in {elapsed:.1f}s "
-          f"({(end - start)/elapsed:.1f} vol/s)")
+    print(
+        f"Shard {args.shard_idx}: wrote {end - start} volumes in {elapsed:.1f}s "
+        f"({(end - start)/elapsed:.1f} vol/s)"
+    )
 
 
 if __name__ == "__main__":

@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import csv
-import sys
 from pathlib import Path
+import sys
 
 import nibabel as nib
 import numpy as np
@@ -50,7 +50,13 @@ def fixed_warmstart_kwyk(kwyk_model, det_weights_path):
     transferred = 0
     for (det_name, det_w), (kwyk_name, kwyk_conv) in zip(encoder_convs, kwyk_convs):
         if det_w.shape != kwyk_conv.v.shape:
-            log.warning("Shape mismatch: %s %s vs %s.v %s", det_name, det_w.shape, kwyk_name, kwyk_conv.v.shape)
+            log.warning(
+                "Shape mismatch: %s %s vs %s.v %s",
+                det_name,
+                det_w.shape,
+                kwyk_name,
+                kwyk_conv.v.shape,
+            )
             continue
         kwyk_conv.v.data.copy_(det_w)
         norms = det_w.flatten(1).norm(dim=1).view_as(kwyk_conv.g)
@@ -72,7 +78,7 @@ def fixed_warmstart_kwyk(kwyk_model, det_weights_path):
 
 def predict_volume(model, img_path, block_shape, mc=False):
     """Block-based prediction."""
-    from nobrainer.prediction import _pad_to_multiple, _extract_blocks, _stitch_blocks
+    from nobrainer.prediction import _extract_blocks, _pad_to_multiple, _stitch_blocks
     from nobrainer.training import get_device
 
     device = get_device()
@@ -88,7 +94,7 @@ def predict_volume(model, img_path, block_shape, mc=False):
     all_preds = []
     with torch.no_grad():
         for start in range(0, len(blocks), 4):
-            chunk = blocks[start:start + 4]
+            chunk = blocks[start : start + 4]
             tensor = torch.from_numpy(chunk[:, None]).to(device)
             try:
                 out = model(tensor, mc=mc)
@@ -105,16 +111,18 @@ def predict_volume(model, img_path, block_shape, mc=False):
 def per_class_dice(pred, gt, n_classes):
     dices = []
     for c in range(1, n_classes):
-        p = (pred == c); g = (gt == c)
-        inter = (p & g).sum(); total = p.sum() + g.sum()
+        p = pred == c
+        g = gt == c
+        inter = (p & g).sum()
+        total = p.sum() + g.sum()
         dices.append(2.0 * inter / total if total > 0 else 1.0)
     return np.array(dices)
 
 
 def main():
     from nobrainer.models import get as get_model
-    from nobrainer.processing.segmentation import Segmentation
     from nobrainer.processing.dataset import Dataset, _load_label_mapping
+    from nobrainer.processing.segmentation import Segmentation
 
     n_classes = 50
     block_shape = (32, 32, 32)
@@ -127,7 +135,9 @@ def main():
             if row["split"] == "test":
                 pairs.append((row["t1w_path"], row["label_path"]))
     img_path, lbl_path = pairs[0]
-    gt_arr = remap_fn(torch.from_numpy(np.asarray(nib.load(lbl_path).dataobj, dtype=np.int32))).numpy()
+    gt_arr = remap_fn(
+        torch.from_numpy(np.asarray(nib.load(lbl_path).dataobj, dtype=np.int32))
+    ).numpy()
 
     # ---- Step 1: Verify MeshNet baseline ----
     log.info("=== Step 1: MeshNet baseline ===")
@@ -141,8 +151,12 @@ def main():
     log.info("=== Step 2: Fixed warm-start ===")
     kwyk_factory = get_model("kwyk_meshnet")
     kwyk_model = kwyk_factory(
-        n_classes=n_classes, filters=96, receptive_field=37,
-        dropout_type="bernoulli", dropout_rate=0.25, sigma_init=0.0001,
+        n_classes=n_classes,
+        filters=96,
+        receptive_field=37,
+        dropout_type="bernoulli",
+        dropout_rate=0.25,
+        sigma_init=0.0001,
     )
     meshnet_ckpt = WORK_DIR / "checkpoints" / "sanity_meshnet" / "model.pth"
     n_transferred = fixed_warmstart_kwyk(kwyk_model, meshnet_ckpt)
@@ -150,11 +164,19 @@ def main():
     # Eval immediately
     pred = predict_volume(kwyk_model, img_path, block_shape, mc=False)
     cd = per_class_dice(pred, gt_arr, n_classes)
-    log.info("KWYKMeshNet fixed warm-start (mc=False): mean=%.4f, max=%.4f", cd.mean(), cd.max())
+    log.info(
+        "KWYKMeshNet fixed warm-start (mc=False): mean=%.4f, max=%.4f",
+        cd.mean(),
+        cd.max(),
+    )
 
     pred = predict_volume(kwyk_model, img_path, block_shape, mc=True)
     cd = per_class_dice(pred, gt_arr, n_classes)
-    log.info("KWYKMeshNet fixed warm-start (mc=True): mean=%.4f, max=%.4f", cd.mean(), cd.max())
+    log.info(
+        "KWYKMeshNet fixed warm-start (mc=True): mean=%.4f, max=%.4f",
+        cd.mean(),
+        cd.max(),
+    )
 
     # ---- Step 3: Train Bayesian (5 subjects, 20 epochs) ----
     log.info("=== Step 3: Train Bayesian with fixed warm-start ===")
@@ -178,6 +200,7 @@ def main():
     )
 
     from nobrainer.training import get_device
+
     device = get_device()
     kwyk_model = kwyk_model.to(device)
     optimizer = torch.optim.Adam(kwyk_model.parameters(), lr=0.0001)

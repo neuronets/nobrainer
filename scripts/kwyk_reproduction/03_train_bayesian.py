@@ -212,8 +212,8 @@ def evaluate_mc_dice(
             # Per-class Dice (skip background)
             class_dices = []
             for c in range(1, n_classes):
-                pred_c = (pred_arr == c)
-                gt_c = (gt_arr == c)
+                pred_c = pred_arr == c
+                gt_c = gt_arr == c
                 intersection = (pred_c & gt_c).sum()
                 total = pred_c.sum() + gt_c.sum()
                 class_dices.append(2.0 * intersection / total if total > 0 else 1.0)
@@ -598,7 +598,8 @@ def main() -> None:
         log.info(
             "Auto batch size: %d (profiled with mc_vwn=False, mc_dropout=True, "
             "config batch_size=%d)",
-            optimal_per_gpu, batch_size,
+            optimal_per_gpu,
+            batch_size,
         )
         batch_size = optimal_per_gpu
 
@@ -612,24 +613,33 @@ def main() -> None:
     if zarr_store and Path(zarr_store).exists():
         log.info("Using Zarr store: %s", zarr_store)
         ds_train = (
-            Dataset.from_zarr(zarr_store, block_shape=block_shape,
-                              n_classes=n_classes, partition="train")
+            Dataset.from_zarr(
+                zarr_store,
+                block_shape=block_shape,
+                n_classes=n_classes,
+                partition="train",
+            )
             .batch(batch_size)
             .binarize(label_mapping)
             .streaming(patches_per_volume=patches_per_volume)
         )
     else:
         ds_train = (
-            Dataset.from_files(train_pairs, block_shape=block_shape, n_classes=n_classes)
+            Dataset.from_files(
+                train_pairs, block_shape=block_shape, n_classes=n_classes
+            )
             .batch(batch_size)
             .binarize(label_mapping)
             .streaming(patches_per_volume=patches_per_volume)
         )
     train_loader = ds_train.dataloader
-    n_train = len(ds_train.data) if hasattr(ds_train, 'data') else len(train_pairs)
+    n_train = len(ds_train.data) if hasattr(ds_train, "data") else len(train_pairs)
     log.info(
         "Training data: %d volumes × %d patches = %d blocks/epoch, batch_size=%d",
-        n_train, patches_per_volume, n_train * patches_per_volume, batch_size,
+        n_train,
+        patches_per_volume,
+        n_train * patches_per_volume,
+        batch_size,
     )
 
     ds_val = None
@@ -637,15 +647,21 @@ def main() -> None:
     if val_pairs:
         if zarr_store and Path(zarr_store).exists():
             ds_val = (
-                Dataset.from_zarr(zarr_store, block_shape=block_shape,
-                                  n_classes=n_classes, partition="val")
+                Dataset.from_zarr(
+                    zarr_store,
+                    block_shape=block_shape,
+                    n_classes=n_classes,
+                    partition="val",
+                )
                 .batch(batch_size)
                 .binarize(label_mapping)
                 .streaming(patches_per_volume=patches_per_volume)
             )
         else:
             ds_val = (
-                Dataset.from_files(val_pairs, block_shape=block_shape, n_classes=n_classes)
+                Dataset.from_files(
+                    val_pairs, block_shape=block_shape, n_classes=n_classes
+                )
                 .batch(batch_size)
                 .binarize(label_mapping)
                 .streaming(patches_per_volume=patches_per_volume)

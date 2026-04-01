@@ -178,7 +178,10 @@ def create_zarr_store(
     )
     logger.info(
         "Created sharded Zarr3: shape=%s, chunks=%s, shards=%s (%d shard files)",
-        (n_subjects, D, H, W), full_chunk, full_shard, n_shards,
+        (n_subjects, D, H, W),
+        full_chunk,
+        full_shard,
+        n_shards,
     )
 
     # Write volumes — parallel across shards.
@@ -206,7 +209,9 @@ def create_zarr_store(
 
     logger.info(
         "Writing %d volumes across %d shards with %d workers...",
-        n_subjects, n_shards, n_workers,
+        n_subjects,
+        n_shards,
+        n_workers,
     )
     with concurrent.futures.ThreadPoolExecutor(max_workers=n_workers) as pool:
         futures = [pool.submit(_write_shard_group, s) for s in range(n_shards)]

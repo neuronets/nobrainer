@@ -119,7 +119,9 @@ def _apply_gradient_checkpointing(model: nn.Module) -> None:
             return _ckpt_forward
 
         module.forward = _make_ckpt_forward(orig_forward)
-    logger.info("Gradient checkpointing enabled on %d modules", len(list(model.children())))
+    logger.info(
+        "Gradient checkpointing enabled on %d modules", len(list(model.children()))
+    )
 
 
 def _apply_model_parallel(model: nn.Module, gpus: int) -> nn.Module:
@@ -172,7 +174,9 @@ def _apply_model_parallel(model: nn.Module, gpus: int) -> nn.Module:
 
     def _mp_forward(*args, **kwargs):
         # Move input to first device
-        first_device = torch.device(f"cuda:{groups[0][0][1].weight.device.index if hasattr(groups[0][0][1], 'weight') else 0}")
+        first_device = torch.device(
+            f"cuda:{groups[0][0][1].weight.device.index if hasattr(groups[0][0][1], 'weight') else 0}"
+        )
         new_args = tuple(
             a.to(first_device) if isinstance(a, torch.Tensor) else a for a in args
         )
@@ -317,7 +321,9 @@ def fit(
         best_loss = min((h["loss"] for h in history), default=float("inf"))
         logger.info(
             "Resumed from epoch %d (%d history entries, best_loss=%.4f)",
-            start_epoch, len(history), best_loss,
+            start_epoch,
+            len(history),
+            best_loss,
         )
 
     for epoch in range(start_epoch, max_epochs):
@@ -373,8 +379,9 @@ def fit(
         if checkpoint_dir is not None:
             from nobrainer.slurm import save_checkpoint as _save_ckpt
 
-            _save_ckpt(checkpoint_dir, model, optimizer, epoch + 1,
-                       {"history": history})
+            _save_ckpt(
+                checkpoint_dir, model, optimizer, epoch + 1, {"history": history}
+            )
 
         # Named checkpoint (for post-hoc Dice eval)
         if (
@@ -389,9 +396,12 @@ def fit(
             for cb in callbacks:
                 cb(epoch, logs, model)
 
-        logger.debug("Epoch %d/%d: %s", epoch + 1, max_epochs,
-                     " ".join(f"{k}={v:.4f}" for k, v in logs.items()
-                              if isinstance(v, float)))
+        logger.debug(
+            "Epoch %d/%d: %s",
+            epoch + 1,
+            max_epochs,
+            " ".join(f"{k}={v:.4f}" for k, v in logs.items() if isinstance(v, float)),
+        )
 
     return {"history": history, "checkpoint_path": ckpt_path}
 
@@ -492,9 +502,9 @@ def _ddp_worker(
 
         if rank == 0:
             if val_loader is not None:
-                logs.update(_run_validation(
-                    ddp_model.module, val_loader, criterion, device
-                ))
+                logs.update(
+                    _run_validation(ddp_model.module, val_loader, criterion, device)
+                )
                 ddp_model.train()
 
             history.append(logs)
@@ -509,8 +519,13 @@ def _ddp_worker(
             if checkpoint_dir is not None:
                 from nobrainer.slurm import save_checkpoint as _save_ckpt
 
-                _save_ckpt(checkpoint_dir, ddp_model.module, optimizer,
-                           epoch + 1, {"history": history})
+                _save_ckpt(
+                    checkpoint_dir,
+                    ddp_model.module,
+                    optimizer,
+                    epoch + 1,
+                    {"history": history},
+                )
 
             # Named checkpoint for post-hoc Dice eval
             if (
@@ -518,15 +533,22 @@ def _ddp_worker(
                 and checkpoint_freq > 0
                 and (epoch + 1) % checkpoint_freq == 0
             ):
-                torch.save(ddp_model.module.state_dict(),
-                           Path(checkpoint_dir) / f"epoch_{epoch + 1:03d}.pth")
+                torch.save(
+                    ddp_model.module.state_dict(),
+                    Path(checkpoint_dir) / f"epoch_{epoch + 1:03d}.pth",
+                )
 
             if tracker is not None:
                 tracker.log(logs)
 
-            logger.info("Epoch %d/%d: %s", epoch + 1, max_epochs,
-                        " ".join(f"{k}={v:.4f}" for k, v in logs.items()
-                                 if isinstance(v, float)))
+            logger.info(
+                "Epoch %d/%d: %s",
+                epoch + 1,
+                max_epochs,
+                " ".join(
+                    f"{k}={v:.4f}" for k, v in logs.items() if isinstance(v, float)
+                ),
+            )
 
     if rank == 0:
         result_dict["history"] = history

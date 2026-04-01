@@ -119,8 +119,8 @@ def evaluate_val_dice(
         # Per-class Dice (skip background class 0)
         class_dices = []
         for c in range(1, n_classes):
-            pred_c = (pred_arr == c)
-            gt_c = (gt_arr == c)
+            pred_c = pred_arr == c
+            gt_c = gt_arr == c
             intersection = (pred_c & gt_c).sum()
             total = pred_c.sum() + gt_c.sum()
             class_dices.append(2.0 * intersection / total if total > 0 else 1.0)
@@ -208,10 +208,10 @@ def main() -> None:
         log.error("No training volumes found in manifest. Exiting.")
         return
 
-    from nobrainer.processing.dataset import Dataset
-
     # Auto-scale batch size to GPU memory
-    from nobrainer.gpu import auto_batch_size as _auto_bs, gpu_count
+    from nobrainer.gpu import auto_batch_size as _auto_bs
+    from nobrainer.gpu import gpu_count
+    from nobrainer.processing.dataset import Dataset
 
     if gpu_count() > 0:
         from nobrainer.models import get as get_model
@@ -223,7 +223,9 @@ def main() -> None:
             dropout_rate=config.get("dropout_rate", 0.25),
         )
         batch_size = _auto_bs(
-            _tmp_model, block_shape, n_classes=n_classes,
+            _tmp_model,
+            block_shape,
+            n_classes=n_classes,
             target_memory_fraction=0.90,
         )
         del _tmp_model
@@ -235,15 +237,21 @@ def main() -> None:
     if zarr_store and Path(zarr_store).exists():
         log.info("Using Zarr store: %s", zarr_store)
         ds_train = (
-            Dataset.from_zarr(zarr_store, block_shape=block_shape,
-                              n_classes=n_classes, partition="train")
+            Dataset.from_zarr(
+                zarr_store,
+                block_shape=block_shape,
+                n_classes=n_classes,
+                partition="train",
+            )
             .batch(batch_size)
             .binarize(label_mapping)
             .streaming(patches_per_volume=patches_per_volume)
         )
     else:
         ds_train = (
-            Dataset.from_files(train_pairs, block_shape=block_shape, n_classes=n_classes)
+            Dataset.from_files(
+                train_pairs, block_shape=block_shape, n_classes=n_classes
+            )
             .batch(batch_size)
             .binarize(label_mapping)
             .streaming(patches_per_volume=patches_per_volume)
@@ -252,7 +260,10 @@ def main() -> None:
     n_train = len(ds_train.data) if hasattr(ds_train, "data") else len(train_pairs)
     log.info(
         "Training data: %d volumes × %d patches = %d blocks/epoch, batch_size=%d",
-        n_train, patches_per_volume, n_train * patches_per_volume, batch_size,
+        n_train,
+        patches_per_volume,
+        n_train * patches_per_volume,
+        batch_size,
     )
 
     # ---- Build validation dataset for per-epoch block-level metrics ----------
@@ -260,15 +271,21 @@ def main() -> None:
     if val_pairs:
         if zarr_store and Path(zarr_store).exists():
             ds_val = (
-                Dataset.from_zarr(zarr_store, block_shape=block_shape,
-                                  n_classes=n_classes, partition="val")
+                Dataset.from_zarr(
+                    zarr_store,
+                    block_shape=block_shape,
+                    n_classes=n_classes,
+                    partition="val",
+                )
                 .batch(batch_size)
                 .binarize(label_mapping)
                 .streaming(patches_per_volume=patches_per_volume)
             )
         else:
             ds_val = (
-                Dataset.from_files(val_pairs, block_shape=block_shape, n_classes=n_classes)
+                Dataset.from_files(
+                    val_pairs, block_shape=block_shape, n_classes=n_classes
+                )
                 .batch(batch_size)
                 .binarize(label_mapping)
                 .streaming(patches_per_volume=patches_per_volume)
@@ -323,13 +340,16 @@ def main() -> None:
 
     if history:
         last = history[-1]
-        log.info("Training complete. %s",
-                 " ".join(f"{k}={v:.4f}" for k, v in last.items() if isinstance(v, float)))
+        log.info(
+            "Training complete. %s",
+            " ".join(f"{k}={v:.4f}" for k, v in last.items() if isinstance(v, float)),
+        )
     else:
         log.info("Training complete (no history).")
 
     # Ensure model is on the right device after DDP
     from nobrainer.training import get_device
+
     seg.model_.to(get_device())
 
     # Evaluate full-volume Dice on each checkpointed epoch

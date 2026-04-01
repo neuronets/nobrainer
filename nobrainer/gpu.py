@@ -194,7 +194,10 @@ def auto_batch_size(
 
     try:
         mem_per_sample = _estimate_memory_per_sample(
-            model, block_shape, n_classes, in_channels,
+            model,
+            block_shape,
+            n_classes,
+            in_channels,
             forward_kwargs=forward_kwargs,
         )
     except RuntimeError as e:

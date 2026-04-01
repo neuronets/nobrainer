@@ -252,7 +252,9 @@ def main() -> None:
         # Predict (batch_size=128 to utilize GPU memory with 32³ blocks)
         if n_samples > 0:
             pred_result = seg.predict(
-                img_path, block_shape=block_shape, n_samples=n_samples,
+                img_path,
+                block_shape=block_shape,
+                n_samples=n_samples,
                 batch_size=128,
             )
             if isinstance(pred_result, tuple):
