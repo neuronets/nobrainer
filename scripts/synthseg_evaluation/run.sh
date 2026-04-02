@@ -47,15 +47,15 @@ print('Manifest created with', len(pairs), 'volumes')
 fi
 
 if [ "$SMOKE" = true ]; then
-    echo "=== Smoke test: 2 epochs, unet, real+mixed ==="
+    echo "=== Smoke test: 2 epochs, attention_unet, real+mixed ==="
     for mode in real mixed; do
-        echo "  Training unet ($mode)..."
-        python 02_train.py --config "$CONFIG" --mode "$mode" --model unet \
+        echo "  Training attention_unet ($mode)..."
+        python 02_train.py --config "$CONFIG" --mode "$mode" --model attention_unet \
             --epochs 2 --manifest manifest.csv
     done
     for mode in real mixed; do
-        echo "  Evaluating unet ($mode)..."
-        python 03_evaluate.py --model "checkpoints/unet_${mode}" \
+        echo "  Evaluating attention_unet ($mode)..."
+        python 03_evaluate.py --model "checkpoints/attention_unet_${mode}" \
             --manifest manifest.csv --config "$CONFIG" || true
     done
     python 04_compare.py --results-dir checkpoints/ --output-dir results/ || true

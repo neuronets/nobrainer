@@ -151,8 +151,8 @@ def main():
 
     # Build model
     model_args = {"n_classes": n_classes}
-    if args.model in ("swin_unetr", "segresnet"):
-        model_args["feature_size"] = 12 if args.model == "swin_unetr" else 16
+    if args.model == "meshnet":
+        model_args["receptive_field"] = 37
 
     seg = Segmentation(
         args.model, model_args=model_args, checkpoint_filepath=str(output_dir)
