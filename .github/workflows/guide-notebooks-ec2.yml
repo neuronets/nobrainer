@@ -86,7 +86,7 @@ jobs:
           mode: start
           github-token: ${{ secrets.GH_TOKEN }}
           ec2-instance-type: ${{ steps.gpu-config.outputs.instance || vars.AWS_INSTANCE_TYPE }}
-          market-type: ${{ steps.gpu-config.outputs.market_type || 'spot' }}
+          market-type: ${{ steps.gpu-config.outputs.market_type }}
           availability-zones-config: ${{ vars.AWS_AZ_CONFIG }}
 
   gpu-tests:
