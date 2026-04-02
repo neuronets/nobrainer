@@ -29,11 +29,9 @@ training:
   augmentation_profile: standard
 
 models:
-  - unet
-  - swin_unetr
-  - segresnet
+  - attention_unet
+  - meshnet
   - segformer3d
-  - kwyk_meshnet
 
 evaluation:
   n_samples: 10
@@ -44,5 +42,5 @@ smoke_test:
   n_samples_per_map: 2
   batch_size: 2
   block_shape: [16, 16, 16]
-  models: [unet]
+  models: [attention_unet]
   modes: [real, mixed]

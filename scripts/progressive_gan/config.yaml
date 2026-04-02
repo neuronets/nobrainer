@@ -1,0 +1,22 @@
+# Progressive GAN reproduction — default training config
+# Override any field via CLI: --latent-dim 256
+
+data_path: "data.ome.zarr"     # path to OME-Zarr pyramidal store
+output_dir: "checkpoints"      # output directory for checkpoints + samples
+
+# Model
+latent_dim: 512
+fmap_base: 2048
+fmap_max: 512
+
+# Training
+steps_per_phase: 5000          # training steps per resolution stage
+batch_size: 8
+learning_rate: 0.001
+lambda_gp: 10.0
+
+# Checkpointing
+checkpoint_freq: 1000          # save every N steps (0 = end of each phase only)
+
+# Generation
+n_generate: 4                  # number of volumes to generate after training

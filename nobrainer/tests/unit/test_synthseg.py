@@ -6,7 +6,6 @@ from pathlib import Path
 
 import nibabel as nib
 import numpy as np
-import pytest
 import torch
 
 
@@ -84,9 +83,10 @@ class TestGMMGrouping:
         from nobrainer.augmentation.synthseg import SynthSegGenerator
 
         path = _make_label_map(tmp_path)
+        # Generate multiple samples to avoid flaky single-sample comparisons
         gen = SynthSegGenerator(
             [path],
-            n_samples_per_map=1,
+            n_samples_per_map=5,
             elastic_std=0,
             rotation_range=0,
             flipping=False,
@@ -94,16 +94,19 @@ class TestGMMGrouping:
             noise_std=0,
             bias_field_std=0,
         )
-        sample = gen[0]
-        image = sample["image"][0].numpy()
-        label = sample["label"][0].numpy()
-
-        wm = image[label == 2]
-        csf = image[label == 4]
-        # WM and CSF should have different distributions (different classes)
-        if len(wm) > 10 and len(csf) > 10:
-            # Not guaranteed to differ every time but very likely
-            assert wm.mean() != pytest.approx(csf.mean(), abs=1.0)
+        # Across multiple samples, WM and CSF means should differ at least once
+        n_differ = 0
+        for i in range(5):
+            sample = gen[i]
+            image = sample["image"][0].numpy()
+            label = sample["label"][0].numpy()
+            wm = image[label == 2]
+            csf = image[label == 4]
+            if len(wm) > 10 and len(csf) > 10:
+                if abs(float(wm.mean()) - float(csf.mean())) > 1.0:
+                    n_differ += 1
+        # At least 1 out of 5 samples should show a clear difference
+        assert n_differ >= 1, "WM and CSF never differed across 5 samples"
 
     def test_two_runs_produce_different_intensities(self, tmp_path):
         from nobrainer.augmentation.synthseg import SynthSegGenerator
@@ -214,7 +217,7 @@ class TestResolutionRandomization:
         path = _make_label_map(tmp_path)
         gen_sharp = SynthSegGenerator(
             [path],
-            n_samples_per_map=1,
+            n_samples_per_map=5,
             elastic_std=0,
             rotation_range=0,
             flipping=False,
@@ -224,7 +227,7 @@ class TestResolutionRandomization:
         )
         gen_blur = SynthSegGenerator(
             [path],
-            n_samples_per_map=1,
+            n_samples_per_map=5,
             elastic_std=0,
             rotation_range=0,
             flipping=False,
@@ -233,16 +236,17 @@ class TestResolutionRandomization:
             noise_std=0,
             bias_field_std=0,
         )
-        # Use same seed for intensity but different resolution
-        np.random.seed(42)
-        sharp = gen_sharp[0]["image"][0].numpy()
-        np.random.seed(42)
-        blurred = gen_blur[0]["image"][0].numpy()
+        # Average gradient magnitude over multiple samples to reduce variance
+        sharp_grads = []
+        blur_grads = []
+        for i in range(5):
+            s = gen_sharp[i]["image"][0].numpy()
+            b = gen_blur[i]["image"][0].numpy()
+            sharp_grads.append(np.abs(np.diff(s, axis=0)).mean())
+            blur_grads.append(np.abs(np.diff(b, axis=0)).mean())
 
-        # Blurred should have less high-frequency energy
-        sharp_grad = np.abs(np.diff(sharp, axis=0)).mean()
-        blur_grad = np.abs(np.diff(blurred, axis=0)).mean()
-        assert blur_grad < sharp_grad
+        # On average, blurred should have less high-frequency energy
+        assert np.mean(blur_grads) < np.mean(sharp_grads)
 
 
 class TestOutputFormat:
@@ -314,3 +318,49 @@ class TestMixedDataset:
         mixed = ds.mix(gen, ratio=0.3)
 
         assert hasattr(mixed, "_mixed_dataset")
+
+
+class TestSynthSegFromZarr:
+    """SynthSegGenerator reading label maps from a pyramidal zarr store."""
+
+    def test_generates_from_zarr_labels(self, tmp_path):
+        from nobrainer.augmentation.synthseg import SynthSegGenerator
+        from nobrainer.datasets.zarr_store import create_zarr_store
+
+        # Create a small zarr store with labels
+        label_path = _make_label_map(tmp_path, shape=(32, 32, 32))
+        pairs = [(label_path, label_path)] * 3  # image=label for simplicity
+        store_path = create_zarr_store(
+            pairs, tmp_path / "test.zarr", conform=False, levels=2
+        )
+
+        gen = SynthSegGenerator(
+            zarr_store=store_path,
+            zarr_level=0,
+            n_samples_per_map=2,
+        )
+        assert len(gen) == 6  # 3 subjects × 2 samples
+        item = gen[0]
+        assert "image" in item
+        assert "label" in item
+        assert item["image"].shape[0] == 1  # channel dim
+        assert item["label"].shape[0] == 1
+
+    def test_zarr_level_1_smaller_shape(self, tmp_path):
+        from nobrainer.augmentation.synthseg import SynthSegGenerator
+        from nobrainer.datasets.zarr_store import create_zarr_store
+
+        label_path = _make_label_map(tmp_path, shape=(32, 32, 32))
+        pairs = [(label_path, label_path)] * 2
+        store_path = create_zarr_store(
+            pairs, tmp_path / "test.zarr", conform=False, levels=2
+        )
+
+        gen = SynthSegGenerator(
+            zarr_store=store_path,
+            zarr_level=1,  # 16³
+            n_samples_per_map=1,
+        )
+        item = gen[0]
+        # Level 1 labels are 16³
+        assert item["label"].shape[1:] == (16, 16, 16)

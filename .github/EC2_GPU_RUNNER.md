@@ -117,8 +117,24 @@ aws ec2 terminate-instances --instance-id i-XXXXXXXXX
 | `AWS_REGION` | `us-east-1` | Region where the AMI lives |
 | `AWS_IMAGE_ID` | `ami-0abc123def456` | The AMI created above |
 | `AWS_INSTANCE_TYPE` | `g4dn.xlarge` | 1x T4 GPU (~$0.53/hr); `p3.2xlarge` for V100 |
-| `AWS_SUBNET` | `subnet-0abc123` | Must have internet access for runner registration |
+| `AWS_SUBNET` | `subnet-0abc123` | Primary subnet; must have internet access |
 | `AWS_SECURITY_GROUP` | `sg-0abc123` | Allow outbound HTTPS (port 443) |
+| `AWS_AZ_CONFIG` | `[{"imageId":...}]` | Multi-AZ failover config (see below) |
+
+**Multi-AZ failover**: The workflow uses `availability-zones-config` (stored in
+`AWS_AZ_CONFIG` variable) to try multiple AZs in sequence. If spot capacity is
+unavailable in one AZ, it automatically fails over to the next. Format:
+
+```json
+[
+  {"imageId": "ami-xxx", "subnetId": "subnet-az-a", "securityGroupId": "sg-xxx"},
+  {"imageId": "ami-xxx", "subnetId": "subnet-az-b", "securityGroupId": "sg-xxx"},
+  {"imageId": "ami-xxx", "subnetId": "subnet-az-c", "securityGroupId": "sg-xxx"}
+]
+```
+
+Each entry targets a different AZ via its subnet. The same AMI and security
+group can be used across AZs within a region.
 
 ## IAM policy (minimum permissions)
 

@@ -60,7 +60,7 @@ nobrainer = "nobrainer.cli.main:cli"
 bayesian = ["pyro-ppl >= 1.9"]
 generative = ["pytorch-lightning >= 2.0"]
 lightning = ["pytorch-lightning >= 2.0"]
-zarr = ["zarr >= 3.0", "nifti-zarr", "scipy >= 1.11"]
+zarr = ["zarr >= 3.0", "nifti-zarr", "ome-zarr >= 0.14.0", "dask[array]", "scipy >= 1.11"]
 croissant = ["mlcroissant"]
 versioning = ["datalad >= 0.19"]
 tfrecord = ["tfrecord >= 1.14"]

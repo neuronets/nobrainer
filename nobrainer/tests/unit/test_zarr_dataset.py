@@ -81,3 +81,103 @@ class TestZarrDataset:
         item = ds[0]
         # Level 1 is 2x downsampled: (1, 32, 32, 32)
         assert item["image"].shape == (1, 32, 32, 32)
+
+
+# ---------------------------------------------------------------------------
+# US2 tests: Dataset.from_zarr with pyramidal multi-subject stores
+# ---------------------------------------------------------------------------
+
+
+def _make_nifti_pair(tmp_path, idx, shape=(32, 32, 32)):
+    """Create a NIfTI image + label pair."""
+    img_data = np.random.randn(*shape).astype(np.float32)
+    lbl_data = np.random.randint(0, 5, shape, dtype=np.int32)
+    affine = np.eye(4)
+    img_path = tmp_path / f"sub-{idx:02d}_image.nii.gz"
+    lbl_path = tmp_path / f"sub-{idx:02d}_label.nii.gz"
+    nib.save(nib.Nifti1Image(img_data, affine), str(img_path))
+    nib.save(nib.Nifti1Image(lbl_data, affine), str(lbl_path))
+    return str(img_path), str(lbl_path)
+
+
+class TestDatasetFromZarrPyramid:
+    """T022: Dataset.from_zarr with level selection and decoding."""
+
+    def test_level_0_full_resolution(self, tmp_path):
+        from nobrainer.datasets.zarr_store import create_zarr_store
+        from nobrainer.processing import Dataset
+
+        pairs = [_make_nifti_pair(tmp_path, i) for i in range(3)]
+        store_path = create_zarr_store(
+            pairs, tmp_path / "test.zarr", conform=False, levels=3
+        )
+
+        ds = Dataset.from_zarr(store_path, block_shape=(16, 16, 16), level=0)
+        assert ds.volume_shape == (32, 32, 32)
+
+    def test_level_2_downsampled(self, tmp_path):
+        from nobrainer.datasets.zarr_store import create_zarr_store
+        from nobrainer.processing import Dataset
+
+        pairs = [_make_nifti_pair(tmp_path, i) for i in range(3)]
+        store_path = create_zarr_store(
+            pairs, tmp_path / "test.zarr", conform=False, levels=3
+        )
+
+        ds = Dataset.from_zarr(store_path, block_shape=(4, 4, 4), level=2)
+        assert ds.volume_shape == (8, 8, 8)
+
+    def test_invalid_level_raises(self, tmp_path):
+        from nobrainer.datasets.zarr_store import create_zarr_store
+        from nobrainer.processing import Dataset
+
+        pairs = [_make_nifti_pair(tmp_path, i) for i in range(2)]
+        store_path = create_zarr_store(
+            pairs, tmp_path / "test.zarr", conform=False, levels=2
+        )
+
+        with pytest.raises(ValueError, match="level=5"):
+            Dataset.from_zarr(store_path, level=5)
+
+    def test_bfloat16_decoded_on_read(self, tmp_path):
+        from nobrainer.datasets.zarr_store import create_zarr_store
+        from nobrainer.processing import Dataset
+        from nobrainer.processing.dataset import PatchDataset
+
+        pairs = [_make_nifti_pair(tmp_path, i) for i in range(2)]
+        store_path = create_zarr_store(pairs, tmp_path / "test.zarr", conform=False)
+
+        ds = Dataset.from_zarr(store_path, block_shape=(16, 16, 16), level=0)
+        # Use PatchDataset directly (bypasses MONAI LoadImaged)
+        patch_ds = PatchDataset(
+            data=ds.data,
+            block_shape=(16, 16, 16),
+            patches_per_volume=1,
+        )
+        item = patch_ds[0]
+        img = item["image"]
+        # Should be float32 (decoded from bfloat16 by _read_region_cached)
+        assert img.dtype == torch.float32
+        # Values should be non-zero (not raw uint16 bits)
+        assert img.float().abs().mean() > 0
+
+    def test_legacy_store_backward_compat(self, tmp_path):
+        """T021/T023: Legacy non-pyramidal stores work with level=0."""
+        from nobrainer.datasets.zarr_store import create_zarr_store
+        from nobrainer.processing import Dataset
+
+        # Create a store without the old layout by directly writing
+        # a store with levels=1 (which uses the new images/0 layout
+        # but still has n_levels=1 in metadata)
+        pairs = [_make_nifti_pair(tmp_path, i) for i in range(2)]
+        store_path = create_zarr_store(
+            pairs, tmp_path / "test.zarr", conform=False, levels=1
+        )
+
+        # level=0 should work
+        ds = Dataset.from_zarr(store_path, block_shape=(16, 16, 16), level=0)
+        assert ds.volume_shape == (32, 32, 32)
+
+        # level=1 should raise
+        with pytest.raises(ValueError, match="level=1"):
+            Dataset.from_zarr(store_path, level=1)
