@@ -43,18 +43,18 @@ class _ConvBlock(nn.Module):
 
 
 class _ToRGB(nn.Module):
-    def __init__(self, in_ch: int) -> None:
+    def __init__(self, in_ch: int, out_channels: int = 1) -> None:
         super().__init__()
-        self.conv = nn.Conv3d(in_ch, 1, kernel_size=1)
+        self.conv = nn.Conv3d(in_ch, out_channels, kernel_size=1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.conv(x)
 
 
 class _FromRGB(nn.Module):
-    def __init__(self, out_ch: int) -> None:
+    def __init__(self, out_ch: int, in_channels: int = 1) -> None:
         super().__init__()
-        self.conv = nn.Conv3d(1, out_ch, kernel_size=1)
+        self.conv = nn.Conv3d(in_channels, out_ch, kernel_size=1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return F.leaky_relu(self.conv(x), 0.2)
@@ -66,7 +66,11 @@ class _FromRGB(nn.Module):
 
 
 class _Generator(nn.Module):
-    """Progressive generator.  Each stage doubles the spatial resolution."""
+    """Progressive generator.  Each stage doubles the spatial resolution.
+
+    Supports optional conditioning via a condition vector that is
+    concatenated with the latent vector before the initial block.
+    """
 
     def __init__(
         self,
@@ -74,21 +78,28 @@ class _Generator(nn.Module):
         fmap_base: int,
         fmap_max: int,
         resolution_schedule: list[int],
+        condition_size: int = 0,
+        out_channels: int = 1,
     ) -> None:
         super().__init__()
         self.resolution_schedule = resolution_schedule
         self.current_level = 0
+        self.condition_size = condition_size
+
+        effective_latent = latent_size + condition_size
 
         def nf(level: int) -> int:
             return min(int(fmap_base / (2**level)), fmap_max)
 
-        # Level 0: latent → 4³ feature map
+        # Level 0: (latent + condition) → 4³ feature map
         self.init_block = nn.Sequential(
-            nn.ConvTranspose3d(latent_size, nf(0), kernel_size=4, stride=1, padding=0),
+            nn.ConvTranspose3d(
+                effective_latent, nf(0), kernel_size=4, stride=1, padding=0
+            ),
             nn.LeakyReLU(0.2),
             _ConvBlock(nf(0), nf(0)),
         )
-        self.to_rgb_blocks = nn.ModuleList([_ToRGB(nf(0))])
+        self.to_rgb_blocks = nn.ModuleList([_ToRGB(nf(0), out_channels=out_channels)])
         self.upsample_blocks = nn.ModuleList()
 
         for level in range(1, len(resolution_schedule)):
@@ -97,22 +108,38 @@ class _Generator(nn.Module):
                 _ConvBlock(nf(level), nf(level)),
             )
             self.upsample_blocks.append(block)
-            self.to_rgb_blocks.append(_ToRGB(nf(level)))
+            self.to_rgb_blocks.append(_ToRGB(nf(level), out_channels=out_channels))
 
         self.alpha: float = 1.0
 
-    def forward(self, z: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, z: torch.Tensor, condition: torch.Tensor | None = None
+    ) -> torch.Tensor:
+        """Forward pass.
+
+        Parameters
+        ----------
+        z : Tensor
+            Latent vector ``(B, latent_size)``.
+        condition : Tensor or None
+            Conditioning vector ``(B, condition_size)``.  Concatenated
+            with ``z`` before the initial block.  Required if the model
+            was created with ``condition_size > 0``.
+        """
+        if self.condition_size > 0:
+            if condition is None:
+                raise ValueError("condition required when condition_size > 0")
+            z = torch.cat([z, condition], dim=1)
+
         x = self.init_block(z.view(*z.shape, 1, 1, 1))
 
         if self.current_level == 0:
             return torch.tanh(self.to_rgb_blocks[0](x))
 
-        # Grow through levels up to current_level - 1, then fade in last level
         for i in range(self.current_level - 1):
             x = F.interpolate(x, scale_factor=2, mode="trilinear", align_corners=False)
             x = self.upsample_blocks[i](x)
 
-        # Fade-in: blend previous RGB with new upsampled RGB
         prev_rgb = self.to_rgb_blocks[self.current_level - 1](x)
         prev_rgb = F.interpolate(
             prev_rgb, scale_factor=2, mode="trilinear", align_corners=False
@@ -132,17 +159,25 @@ class _Generator(nn.Module):
 
 
 class _Discriminator(nn.Module):
-    """Progressive discriminator.  Mirror of the generator."""
+    """Progressive discriminator.  Mirror of the generator.
+
+    Supports conditioning via projection: the condition vector is
+    projected and added to the discriminator's output logit
+    (Miyato & Koyama, 2018).
+    """
 
     def __init__(
         self,
         fmap_base: int,
         fmap_max: int,
         resolution_schedule: list[int],
+        condition_size: int = 0,
+        in_channels: int = 1,
     ) -> None:
         super().__init__()
         self.resolution_schedule = resolution_schedule
         self.current_level = 0
+        self.condition_size = condition_size
 
         def nf(level: int) -> int:
             return min(int(fmap_base / (2**level)), fmap_max)
@@ -154,7 +189,7 @@ class _Discriminator(nn.Module):
             nn.Flatten(),
             nn.Linear(nf(0), 1),
         )
-        self.from_rgb_blocks = nn.ModuleList([_FromRGB(nf(0))])
+        self.from_rgb_blocks = nn.ModuleList([_FromRGB(nf(0), in_channels=in_channels)])
         self.downsample_blocks = nn.ModuleList()
 
         for level in range(1, len(resolution_schedule)):
@@ -163,16 +198,35 @@ class _Discriminator(nn.Module):
                 _ConvBlock(nf(level), nf(level - 1), use_pixel_norm=False),
             )
             self.downsample_blocks.append(block)
-            self.from_rgb_blocks.append(_FromRGB(nf(level)))
+            self.from_rgb_blocks.append(_FromRGB(nf(level), in_channels=in_channels))
+
+        # Projection head for conditioning (Miyato & Koyama, 2018)
+        if condition_size > 0:
+            self.cond_proj = nn.Linear(condition_size, nf(0), bias=False)
+        else:
+            self.cond_proj = None
 
         self.alpha: float = 1.0
 
-    def forward(self, img: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self,
+        img: torch.Tensor,
+        condition: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        """Forward pass.
+
+        Parameters
+        ----------
+        img : Tensor
+            Input image ``(B, C, D, H, W)``.
+        condition : Tensor or None
+            Conditioning vector ``(B, condition_size)`` for projection
+            discrimination.
+        """
         if self.current_level == 0:
             x = self.from_rgb_blocks[0](img)
-            return self.final_block(x)
+            return self._output(x, condition)
 
-        # Fade-in: blend downsampled previous level with new level
         prev_img = F.avg_pool3d(img, kernel_size=2, stride=2)
         prev_x = self.from_rgb_blocks[self.current_level - 1](prev_img)
 
@@ -186,7 +240,20 @@ class _Discriminator(nn.Module):
             x = self.downsample_blocks[i](x)
             x = F.avg_pool3d(x, kernel_size=2, stride=2)
 
-        return self.final_block(x)
+        return self._output(x, condition)
+
+    def _output(self, x: torch.Tensor, condition: torch.Tensor | None) -> torch.Tensor:
+        """Compute final logit with optional projection conditioning."""
+        # Pass through final block up to (but not including) the linear
+        feat = self.final_block[:-1](x)  # conv + pool + flatten → (B, nf0)
+        logit = self.final_block[-1](feat)  # linear → (B, 1)
+
+        if self.cond_proj is not None and condition is not None:
+            # Projection discrimination: logit += <embed(c), feat>
+            c_embed = self.cond_proj(condition)  # (B, nf0)
+            logit = logit + (feat * c_embed).sum(dim=1, keepdim=True)
+
+        return logit
 
 
 # ---------------------------------------------------------------------------
@@ -197,12 +264,23 @@ class _Discriminator(nn.Module):
 class ProgressiveGAN(pl.LightningModule):
     """ProgressiveGAN as a PyTorch Lightning module.
 
+    Supports optional conditioning (e.g., modality labels, class IDs, or
+    embedding vectors from a conditioning image) and data augmentation.
+
     Parameters
     ----------
     latent_size : int
         Dimension of the latent noise vector.
-    label_size : int
-        Conditioning label dimension (0 = unconditional).
+    condition_size : int
+        Conditioning vector dimension (0 = unconditional).  For class
+        conditioning, use a small integer (e.g., number of modalities).
+        For image conditioning, use the output dim of an encoder.
+    in_channels : int
+        Number of input image channels (1 = single modality, >1 for
+        multi-channel or concatenated modalities).
+    out_channels : int
+        Number of output image channels (matches ``in_channels`` for
+        reconstruction-style generation).
     fmap_base : int
         Base feature-map count used to compute per-level channels.
     fmap_max : int
@@ -215,33 +293,59 @@ class ProgressiveGAN(pl.LightningModule):
         WGAN-GP gradient penalty weight.
     lr : float
         Learning rate for Adam (used for both G and D).
+    augment_fn : callable or None
+        Differentiable augmentation function applied to real (and
+        optionally fake) images before the discriminator.  Signature:
+        ``augment_fn(images: Tensor) -> Tensor``.  If None, no
+        augmentation is applied.
+    augment_fake : bool
+        If True and ``augment_fn`` is set, also augment fake images
+        before the discriminator (recommended for ADA-style training).
     """
 
     def __init__(
         self,
         latent_size: int = 512,
-        label_size: int = 0,
+        condition_size: int = 0,
+        in_channels: int = 1,
+        out_channels: int = 1,
         fmap_base: int = 2048,
         fmap_max: int = 512,
         resolution_schedule: list[int] | None = None,
         steps_per_phase: int = 1000,
         lambda_gp: float = 10.0,
         lr: float = 1e-3,
+        augment_fn: Any | None = None,
+        augment_fake: bool = True,
     ) -> None:
         super().__init__()
-        self.save_hyperparameters()
+        self.save_hyperparameters(ignore=["augment_fn"])
         if resolution_schedule is None:
             resolution_schedule = [4, 8, 16, 32, 64]
         self.latent_size = latent_size
+        self.condition_size = condition_size
         self.resolution_schedule = resolution_schedule
         self.steps_per_phase = steps_per_phase
         self.lambda_gp = lambda_gp
         self.lr = lr
+        self.augment_fn = augment_fn
+        self.augment_fake = augment_fake
 
         self.generator = _Generator(
-            latent_size, fmap_base, fmap_max, resolution_schedule
+            latent_size,
+            fmap_base,
+            fmap_max,
+            resolution_schedule,
+            condition_size=condition_size,
+            out_channels=out_channels,
         )
-        self.discriminator = _Discriminator(fmap_base, fmap_max, resolution_schedule)
+        self.discriminator = _Discriminator(
+            fmap_base,
+            fmap_max,
+            resolution_schedule,
+            condition_size=condition_size,
+            in_channels=in_channels,
+        )
 
         self._step_count = 0
         self.automatic_optimization = False
@@ -250,12 +354,23 @@ class ProgressiveGAN(pl.LightningModule):
     # Helpers
     # ------------------------------------------------------------------
 
-    def _gradient_penalty(self, real: torch.Tensor, fake: torch.Tensor) -> torch.Tensor:
+    def _augment(self, x: torch.Tensor) -> torch.Tensor:
+        """Apply augmentation if configured."""
+        if self.augment_fn is not None:
+            return self.augment_fn(x)
+        return x
+
+    def _gradient_penalty(
+        self,
+        real: torch.Tensor,
+        fake: torch.Tensor,
+        condition: torch.Tensor | None = None,
+    ) -> torch.Tensor:
         """Compute WGAN-GP gradient penalty."""
         b = real.size(0)
         eps = torch.rand(b, 1, 1, 1, 1, device=real.device)
         interp = (eps * real + (1.0 - eps) * fake).requires_grad_(True)
-        d_interp = self.discriminator(interp)
+        d_interp = self.discriminator(interp, condition=condition)
         grads = torch.autograd.grad(
             outputs=d_interp,
             inputs=interp,
@@ -280,20 +395,33 @@ class ProgressiveGAN(pl.LightningModule):
         b = real.size(0)
         z = self._sample_z(b)
 
+        # Extract conditioning if present
+        condition = None
+        if self.condition_size > 0:
+            if isinstance(batch, dict) and "condition" in batch:
+                condition = batch["condition"]
+            else:
+                raise ValueError("condition_size > 0 but batch has no 'condition' key")
+
         # --- Discriminator step ---
         opt_d.zero_grad()
-        fake = self.generator(z).detach()
-        d_real = self.discriminator(real)
-        d_fake = self.discriminator(fake)
-        gp = self._gradient_penalty(real, fake.requires_grad_(True))
+        fake = self.generator(z, condition=condition).detach()
+        real_aug = self._augment(real)
+        fake_aug = self._augment(fake) if self.augment_fake else fake
+        d_real = self.discriminator(real_aug, condition=condition)
+        d_fake = self.discriminator(fake_aug, condition=condition)
+        gp = self._gradient_penalty(
+            real, fake.requires_grad_(True), condition=condition
+        )
         d_loss = d_fake.mean() - d_real.mean() + self.lambda_gp * gp
         self.manual_backward(d_loss)
         opt_d.step()
 
         # --- Generator step ---
         opt_g.zero_grad()
-        fake = self.generator(z)
-        g_loss = -self.discriminator(fake).mean()
+        fake = self.generator(z, condition=condition)
+        fake_aug = self._augment(fake) if self.augment_fake else fake
+        g_loss = -self.discriminator(fake_aug, condition=condition).mean()
         self.manual_backward(g_loss)
         opt_g.step()
 
@@ -323,7 +451,9 @@ class ProgressiveGAN(pl.LightningModule):
 
 def progressivegan(
     latent_size: int = 512,
-    label_size: int = 0,
+    condition_size: int = 0,
+    in_channels: int = 1,
+    out_channels: int = 1,
     fmap_base: int = 2048,
     fmap_max: int = 512,
     resolution_schedule: list[int] | None = None,
@@ -332,7 +462,9 @@ def progressivegan(
     """Factory function for :class:`ProgressiveGAN`."""
     return ProgressiveGAN(
         latent_size=latent_size,
-        label_size=label_size,
+        condition_size=condition_size,
+        in_channels=in_channels,
+        out_channels=out_channels,
         fmap_base=fmap_base,
         fmap_max=fmap_max,
         resolution_schedule=resolution_schedule,
