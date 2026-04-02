@@ -60,7 +60,7 @@ class SynthSegGenerator(torch.utils.data.Dataset):
 
     def __init__(
         self,
-        label_maps: list[str | Path],
+        label_maps: list[str | Path] | None = None,
         n_samples_per_map: int = 10,
         generation_classes: dict[str, list[int]] | None = None,
         intensity_prior: tuple[float, float] = (0.0, 250.0),
@@ -74,9 +74,29 @@ class SynthSegGenerator(torch.utils.data.Dataset):
         randomize_resolution: bool = True,
         resolution_range: tuple[float, float] = (1.0, 3.0),
         seed: int | None = None,
+        zarr_store: str | Path | None = None,
+        zarr_level: int = 0,
     ) -> None:
-        self.label_maps = [Path(p) for p in label_maps]
+        if label_maps is not None:
+            self.label_maps = [Path(p) for p in label_maps]
+        else:
+            self.label_maps = []
         self._seed = seed
+
+        # Zarr store support: read labels from a pyramidal zarr store
+        self._zarr_store_path = str(zarr_store) if zarr_store else None
+        self._zarr_level = zarr_level
+        self._zarr_group = None
+        self._zarr_n_subjects = 0
+        if self._zarr_store_path is not None:
+            import zarr
+
+            self._zarr_group = zarr.open_group(self._zarr_store_path, mode="r")
+            lbl_arr = self._zarr_group[f"labels/{zarr_level}"]
+            self._zarr_n_subjects = lbl_arr.shape[0]
+            if not self.label_maps:
+                # Use zarr subjects as the "label maps"
+                self.label_maps = list(range(self._zarr_n_subjects))
         self.n_samples_per_map = n_samples_per_map
         self.intensity_prior = intensity_prior
         self.std_prior = std_prior
@@ -104,7 +124,8 @@ class SynthSegGenerator(torch.utils.data.Dataset):
                 self._label_to_class[lid] = cls_name
 
     def __len__(self) -> int:
-        return len(self.label_maps) * self.n_samples_per_map
+        n_maps = self._zarr_n_subjects if self._zarr_group else len(self.label_maps)
+        return n_maps * self.n_samples_per_map
 
     def _get_rng(self, idx: int) -> np.random.Generator:
         """Get a seeded RNG for reproducibility, or unseeded if no seed."""
@@ -114,10 +135,15 @@ class SynthSegGenerator(torch.utils.data.Dataset):
 
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         map_idx = idx // self.n_samples_per_map
-        label_path = self.label_maps[map_idx]
 
-        # Load label map
-        label_data = np.asarray(nib.load(label_path).dataobj, dtype=np.int32)
+        # Load label map from zarr store or NIfTI
+        if self._zarr_group is not None:
+            subject_idx = map_idx % self._zarr_n_subjects
+            lbl_arr = self._zarr_group[f"labels/{self._zarr_level}"]
+            label_data = np.asarray(lbl_arr[subject_idx], dtype=np.int32)
+        else:
+            label_path = self.label_maps[map_idx]
+            label_data = np.asarray(nib.load(label_path).dataobj, dtype=np.int32)
 
         # 1. GMM intensity generation (per tissue class)
         image = self._generate_intensities(label_data)
