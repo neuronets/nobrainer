@@ -139,6 +139,9 @@ class TestKwykSmoke:
         # Train Bayesian for 1 epoch
         from nobrainer.models.bayesian.utils import accumulate_kl
 
+        # Pyro's param store can cache unconstrained tensors on CPU even
+        # after .to(device). Clear and re-register to ensure device consistency.
+        pyro.clear_param_store()
         bayes_model = bayes_model.to(device)
         bayes_model.train()
         optimizer_b = torch.optim.Adam(bayes_model.parameters(), lr=1e-3)
