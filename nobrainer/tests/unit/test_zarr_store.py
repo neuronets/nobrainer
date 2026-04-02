@@ -182,3 +182,149 @@ class TestPartition:
         )
         # Different seeds should produce different train sets (with high probability)
         assert p1["train"] != p2["train"]
+
+
+# ---------------------------------------------------------------------------
+# Foundational utility tests (T008)
+# ---------------------------------------------------------------------------
+
+
+class TestSelectStorageDtype:
+    def test_labels_uint8(self):
+        from nobrainer.datasets.zarr_store import select_storage_dtype
+
+        data = np.array([0, 1, 2, 3, 4], dtype=np.int32)
+        result = select_storage_dtype(data, mode="labels")
+        assert result["dtype"] == "uint8"
+        assert result["scl_slope"] is None
+
+    def test_labels_uint16(self):
+        from nobrainer.datasets.zarr_store import select_storage_dtype
+
+        data = np.arange(300, dtype=np.int32)
+        result = select_storage_dtype(data, mode="labels")
+        assert result["dtype"] == "uint16"
+
+    def test_images_default_bfloat16(self):
+        from nobrainer.datasets.zarr_store import select_storage_dtype
+
+        data = np.random.randn(100).astype(np.float32)
+        result = select_storage_dtype(data, mode="images")
+        assert result["dtype"] == "uint16"
+        assert result["_nobrainer_dtype"] == "bfloat16"
+
+    def test_images_quantize_int16(self):
+        from nobrainer.datasets.zarr_store import select_storage_dtype
+
+        data = np.random.randn(100).astype(np.float32) * 100
+        result = select_storage_dtype(data, mode="images", quantize=True)
+        assert result["dtype"] == "int16"
+        assert result["scl_slope"] is not None
+
+    def test_auto_detect_labels(self):
+        from nobrainer.datasets.zarr_store import select_storage_dtype
+
+        data = np.array([0, 2, 41, 77], dtype=np.int32)
+        result = select_storage_dtype(data)
+        assert result["dtype"] == "uint8"  # auto-detected as labels
+
+
+class TestSuggestShards:
+    def test_basic(self):
+        from nobrainer.datasets.zarr_store import suggest_shards
+
+        result = suggest_shards(100, (256, 256, 256), dtype="float32")
+        assert result["subjects_per_shard"] >= 1
+        assert result["n_shards"] >= 1
+        assert result["n_shards"] * result["subjects_per_shard"] >= 100
+
+    def test_shard_count_within_limit(self):
+        from nobrainer.datasets.zarr_store import suggest_shards
+
+        result = suggest_shards(100, (256, 256, 256), n_input_files=200)
+        # shards ≤ 20% of input files (may be reduced by log factor)
+        assert result["n_shards"] <= 40
+
+    def test_single_shard_small_dataset(self):
+        from nobrainer.datasets.zarr_store import suggest_shards
+
+        result = suggest_shards(3, (32, 32, 32), n_input_files=6)
+        assert result["n_shards"] <= 3
+
+    def test_inode_estimate_includes_levels(self):
+        from nobrainer.datasets.zarr_store import suggest_shards
+
+        r1 = suggest_shards(100, (64, 64, 64), levels=1)
+        r3 = suggest_shards(100, (64, 64, 64), levels=3)
+        assert r3["estimated_inodes"] == 3 * r1["estimated_inodes"]
+
+
+class TestBfloat16Encoding:
+    def test_roundtrip(self):
+        from nobrainer.datasets.zarr_store import decode_bfloat16, encode_bfloat16
+
+        data = np.random.randn(8, 8, 8).astype(np.float32)
+        encoded = encode_bfloat16(data)
+        assert encoded.dtype == np.uint16
+        decoded = decode_bfloat16(encoded)
+        # bfloat16 has ~3 decimal digits of precision
+        np.testing.assert_allclose(decoded, data, rtol=1e-2, atol=1e-3)
+
+    def test_preserves_zeros(self):
+        from nobrainer.datasets.zarr_store import decode_bfloat16, encode_bfloat16
+
+        data = np.zeros((4, 4, 4), dtype=np.float32)
+        decoded = decode_bfloat16(encode_bfloat16(data))
+        np.testing.assert_array_equal(decoded, 0.0)
+
+
+class TestScaleFactorEncoding:
+    def test_roundtrip_int16(self):
+        from nobrainer.datasets.zarr_store import (
+            decode_scale_factor,
+            encode_scale_factor,
+        )
+
+        data = np.random.randn(16, 16, 16).astype(np.float32) * 200
+        encoded, slope, inter = encode_scale_factor(data, "int16")
+        assert encoded.dtype == np.int16
+        decoded = decode_scale_factor(encoded, slope, inter)
+        # ≤ 0.1% relative error for most values
+        nonzero = np.abs(data) > 1e-3
+        rel_err = np.abs(decoded[nonzero] - data[nonzero]) / np.abs(data[nonzero])
+        assert np.percentile(rel_err, 99) < 0.01  # 99th percentile < 1%
+
+    def test_constant_data(self):
+        from nobrainer.datasets.zarr_store import (
+            decode_scale_factor,
+            encode_scale_factor,
+        )
+
+        data = np.full((4, 4, 4), 42.0, dtype=np.float32)
+        encoded, slope, inter = encode_scale_factor(data, "int16")
+        decoded = decode_scale_factor(encoded, slope, inter)
+        np.testing.assert_allclose(decoded, 42.0, atol=0.1)
+
+
+class TestDownsampleLabels:
+    def test_preserves_label_values(self):
+        from nobrainer.datasets.zarr_store import downsample_labels
+
+        labels = np.zeros((32, 32, 32), dtype=np.int32)
+        labels[:16, :, :] = 2
+        labels[16:, :16, :] = 41
+        labels[16:, 16:, :] = 77
+
+        downsampled = downsample_labels(labels, factor=2)
+        assert downsampled.shape == (16, 16, 16)
+        unique = set(np.unique(downsampled))
+        assert unique.issubset({0, 2, 41, 77})
+
+    def test_factor_4(self):
+        from nobrainer.datasets.zarr_store import downsample_labels
+
+        labels = np.zeros((32, 32, 32), dtype=np.int32)
+        labels[8:24, 8:24, 8:24] = 5
+        downsampled = downsample_labels(labels, factor=4)
+        assert downsampled.shape == (8, 8, 8)
+        assert set(np.unique(downsampled)).issubset({0, 5})

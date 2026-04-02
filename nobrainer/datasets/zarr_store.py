@@ -21,6 +21,266 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Foundational utilities (T003–T007)
+# ---------------------------------------------------------------------------
+
+
+def select_storage_dtype(
+    data: np.ndarray,
+    mode: str | None = None,
+    quantize: bool = False,
+) -> dict:
+    """Select the most space-efficient storage dtype for an array.
+
+    Parameters
+    ----------
+    data : ndarray
+        Representative data sample (at least one volume).
+    mode : str or None
+        ``"labels"`` or ``"images"``.  None = auto-detect from dtype
+        and unique-value count (integer with ≤ 1000 unique → labels).
+    quantize : bool
+        If True and mode is images, use int16+scale-factor instead
+        of bfloat16 (the default for float images).
+
+    Returns
+    -------
+    dict
+        ``{"dtype": str, "scl_slope": float|None, "scl_inter": float|None,
+           "_nobrainer_dtype": str|None}``
+    """
+    if mode is None:
+        if np.issubdtype(data.dtype, np.integer):
+            n_unique = len(np.unique(data))
+            mode = "labels" if n_unique <= 1000 else "images"
+        else:
+            mode = "images"
+
+    if mode == "labels":
+        n_unique = len(np.unique(data))
+        if n_unique <= 256:
+            return {
+                "dtype": "uint8",
+                "scl_slope": None,
+                "scl_inter": None,
+                "_nobrainer_dtype": None,
+            }
+        elif n_unique <= 65536:
+            return {
+                "dtype": "uint16",
+                "scl_slope": None,
+                "scl_inter": None,
+                "_nobrainer_dtype": None,
+            }
+        else:
+            return {
+                "dtype": "int32",
+                "scl_slope": None,
+                "scl_inter": None,
+                "_nobrainer_dtype": None,
+            }
+    else:
+        if quantize:
+            dmin, dmax = float(data.min()), float(data.max())
+            drange = dmax - dmin
+            if drange == 0:
+                drange = 1.0
+            if dmax < 32767 and dmin > -32768:
+                slope = drange / 65534.0
+                inter = dmin
+                return {
+                    "dtype": "int16",
+                    "scl_slope": slope,
+                    "scl_inter": inter,
+                    "_nobrainer_dtype": None,
+                }
+            else:
+                slope = drange / 65535.0
+                inter = dmin
+                return {
+                    "dtype": "uint16",
+                    "scl_slope": slope,
+                    "scl_inter": inter,
+                    "_nobrainer_dtype": None,
+                }
+        else:
+            return {
+                "dtype": "uint16",
+                "scl_slope": None,
+                "scl_inter": None,
+                "_nobrainer_dtype": "bfloat16",
+            }
+
+
+def suggest_shards(
+    n_volumes: int,
+    volume_shape: tuple[int, int, int],
+    dtype: str = "float32",
+    n_input_files: int | None = None,
+    levels: int = 1,
+) -> dict:
+    """Compute optimal whole-subject shard parameters.
+
+    Shard count ≤ 20% of input file count, with log-scale reduction
+    for larger datasets.  Whole-subject shards only (no subject splitting).
+
+    Parameters
+    ----------
+    n_volumes : int
+        Number of subjects.
+    volume_shape : tuple of int
+        Spatial shape ``(D, H, W)``.
+    dtype : str
+        Array dtype (for byte estimation).
+    n_input_files : int or None
+        Total input files.  None = ``2 * n_volumes``.
+    levels : int
+        Pyramid levels (affects inode estimate).
+
+    Returns
+    -------
+    dict
+        ``{"subjects_per_shard", "shard_shape", "n_shards",
+           "estimated_inodes", "estimated_shard_bytes"}``
+    """
+    if n_input_files is None:
+        n_input_files = 2 * n_volumes
+
+    itemsize = np.dtype(dtype).itemsize
+    vol_bytes = int(np.prod(volume_shape)) * itemsize
+    total_bytes = vol_bytes * n_volumes
+
+    # max_shards = floor(0.2 * n_input_files / max(1, log10(total_bytes/1GB)))
+    gb = max(total_bytes / 1e9, 0.001)
+    log_factor = max(1.0, np.log10(gb))
+    max_shards = max(1, int(0.2 * n_input_files / log_factor))
+    max_shards = min(max_shards, n_volumes)
+
+    subjects_per_shard = int(np.ceil(n_volumes / max_shards))
+    n_shards = int(np.ceil(n_volumes / subjects_per_shard))
+    D, H, W = volume_shape
+    shard_shape = (subjects_per_shard, D, H, W)
+    shard_bytes = subjects_per_shard * vol_bytes
+    # 2 arrays (images + labels) × levels
+    estimated_inodes = n_shards * 2 * levels
+
+    return {
+        "subjects_per_shard": subjects_per_shard,
+        "shard_shape": shard_shape,
+        "n_shards": n_shards,
+        "estimated_inodes": estimated_inodes,
+        "estimated_shard_bytes": shard_bytes,
+    }
+
+
+def encode_bfloat16(data: np.ndarray) -> np.ndarray:
+    """Convert float32 to bfloat16 stored as uint16.
+
+    Uses PyTorch for the float32→bfloat16 conversion (truncates mantissa),
+    then views the result as uint16 for zarr storage.
+    """
+    import torch
+
+    t = torch.from_numpy(data.astype(np.float32)).to(torch.bfloat16)
+    return t.view(torch.uint16).numpy()
+
+
+def decode_bfloat16(stored: np.ndarray) -> np.ndarray:
+    """Convert uint16 (bfloat16 bit pattern) back to float32."""
+    import torch
+
+    t = torch.from_numpy(stored.astype(np.uint16)).view(torch.bfloat16)
+    return t.float().numpy()
+
+
+def encode_scale_factor(
+    data: np.ndarray,
+    target_dtype: str = "int16",
+) -> tuple[np.ndarray, float, float]:
+    """Encode float data as integer with slope/intercept.
+
+    Returns ``(encoded_array, scl_slope, scl_inter)`` where
+    ``original ≈ encoded * scl_slope + scl_inter``.
+    """
+    dt = np.dtype(target_dtype)
+    dmin, dmax = float(data.min()), float(data.max())
+    drange = dmax - dmin
+    if drange == 0:
+        drange = 1.0
+
+    if np.issubdtype(dt, np.signedinteger):
+        info = np.iinfo(dt)
+        dtype_range = info.max - info.min
+        slope = drange / dtype_range
+        inter = dmin - info.min * slope
+    else:
+        info = np.iinfo(dt)
+        dtype_range = info.max
+        slope = drange / dtype_range
+        inter = dmin
+
+    encoded = np.clip((data - inter) / slope, info.min, info.max).astype(dt)
+    return encoded, float(slope), float(inter)
+
+
+def decode_scale_factor(
+    stored: np.ndarray,
+    scl_slope: float,
+    scl_inter: float,
+) -> np.ndarray:
+    """Decode integer array to float32 using slope/intercept."""
+    return stored.astype(np.float32) * scl_slope + scl_inter
+
+
+def downsample_labels(label_data: np.ndarray, factor: int = 2) -> np.ndarray:
+    """Downsample a discrete label map preserving valid label values.
+
+    Uses max-probability approach (from nifti-zarr): for each label,
+    create a binary mask, smooth it with a Gaussian, then at each
+    output voxel pick the label whose smoothed probability is highest.
+
+    Parameters
+    ----------
+    label_data : ndarray
+        3-D integer label array.
+    factor : int
+        Downsampling factor per axis (default 2).
+
+    Returns
+    -------
+    ndarray
+        Downsampled label array with only original label values.
+    """
+    from scipy.ndimage import gaussian_filter, zoom
+
+    unique_labels = np.unique(label_data)
+    target_shape = tuple(s // factor for s in label_data.shape)
+
+    if len(unique_labels) > 500:
+        # Too many labels for max-probability — fall back to nearest
+        return zoom(label_data.astype(np.float64), 1.0 / factor, order=0).astype(
+            label_data.dtype
+        )[: target_shape[0], : target_shape[1], : target_shape[2]]
+
+    # Build smoothed probability for each label, pick argmax
+    best_prob = np.full(target_shape, -1.0, dtype=np.float64)
+    result = np.zeros(target_shape, dtype=label_data.dtype)
+    sigma = factor * 0.5
+
+    for lab in unique_labels:
+        mask = (label_data == lab).astype(np.float64)
+        smoothed = gaussian_filter(mask, sigma=sigma)
+        # Downsample the smoothed probability
+        down = zoom(smoothed, 1.0 / factor, order=1)
+        down = down[: target_shape[0], : target_shape[1], : target_shape[2]]
+        better = down > best_prob
+        best_prob[better] = down[better]
+        result[better] = lab
+
+    return result
+
+
 def _conform_volume(img, target_shape, target_voxel_size=(1.0, 1.0, 1.0)):
     """Conform a nibabel image to target shape and voxel size."""
     from nibabel.processing import conform
