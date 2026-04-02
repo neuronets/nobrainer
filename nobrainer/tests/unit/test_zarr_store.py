@@ -236,6 +236,33 @@ class TestPyramidalStore:
         info = store_info(store_path)
         assert info["n_levels"] == 3
 
+    def test_ome_reader_can_parse(self, tmp_path):
+        """T016b: ome-zarr Reader can discover pyramid levels."""
+        from nobrainer.datasets.zarr_store import create_zarr_store
+
+        pairs = [_make_nifti_pair(tmp_path, i, shape=(32, 32, 32)) for i in range(2)]
+        store_path = create_zarr_store(
+            pairs, tmp_path / "test.zarr", conform=False, levels=3
+        )
+
+        from ome_zarr.io import parse_url
+        from ome_zarr.reader import Reader
+
+        # Reader should discover the multiscales metadata
+        reader = Reader(parse_url(str(store_path)))
+        nodes = list(reader())
+        assert len(nodes) >= 1
+        # The root node should have parsed multiscale metadata
+        node = nodes[0]
+        md = node.metadata
+        # ome-zarr Reader flattens multiscales into axes + coordinateTransformations
+        assert "axes" in md
+        axes = [a["name"] for a in md["axes"]]
+        assert axes == ["z", "y", "x"]
+        # Should have scale transforms for each level
+        assert "coordinateTransformations" in md
+        assert len(md["coordinateTransformations"]) == 3
+
 
 class TestPartition:
     def test_create_partition(self, tmp_path):

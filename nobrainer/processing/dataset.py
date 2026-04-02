@@ -168,6 +168,7 @@ class Dataset:
         n_classes: int = 1,
         partition: str | None = None,
         partition_path: str | Path | None = None,
+        level: int = 0,
     ) -> "Dataset":
         """Create a Dataset from a Zarr3 store.
 
@@ -185,16 +186,33 @@ class Dataset:
         partition_path : str or Path or None
             Path to partition JSON.  If None and partition is set, looks for
             ``<store_path>_partition.json``.
+        level : int
+            Pyramid level to read from (0 = full resolution).
+            For legacy non-pyramidal stores, only level=0 is valid.
         """
-        from nobrainer.datasets.zarr_store import load_partition, store_info
+        from nobrainer.datasets.zarr_store import store_info
 
         store_path = Path(store_path)
         info = store_info(store_path)
         subject_ids = info["subject_ids"]
-        volume_shape = tuple(info["volume_shape"])
+        n_levels = info.get("n_levels", 1)
+
+        # Validate level
+        if level >= n_levels:
+            raise ValueError(
+                f"Requested level={level} but store has {n_levels} "
+                f"level(s) (0..{n_levels - 1})."
+            )
+
+        # Compute volume shape at requested level
+        full_shape = tuple(info["volume_shape"])
+        factor = 2**level
+        volume_shape = tuple(s // factor for s in full_shape)
 
         # Filter by partition
         if partition is not None:
+            from nobrainer.datasets.zarr_store import load_partition
+
             if partition_path is None:
                 partition_path = Path(str(store_path) + "_partition.json")
             parts = load_partition(partition_path)
@@ -205,24 +223,30 @@ class Dataset:
                 )
             subject_ids = parts[partition]
 
-        # Build data list referencing zarr indices
+        # Build data list referencing zarr indices with level
         id_to_idx = {sid: i for i, sid in enumerate(info["subject_ids"])}
         data = []
         for sid in subject_ids:
             idx = id_to_idx[sid]
             data.append(
                 {
-                    "image": f"zarr://{store_path}#images/{idx}",
-                    "label": f"zarr://{store_path}#labels/{idx}",
+                    "image": f"zarr://{store_path}#images/{level}/{idx}",
+                    "label": f"zarr://{store_path}#labels/{level}/{idx}",
                     "_zarr_store": str(store_path),
                     "_zarr_index": idx,
                     "_subject_id": sid,
+                    "_zarr_level": level,
                 }
             )
 
         ds = cls(data=data, volume_shape=volume_shape, n_classes=n_classes)
         ds._block_shape = block_shape
         ds._zarr_store_path = str(store_path)
+        ds._zarr_level = level
+        # Store decoding info for the loader
+        ds._zarr_scl_slope = info.get("scl_slope")
+        ds._zarr_scl_inter = info.get("scl_inter")
+        ds._zarr_nobrainer_dtype = info.get("_nobrainer_dtype")
         return ds
 
     # --- Fluent API ---
@@ -687,19 +711,21 @@ class PatchDataset(torch.utils.data.Dataset):
 
     @staticmethod
     def _parse_zarr_path(path: str) -> tuple[str, str, int] | None:
-        """Parse zarr://store_path#array_name/subject_index.
+        """Parse zarr://store_path#array_name/level/subject_index.
 
-        Returns ``(store_path, array_name, subject_index)`` or None.
+        Handles both new format ``images/0/42`` and legacy ``images/42``.
+        Returns ``(store_path, array_path, subject_index)`` or None.
         """
         if path.startswith("zarr://"):
             rest = path[len("zarr://") :]
             if "#" in rest:
                 store_path, fragment = rest.split("#", 1)
+                # Split off the trailing subject index
                 parts = fragment.rsplit("/", 1)
                 if len(parts) == 2:
                     return store_path, parts[0], int(parts[1])
                 return store_path, fragment, 0
-            return rest, "images", 0
+            return rest, "images/0", 0
         return None
 
     @staticmethod
@@ -710,10 +736,10 @@ class PatchDataset(torch.utils.data.Dataset):
         if parsed is not None:
             import zarr
 
-            store_path, array_name, idx = parsed
+            store_path, array_path, idx = parsed
             store = zarr.open_group(store_path, mode="r")
             # Shape of the 4D array is (N, D, H, W); return spatial (D, H, W)
-            return store[array_name].shape[1:]
+            return store[array_path].shape[1:]
         elif path.rstrip("/").endswith(".zarr"):
             import zarr
 
@@ -733,14 +759,36 @@ class PatchDataset(torch.utils.data.Dataset):
         return self._zarr_cache[store_path]
 
     def _read_region_cached(self, path: str, slc: tuple[slice, ...]) -> np.ndarray:
-        """Read a spatial region, using cached zarr handles."""
+        """Read a spatial region, using cached zarr handles.
+
+        Transparently applies scale-factor decoding or bfloat16 decoding
+        based on array attributes.
+        """
         path = str(path)
         parsed = self._parse_zarr_path(path)
         if parsed is not None:
-            store_path, array_name, idx = parsed
+            store_path, array_path, idx = parsed
             store = self._get_zarr_store(store_path)
+            arr = store[array_path]
             sd, sh, sw = slc
-            return np.asarray(store[array_name][idx, sd, sh, sw])
+            raw = np.asarray(arr[idx, sd, sh, sw])
+
+            # Check for bfloat16 encoding
+            nb_dtype = arr.attrs.get("_nobrainer_dtype")
+            if nb_dtype == "bfloat16":
+                from nobrainer.datasets.zarr_store import decode_bfloat16
+
+                return decode_bfloat16(raw)
+
+            # Check for scale-factor encoding
+            slope = arr.attrs.get("scl_slope")
+            if slope is not None:
+                inter = arr.attrs.get("scl_inter", 0.0)
+                from nobrainer.datasets.zarr_store import decode_scale_factor
+
+                return decode_scale_factor(raw, slope, inter)
+
+            return raw
         return self._read_region(path, slc)
 
     @staticmethod
@@ -751,10 +799,24 @@ class PatchDataset(torch.utils.data.Dataset):
         if parsed is not None:
             import zarr
 
-            store_path, array_name, idx = parsed
+            store_path, array_path, idx = parsed
             store = zarr.open_group(store_path, mode="r")
+            arr = store[array_path]
             sd, sh, sw = slc
-            return np.asarray(store[array_name][idx, sd, sh, sw])
+            raw = np.asarray(arr[idx, sd, sh, sw])
+
+            # Decode if needed
+            nb_dtype = arr.attrs.get("_nobrainer_dtype")
+            if nb_dtype == "bfloat16":
+                from nobrainer.datasets.zarr_store import decode_bfloat16
+
+                return decode_bfloat16(raw)
+            slope = arr.attrs.get("scl_slope")
+            if slope is not None:
+                from nobrainer.datasets.zarr_store import decode_scale_factor
+
+                return decode_scale_factor(raw, slope, arr.attrs.get("scl_inter", 0.0))
+            return raw
         elif path.rstrip("/").endswith(".zarr"):
             import zarr
 
