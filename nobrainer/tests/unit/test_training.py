@@ -70,6 +70,28 @@ class TestFit:
         )
         assert result["checkpoint_path"] is not None
         assert (tmp_path / "best_model.pth").exists()
+        assert (tmp_path / "croissant.json").exists()
+
+    def test_checkpoint_croissant_content(self, tmp_path):
+        """Checkpoint croissant.json contains provenance metadata."""
+        import json
+
+        model = _make_model()
+        loader = _make_loader()
+        fit(
+            model,
+            loader,
+            nn.CrossEntropyLoss(),
+            torch.optim.Adam(model.parameters()),
+            max_epochs=2,
+            checkpoint_dir=tmp_path,
+        )
+        data = json.loads((tmp_path / "croissant.json").read_text())
+        prov = data["nobrainer:provenance"]
+        assert prov["epochs_trained"] > 0
+        assert prov["model_architecture"] == "Sequential"
+        assert prov["loss_function"] == "CrossEntropyLoss"
+        assert "optimizer" in prov
 
     def test_epochs_completed(self):
         model = _make_model()

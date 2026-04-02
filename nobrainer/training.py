@@ -375,6 +375,11 @@ def fit(
             if checkpoint_dir is not None:
                 ckpt_path = str(checkpoint_dir / "best_model.pth")
                 torch.save(model.state_dict(), ckpt_path)
+                from nobrainer.processing.croissant import write_checkpoint_croissant
+
+                write_checkpoint_croissant(
+                    checkpoint_dir, model, optimizer, criterion, history
+                )
 
         # Resumable checkpoint (every epoch)
         if checkpoint_dir is not None:
@@ -515,6 +520,17 @@ def _ddp_worker(
                 if checkpoint_dir is not None:
                     ckpt_path = str(Path(checkpoint_dir) / "best_model.pth")
                     torch.save(ddp_model.module.state_dict(), ckpt_path)
+                    from nobrainer.processing.croissant import (
+                        write_checkpoint_croissant,
+                    )
+
+                    write_checkpoint_croissant(
+                        checkpoint_dir,
+                        ddp_model.module,
+                        optimizer,
+                        criterion,
+                        history,
+                    )
 
             # Resumable checkpoint
             if checkpoint_dir is not None:
