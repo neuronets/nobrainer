@@ -16,13 +16,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .layers import BayesianConv3d
+from nobrainer.models._constants import (  # noqa: E501
+    DILATION_SCHEDULES as _DILATION_SCHEDULES,
+)
 
-_DILATION_SCHEDULES: dict[int, list[int]] = {
-    37: [1, 1, 1, 2, 4, 8, 1],
-    67: [1, 1, 2, 4, 8, 16, 1],
-    129: [1, 2, 4, 8, 16, 32, 1],
-}
+from .layers import BayesianConv3d
 
 
 class _BayesConvBNActDrop(PyroModule):
@@ -143,7 +141,9 @@ class BayesianMeshNet(PyroModule):
         # Final 1×1×1 classifier — deterministic
         self.classifier = nn.Conv3d(filters, n_classes, kernel_size=1)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    supports_mc = True
+
+    def forward(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
         h = x
         for i in range(self._n_layers):
             h = getattr(self, f"layer_{i}")(h)

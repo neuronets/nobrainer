@@ -1,0 +1,15 @@
+# DDP test: 128³ patches on 2× L40S
+
+filters: 96
+receptive_field: 37
+dropout_rate: 0.25
+
+block_shape: [128, 128, 128]
+lr: 0.0001
+batch_size: 4
+n_classes: 50
+label_mapping: 50-class
+patches_per_volume: 8
+val_dice_freq: 1
+
+zarr_store: /orcd/scratch/orcd/013/satra/kwyk_reproduction/data/kwyk_500.zarr

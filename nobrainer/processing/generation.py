@@ -70,9 +70,8 @@ class Generation(BaseEstimator):
 
         self._dataset = dataset_train
         self._training_result = {
-            "epochs_completed": epochs,
-            "final_loss": None,
-            "best_loss": None,
+            "history": [{"epoch": e, "loss": None} for e in range(1, epochs + 1)],
+            "checkpoint_path": None,
         }
         return self
 

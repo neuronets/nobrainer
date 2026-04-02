@@ -80,8 +80,8 @@ class TestKwykSmoke:
         # Collect losses via callback
         losses = []
 
-        def _on_epoch(epoch, loss, model):
-            losses.append(loss)
+        def _on_epoch(epoch, logs, model):
+            losses.append(logs["loss"] if isinstance(logs, dict) else logs)
 
         seg.fit(ds, epochs=1, callbacks=[_on_epoch])
 
@@ -128,16 +128,20 @@ class TestKwykSmoke:
             optimizer.step()
             break  # Just one batch for speed
 
-        # Build Bayesian model and warm-start
+        # Build Bayesian model and warm-start (on CPU to avoid device issues)
+        det_model_cpu = det_model.cpu()
         bayes_model = get_model("bayesian_meshnet")(**MODEL_ARGS)
         n_transferred = warmstart_bayesian_from_deterministic(
-            bayes_model, det_model, initial_rho=-3.0
+            bayes_model, det_model_cpu, initial_rho=-3.0
         )
         assert n_transferred > 0, "Expected at least 1 layer transferred"
 
         # Train Bayesian for 1 epoch
         from nobrainer.models.bayesian.utils import accumulate_kl
 
+        # Pyro's param store can cache unconstrained tensors on CPU even
+        # after .to(device). Clear and re-register to ensure device consistency.
+        pyro.clear_param_store()
         bayes_model = bayes_model.to(device)
         bayes_model.train()
         optimizer_b = torch.optim.Adam(bayes_model.parameters(), lr=1e-3)

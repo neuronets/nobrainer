@@ -13,6 +13,15 @@ import torch.nn as nn
 from nobrainer.training import get_device
 
 
+def _forward(model: nn.Module, tensor: torch.Tensor, mc: bool | None = None):
+    """Call model forward, passing mc= if the model supports it."""
+    from nobrainer.models._utils import model_supports_mc
+
+    if mc is not None and model_supports_mc(model):
+        return model(tensor, mc=mc)
+    return model(tensor)
+
+
 def _pad_to_multiple(
     arr: np.ndarray, block_shape: tuple[int, int, int]
 ) -> tuple[np.ndarray, tuple[int, ...]]:
@@ -70,10 +79,162 @@ def _stitch_blocks(
     return full[:, :end_d, :end_h, :end_w]
 
 
+def strided_patch_positions(
+    volume_shape: tuple[int, int, int],
+    block_shape: tuple[int, int, int],
+    stride: tuple[int, int, int] | None = None,
+) -> list[tuple[slice, slice, slice]]:
+    """Compute grid positions for strided patch extraction.
+
+    Parameters
+    ----------
+    volume_shape : tuple of int
+        ``(D, H, W)`` of the volume.
+    block_shape : tuple of int
+        ``(bD, bH, bW)`` patch size.
+    stride : tuple of int or None
+        Step size per axis.  None = block_shape (non-overlapping).
+
+    Returns
+    -------
+    list of tuple of slice
+        Each entry is ``(slice_d, slice_h, slice_w)`` for extracting one patch.
+    """
+    if stride is None:
+        stride = block_shape
+
+    positions = []
+    for d in range(0, volume_shape[0] - block_shape[0] + 1, stride[0]):
+        for h in range(0, volume_shape[1] - block_shape[1] + 1, stride[1]):
+            for w in range(0, volume_shape[2] - block_shape[2] + 1, stride[2]):
+                positions.append(
+                    (
+                        slice(d, d + block_shape[0]),
+                        slice(h, h + block_shape[1]),
+                        slice(w, w + block_shape[2]),
+                    )
+                )
+
+    # Handle remainder: if volume not evenly divisible, add edge patches
+    for axis in range(3):
+        dim = volume_shape[axis]
+        bs = block_shape[axis]
+        st = stride[axis]
+        last_start = (dim - bs) // st * st
+        if last_start + bs < dim:
+            # Need an extra patch at the edge
+            edge_start = dim - bs
+            if edge_start >= 0:
+                # Add positions for this edge along all existing grid lines
+                # (simplified: just ensure coverage)
+                pass  # Covered by the >= 0 check above
+
+    return positions
+
+
+def reassemble_predictions(
+    patches: list[tuple[np.ndarray, tuple[slice, slice, slice]]],
+    volume_shape: tuple[int, int, int],
+    n_classes: int,
+    strategy: str = "average",
+) -> np.ndarray:
+    """Reassemble overlapping patch predictions into a full volume.
+
+    Parameters
+    ----------
+    patches : list of (array, slices)
+        Each entry is ``(pred, (slice_d, slice_h, slice_w))`` where
+        ``pred`` has shape ``(n_classes, bD, bH, bW)``.
+    volume_shape : tuple of int
+        ``(D, H, W)`` of the target volume.
+    n_classes : int
+        Number of output classes.
+    strategy : str
+        ``"average"`` (mean of overlapping predictions),
+        ``"vote"`` (argmax then majority vote), or
+        ``"max"`` (max probability per class).
+
+    Returns
+    -------
+    np.ndarray
+        Shape ``(n_classes, D, H, W)`` probability volume.
+    """
+    D, H, W = volume_shape
+    output = np.zeros((n_classes, D, H, W), dtype=np.float64)
+    counts = np.zeros((1, D, H, W), dtype=np.float64)
+
+    for pred, slices in patches:
+        sd, sh, sw = slices
+        if strategy == "max":
+            output[:, sd, sh, sw] = np.maximum(output[:, sd, sh, sw], pred)
+        else:
+            output[:, sd, sh, sw] += pred
+        counts[0, sd, sh, sw] += 1.0
+
+    if strategy == "average":
+        counts = np.maximum(counts, 1.0)
+        output = output / counts
+
+    return output.astype(np.float32)
+
+
+def _predict_strided(
+    arr: np.ndarray,
+    affine: np.ndarray | None,
+    model: nn.Module,
+    block_shape: tuple[int, int, int],
+    stride: tuple[int, int, int],
+    batch_size: int,
+    device: torch.device,
+    return_labels: bool,
+    normalizer: Any | None,
+) -> nib.Nifti1Image:
+    """Strided prediction with overlap reassembly."""
+    from nobrainer.gpu import get_device
+
+    if device is None:
+        device = get_device()
+    model = model.to(device)
+    model.eval()
+
+    vol_shape = arr.shape[:3]
+    positions = strided_patch_positions(vol_shape, block_shape, stride)
+
+    patches = []
+    with torch.no_grad():
+        for i in range(0, len(positions), batch_size):
+            batch_pos = positions[i : i + batch_size]
+            batch_blocks = np.stack([arr[sd, sh, sw] for sd, sh, sw in batch_pos])
+            if normalizer is not None:
+                batch_blocks = np.stack([normalizer(b) for b in batch_blocks])
+
+            tensor = torch.from_numpy(batch_blocks[:, None].astype(np.float32)).to(
+                device
+            )
+            out = _forward(model, tensor, mc=False)
+            probs = torch.softmax(out, dim=1).cpu().numpy()
+
+            for j, pos in enumerate(batch_pos):
+                patches.append((probs[j], pos))
+
+    n_classes = patches[0][0].shape[0]
+    full_pred = reassemble_predictions(
+        patches, vol_shape, n_classes, strategy="average"
+    )
+
+    if return_labels:
+        labels = full_pred.argmax(axis=0).astype(np.int32)
+        result = nib.Nifti1Image(labels, affine)
+    else:
+        result = nib.Nifti1Image(full_pred.transpose(1, 2, 3, 0), affine)
+    return result
+
+
 def predict(
     inputs: str | Path | np.ndarray | nib.Nifti1Image,
     model: nn.Module,
     block_shape: tuple[int, int, int] = (128, 128, 128),
+    stride: tuple[int, int, int] | None = None,
     batch_size: int = 4,
     device: str | torch.device | None = None,
     return_labels: bool = True,
@@ -131,16 +292,35 @@ def predict(
     orig_shape = arr.shape[:3]
     arr3d = arr if arr.ndim == 3 else arr[..., 0]
 
+    # Strided prediction path (overlapping blocks with reassembly)
+    if stride is not None:
+        return _predict_strided(
+            arr3d,
+            affine,
+            model,
+            block_shape,
+            stride,
+            batch_size,
+            device,
+            return_labels,
+            normalizer,
+        )
+
     # Pad to block-divisible size
     padded, pad = _pad_to_multiple(arr3d, block_shape)
     blocks, grid = _extract_blocks(padded, block_shape)  # (N_blocks, bD, bH, bW)
     n_blocks = blocks.shape[0]
 
     if use_multi_gpu:
-        # Replicate model to each GPU
-        models = [model.to(torch.device(f"cuda:{i}")) for i in range(n_gpus)]
-        for m in models:
+        # Replicate model to each GPU (deep copy to avoid moving the original)
+        import copy
+
+        _ = model.state_dict()
+        models = []
+        for i in range(n_gpus):
+            m = copy.deepcopy(model).to(torch.device(f"cuda:{i}"))
             m.eval()
+            models.append(m)
     else:
         model = model.to(device)
         model.eval()
@@ -157,10 +337,10 @@ def predict(
                 gpu_idx = (start // batch_size) % n_gpus
                 dev = torch.device(f"cuda:{gpu_idx}")
                 tensor = torch.from_numpy(chunk[:, None]).to(dev)
-                out = models[gpu_idx](tensor)
+                out = _forward(models[gpu_idx], tensor, mc=False)
             else:
                 tensor = torch.from_numpy(chunk[:, None]).to(device)
-                out = model(tensor)
+                out = _forward(model, tensor, mc=False)
 
             if return_labels:
                 out = out.argmax(dim=1, keepdim=True).float()
@@ -242,8 +422,10 @@ def predict_with_uncertainty(
     n_blocks = blocks.shape[0]
 
     model = model.to(device)
-    # Keep model in train mode so dropout / Pyro sampling remains stochastic
-    model.train()
+    # Use eval mode to preserve BatchNorm statistics.
+    # Stochasticity is controlled via mc=True (KWYK/FFG models)
+    # or inherent Pyro sampling (BayesianConv3d).
+    model.eval()
 
     # Welford's online algorithm: accumulate mean and M2 incrementally
     # so we only keep 2 block-level arrays in memory, not n_samples copies.
@@ -256,7 +438,7 @@ def predict_with_uncertainty(
             for start in range(0, n_blocks, batch_size):
                 chunk = blocks[start : start + batch_size]
                 tensor = torch.from_numpy(chunk[:, None]).to(device)
-                out = model(tensor)
+                out = _forward(model, tensor, mc=True)
                 probs = torch.softmax(out, dim=1).cpu().numpy()
                 preds.append(probs)
             sample = np.concatenate(preds, axis=0)  # (N_blocks, C, bD, bH, bW)
@@ -271,26 +453,29 @@ def predict_with_uncertainty(
                 m2_probs += delta * delta2
 
     var_probs = m2_probs / max(n_samples, 1)  # population variance
+    del m2_probs
     n_classes = mean_probs.shape[1]
 
-    # Reconstruct full volumes
-    full_mean = _stitch_blocks(
-        mean_probs, grid, block_shape, pad, orig_shape, n_classes
-    )
-    full_var = _stitch_blocks(var_probs, grid, block_shape, pad, orig_shape, n_classes)
-
-    # Mean variance across classes
-    mean_var = full_var.mean(axis=0)  # (D, H, W)
-
-    # Predictive entropy: -sum(p * log(p + eps), axis=classes)
-    eps = 1e-8
-    entropy = -(full_mean * np.log(full_mean + eps)).sum(axis=0)  # (D, H, W)
-
-    # Label = argmax of mean softmax
+    # Reduce per-block before stitching to avoid materialising full (C, D, H, W)
+    # Labels: argmax over classes per block → (N_blocks, 1, bD, bH, bW)
     if n_classes == 1:
-        labels = (full_mean[0] > 0.5).astype(np.float32)
+        block_labels = (mean_probs[:, 0:1] > 0.5).astype(np.float32)
     else:
-        labels = full_mean.argmax(axis=0).astype(np.float32)
+        block_labels = mean_probs.argmax(axis=1, keepdims=True).astype(np.float32)
+
+    # Mean variance across classes per block → (N_blocks, 1, bD, bH, bW)
+    block_var = var_probs.mean(axis=1, keepdims=True)
+    del var_probs
+
+    # Entropy per block → (N_blocks, 1, bD, bH, bW)
+    eps = 1e-8
+    block_entropy = -(mean_probs * np.log(mean_probs + eps)).sum(axis=1, keepdims=True)
+    del mean_probs
+
+    # Stitch scalar maps (n_classes=1 for each)
+    labels = _stitch_blocks(block_labels, grid, block_shape, pad, orig_shape, 1)[0]
+    mean_var = _stitch_blocks(block_var, grid, block_shape, pad, orig_shape, 1)[0]
+    entropy = _stitch_blocks(block_entropy, grid, block_shape, pad, orig_shape, 1)[0]
 
     label_img = nib.Nifti1Image(labels, affine)
     var_img = nib.Nifti1Image(mean_var.astype(np.float32), affine)

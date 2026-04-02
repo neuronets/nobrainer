@@ -78,9 +78,18 @@ def write_model_croissant(
                 "args": {k: str(v) for k, v in (opt_args or {}).items()},
             },
             "loss_function": str(loss_name),
-            "epochs_trained": result.get("epochs_completed", 0),
-            "final_loss": result.get("final_loss", None),
-            "best_loss": result.get("best_loss", None),
+            "epochs_trained": len(result.get("history", [])),
+            "final_loss": (
+                result["history"][-1].get("loss") if result.get("history") else None
+            ),
+            "best_loss": (
+                min(
+                    (h["loss"] for h in result["history"] if h.get("loss") is not None),
+                    default=None,
+                )
+                if result.get("history")
+                else None
+            ),
             "model_architecture": getattr(estimator, "base_model", "unknown"),
             "model_args": getattr(estimator, "model_args", None) or {},
             "n_classes": getattr(estimator, "n_classes_", None),
@@ -90,6 +99,69 @@ def write_model_croissant(
     }
 
     out = save_dir / "croissant.json"
+    out.write_text(json.dumps(metadata, indent=2, default=str))
+    return out
+
+
+def write_checkpoint_croissant(
+    checkpoint_dir: Path,
+    model: Any,
+    optimizer: Any,
+    criterion: Any,
+    history: list[dict],
+) -> Path:
+    """Write croissant.json alongside a training checkpoint.
+
+    Lighter-weight than :func:`write_model_croissant` — works with the raw
+    model/optimizer/criterion objects available inside :func:`~nobrainer.training.fit`
+    rather than requiring an estimator wrapper.
+    """
+    import torch
+
+    import nobrainer
+
+    checkpoint_dir = Path(checkpoint_dir)
+
+    metadata = {
+        "@context": {"@vocab": "http://mlcommons.org/croissant/"},
+        "@type": "cr:Dataset",
+        "name": f"nobrainer-{type(model).__name__}",
+        "description": f"Trained {type(model).__name__} checkpoint via nobrainer",
+        "distribution": [
+            {
+                "@type": "cr:FileObject",
+                "name": "best_model.pth",
+                "contentUrl": "best_model.pth",
+                "encodingFormat": "application/x-pytorch",
+            }
+        ],
+        "nobrainer:provenance": {
+            "training_date": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "nobrainer_version": nobrainer.__version__,
+            "pytorch_version": torch.__version__,
+            "optimizer": {
+                "class": type(optimizer).__name__,
+                "args": {k: str(v) for k, v in optimizer.defaults.items()},
+            },
+            "loss_function": type(criterion).__name__,
+            "epochs_trained": len(history),
+            "final_loss": (history[-1].get("loss") if history else None),
+            "best_loss": (
+                min(
+                    (h["loss"] for h in history if h.get("loss") is not None),
+                    default=None,
+                )
+                if history
+                else None
+            ),
+            "model_architecture": type(model).__name__,
+            "gpu_count": (
+                torch.cuda.device_count() if torch.cuda.is_available() else 0
+            ),
+        },
+    }
+
+    out = checkpoint_dir / "croissant.json"
     out.write_text(json.dumps(metadata, indent=2, default=str))
     return out
 

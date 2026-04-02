@@ -1,0 +1,63 @@
+# KWYK PAC Dataset Smoke Test — 50-class parcellation, 100 subjects
+# Based on: McClure et al., Frontiers in Neuroinformatics 2019
+
+# ---------------------------------------------------------------------------
+# Shared architecture (all variants use identical VWN structure)
+# ---------------------------------------------------------------------------
+filters: 96
+receptive_field: 37  # dilation schedule [1,1,1,2,4,8,1]
+dropout_rate: 0.25
+sigma_init: 0.0001  # initial |kernel_a| for VWN weight sigma
+
+# Training
+block_shape: [32, 32, 32]
+lr: 0.0001
+batch_size: 256
+n_classes: 50  # 50-class FreeSurfer parcellation
+label_mapping: 50-class
+patches_per_volume: 50  # random patches per volume per epoch (GPU utilization)
+
+# Warm-start (deterministic → VWN)
+pretrain_epochs: 50
+bayesian_epochs: 50
+
+# Validation
+val_dice_freq: 5  # full-volume Dice every N epochs (block-level metrics every epoch)
+
+# Inference
+n_samples: 10  # MC inference samples
+
+# Zarr store (fast chunk-aligned I/O, created by slurm_convert_zarr.sbatch)
+zarr_store: /orcd/scratch/orcd/013/satra/kwyk_reproduction/data/kwyk_500.zarr
+
+# Data augmentation
+augmentation: real  # real, synthetic, mixed
+
+# Data assembly
+datasets:
+  - kwyk
+split: [80, 10, 10]  # train/val/test percentages
+
+# ---------------------------------------------------------------------------
+# Model variant configurations (matching original kwyk)
+# ---------------------------------------------------------------------------
+variants:
+  bwn:
+    model: kwyk_meshnet
+    dropout_type: bernoulli
+    mc_at_inference: false
+    description: "VWN MeshNet, Bernoulli dropout, deterministic inference (MAP)"
+
+  bwn_multi:
+    model: kwyk_meshnet
+    dropout_type: bernoulli
+    mc_at_inference: true
+    description: "VWN MeshNet, MC Bernoulli dropout at inference"
+
+  bvwn_multi_prior:
+    model: kwyk_meshnet
+    dropout_type: concrete
+    concrete_temperature: 0.02
+    concrete_init_p: 0.9
+    mc_at_inference: true
+    description: "VWN MeshNet, Concrete dropout (learned rates)"

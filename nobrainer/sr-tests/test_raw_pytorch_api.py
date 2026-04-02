@@ -47,8 +47,8 @@ class TestRawPyTorchAPI:
             gpus=0,
         )
 
-        assert "final_loss" in result
-        assert result["epochs_completed"] == 2
+        assert "history" in result
+        assert len(result["history"]) == 2
 
         # Predict
         model.eval()

@@ -37,28 +37,22 @@ class TestFit:
             torch.optim.Adam(model.parameters()),
             max_epochs=2,
         )
-        assert "final_loss" in result
-        assert "best_loss" in result
-        assert "epochs_completed" in result
+        assert "history" in result
         assert "checkpoint_path" in result
+        assert len(result["history"]) == 2
 
     def test_loss_decreases(self):
         torch.manual_seed(42)
         model = _make_model()
         loader = _make_loader()
-        losses = []
-
-        def track_loss(epoch, loss, model):
-            losses.append(loss)
-
-        fit(
+        result = fit(
             model,
             loader,
             nn.CrossEntropyLoss(),
             torch.optim.Adam(model.parameters(), lr=1e-2),
             max_epochs=10,
-            callbacks=[track_loss],
         )
+        losses = [h["loss"] for h in result["history"]]
         assert (
             losses[-1] < losses[0]
         ), f"Loss did not decrease: first={losses[0]:.4f}, last={losses[-1]:.4f}"
@@ -76,6 +70,28 @@ class TestFit:
         )
         assert result["checkpoint_path"] is not None
         assert (tmp_path / "best_model.pth").exists()
+        assert (tmp_path / "croissant.json").exists()
+
+    def test_checkpoint_croissant_content(self, tmp_path):
+        """Checkpoint croissant.json contains provenance metadata."""
+        import json
+
+        model = _make_model()
+        loader = _make_loader()
+        fit(
+            model,
+            loader,
+            nn.CrossEntropyLoss(),
+            torch.optim.Adam(model.parameters()),
+            max_epochs=2,
+            checkpoint_dir=tmp_path,
+        )
+        data = json.loads((tmp_path / "croissant.json").read_text())
+        prov = data["nobrainer:provenance"]
+        assert prov["epochs_trained"] > 0
+        assert prov["model_architecture"] == "Sequential"
+        assert prov["loss_function"] == "CrossEntropyLoss"
+        assert "optimizer" in prov
 
     def test_epochs_completed(self):
         model = _make_model()
@@ -87,7 +103,7 @@ class TestFit:
             torch.optim.Adam(model.parameters()),
             max_epochs=3,
         )
-        assert result["epochs_completed"] == 3
+        assert len(result["history"]) == 3
 
     def test_dict_batch_format(self):
         """fit() works with dict-style batches (from MONAI DataLoader)."""
@@ -110,4 +126,4 @@ class TestFit:
             torch.optim.Adam(model.parameters()),
             max_epochs=1,
         )
-        assert result["epochs_completed"] == 1
+        assert len(result["history"]) == 1

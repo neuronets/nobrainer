@@ -192,7 +192,7 @@ class ExperimentTracker:
     def callback(self, **extra_fields) -> callable:
         """Return a training callback that logs epoch metrics.
 
-        The returned callable has signature ``(epoch, loss, model)`` —
+        The returned callable has signature ``(epoch, logs, model)`` —
         matching the callback protocol in :func:`nobrainer.training.fit`
         and :class:`Segmentation.fit`.
 
@@ -209,7 +209,7 @@ class ExperimentTracker:
             tracker.finish()
         """
 
-        def _cb(epoch: int, loss: float, model: Any) -> None:
-            self.log({"epoch": epoch, "train_loss": loss, **extra_fields})
+        def _cb(epoch: int, logs: dict, model: Any) -> None:
+            self.log({"epoch": epoch, **logs, **extra_fields})
 
         return _cb

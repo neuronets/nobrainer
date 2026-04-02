@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import copy
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
+
+if TYPE_CHECKING:
+    import zarr
 
 import numpy as np
 import torch
@@ -63,14 +66,20 @@ def _load_label_mapping(name_or_path: str) -> Callable:
             new = int(row["new"])
             lookup[orig] = new
 
-    def _remap(x):
-        """Remap FreeSurfer labels using lookup table."""
+    return _LabelRemap(lookup)
+
+
+class _LabelRemap:
+    """Picklable label remapping callable (needed for DataLoader workers)."""
+
+    def __init__(self, lookup: dict[int, int]):
+        self.lookup = lookup
+
+    def __call__(self, x):
         result = torch.zeros_like(x)
-        for orig_val, new_val in lookup.items():
+        for orig_val, new_val in self.lookup.items():
             result[x == orig_val] = new_val
         return result.long()
-
-    return _remap
 
 
 class Dataset:
@@ -101,6 +110,7 @@ class Dataset:
         self._batch_size: int = 1
         self._shuffle: bool = False
         self._augment: bool = False
+        self._augment_profile: str = "standard"
         self._binarize: bool = False
         self._streaming: bool = False
         self._patches_per_volume: int = 10
@@ -148,6 +158,71 @@ class Dataset:
 
         ds = cls(data=data, volume_shape=volume_shape, n_classes=n_classes)
         ds._block_shape = block_shape
+        return ds
+
+    @classmethod
+    def from_zarr(
+        cls,
+        store_path: str | Path,
+        block_shape: tuple[int, int, int] | None = None,
+        n_classes: int = 1,
+        partition: str | None = None,
+        partition_path: str | Path | None = None,
+    ) -> "Dataset":
+        """Create a Dataset from a Zarr3 store.
+
+        Parameters
+        ----------
+        store_path : str or Path
+            Path to a Zarr store created by
+            :func:`nobrainer.datasets.zarr_store.create_zarr_store`.
+        block_shape : tuple or None
+            Spatial patch size.
+        n_classes : int
+            Number of label classes.
+        partition : str or None
+            Partition to use: ``"train"``, ``"val"``, ``"test"``, or None (all).
+        partition_path : str or Path or None
+            Path to partition JSON.  If None and partition is set, looks for
+            ``<store_path>_partition.json``.
+        """
+        from nobrainer.datasets.zarr_store import load_partition, store_info
+
+        store_path = Path(store_path)
+        info = store_info(store_path)
+        subject_ids = info["subject_ids"]
+        volume_shape = tuple(info["volume_shape"])
+
+        # Filter by partition
+        if partition is not None:
+            if partition_path is None:
+                partition_path = Path(str(store_path) + "_partition.json")
+            parts = load_partition(partition_path)
+            if partition not in parts:
+                raise ValueError(
+                    f"Partition '{partition}' not found. "
+                    f"Available: {list(parts.keys())}"
+                )
+            subject_ids = parts[partition]
+
+        # Build data list referencing zarr indices
+        id_to_idx = {sid: i for i, sid in enumerate(info["subject_ids"])}
+        data = []
+        for sid in subject_ids:
+            idx = id_to_idx[sid]
+            data.append(
+                {
+                    "image": f"zarr://{store_path}#images/{idx}",
+                    "label": f"zarr://{store_path}#labels/{idx}",
+                    "_zarr_store": str(store_path),
+                    "_zarr_index": idx,
+                    "_subject_id": sid,
+                }
+            )
+
+        ds = cls(data=data, volume_shape=volume_shape, n_classes=n_classes)
+        ds._block_shape = block_shape
+        ds._zarr_store_path = str(store_path)
         return ds
 
     # --- Fluent API ---
@@ -207,11 +282,63 @@ class Dataset:
         self._dataloader = None
         return self
 
-    def augment(self) -> "Dataset":
-        """Enable data augmentation."""
-        self._augment = True
+    def augment(self, profile: str | bool = True) -> "Dataset":
+        """Enable data augmentation.
+
+        Parameters
+        ----------
+        profile : str or bool
+            ``True`` or ``"standard"`` for the standard profile.
+            Named profiles: ``"none"``, ``"light"``, ``"standard"``, ``"heavy"``.
+            ``False`` disables augmentation.
+        """
+        if profile is False or profile == "none":
+            self._augment = False
+        elif profile is True:
+            self._augment = True
+            self._augment_profile = "standard"
+        elif isinstance(profile, str):
+            self._augment = True
+            self._augment_profile = profile
         self._dataloader = None
         return self
+
+    def mix(
+        self,
+        generator: "torch.utils.data.Dataset",
+        ratio: float = 0.3,
+    ) -> "Dataset":
+        """Combine this dataset with a synthetic data generator.
+
+        Creates a mixed dataset where each sample is drawn from either
+        the real data (this dataset) or the synthetic generator, based
+        on the ratio.
+
+        Parameters
+        ----------
+        generator : torch.utils.data.Dataset
+            Synthetic data source (e.g., ``SynthSegGenerator``).
+            Must return ``{"image": Tensor, "label": Tensor}`` dicts.
+        ratio : float
+            Fraction of samples drawn from the generator (default 0.3 = 30%).
+
+        Returns
+        -------
+        Dataset
+            A new Dataset wrapping a ``MixedDataset``.
+        """
+
+        mixed = MixedDataset(self, generator, ratio=ratio)
+        new_ds = Dataset(
+            data=self.data, volume_shape=self.volume_shape, n_classes=self.n_classes
+        )
+        new_ds._block_shape = self._block_shape
+        new_ds._batch_size = self._batch_size
+        new_ds._augment = self._augment
+        new_ds._augment_profile = self._augment_profile
+        new_ds._mixed_dataset = mixed
+        new_ds._dataloader = None
+        return new_ds
 
     def streaming(self, patches_per_volume: int = 10) -> "Dataset":
         """Use streaming patch extraction (no full-volume loading).
@@ -273,17 +400,41 @@ class Dataset:
 
         # Streaming mode: use PatchDataset for on-the-fly patch extraction
         if self._streaming:
+            # Build augmentation transforms if enabled
+            transforms = None
+            if self._augment:
+                from monai.transforms import Compose
+
+                from nobrainer.augmentation.profiles import get_augmentation_profile
+
+                aug_transforms = get_augmentation_profile(
+                    self._augment_profile, keys=["image", "label"]
+                )
+                if aug_transforms:
+                    transforms = Compose(aug_transforms)
+
             patch_ds = PatchDataset(
                 data=self.data,
                 block_shape=self._block_shape or (32, 32, 32),
                 patches_per_volume=self._patches_per_volume,
                 binarize=self._binarize if self._binarize else None,
+                transforms=transforms,
             )
+            # Use multiple workers for I/O prefetching — each worker loads
+            # patches independently while GPU processes the current batch.
+            # Respect SLURM allocation or fall back to cpu_count.
+            import os
+
+            slurm_cpus = os.environ.get("SLURM_CPUS_PER_TASK")
+            max_cpus = int(slurm_cpus) if slurm_cpus else (os.cpu_count() or 1)
+            n_workers = max(1, max_cpus - 1)  # leave 1 CPU for main process
             self._dataloader = DataLoader(
                 patch_ds,
                 batch_size=self._batch_size,
                 shuffle=self._shuffle,
-                num_workers=0,
+                num_workers=n_workers,
+                prefetch_factor=2,
+                persistent_workers=True if n_workers > 0 else False,
                 pin_memory=torch.cuda.is_available(),
             )
             return self._dataloader
@@ -471,10 +622,20 @@ class PatchDataset(torch.utils.data.Dataset):
         self.binarize = binarize
         self.transforms = transforms
 
-        # Cache volume shapes to avoid repeated reads
+        # Cache zarr store handles (opened once, reused for all reads)
+        self._zarr_cache: dict[str, zarr.Group] = {}
+
+        # Cache volume shapes — use zarr metadata when available (fast)
         self._shapes: list[tuple[int, ...]] = []
-        for item in data:
-            self._shapes.append(self._get_shape(item["image"]))
+        first_parsed = self._parse_zarr_path(str(data[0]["image"])) if data else None
+        if first_parsed is not None:
+            # All items share the same zarr store — read shape once
+            store = self._get_zarr_store(first_parsed[0])
+            spatial_shape = store[first_parsed[1]].shape[1:]  # (D, H, W)
+            self._shapes = [spatial_shape] * len(data)
+        else:
+            for item in data:
+                self._shapes.append(self._get_shape(item["image"]))
 
     def __len__(self) -> int:
         return len(self.data) * self.patches_per_volume
@@ -491,15 +652,15 @@ class PatchDataset(torch.utils.data.Dataset):
         w0 = np.random.randint(0, max(1, shape[2] - bw + 1))
         slc = (slice(d0, d0 + bd), slice(h0, h0 + bh), slice(w0, w0 + bw))
 
-        # Read only the patch region
-        img_patch = self._read_region(item["image"], slc).astype(np.float32)
+        # Read only the patch region (cached zarr handles for speed)
+        img_patch = self._read_region_cached(item["image"], slc).astype(np.float32)
 
         result: dict[str, torch.Tensor] = {
             "image": torch.from_numpy(img_patch[None]),  # add channel dim
         }
 
         if "label" in item:
-            lbl_patch = self._read_region(item["label"], slc).astype(np.float32)
+            lbl_patch = self._read_region_cached(item["label"], slc).astype(np.float32)
             lbl_patch = self._apply_binarize(lbl_patch)
             result["label"] = torch.from_numpy(lbl_patch[None])
 
@@ -518,14 +679,42 @@ class PatchDataset(torch.utils.data.Dataset):
                 mask = np.maximum(mask, (lbl == val).astype(np.float32))
             return mask
         elif callable(self.binarize):
-            return self.binarize(lbl)
+            # Remap functions may expect torch tensors (e.g., _load_label_mapping)
+            t = torch.from_numpy(lbl.astype(np.int32))
+            result = self.binarize(t)
+            return result.numpy().astype(np.float32)
         return lbl
+
+    @staticmethod
+    def _parse_zarr_path(path: str) -> tuple[str, str, int] | None:
+        """Parse zarr://store_path#array_name/subject_index.
+
+        Returns ``(store_path, array_name, subject_index)`` or None.
+        """
+        if path.startswith("zarr://"):
+            rest = path[len("zarr://") :]
+            if "#" in rest:
+                store_path, fragment = rest.split("#", 1)
+                parts = fragment.rsplit("/", 1)
+                if len(parts) == 2:
+                    return store_path, parts[0], int(parts[1])
+                return store_path, fragment, 0
+            return rest, "images", 0
+        return None
 
     @staticmethod
     def _get_shape(path: str) -> tuple[int, ...]:
         """Get volume shape without loading full data."""
         path = str(path)
-        if path.rstrip("/").endswith(".zarr"):
+        parsed = PatchDataset._parse_zarr_path(path)
+        if parsed is not None:
+            import zarr
+
+            store_path, array_name, idx = parsed
+            store = zarr.open_group(store_path, mode="r")
+            # Shape of the 4D array is (N, D, H, W); return spatial (D, H, W)
+            return store[array_name].shape[1:]
+        elif path.rstrip("/").endswith(".zarr"):
             import zarr
 
             store = zarr.open_group(path, mode="r")
@@ -535,18 +724,38 @@ class PatchDataset(torch.utils.data.Dataset):
 
             return nib.load(path).shape[:3]
 
+    def _get_zarr_store(self, store_path: str):
+        """Get or create a cached zarr group handle."""
+        if store_path not in self._zarr_cache:
+            import zarr
+
+            self._zarr_cache[store_path] = zarr.open_group(store_path, mode="r")
+        return self._zarr_cache[store_path]
+
+    def _read_region_cached(self, path: str, slc: tuple[slice, ...]) -> np.ndarray:
+        """Read a spatial region, using cached zarr handles."""
+        path = str(path)
+        parsed = self._parse_zarr_path(path)
+        if parsed is not None:
+            store_path, array_name, idx = parsed
+            store = self._get_zarr_store(store_path)
+            sd, sh, sw = slc
+            return np.asarray(store[array_name][idx, sd, sh, sw])
+        return self._read_region(path, slc)
+
     @staticmethod
     def _read_region(path: str, slc: tuple[slice, ...]) -> np.ndarray:
-        """Read a spatial region from a volume.
-
-        For Zarr stores, this is a true partial read (only chunks
-        overlapping the region are fetched from storage).
-        For NIfTI, the full volume header is read but only the
-        requested region is loaded into memory via nibabel's
-        array proxy.
-        """
+        """Read a spatial region from a volume (static, no caching)."""
         path = str(path)
-        if path.rstrip("/").endswith(".zarr"):
+        parsed = PatchDataset._parse_zarr_path(path)
+        if parsed is not None:
+            import zarr
+
+            store_path, array_name, idx = parsed
+            store = zarr.open_group(store_path, mode="r")
+            sd, sh, sw = slc
+            return np.asarray(store[array_name][idx, sd, sh, sw])
+        elif path.rstrip("/").endswith(".zarr"):
             import zarr
 
             store = zarr.open_group(path, mode="r")
@@ -555,5 +764,52 @@ class PatchDataset(torch.utils.data.Dataset):
             import nibabel as nib
 
             img = nib.load(path)
-            # Use dataobj proxy for memory-efficient slicing
             return np.asarray(img.dataobj[slc])
+
+
+class MixedDataset(torch.utils.data.Dataset):
+    """Combine a real dataset with a synthetic generator at a given ratio.
+
+    Each ``__getitem__`` call randomly selects from either the real data
+    or the generator based on the ratio.
+
+    Parameters
+    ----------
+    real_dataset : Dataset or torch.utils.data.Dataset
+        The real data source.
+    generator : torch.utils.data.Dataset
+        Synthetic data source (e.g., ``SynthSegGenerator``).
+    ratio : float
+        Fraction of samples from the generator (0.3 = 30% synthetic).
+    """
+
+    def __init__(
+        self,
+        real_dataset: "Dataset | torch.utils.data.Dataset",
+        generator: torch.utils.data.Dataset,
+        ratio: float = 0.3,
+    ) -> None:
+        self.real_dataset = real_dataset
+        self.generator = generator
+        self.ratio = ratio
+        # Total length is the max of real and synthetic
+        self._real_len = len(real_dataset) if hasattr(real_dataset, "__len__") else 0
+        self._gen_len = len(generator)
+
+    def __len__(self) -> int:
+        return max(self._real_len, self._gen_len)
+
+    def __getitem__(self, idx: int) -> dict:
+        import random
+
+        if random.random() < self.ratio:
+            # Synthetic sample
+            gen_idx = idx % self._gen_len
+            return self.generator[gen_idx]
+        else:
+            # Real sample
+            real_idx = idx % max(self._real_len, 1)
+            if hasattr(self.real_dataset, "dataloader"):
+                # Dataset object — use underlying data
+                return self.real_dataset.data[real_idx]
+            return self.real_dataset[real_idx]

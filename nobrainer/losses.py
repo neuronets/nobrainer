@@ -406,6 +406,55 @@ class DiceCELoss(torch.nn.Module):
         return self.dice_weight * d + self.ce_weight * ce
 
 
+class FocalLoss(torch.nn.Module):
+    """Focal Loss for imbalanced multi-class segmentation.
+
+    Down-weights well-classified examples and focuses on hard ones.
+    ``FL(p) = -α · (1 - p)^γ · log(p)``
+
+    Parameters
+    ----------
+    gamma : float
+        Focusing parameter (default 2.0). Higher = more focus on hard examples.
+    alpha : torch.Tensor or None
+        Per-class weights. None = uniform.
+    """
+
+    def __init__(
+        self,
+        gamma: float = 2.0,
+        alpha: torch.Tensor | None = None,
+    ) -> None:
+        super().__init__()
+        self.gamma = gamma
+        if alpha is not None:
+            self.register_buffer("alpha", alpha)
+        else:
+            self.alpha = None
+
+    def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        if target.ndim == pred.ndim - 1:
+            pass  # expected: target is (B, D, H, W), pred is (B, C, D, H, W)
+        elif target.ndim == pred.ndim and target.shape[1] == 1:
+            target = target.squeeze(1)
+        target = target.long()
+
+        ce = torch.nn.functional.cross_entropy(pred, target, reduction="none")
+        p = torch.exp(-ce)  # probability of correct class
+        focal_weight = (1 - p) ** self.gamma
+
+        if self.alpha is not None:
+            alpha_t = self.alpha[target]
+            focal_weight = focal_weight * alpha_t
+
+        return (focal_weight * ce).mean()
+
+
+def focal(gamma: float = 2.0, alpha: torch.Tensor | None = None) -> FocalLoss:
+    """Return a :class:`FocalLoss` instance."""
+    return FocalLoss(gamma=gamma, alpha=alpha)
+
+
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
@@ -419,6 +468,7 @@ _losses = {
     "wasserstein": wasserstein,
     "gradient_penalty": gradient_penalty,
     "hamming": hamming,
+    "focal": focal,
     "weighted_cross_entropy": weighted_cross_entropy,
     "dice_ce": DiceCELoss,
 }

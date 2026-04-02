@@ -7,14 +7,10 @@ from typing import Any, Callable
 
 from monai.data import CacheDataset, DataLoader
 from monai.transforms import (
-    Compose,
     EnsureChannelFirstd,
     LoadImaged,
     NormalizeIntensityd,
     Orientationd,
-    RandAffined,
-    RandFlipd,
-    RandGaussianNoised,
     Spacingd,
 )
 import numpy as np
@@ -122,22 +118,13 @@ def get_dataset(
         else:
             transforms.append(Lambdad(keys=["label"], func=lambda x: (x > 0).float()))
 
-    # Optional augmentation
+    # Optional augmentation — supports bool or profile name
     if augment:
-        transforms += [
-            RandAffined(
-                keys=keys,
-                prob=0.5,
-                rotate_range=(0.1, 0.1, 0.1),
-                scale_range=(0.1, 0.1, 0.1),
-                mode=["bilinear", "nearest"] if has_labels else ["bilinear"],
-                padding_mode="border",
-            ),
-            RandFlipd(keys=keys, prob=0.5, spatial_axis=0),
-            RandFlipd(keys=keys, prob=0.5, spatial_axis=1),
-            RandFlipd(keys=keys, prob=0.5, spatial_axis=2),
-            RandGaussianNoised(keys=["image"], prob=0.2, mean=0.0, std=0.1),
-        ]
+        from nobrainer.augmentation.profiles import get_augmentation_profile
+
+        profile_name = augment if isinstance(augment, str) else "standard"
+        aug_transforms = get_augmentation_profile(profile_name, keys=keys)
+        transforms += aug_transforms
 
     if block_shape is not None:
         from monai.transforms import RandSpatialCropd
@@ -146,9 +133,14 @@ def get_dataset(
             RandSpatialCropd(keys=keys, roi_size=block_shape, random_size=False)
         )
 
+    # Use TrainableCompose so augmentation can be skipped during predict
+    from nobrainer.augmentation.transforms import TrainableCompose
+
+    compose = TrainableCompose(transforms)
+
     dataset = CacheDataset(
         data=data,
-        transform=Compose(transforms),
+        transform=compose,
         cache_rate=cache_rate,
         num_workers=max(0, num_workers),
     )

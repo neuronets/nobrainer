@@ -61,6 +61,7 @@ class Segmentation(BaseEstimator):
         class_weights: torch.Tensor | str | None = None,
         metrics: Callable | None = None,
         callbacks: list | None = None,
+        **kwargs,
     ) -> "Segmentation":
         """Train the model and return self for chaining.
 
@@ -134,6 +135,13 @@ class Segmentation(BaseEstimator):
             if hasattr(dataset_train, "dataloader")
             else dataset_train
         )
+        val_loader = None
+        if dataset_validate is not None:
+            val_loader = (
+                dataset_validate.dataloader
+                if hasattr(dataset_validate, "dataloader")
+                else dataset_validate
+            )
         self._training_result = training_fit(
             model=self.model_,
             loader=loader,
@@ -143,6 +151,11 @@ class Segmentation(BaseEstimator):
             gpus=gpus,
             checkpoint_dir=self.checkpoint_filepath,
             callbacks=callbacks,
+            val_loader=val_loader,
+            checkpoint_freq=kwargs.get("checkpoint_freq", 0),
+            gradient_checkpointing=kwargs.get("gradient_checkpointing", False),
+            model_parallel=kwargs.get("model_parallel", False),
+            resume_from=kwargs.get("resume_from"),
         )
         self._dataset = dataset_train
         return self
