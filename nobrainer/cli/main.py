@@ -623,6 +623,51 @@ Timestamp: {datetime.datetime.utcnow().strftime('%Y/%m/%d %T')}"""
     click.echo(s)
 
 
+# ---------------------------------------------------------------------------
+# zarr subcommands
+# ---------------------------------------------------------------------------
+
+
+@cli.group()
+def zarr():
+    """Zarr store management commands."""
+
+
+@zarr.command("suggest-shards")
+@click.option("--n-volumes", required=True, type=int, help="Number of subjects")
+@click.option(
+    "--volume-shape",
+    required=True,
+    type=str,
+    help="Spatial shape as D,H,W (e.g. 256,256,256)",
+)
+@click.option("--dtype", default="float32", help="Array dtype")
+@click.option(
+    "--n-input-files",
+    default=None,
+    type=int,
+    help="Total input files (default: 2×n-volumes)",
+)
+@click.option("--levels", default=1, type=int, help="Pyramid levels")
+def zarr_suggest_shards(n_volumes, volume_shape, dtype, n_input_files, levels):
+    """Compute optimal shard parameters for a dataset."""
+    import json
+
+    from ..datasets.zarr_store import suggest_shards
+
+    shape = tuple(int(x) for x in volume_shape.split(","))
+    result = suggest_shards(
+        n_volumes,
+        shape,
+        dtype=dtype,
+        n_input_files=n_input_files,
+        levels=levels,
+    )
+    # Convert tuple to list for JSON serialization
+    result["shard_shape"] = list(result["shard_shape"])
+    click.echo(json.dumps(result, indent=2))
+
+
 # For debugging only.
 if __name__ == "__main__":
     cli()

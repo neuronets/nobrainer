@@ -320,6 +320,99 @@ def _infer_target_shape(
     return median_shape, modal_voxel
 
 
+# ---------------------------------------------------------------------------
+# OME-NGFF metadata + pyramid generation (T009–T012)
+# ---------------------------------------------------------------------------
+
+
+def write_ome_metadata(
+    group,
+    axes: list[str],
+    n_levels: int,
+    voxel_size: tuple[float, ...] = (1.0, 1.0, 1.0),
+    array_prefix: str = "",
+) -> None:
+    """Write OME-NGFF v0.5 multiscale metadata to a zarr group.
+
+    Parameters
+    ----------
+    group : zarr.Group
+        Zarr group to annotate.
+    axes : list of str
+        Axis names, e.g. ``["z", "y", "x"]``.
+    n_levels : int
+        Number of pyramid levels (including full resolution).
+    voxel_size : tuple of float
+        Physical voxel size at level 0.
+    array_prefix : str
+        Path prefix for level arrays (e.g. ``"images/"``).
+    """
+    datasets = []
+    for lvl in range(n_levels):
+        factor = 2**lvl
+        scale = [float(v * factor) for v in voxel_size]
+        datasets.append(
+            {
+                "path": f"{array_prefix}{lvl}",
+                "coordinateTransformations": [{"type": "scale", "scale": scale}],
+            }
+        )
+
+    multiscales = [
+        {
+            "version": "0.5",
+            "axes": [
+                {"name": ax, "type": "space", "unit": "millimeter"} for ax in axes
+            ],
+            "datasets": datasets,
+            "type": "gaussian",
+        }
+    ]
+    group.attrs["multiscales"] = multiscales
+
+
+def build_pyramid_level(
+    base_data: np.ndarray,
+    level: int,
+    is_labels: bool = False,
+) -> np.ndarray:
+    """Downsample a 3-D volume by 2^level.
+
+    For images: anti-aliased smooth downsampling via scipy zoom.
+    For labels: max-probability label-preserving downsampling.
+
+    Parameters
+    ----------
+    base_data : ndarray
+        3-D array (D, H, W) at full resolution.
+    level : int
+        Pyramid level (0 = original, 1 = 2× down, etc.).
+    is_labels : bool
+        Use label-preserving downsampling if True.
+
+    Returns
+    -------
+    ndarray
+        Downsampled array.
+    """
+    if level == 0:
+        return base_data
+
+    factor = 2**level
+    if is_labels:
+        # Iterative 2× downsampling for better label preservation
+        result = base_data
+        for _ in range(level):
+            result = downsample_labels(result, factor=2)
+        return result
+    else:
+        from scipy.ndimage import zoom
+
+        return zoom(base_data.astype(np.float32), 1.0 / factor, order=1).astype(
+            base_data.dtype
+        )
+
+
 def create_zarr_store(
     image_label_pairs: list[tuple[str, str]],
     output_path: str | Path,
@@ -330,13 +423,16 @@ def create_zarr_store(
     conform: bool = True,
     target_shape: tuple[int, int, int] | None = None,
     target_voxel_size: tuple[float, float, float] | None = None,
+    levels: int = 1,
+    quantize: bool = False,
+    dtype: str | None = None,
+    n_input_files: int | None = None,
 ) -> Path:
-    """Convert NIfTI pairs into a single sharded Zarr3 store.
+    """Convert NIfTI pairs into a sharded Zarr3 store with optional pyramids.
 
     When ``conform=True`` (default), volumes are conformed to a uniform
-    shape so they can be stacked into 4D arrays ``images[N, D, H, W]``
-    and ``labels[N, D, H, W]``.  The target shape is inferred from the
-    data (median shape) unless explicitly provided.
+    shape so they can be stacked into 4D arrays.  Pyramid levels are
+    generated after conforming (optional, controlled by ``levels``).
 
     Parameters
     ----------
@@ -349,7 +445,7 @@ def create_zarr_store(
     chunk_shape : tuple of int
         Spatial chunk dimensions (default 32³).
     shard_shape : tuple of int or None
-        Shard dimensions.  None = auto (full array or large multiple).
+        Shard dimensions.  None = auto via ``suggest_shards()``.
     compressor : str
         Compression codec name (default ``"blosc"``).
     conform : bool
@@ -358,6 +454,15 @@ def create_zarr_store(
         Target spatial shape.  None = infer from data.
     target_voxel_size : tuple of float or None
         Target voxel size.  None = infer from data.
+    levels : int
+        Number of pyramid levels (1 = no pyramid, 3 = typical).
+    quantize : bool
+        Use int16+scale-factor encoding for images (default False).
+    dtype : str or None
+        Override storage dtype (``"bfloat16"``, ``"int16"``, etc.).
+        None = auto-select.
+    n_input_files : int or None
+        Total input file count for shard heuristic.  None = 2×pairs.
 
     Returns
     -------
@@ -401,59 +506,132 @@ def create_zarr_store(
             img = nib.load(p)
             if img.shape[:3] != target_shape:
                 raise ValueError(
-                    f"Non-uniform shapes detected ({img.shape[:3]} vs {target_shape}). "
-                    "Use conform=True to auto-conform, or ensure all volumes match."
+                    f"Non-uniform shapes ({img.shape[:3]} vs {target_shape}). "
+                    "Use conform=True or ensure all volumes match."
                 )
 
     D, H, W = target_shape
-    full_chunk = (1, *chunk_shape)  # one subject per chunk along axis 0
+    voxel_size = target_voxel_size or (1.0, 1.0, 1.0)
 
-    # Shard shape: group subjects into shards for balanced write parallelism
-    # and read efficiency.  Default: ~50 subjects per shard → manageable
-    # file count while allowing parallel writes across shards.
-    subjects_per_shard = 50
-    if shard_shape is not None:
-        full_shard = shard_shape
+    # Determine image storage dtype
+    if dtype is not None:
+        img_dtype_info = {
+            "dtype": dtype if dtype != "bfloat16" else "uint16",
+            "scl_slope": None,
+            "scl_inter": None,
+            "_nobrainer_dtype": "bfloat16" if dtype == "bfloat16" else None,
+        }
     else:
-        full_shard = (min(subjects_per_shard, n_subjects), D, H, W)
+        # Auto-select: sample first image for range analysis
+        sample_img = nib.load(image_paths[0])
+        sample_data = np.asarray(sample_img.dataobj, dtype=np.float32)
+        img_dtype_info = select_storage_dtype(
+            sample_data, mode="images", quantize=quantize
+        )
+
+    # Determine label storage dtype from first label
+    sample_lbl = nib.load(image_label_pairs[0][1])
+    sample_lbl_data = np.asarray(sample_lbl.dataobj, dtype=np.int32)
+    lbl_dtype_info = select_storage_dtype(sample_lbl_data, mode="labels")
+
+    img_np_dtype = np.dtype(img_dtype_info["dtype"])
+    lbl_np_dtype = np.dtype(lbl_dtype_info["dtype"])
+
+    # Compute shard shape via heuristic
+    if shard_shape is None:
+        shard_info = suggest_shards(
+            n_subjects,
+            target_shape,
+            dtype=img_dtype_info["dtype"],
+            n_input_files=n_input_files,
+            levels=levels,
+        )
+        full_shard = shard_info["shard_shape"]
+        logger.info("Shard heuristic: %s", shard_info)
+    else:
+        full_shard = shard_shape
+
+    full_chunk = (1, *chunk_shape)
 
     # Create store
     store = zarr.open_group(str(output_path), mode="w")
 
-    # Create sharded 4D arrays
+    def _create_level_arrays(lvl, lvl_shape):
+        """Create image and label arrays for one pyramid level."""
+        lvl_D, lvl_H, lvl_W = lvl_shape
+        lvl_chunk = (
+            1,
+            min(chunk_shape[0], lvl_D),
+            min(chunk_shape[1], lvl_H),
+            min(chunk_shape[2], lvl_W),
+        )
+        lvl_shard = (full_shard[0], lvl_D, lvl_H, lvl_W)
+
+        img_arr = store.create_array(
+            f"images/{lvl}",
+            shape=(n_subjects, lvl_D, lvl_H, lvl_W),
+            chunks=lvl_chunk,
+            shards=lvl_shard,
+            dtype=img_np_dtype,
+        )
+        lbl_arr = store.create_array(
+            f"labels/{lvl}",
+            shape=(n_subjects, lvl_D, lvl_H, lvl_W),
+            chunks=lvl_chunk,
+            shards=lvl_shard,
+            dtype=lbl_np_dtype,
+        )
+
+        # Per-array attributes
+        if img_dtype_info["scl_slope"] is not None:
+            img_arr.attrs["scl_slope"] = img_dtype_info["scl_slope"]
+            img_arr.attrs["scl_inter"] = img_dtype_info["scl_inter"]
+        if img_dtype_info["_nobrainer_dtype"]:
+            img_arr.attrs["_nobrainer_dtype"] = img_dtype_info["_nobrainer_dtype"]
+        img_arr.attrs["interpolation"] = "linear"
+        lbl_arr.attrs["interpolation"] = "nearest"
+
+        return img_arr, lbl_arr
+
+    # Create arrays for all levels
+    level_shapes = []
+    level_arrays = []
+    for lvl in range(levels):
+        factor = 2**lvl
+        lvl_shape = (D // factor, H // factor, W // factor)
+        level_shapes.append(lvl_shape)
+        level_arrays.append(_create_level_arrays(lvl, lvl_shape))
+
     n_shards = int(np.ceil(n_subjects / full_shard[0]))
-    images_arr = store.create_array(
-        "images",
-        shape=(n_subjects, D, H, W),
-        chunks=full_chunk,
-        shards=full_shard,
-        dtype=np.float32,
-    )
-    labels_arr = store.create_array(
-        "labels",
-        shape=(n_subjects, D, H, W),
-        chunks=full_chunk,
-        shards=full_shard,
-        dtype=np.int32,
-    )
     logger.info(
-        "Created sharded Zarr3: shape=%s, chunks=%s, shards=%s (%d shard files)",
+        "Created Zarr3: %d levels, shape=%s, chunks=%s, shards=%s "
+        "(%d shard files per array)",
+        levels,
         (n_subjects, D, H, W),
         full_chunk,
         full_shard,
         n_shards,
     )
 
-    # Write volumes — parallel across shards.
-    # Each shard is independent, so we can write to different shards
-    # concurrently.  Within a shard, writes are sequential.
+    # Write base level (level 0) — parallel across shards
     import concurrent.futures
     import os
 
     n_workers = min(os.cpu_count() or 1, n_shards, 8)
+    img_arr_0, lbl_arr_0 = level_arrays[0]
+
+    def _encode_image(raw_data):
+        """Encode a single image volume to storage dtype."""
+        if img_dtype_info["_nobrainer_dtype"] == "bfloat16":
+            return encode_bfloat16(raw_data)
+        elif img_dtype_info["scl_slope"] is not None:
+            encoded, _, _ = encode_scale_factor(raw_data, img_dtype_info["dtype"])
+            return encoded
+        else:
+            return raw_data.astype(img_np_dtype)
 
     def _write_shard_group(shard_idx):
-        """Load and write all subjects belonging to one shard."""
+        """Load, conform, encode, and write subjects for one shard."""
         start = shard_idx * full_shard[0]
         end = min(start + full_shard[0], n_subjects)
         for i in range(start, end):
@@ -461,15 +639,29 @@ def create_zarr_store(
             img = nib.load(img_path)
             lbl = nib.load(lbl_path)
             if conform:
-                img = _conform_volume(img, target_shape, target_voxel_size)
-                lbl = _conform_volume(lbl, target_shape, target_voxel_size)
-            images_arr[i] = np.asarray(img.dataobj, dtype=np.float32)[:D, :H, :W]
-            labels_arr[i] = np.asarray(lbl.dataobj, dtype=np.int32)[:D, :H, :W]
+                img = _conform_volume(img, target_shape, voxel_size)
+                lbl = _conform_volume(lbl, target_shape, voxel_size)
+            img_data = np.asarray(img.dataobj, dtype=np.float32)[:D, :H, :W]
+            lbl_data = np.asarray(lbl.dataobj, dtype=np.int32)[:D, :H, :W]
+
+            # Write base level
+            img_arr_0[i] = _encode_image(img_data)
+            lbl_arr_0[i] = lbl_data.astype(lbl_np_dtype)
+
+            # Write pyramid levels (per-subject, after conform)
+            for lvl in range(1, levels):
+                img_down = build_pyramid_level(img_data, lvl, is_labels=False)
+                lbl_down = build_pyramid_level(lbl_data, lvl, is_labels=True)
+                lvl_img_arr, lvl_lbl_arr = level_arrays[lvl]
+                ld, lh, lw = level_shapes[lvl]
+                lvl_img_arr[i] = _encode_image(img_down[:ld, :lh, :lw])
+                lvl_lbl_arr[i] = lbl_down[:ld, :lh, :lw].astype(lbl_np_dtype)
         return end - start
 
     logger.info(
-        "Writing %d volumes across %d shards with %d workers...",
+        "Writing %d volumes (%d levels) across %d shards with %d workers...",
         n_subjects,
+        levels,
         n_shards,
         n_workers,
     )
@@ -480,26 +672,51 @@ def create_zarr_store(
             done += future.result()
             logger.info("Stored %d/%d volumes", done, n_subjects)
 
-    # Store metadata
+    # Write OME-NGFF metadata
+    if levels > 1:
+        write_ome_metadata(
+            store,
+            axes=["z", "y", "x"],
+            n_levels=levels,
+            voxel_size=voxel_size,
+            array_prefix="images/",
+        )
+        write_ome_metadata(
+            store,
+            axes=["z", "y", "x"],
+            n_levels=levels,
+            voxel_size=voxel_size,
+            array_prefix="labels/",
+        )
+
+    # Store nobrainer metadata
+    import nobrainer
+
     store.attrs["n_subjects"] = n_subjects
     store.attrs["subject_ids"] = subject_ids
     store.attrs["volume_shape"] = list(target_shape)
     store.attrs["chunk_shape"] = list(chunk_shape)
+    store.attrs["n_levels"] = levels
     store.attrs["layout"] = "stacked"
-    store.attrs["image_dtype"] = "float32"
-    store.attrs["label_dtype"] = "int32"
+    store.attrs["image_dtype"] = img_dtype_info["dtype"]
+    store.attrs["label_dtype"] = lbl_dtype_info["dtype"]
+    store.attrs["nobrainer_version"] = nobrainer.__version__
+    store.attrs["conformed"] = bool(conform)
     if conform:
-        store.attrs["conformed"] = True
         store.attrs["target_shape"] = [int(x) for x in target_shape]
-        store.attrs["target_voxel_size"] = [float(x) for x in target_voxel_size]
-    else:
-        store.attrs["conformed"] = False
+        store.attrs["target_voxel_size"] = [float(x) for x in voxel_size]
+    if img_dtype_info["_nobrainer_dtype"]:
+        store.attrs["_nobrainer_dtype"] = img_dtype_info["_nobrainer_dtype"]
+    if img_dtype_info["scl_slope"] is not None:
+        store.attrs["scl_slope"] = img_dtype_info["scl_slope"]
+        store.attrs["scl_inter"] = img_dtype_info["scl_inter"]
 
     logger.info(
-        "Zarr store created: %s (%d subjects, shape=%s)",
+        "Zarr store created: %s (%d subjects, shape=%s, %d levels)",
         output_path,
         n_subjects,
         target_shape,
+        levels,
     )
     return output_path.resolve()
 

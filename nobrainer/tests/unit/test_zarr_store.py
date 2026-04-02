@@ -47,10 +47,8 @@ class TestCreateZarrStore:
         )
 
         store = zarr.open_group(str(store_path), mode="r")
-        assert store["images"].shape == (3, 32, 32, 32)
-        assert store["labels"].shape == (3, 32, 32, 32)
-        assert store["images"].dtype == np.float32
-        assert store["labels"].dtype == np.int32
+        assert store["images/0"].shape == (3, 32, 32, 32)
+        assert store["labels/0"].shape == (3, 32, 32, 32)
 
     def test_metadata_stored(self, tmp_path):
         from nobrainer.datasets.zarr_store import create_zarr_store, store_info
@@ -77,11 +75,14 @@ class TestCreateZarrStore:
         pairs = [_make_nifti_pair(tmp_path, i) for i in range(2)]
         store_path = create_zarr_store(pairs, tmp_path / "test.zarr", conform=False)
 
-        # Read back and compare
+        # Read back and compare (bfloat16 default loses some precision)
         original = np.asarray(nib.load(pairs[0][0]).dataobj, dtype=np.float32)
         store = zarr.open_group(str(store_path), mode="r")
-        stored = np.array(store["images"][0])
-        assert np.allclose(original, stored, atol=1e-6)
+        from nobrainer.datasets.zarr_store import decode_bfloat16
+
+        stored_raw = np.array(store["images/0"][0])
+        stored = decode_bfloat16(stored_raw)
+        assert np.allclose(original, stored, rtol=1e-2, atol=1e-3)
 
     def test_partial_io(self, tmp_path):
         import zarr
@@ -93,7 +94,7 @@ class TestCreateZarrStore:
 
         store = zarr.open_group(str(store_path), mode="r")
         # Read a subregion from subject 2
-        patch = np.array(store["images"][2, 8:24, 8:24, 8:24])
+        patch = np.array(store["images/0"][2, 8:24, 8:24, 8:24])
         assert patch.shape == (16, 16, 16)
 
     def test_auto_conform(self, tmp_path):
@@ -116,7 +117,7 @@ class TestCreateZarrStore:
 
         store = zarr.open_group(str(store_path), mode="r")
         # All subjects should have same shape
-        assert store["images"].shape[1:] == store["images"].shape[1:]
+        assert store["images/0"].shape[0] == 3
         info = dict(store.attrs)
         assert info["conformed"] is True
 
@@ -129,6 +130,111 @@ class TestCreateZarrStore:
         ]
         with pytest.raises(ValueError, match="Non-uniform shapes"):
             create_zarr_store(pairs, tmp_path / "test.zarr", conform=False)
+
+
+class TestPyramidalStore:
+    """Tests for pyramidal OME-Zarr store creation (T016)."""
+
+    def test_creates_pyramid_levels(self, tmp_path):
+        import zarr
+
+        from nobrainer.datasets.zarr_store import create_zarr_store
+
+        pairs = [_make_nifti_pair(tmp_path, i, shape=(32, 32, 32)) for i in range(3)]
+        store_path = create_zarr_store(
+            pairs, tmp_path / "test.zarr", conform=False, levels=3
+        )
+
+        store = zarr.open_group(str(store_path), mode="r")
+        # Level 0: full resolution
+        assert store["images/0"].shape == (3, 32, 32, 32)
+        # Level 1: 2× downsampled
+        assert store["images/1"].shape == (3, 16, 16, 16)
+        # Level 2: 4× downsampled
+        assert store["images/2"].shape == (3, 8, 8, 8)
+        # Labels too
+        assert store["labels/0"].shape == (3, 32, 32, 32)
+        assert store["labels/2"].shape == (3, 8, 8, 8)
+
+    def test_label_values_preserved_at_all_levels(self, tmp_path):
+        import zarr
+
+        from nobrainer.datasets.zarr_store import create_zarr_store
+
+        # Create label maps with specific discrete values
+        shape = (32, 32, 32)
+        for i in range(3):
+            img_data = np.random.randn(*shape).astype(np.float32)
+            lbl_data = np.zeros(shape, dtype=np.int32)
+            lbl_data[:16, :, :] = 2
+            lbl_data[16:, :16, :] = 41
+            lbl_data[16:, 16:, :] = 77
+
+            affine = np.eye(4)
+            img_path = tmp_path / f"sub-{i:02d}_image.nii.gz"
+            lbl_path = tmp_path / f"sub-{i:02d}_label.nii.gz"
+            nib.save(nib.Nifti1Image(img_data, affine), str(img_path))
+            nib.save(nib.Nifti1Image(lbl_data, affine), str(lbl_path))
+
+        pairs = [
+            (
+                str(tmp_path / f"sub-{i:02d}_image.nii.gz"),
+                str(tmp_path / f"sub-{i:02d}_label.nii.gz"),
+            )
+            for i in range(3)
+        ]
+        store_path = create_zarr_store(
+            pairs, tmp_path / "test.zarr", conform=False, levels=3
+        )
+
+        store = zarr.open_group(str(store_path), mode="r")
+        for lvl in range(3):
+            lbl_arr = np.array(store[f"labels/{lvl}"][0])
+            unique = set(np.unique(lbl_arr))
+            assert unique.issubset(
+                {0, 2, 41, 77}
+            ), f"Level {lvl} has unexpected values: {unique - {0, 2, 41, 77}}"
+
+    def test_ome_metadata_written(self, tmp_path):
+        import zarr
+
+        from nobrainer.datasets.zarr_store import create_zarr_store
+
+        pairs = [_make_nifti_pair(tmp_path, i, shape=(32, 32, 32)) for i in range(2)]
+        store_path = create_zarr_store(
+            pairs, tmp_path / "test.zarr", conform=False, levels=2
+        )
+
+        store = zarr.open_group(str(store_path), mode="r")
+        ms = store.attrs.get("multiscales")
+        assert ms is not None
+        assert len(ms) >= 1
+        assert ms[0]["version"] == "0.5"
+        assert len(ms[0]["datasets"]) == 2
+
+    def test_bfloat16_default(self, tmp_path):
+        import zarr
+
+        from nobrainer.datasets.zarr_store import create_zarr_store
+
+        pairs = [_make_nifti_pair(tmp_path, i, shape=(32, 32, 32)) for i in range(2)]
+        store_path = create_zarr_store(pairs, tmp_path / "test.zarr", conform=False)
+
+        store = zarr.open_group(str(store_path), mode="r")
+        # Default: images stored as uint16 (bfloat16 view)
+        assert store["images/0"].dtype == np.uint16
+        assert store["images/0"].attrs.get("_nobrainer_dtype") == "bfloat16"
+
+    def test_n_levels_metadata(self, tmp_path):
+        from nobrainer.datasets.zarr_store import create_zarr_store, store_info
+
+        pairs = [_make_nifti_pair(tmp_path, i, shape=(32, 32, 32)) for i in range(2)]
+        store_path = create_zarr_store(
+            pairs, tmp_path / "test.zarr", conform=False, levels=3
+        )
+
+        info = store_info(store_path)
+        assert info["n_levels"] == 3
 
 
 class TestPartition:
