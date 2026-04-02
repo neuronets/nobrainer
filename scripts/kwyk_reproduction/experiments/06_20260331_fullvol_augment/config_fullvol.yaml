@@ -1,0 +1,31 @@
+# Full-volume training with augmentation — 50-class parcellation
+# Uses 128³ blocks (fits on L40S) or 256³ on larger GPUs
+
+filters: 96
+receptive_field: 37
+dropout_rate: 0.25
+sigma_init: 0.0001
+
+block_shape: [128, 128, 128]
+lr: 0.0001
+batch_size: 4
+n_classes: 50
+label_mapping: 50-class
+patches_per_volume: 8  # fewer patches needed with large blocks
+
+pretrain_epochs: 20
+bayesian_epochs: 20
+val_dice_freq: 5
+
+n_samples: 10
+augmentation_profile: standard
+
+datasets:
+  - kwyk
+split: [80, 10, 10]
+
+variants:
+  bwn_multi:
+    model: kwyk_meshnet
+    dropout_type: bernoulli
+    mc_at_inference: true

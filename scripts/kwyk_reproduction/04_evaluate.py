@@ -249,10 +249,13 @@ def main() -> None:
 
         t1w_arr = np.asarray(nib.load(img_path).dataobj, dtype=np.float32)
 
-        # Predict
+        # Predict (batch_size=128 to utilize GPU memory with 32³ blocks)
         if n_samples > 0:
             pred_result = seg.predict(
-                img_path, block_shape=block_shape, n_samples=n_samples
+                img_path,
+                block_shape=block_shape,
+                n_samples=n_samples,
+                batch_size=128,
             )
             if isinstance(pred_result, tuple):
                 label_img, var_img, entropy_img = pred_result
@@ -261,7 +264,7 @@ def main() -> None:
             else:
                 label_img = pred_result
         else:
-            label_img = seg.predict(img_path, block_shape=block_shape)
+            label_img = seg.predict(img_path, block_shape=block_shape, batch_size=128)
 
         pred_arr = np.asarray(label_img.dataobj, dtype=np.int32)
 

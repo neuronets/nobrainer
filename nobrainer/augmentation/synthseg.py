@@ -73,8 +73,10 @@ class SynthSegGenerator(torch.utils.data.Dataset):
         flipping: bool = True,
         randomize_resolution: bool = True,
         resolution_range: tuple[float, float] = (1.0, 3.0),
+        seed: int | None = None,
     ) -> None:
         self.label_maps = [Path(p) for p in label_maps]
+        self._seed = seed
         self.n_samples_per_map = n_samples_per_map
         self.intensity_prior = intensity_prior
         self.std_prior = std_prior
@@ -103,6 +105,12 @@ class SynthSegGenerator(torch.utils.data.Dataset):
 
     def __len__(self) -> int:
         return len(self.label_maps) * self.n_samples_per_map
+
+    def _get_rng(self, idx: int) -> np.random.Generator:
+        """Get a seeded RNG for reproducibility, or unseeded if no seed."""
+        if self._seed is not None:
+            return np.random.default_rng(self._seed + idx)
+        return np.random.default_rng()
 
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         map_idx = idx // self.n_samples_per_map
