@@ -93,7 +93,7 @@ jobs:
 
           # Install nobrainer from checkout on top of the base layer
           uv pip install \
-            ".[bayesian,generative,dev]" \
+            ".[bayesian,generative,zarr,dev]" \
             monai \
             pyro-ppl \
             matplotlib
