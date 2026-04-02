@@ -78,9 +78,18 @@ def write_model_croissant(
                 "args": {k: str(v) for k, v in (opt_args or {}).items()},
             },
             "loss_function": str(loss_name),
-            "epochs_trained": result.get("epochs_completed", 0),
-            "final_loss": result.get("final_loss", None),
-            "best_loss": result.get("best_loss", None),
+            "epochs_trained": len(result.get("history", [])),
+            "final_loss": (
+                result["history"][-1].get("loss") if result.get("history") else None
+            ),
+            "best_loss": (
+                min(
+                    (h["loss"] for h in result["history"] if h.get("loss") is not None),
+                    default=None,
+                )
+                if result.get("history")
+                else None
+            ),
             "model_architecture": getattr(estimator, "base_model", "unknown"),
             "model_args": getattr(estimator, "model_args", None) or {},
             "n_classes": getattr(estimator, "n_classes_", None),

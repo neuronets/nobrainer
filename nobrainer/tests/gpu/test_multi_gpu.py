@@ -50,7 +50,8 @@ class TestMultiGPU:
             gpus=2,
             callbacks=[track],
         )
-        assert result["final_loss"] < losses[0]
+        final_loss = result["history"][-1]["loss"]
+        assert final_loss < losses[0]
 
     def test_multi_gpu_predict_matches_single(self):
         """Multi-GPU predict() output matches single-GPU result."""

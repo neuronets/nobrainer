@@ -174,9 +174,9 @@ def _apply_model_parallel(model: nn.Module, gpus: int) -> nn.Module:
 
     def _mp_forward(*args, **kwargs):
         # Move input to first device
-        first_device = torch.device(
-            f"cuda:{groups[0][0][1].weight.device.index if hasattr(groups[0][0][1], 'weight') else 0}"
-        )
+        first_mod = groups[0][0][1]
+        dev_idx = first_mod.weight.device.index if hasattr(first_mod, "weight") else 0
+        first_device = torch.device(f"cuda:{dev_idx}")
         new_args = tuple(
             a.to(first_device) if isinstance(a, torch.Tensor) else a for a in args
         )
@@ -258,8 +258,9 @@ def fit(
 
     Returns
     -------
-    dict with keys: final_loss, best_loss, epochs_completed, checkpoint_path,
-    train_losses, val_losses, checkpoint_epochs
+    dict
+        ``{"history": [{"epoch": int, "loss": float, ...}, ...],
+        "checkpoint_path": str | None}``
     """
     device = get_device()
 
