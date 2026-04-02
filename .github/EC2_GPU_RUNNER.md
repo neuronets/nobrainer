@@ -117,8 +117,14 @@ aws ec2 terminate-instances --instance-id i-XXXXXXXXX
 | `AWS_REGION` | `us-east-1` | Region where the AMI lives |
 | `AWS_IMAGE_ID` | `ami-0abc123def456` | The AMI created above |
 | `AWS_INSTANCE_TYPE` | `g4dn.xlarge` | 1x T4 GPU (~$0.53/hr); `p3.2xlarge` for V100 |
-| `AWS_SUBNET` | `subnet-0abc123` | Must have internet access for runner registration |
+| `AWS_SUBNET` | `subnet-0abc123` | Primary subnet (us-west-2a); must have internet access |
 | `AWS_SECURITY_GROUP` | `sg-0abc123` | Allow outbound HTTPS (port 443) |
+
+**Multi-AZ failover**: The workflow uses `availability-zones-config` to try
+three AZs in sequence (us-west-2a, 2b, 2c). If spot capacity is unavailable
+in one AZ, it automatically fails over to the next. The additional subnets are:
+- `subnet-037d2d3a590d2d5a0` (us-west-2b)
+- `subnet-0a0a8a5b43dffd7d2` (us-west-2c)
 
 ## IAM policy (minimum permissions)
 

@@ -85,11 +85,14 @@ jobs:
         with:
           mode: start
           github-token: ${{ secrets.GH_TOKEN }}
-          ec2-image-id: ${{ vars.AWS_IMAGE_ID }}
           ec2-instance-type: ${{ steps.gpu-config.outputs.instance || vars.AWS_INSTANCE_TYPE }}
-          subnet-id: ${{ vars.AWS_SUBNET }}
-          security-group-id: ${{ vars.AWS_SECURITY_GROUP }}
           market-type: ${{ steps.gpu-config.outputs.market_type || 'spot' }}
+          availability-zones-config: |
+            [
+              {"imageId": "${{ vars.AWS_IMAGE_ID }}", "subnetId": "${{ vars.AWS_SUBNET }}", "securityGroupId": "${{ vars.AWS_SECURITY_GROUP }}"},
+              {"imageId": "${{ vars.AWS_IMAGE_ID }}", "subnetId": "subnet-037d2d3a590d2d5a0", "securityGroupId": "${{ vars.AWS_SECURITY_GROUP }}"},
+              {"imageId": "${{ vars.AWS_IMAGE_ID }}", "subnetId": "subnet-0a0a8a5b43dffd7d2", "securityGroupId": "${{ vars.AWS_SECURITY_GROUP }}"}
+            ]
 
   gpu-tests:
     needs: start-runner
