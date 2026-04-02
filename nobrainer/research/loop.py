@@ -17,6 +17,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import time
 from typing import Any
 
@@ -121,7 +122,7 @@ def run_loop(
 
         try:
             proc = subprocess.run(
-                ["python", str(train_path)],
+                [sys.executable, str(train_path)],
                 cwd=str(working_dir),
                 capture_output=True,
                 text=True,

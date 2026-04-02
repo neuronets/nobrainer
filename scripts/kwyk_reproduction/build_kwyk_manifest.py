@@ -99,9 +99,14 @@ def main():
             writer.writerow([f"pac_{subj_id}", "kwyk", orig_path, aseg_path, split])
 
     # Summary
+    from collections import Counter
 
+    split_counts = Counter(splits)
     print(f"Manifest written to {output_csv}")
-    print()
+    print(
+        f"  train: {split_counts['train']}, "
+        f"val: {split_counts['val']}, test: {split_counts['test']}"
+    )
 
 
 if __name__ == "__main__":

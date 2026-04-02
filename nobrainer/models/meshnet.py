@@ -12,11 +12,9 @@ import torch
 import torch.nn as nn
 
 # Dilation schedules indexed by receptive field size
-_DILATION_SCHEDULES: dict[int, list[int]] = {
-    37: [1, 1, 1, 2, 4, 8, 1],
-    67: [1, 1, 2, 4, 8, 16, 1],
-    129: [1, 2, 4, 8, 16, 32, 1],
-}
+from nobrainer.models._constants import (  # noqa: E501
+    DILATION_SCHEDULES as _DILATION_SCHEDULES,
+)
 
 
 class _ConvBNActDrop(nn.Module):

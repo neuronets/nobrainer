@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 
-def _make_nifti_pair(tmp_path, idx, shape=(16, 16, 16)):
+def _make_nifti_pair(tmp_path, idx, shape=(32, 32, 32)):
     """Create a NIfTI image + label pair."""
     img_data = np.random.randn(*shape).astype(np.float32)
     lbl_data = np.random.randint(0, 5, shape, dtype=np.int32)
@@ -47,8 +47,8 @@ class TestCreateZarrStore:
         )
 
         store = zarr.open_group(str(store_path), mode="r")
-        assert store["images"].shape == (3, 16, 16, 16)
-        assert store["labels"].shape == (3, 16, 16, 16)
+        assert store["images"].shape == (3, 32, 32, 32)
+        assert store["labels"].shape == (3, 32, 32, 32)
         assert store["images"].dtype == np.float32
         assert store["labels"].dtype == np.int32
 
@@ -66,7 +66,7 @@ class TestCreateZarrStore:
         info = store_info(store_path)
         assert info["n_subjects"] == 3
         assert info["subject_ids"] == ["sub-00", "sub-01", "sub-02"]
-        assert info["volume_shape"] == [16, 16, 16]
+        assert info["volume_shape"] == [32, 32, 32]
         assert info["layout"] == "stacked"
 
     def test_round_trip_fidelity(self, tmp_path):
@@ -93,18 +93,20 @@ class TestCreateZarrStore:
 
         store = zarr.open_group(str(store_path), mode="r")
         # Read a subregion from subject 2
-        patch = np.array(store["images"][2, 4:12, 4:12, 4:12])
-        assert patch.shape == (8, 8, 8)
+        patch = np.array(store["images"][2, 8:24, 8:24, 8:24])
+        assert patch.shape == (16, 16, 16)
 
     def test_auto_conform(self, tmp_path):
         import zarr
 
         from nobrainer.datasets.zarr_store import create_zarr_store
 
-        # Create volumes with different shapes
+        # Create volumes with different shapes — conform should make them uniform
+        # Use shapes where median is 32-divisible for sharding compat
         pairs = [
-            _make_nifti_pair(tmp_path, 0, shape=(16, 16, 16)),
-            _make_nifti_pair(tmp_path, 1, shape=(18, 14, 16)),
+            _make_nifti_pair(tmp_path, 0, shape=(32, 32, 32)),
+            _make_nifti_pair(tmp_path, 1, shape=(32, 32, 32)),
+            _make_nifti_pair(tmp_path, 2, shape=(64, 64, 64)),
         ]
         store_path = create_zarr_store(
             pairs,
@@ -122,8 +124,8 @@ class TestCreateZarrStore:
         from nobrainer.datasets.zarr_store import create_zarr_store
 
         pairs = [
-            _make_nifti_pair(tmp_path, 0, shape=(16, 16, 16)),
-            _make_nifti_pair(tmp_path, 1, shape=(20, 20, 20)),
+            _make_nifti_pair(tmp_path, 0, shape=(32, 32, 32)),
+            _make_nifti_pair(tmp_path, 1, shape=(64, 64, 64)),
         ]
         with pytest.raises(ValueError, match="Non-uniform shapes"):
             create_zarr_store(pairs, tmp_path / "test.zarr", conform=False)

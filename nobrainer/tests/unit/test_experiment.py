@@ -35,15 +35,15 @@ class TestExperimentTracker:
         cb = tracker.callback(variant="test")
 
         # Simulate training callback
-        cb(0, 1.5, None)  # (epoch, loss, model)
-        cb(1, 0.8, None)
+        cb(0, {"loss": 1.5}, None)  # (epoch, logs_dict, model)
+        cb(1, {"loss": 0.8}, None)
         tracker.finish()
 
         lines = (tmp_path / "metrics.jsonl").read_text().strip().split("\n")
         assert len(lines) == 2
         row = json.loads(lines[0])
         assert row["epoch"] == 0
-        assert row["train_loss"] == 1.5
+        assert row["loss"] == 1.5
         assert row["variant"] == "test"
 
     def test_no_wandb_by_default(self, tmp_path):

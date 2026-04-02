@@ -69,7 +69,13 @@ class TestWriteModelCroissant:
         """write_model_croissant() creates a valid JSON-LD file."""
         est = _make_fake_estimator()
         ds = _make_fake_dataset(tmp_path)
-        result = {"epochs_completed": 2, "final_loss": 0.5, "best_loss": 0.4}
+        result = {
+            "history": [
+                {"epoch": 1, "loss": 0.5},
+                {"epoch": 2, "loss": 0.4},
+            ],
+            "checkpoint_path": None,
+        }
         out = write_model_croissant(tmp_path, est, result, ds)
         assert out.exists()
         data = json.loads(out.read_text())
@@ -81,7 +87,13 @@ class TestWriteModelCroissant:
         """Provenance must contain all required fields."""
         est = _make_fake_estimator()
         ds = _make_fake_dataset(tmp_path)
-        result = {"epochs_completed": 2, "final_loss": 0.5, "best_loss": 0.4}
+        result = {
+            "history": [
+                {"epoch": 1, "loss": 0.5},
+                {"epoch": 2, "loss": 0.4},
+            ],
+            "checkpoint_path": None,
+        }
         out = write_model_croissant(tmp_path, est, result, ds)
         data = json.loads(out.read_text())
         prov = data["nobrainer:provenance"]

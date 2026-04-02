@@ -15,11 +15,10 @@ from nobrainer.training import get_device
 
 def _forward(model: nn.Module, tensor: torch.Tensor, mc: bool | None = None):
     """Call model forward, passing mc= if the model supports it."""
-    if mc is not None:
-        try:
-            return model(tensor, mc=mc)
-        except TypeError:
-            pass
+    from nobrainer.models._utils import model_supports_mc
+
+    if mc is not None and model_supports_mc(model):
+        return model(tensor, mc=mc)
     return model(tensor)
 
 
@@ -179,10 +178,63 @@ def reassemble_predictions(
     return output.astype(np.float32)
 
 
+def _predict_strided(
+    arr: np.ndarray,
+    affine: np.ndarray | None,
+    model: nn.Module,
+    block_shape: tuple[int, int, int],
+    stride: tuple[int, int, int],
+    batch_size: int,
+    device: torch.device,
+    return_labels: bool,
+    normalizer: Any | None,
+) -> nib.Nifti1Image:
+    """Strided prediction with overlap reassembly."""
+    from nobrainer.gpu import get_device
+
+    if device is None:
+        device = get_device()
+    model = model.to(device)
+    model.eval()
+
+    vol_shape = arr.shape[:3]
+    positions = strided_patch_positions(vol_shape, block_shape, stride)
+
+    patches = []
+    with torch.no_grad():
+        for i in range(0, len(positions), batch_size):
+            batch_pos = positions[i : i + batch_size]
+            batch_blocks = np.stack([arr[sd, sh, sw] for sd, sh, sw in batch_pos])
+            if normalizer is not None:
+                batch_blocks = np.stack([normalizer(b) for b in batch_blocks])
+
+            tensor = torch.from_numpy(batch_blocks[:, None].astype(np.float32)).to(
+                device
+            )
+            out = _forward(model, tensor, mc=False)
+            probs = torch.softmax(out, dim=1).cpu().numpy()
+
+            for j, pos in enumerate(batch_pos):
+                patches.append((probs[j], pos))
+
+    n_classes = patches[0][0].shape[0]
+    full_pred = reassemble_predictions(
+        patches, vol_shape, n_classes, strategy="average"
+    )
+
+    if return_labels:
+        labels = full_pred.argmax(axis=0).astype(np.int32)
+        result = nib.Nifti1Image(labels, affine)
+    else:
+        result = nib.Nifti1Image(full_pred.transpose(1, 2, 3, 0), affine)
+    return result
+
+
 def predict(
     inputs: str | Path | np.ndarray | nib.Nifti1Image,
     model: nn.Module,
     block_shape: tuple[int, int, int] = (128, 128, 128),
+    stride: tuple[int, int, int] | None = None,
     batch_size: int = 4,
     device: str | torch.device | None = None,
     return_labels: bool = True,
@@ -240,16 +292,35 @@ def predict(
     orig_shape = arr.shape[:3]
     arr3d = arr if arr.ndim == 3 else arr[..., 0]
 
+    # Strided prediction path (overlapping blocks with reassembly)
+    if stride is not None:
+        return _predict_strided(
+            arr3d,
+            affine,
+            model,
+            block_shape,
+            stride,
+            batch_size,
+            device,
+            return_labels,
+            normalizer,
+        )
+
     # Pad to block-divisible size
     padded, pad = _pad_to_multiple(arr3d, block_shape)
     blocks, grid = _extract_blocks(padded, block_shape)  # (N_blocks, bD, bH, bW)
     n_blocks = blocks.shape[0]
 
     if use_multi_gpu:
-        # Replicate model to each GPU
-        models = [model.to(torch.device(f"cuda:{i}")) for i in range(n_gpus)]
-        for m in models:
+        # Replicate model to each GPU (deep copy to avoid moving the original)
+        import copy
+
+        _ = model.state_dict()
+        models = []
+        for i in range(n_gpus):
+            m = copy.deepcopy(model).to(torch.device(f"cuda:{i}"))
             m.eval()
+            models.append(m)
     else:
         model = model.to(device)
         model.eval()
@@ -351,8 +422,10 @@ def predict_with_uncertainty(
     n_blocks = blocks.shape[0]
 
     model = model.to(device)
-    # Keep model in train mode so dropout / Pyro sampling remains stochastic
-    model.train()
+    # Use eval mode to preserve BatchNorm statistics.
+    # Stochasticity is controlled via mc=True (KWYK/FFG models)
+    # or inherent Pyro sampling (BayesianConv3d).
+    model.eval()
 
     # Welford's online algorithm: accumulate mean and M2 incrementally
     # so we only keep 2 block-level arrays in memory, not n_samples copies.

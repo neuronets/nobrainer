@@ -161,7 +161,9 @@ class BayesianVNet(PyroModule):
         # Final 1×1×1 classifier — deterministic
         self.classifier = nn.Conv3d(ch[0], n_classes, kernel_size=1)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    supports_mc = True
+
+    def forward(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
         h = F.elu(self.input_bn(self.input_proj(x)))
 
         skips: list[torch.Tensor] = []
