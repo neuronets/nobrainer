@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import copy
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
+
+if TYPE_CHECKING:
+    import zarr
 
 import numpy as np
 import torch
@@ -620,7 +623,7 @@ class PatchDataset(torch.utils.data.Dataset):
         self.transforms = transforms
 
         # Cache zarr store handles (opened once, reused for all reads)
-        self._zarr_cache: dict[str, "zarr.Group"] = {}
+        self._zarr_cache: dict[str, zarr.Group] = {}
 
         # Cache volume shapes — use zarr metadata when available (fast)
         self._shapes: list[tuple[int, ...]] = []

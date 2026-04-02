@@ -13,7 +13,7 @@ import torch
 import torch.nn as nn
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from utils import setup_logging
+from utils import setup_logging  # noqa: E402
 
 log = setup_logging(__name__)
 
@@ -159,7 +159,7 @@ def main():
         sigma_init=0.0001,
     )
     meshnet_ckpt = WORK_DIR / "checkpoints" / "sanity_meshnet" / "model.pth"
-    n_transferred = fixed_warmstart_kwyk(kwyk_model, meshnet_ckpt)
+    fixed_warmstart_kwyk(kwyk_model, meshnet_ckpt)
 
     # Eval immediately
     pred = predict_volume(kwyk_model, img_path, block_shape, mc=False)
@@ -231,7 +231,7 @@ def main():
             n_batches += 1
 
         avg_loss = epoch_loss / max(n_batches, 1)
-        msg = f"Epoch {epoch+1}/20: loss={avg_loss:.4f}"
+        msg = f"Epoch {epoch + 1}/20: loss={avg_loss:.4f}"
 
         # Eval every 5 epochs
         if (epoch + 1) % 5 == 0:

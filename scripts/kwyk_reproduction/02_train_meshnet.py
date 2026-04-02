@@ -17,7 +17,7 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from utils import compute_dice, load_config, save_figure, setup_logging
+from utils import load_config, save_figure, setup_logging
 
 log = setup_logging(__name__)
 
@@ -385,8 +385,6 @@ def main() -> None:
     log.info("  Output directory : %s", output_dir)
     log.info("  Epochs           : %d", epochs)
     log.info("  Final train loss : %.6f", train_losses[-1] if train_losses else 0.0)
-    if val_losses:
-        log.info("  Final val loss   : %.6f", val_losses[-1])
     final_dice = [d for d in val_dice_per_epoch if not np.isnan(d)]
     if final_dice:
         log.info("  Val Dice (mean)  : %.4f", final_dice[-1])

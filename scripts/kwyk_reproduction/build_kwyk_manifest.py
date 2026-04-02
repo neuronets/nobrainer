@@ -104,7 +104,8 @@ def main():
     split_counts = Counter(splits)
     print(f"Manifest written to {output_csv}")
     print(
-        f"  train: {split_counts['train']}, val: {split_counts['val']}, test: {split_counts['test']}"
+        f"  train: {split_counts['train']}, "
+        f"val: {split_counts['val']}, test: {split_counts['test']}"
     )
 
 

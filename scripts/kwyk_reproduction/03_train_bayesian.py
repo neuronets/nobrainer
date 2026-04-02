@@ -36,7 +36,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
-from utils import compute_dice, load_config, save_figure, setup_logging
+from utils import load_config, save_figure, setup_logging
 
 from nobrainer.gpu import auto_batch_size, gpu_count
 from nobrainer.slurm import SlurmPreemptionHandler, load_checkpoint, save_checkpoint

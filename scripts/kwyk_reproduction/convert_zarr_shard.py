@@ -115,7 +115,7 @@ def main():
     elapsed = time.time() - t0
     print(
         f"Shard {args.shard_idx}: wrote {end - start} volumes in {elapsed:.1f}s "
-        f"({(end - start)/elapsed:.1f} vol/s)"
+        f"({(end - start) / elapsed:.1f} vol/s)"
     )
 
 

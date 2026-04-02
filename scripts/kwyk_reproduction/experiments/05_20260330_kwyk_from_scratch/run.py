@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from utils import setup_logging
+from utils import setup_logging  # noqa: E402
 
 log = setup_logging(__name__)
 
@@ -149,7 +149,7 @@ def train_kwyk(name, n_classes, label_mapping, mc_train, epochs=50):
             n_batches += 1
 
         avg_loss = epoch_loss / max(n_batches, 1)
-        msg = f"  Epoch {epoch+1}/{epochs}: loss={avg_loss:.4f}"
+        msg = f"  Epoch {epoch + 1}/{epochs}: loss={avg_loss:.4f}"
 
         if (epoch + 1) % 10 == 0 or epoch == 0:
             pred_vol = predict_volume(model, img_path, block_shape, mc=False)
