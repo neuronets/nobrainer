@@ -21,13 +21,44 @@ jobs:
     outputs:
       label: ${{ steps.start-ec2-runner.outputs.label }}
       ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
+      multi_gpu: ${{ steps.gpu-config.outputs.multi_gpu }}
     steps:
       - name: Parse GPU config labels
         id: gpu-config
         if: github.event_name == 'pull_request'
         run: |
           LABELS='${{ toJSON(github.event.pull_request.labels.*.name) }}'
+
+          # Priority: gpu-instance: (exact) > gpu-multi (multi-GPU) > gpu-family: (family default)
           INSTANCE=$(echo "$LABELS" | jq -r '[.[] | select(startswith("gpu-instance:"))] | if length > 0 then .[0] | split(":")[1] else "" end')
+
+          # gpu-multi label → pick a multi-GPU instance for DDP/model-parallel tests
+          MULTI_GPU=$(echo "$LABELS" | jq -r '[.[] | select(. == "gpu-multi")] | if length > 0 then "true" else "" end')
+          if [ -z "$INSTANCE" ] && [ -n "$MULTI_GPU" ]; then
+            INSTANCE="g5.12xlarge"  # 4x A10G GPUs
+            echo "gpu-multi label → selecting $INSTANCE (4 GPUs)"
+          fi
+
+          # gpu-family:<family> label → pick default instance from that family
+          # Supported families: g4dn, g5, g6, p3, p4d, p5
+          if [ -z "$INSTANCE" ]; then
+            FAMILY=$(echo "$LABELS" | jq -r '[.[] | select(startswith("gpu-family:"))] | if length > 0 then .[0] | split(":")[1] else "" end')
+            if [ -n "$FAMILY" ]; then
+              case "$FAMILY" in
+                g4dn) INSTANCE="g4dn.xlarge" ;;   # 1x T4
+                g5)   INSTANCE="g5.xlarge" ;;      # 1x A10G
+                g6)   INSTANCE="g6.xlarge" ;;      # 1x L4
+                p3)   INSTANCE="p3.2xlarge" ;;     # 1x V100
+                p4d)  INSTANCE="p4d.24xlarge" ;;   # 8x A100
+                p5)   INSTANCE="p5.48xlarge" ;;    # 8x H100
+                *)    echo "Unknown GPU family: $FAMILY"; INSTANCE="" ;;
+              esac
+              if [ -n "$INSTANCE" ]; then
+                echo "gpu-family:${FAMILY} → selecting $INSTANCE"
+              fi
+            fi
+          fi
+
           # Default to spot pricing; gpu-ondemand:true overrides to on-demand
           ONDEMAND=$(echo "$LABELS" | jq -r '[.[] | select(. == "gpu-ondemand:true")] | if length > 0 then "true" else "" end')
           if [ -n "$ONDEMAND" ]; then
@@ -35,9 +66,11 @@ jobs:
           else
             MARKET="spot"
           fi
+
           echo "instance=${INSTANCE}" >> $GITHUB_OUTPUT
           echo "market_type=${MARKET}" >> $GITHUB_OUTPUT
-          echo "Parsed labels: instance=${INSTANCE:-default}, market=${MARKET:-spot}"
+          echo "multi_gpu=${MULTI_GPU}" >> $GITHUB_OUTPUT
+          echo "Parsed labels: instance=${INSTANCE:-default}, market=${MARKET:-spot}, multi_gpu=${MULTI_GPU:-false}"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -104,7 +137,10 @@ jobs:
           uv run python -c "
           import torch
           assert torch.cuda.is_available(), 'CUDA not available'
-          print(f'GPU: {torch.cuda.get_device_name(0)}')
+          n = torch.cuda.device_count()
+          print(f'GPUs: {n}')
+          for i in range(n):
+              print(f'  [{i}] {torch.cuda.get_device_name(i)}')
           print(f'CUDA: {torch.version.cuda}')
           print(f'PyTorch: {torch.__version__}')
           "
@@ -115,6 +151,16 @@ jobs:
           uv run pytest nobrainer/tests/ nobrainer/sr-tests/ -v \
             --no-header \
             --tb=short
+
+      - name: Run multi-GPU tests (DDP + model parallel)
+        if: needs.start-runner.outputs.multi_gpu == 'true'
+        run: |
+          export PATH="${EC2_USER_HOME}/.local/bin:$PATH"
+          echo "=== Multi-GPU DDP and model-parallel tests ==="
+          uv run pytest nobrainer/tests/gpu/ -v \
+            --no-header \
+            --tb=short \
+            -k "multi_gpu or ddp or model_parallel"
 
   stop-runner:
     name: Stop self-hosted EC2 runner
