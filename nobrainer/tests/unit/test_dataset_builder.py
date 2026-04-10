@@ -159,7 +159,7 @@ class TestToCroissant:
         data = json.loads(out.read_text())
         assert "@context" in data
         assert "@type" in data
-        assert data["@type"] == "cr:Dataset"
+        assert data["@type"] == "sc:Dataset"
 
     def test_has_dataset_info(self, tmp_path):
         pairs = _make_file_pairs(2, (16, 16, 16), tmp_path)
