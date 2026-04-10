@@ -81,7 +81,7 @@ class TestWriteModelCroissant:
         data = json.loads(out.read_text())
         assert "@context" in data
         assert "@type" in data
-        assert data["@type"] == "cr:Dataset"
+        assert data["@type"] == "sc:Dataset"
 
     def test_required_provenance_fields(self, tmp_path):
         """Provenance must contain all required fields."""
@@ -164,7 +164,7 @@ class TestWriteDatasetCroissant:
         data = json.loads(out.read_text())
         assert "@context" in data
         assert "@type" in data
-        assert data["@type"] == "cr:Dataset"
+        assert data["@type"] == "sc:Dataset"
 
     def test_dataset_info_present(self, tmp_path):
         ds = _make_fake_dataset(tmp_path)
