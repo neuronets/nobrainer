@@ -128,3 +128,33 @@ Every plan MUST include a Constitution Check evaluated before research and after
 ```
 
 If speckit is not installed, follow the principles above manually.
+
+## Dependency constraint
+
+Do not add external dependencies unless they are already declared in `setup.cfg` or `pyproject.toml`. Current core deps include: torch, monai, nibabel, numpy, click, zarr, fsspec, joblib, scikit-image, psutil. If you think a new dep is justified, flag it explicitly — do not silently add it.
+
+## MONAI-first rule
+
+Before implementing any data loading, transform, loss, metric, or inference utility, check whether MONAI already provides it. Prefer wrapping MONAI over reimplementing. Check `monai.transforms`, `monai.data`, `monai.inferers`, `monai.losses`, `monai.metrics` before writing new code. If MONAI's version is insufficient, document why in a code comment.
+
+## Read before write
+
+Before modifying any existing module:
+1. Read the module completely. List its implicit assumptions.
+2. Check what MONAI provides that overlaps.
+3. Do not guess function signatures — read the source.
+4. If the module has existing tests, read those too to understand expected behavior.
+
+## Testing philosophy
+
+Every test should fail if the feature is removed. If a test passes regardless of whether your code exists, it's not testing your code.
+
+## Review process
+
+A reviewer subagent runs automatically (via stop hook) when you finish a task. It executes tests, inspects the diff, and writes a verdict to `.claude/reviews/`. If the reviewer blocks:
+1. Read the review file it points to.
+2. Fix every CRITICAL finding.
+3. Address WARNING findings where reasonable.
+4. The hook will re-run on your next stop.
+
+Do not commit until the reviewer passes.
