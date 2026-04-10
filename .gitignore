@@ -151,3 +151,6 @@ data/
 # Model artifacts
 *.pth
 brain_mask_extraction_model/
+
+# Claude Code review artifacts
+.claude/REVIEW.MD/
