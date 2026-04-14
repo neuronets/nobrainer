@@ -454,24 +454,45 @@ def write_zarr_shard(
     # Infer dtypes from existing arrays — detect pyramidal vs flat layout
     if "0" in store["images"]:
         # Pyramidal: images/0, images/1, ...
-        img_dtype = store["images/0"].dtype
-        lbl_dtype = store["labels/0"].dtype
+        img_arr_ref = store["images/0"]
+        lbl_arr_ref = store["labels/0"]
         is_pyramidal = True
     else:
         # Flat legacy: images is a single 4D array
-        img_dtype = store["images"].dtype
-        lbl_dtype = store["labels"].dtype
+        img_arr_ref = store["images"]
+        lbl_arr_ref = store["labels"]
         is_pyramidal = False
+
+    img_dtype = img_arr_ref.dtype
+    lbl_dtype = lbl_arr_ref.dtype
+
+    # Detect special encodings from array attributes
+    img_attrs = dict(img_arr_ref.attrs)
+    nobrainer_dtype = img_attrs.get("_nobrainer_dtype")
+    scl_slope = img_attrs.get("scl_slope")
+    needs_encoding = nobrainer_dtype == "bfloat16" or scl_slope is not None
 
     level_shapes = []
     for lvl in range(levels):
         factor = 2**lvl
         level_shapes.append((D // factor, H // factor, W // factor))
 
-    # Read in storage-native dtype to minimize I/O and memory.
-    # float32 reads are 4× larger than uint8 — avoid unless needed.
-    img_read_dtype = np.float32 if conform else img_dtype
+    # Read as float32 when encoding is needed (bfloat16 or scale-factor),
+    # otherwise read in storage-native dtype to minimize I/O and memory.
+    img_read_dtype = np.float32 if (conform or needs_encoding) else img_dtype
     lbl_read_dtype = np.int32 if conform else lbl_dtype
+
+    def _encode_image(raw_data):
+        """Encode a single image volume to storage dtype."""
+        if nobrainer_dtype == "bfloat16":
+            return encode_bfloat16(raw_data)
+        elif scl_slope is not None:
+            encoded, _, _ = encode_scale_factor(
+                raw_data, str(img_dtype)
+            )
+            return encoded
+        else:
+            return raw_data.astype(img_dtype)
 
     def _load(idx_and_paths):
         local_i, (img_path, lbl_path) = idx_and_paths
@@ -497,7 +518,7 @@ def write_zarr_shard(
             ld, lh, lw = level_shapes[lvl]
             prefix = f"images/{lvl}" if is_pyramidal else "images"
             lprefix = f"labels/{lvl}" if is_pyramidal else "labels"
-            store[prefix][gi] = img_lvl[:ld, :lh, :lw].astype(img_dtype)
+            store[prefix][gi] = _encode_image(img_lvl[:ld, :lh, :lw])
             store[lprefix][gi] = lbl_lvl[:ld, :lh, :lw].astype(lbl_dtype)
 
     # Read-ahead: prefetch the NEXT volume while writing the current one.
