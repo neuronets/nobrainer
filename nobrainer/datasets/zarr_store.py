@@ -451,11 +451,17 @@ def write_zarr_shard(
     D, H, W = target_shape
     voxel_size = target_voxel_size or (1.0, 1.0, 1.0)
 
-    # Infer dtypes from existing arrays
-    img_arr_key = "images/0" if levels > 1 else "images"
-    lbl_arr_key = "labels/0" if levels > 1 else "labels"
-    img_dtype = store[img_arr_key].dtype
-    lbl_dtype = store[lbl_arr_key].dtype
+    # Infer dtypes from existing arrays — detect pyramidal vs flat layout
+    if "0" in store["images"]:
+        # Pyramidal: images/0, images/1, ...
+        img_dtype = store["images/0"].dtype
+        lbl_dtype = store["labels/0"].dtype
+        is_pyramidal = True
+    else:
+        # Flat legacy: images is a single 4D array
+        img_dtype = store["images"].dtype
+        lbl_dtype = store["labels"].dtype
+        is_pyramidal = False
 
     level_shapes = []
     for lvl in range(levels):
@@ -489,8 +495,8 @@ def write_zarr_shard(
                 img_lvl = build_pyramid_level(img_data, lvl, is_labels=False)
                 lbl_lvl = build_pyramid_level(lbl_data, lvl, is_labels=True)
             ld, lh, lw = level_shapes[lvl]
-            prefix = f"images/{lvl}" if levels > 1 else "images"
-            lprefix = f"labels/{lvl}" if levels > 1 else "labels"
+            prefix = f"images/{lvl}" if is_pyramidal else "images"
+            lprefix = f"labels/{lvl}" if is_pyramidal else "labels"
             store[prefix][gi] = img_lvl[:ld, :lh, :lw].astype(img_dtype)
             store[lprefix][gi] = lbl_lvl[:ld, :lh, :lw].astype(lbl_dtype)
 
