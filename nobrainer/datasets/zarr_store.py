@@ -413,6 +413,69 @@ def build_pyramid_level(
         )
 
 
+def _write_shard_process(shard_spec: tuple) -> int:
+    """Write one shard — runs in a forked process.
+
+    Receives a minimal tuple to avoid pickling large objects.
+    The forked process inherits the parent's memory (image_label_pairs
+    etc.) so no serialization is needed.
+    """
+    import nibabel as nib
+    import zarr
+
+    (
+        shard_idx,
+        store_path,
+        pairs_slice,  # list of (img_path, lbl_path) for this shard only
+        target_shape,
+        voxel_size,
+        do_conform,
+        levels,
+        level_shapes,
+        img_dtype_info,
+        img_np_dtype_str,
+        lbl_np_dtype_str,
+        global_start,
+    ) = shard_spec
+
+    store = zarr.open_group(store_path, mode="r+")
+    D, H, W = target_shape
+    img_np_dtype = np.dtype(img_np_dtype_str)
+    lbl_np_dtype = np.dtype(lbl_np_dtype_str)
+
+    def _encode_image(raw_data):
+        if img_dtype_info.get("_nobrainer_dtype") == "bfloat16":
+            return encode_bfloat16(raw_data)
+        elif img_dtype_info.get("scl_slope") is not None:
+            encoded, _, _ = encode_scale_factor(raw_data, img_dtype_info["dtype"])
+            return encoded
+        return raw_data.astype(img_np_dtype)
+
+    for local_i, (img_path, lbl_path) in enumerate(pairs_slice):
+        global_i = global_start + local_i
+        img = nib.load(img_path)
+        lbl = nib.load(lbl_path)
+        if do_conform:
+            img = _conform_volume(img, target_shape, voxel_size)
+            lbl = _conform_volume(lbl, target_shape, voxel_size)
+        img_data = np.asarray(img.dataobj, dtype=np.float32)[:D, :H, :W]
+        lbl_data = np.asarray(lbl.dataobj, dtype=np.int32)[:D, :H, :W]
+
+        for lvl in range(levels):
+            if lvl == 0:
+                img_lvl, lbl_lvl = img_data, lbl_data
+            else:
+                img_lvl = build_pyramid_level(img_data, lvl, is_labels=False)
+                lbl_lvl = build_pyramid_level(lbl_data, lvl, is_labels=True)
+            ld, lh, lw = level_shapes[lvl]
+            store[f"images/{lvl}"][global_i] = _encode_image(img_lvl[:ld, :lh, :lw])
+            store[f"labels/{lvl}"][global_i] = lbl_lvl[:ld, :lh, :lw].astype(
+                lbl_np_dtype
+            )
+
+    return len(pairs_slice)
+
+
 def create_zarr_store(
     image_label_pairs: list[tuple[str, str]],
     output_path: str | Path,
@@ -499,16 +562,22 @@ def create_zarr_store(
                 target_voxel_size,
             )
     else:
-        # Check all shapes are the same
-        first_img = nib.load(image_paths[0])
-        target_shape = first_img.shape[:3]
-        for p in image_paths[1:]:
-            img = nib.load(p)
-            if img.shape[:3] != target_shape:
-                raise ValueError(
-                    f"Non-uniform shapes ({img.shape[:3]} vs {target_shape}). "
-                    "Use conform=True or ensure all volumes match."
-                )
+        if target_shape is not None:
+            # Trust the caller — skip expensive sequential verification
+            logger.info("Using provided target_shape=%s (skipping verification)", target_shape)
+        else:
+            # Infer from first image, verify a sample
+            first_img = nib.load(image_paths[0])
+            target_shape = first_img.shape[:3]
+            # Spot-check a sample instead of every file
+            check_indices = np.linspace(0, len(image_paths) - 1, min(10, len(image_paths)), dtype=int)
+            for idx in check_indices:
+                img = nib.load(image_paths[idx])
+                if img.shape[:3] != target_shape:
+                    raise ValueError(
+                        f"Non-uniform shapes ({img.shape[:3]} vs {target_shape}). "
+                        "Use conform=True or ensure all volumes match."
+                    )
 
     D, H, W = target_shape
     voxel_size = target_voxel_size or (1.0, 1.0, 1.0)
@@ -613,50 +682,32 @@ def create_zarr_store(
         n_shards,
     )
 
-    # Write base level (level 0) — parallel across shards
+    # Write all levels — parallel across shards using forked processes
     import concurrent.futures
+    import multiprocessing
     import os
 
-    n_workers = min(os.cpu_count() or 1, n_shards, 8)
-    img_arr_0, lbl_arr_0 = level_arrays[0]
+    n_workers = min(os.cpu_count() or 1, n_shards, 16)
 
-    def _encode_image(raw_data):
-        """Encode a single image volume to storage dtype."""
-        if img_dtype_info["_nobrainer_dtype"] == "bfloat16":
-            return encode_bfloat16(raw_data)
-        elif img_dtype_info["scl_slope"] is not None:
-            encoded, _, _ = encode_scale_factor(raw_data, img_dtype_info["dtype"])
-            return encoded
-        else:
-            return raw_data.astype(img_np_dtype)
-
-    def _write_shard_group(shard_idx):
-        """Load, conform, encode, and write subjects for one shard."""
-        start = shard_idx * full_shard[0]
+    # Build per-shard specs — each contains only its own slice of pairs
+    shard_specs = []
+    for s in range(n_shards):
+        start = s * full_shard[0]
         end = min(start + full_shard[0], n_subjects)
-        for i in range(start, end):
-            img_path, lbl_path = image_label_pairs[i]
-            img = nib.load(img_path)
-            lbl = nib.load(lbl_path)
-            if conform:
-                img = _conform_volume(img, target_shape, voxel_size)
-                lbl = _conform_volume(lbl, target_shape, voxel_size)
-            img_data = np.asarray(img.dataobj, dtype=np.float32)[:D, :H, :W]
-            lbl_data = np.asarray(lbl.dataobj, dtype=np.int32)[:D, :H, :W]
-
-            # Write base level
-            img_arr_0[i] = _encode_image(img_data)
-            lbl_arr_0[i] = lbl_data.astype(lbl_np_dtype)
-
-            # Write pyramid levels (per-subject, after conform)
-            for lvl in range(1, levels):
-                img_down = build_pyramid_level(img_data, lvl, is_labels=False)
-                lbl_down = build_pyramid_level(lbl_data, lvl, is_labels=True)
-                lvl_img_arr, lvl_lbl_arr = level_arrays[lvl]
-                ld, lh, lw = level_shapes[lvl]
-                lvl_img_arr[i] = _encode_image(img_down[:ld, :lh, :lw])
-                lvl_lbl_arr[i] = lbl_down[:ld, :lh, :lw].astype(lbl_np_dtype)
-        return end - start
+        shard_specs.append((
+            s,
+            str(output_path),
+            image_label_pairs[start:end],
+            target_shape,
+            voxel_size,
+            conform,
+            levels,
+            level_shapes,
+            img_dtype_info,
+            str(img_np_dtype),
+            str(lbl_np_dtype),
+            start,
+        ))
 
     logger.info(
         "Writing %d volumes (%d levels) across %d shards with %d workers...",
@@ -665,8 +716,14 @@ def create_zarr_store(
         n_shards,
         n_workers,
     )
-    with concurrent.futures.ThreadPoolExecutor(max_workers=n_workers) as pool:
-        futures = [pool.submit(_write_shard_group, s) for s in range(n_shards)]
+    # Use fork context — avoids pickling the full argument list
+    ctx = multiprocessing.get_context("fork")
+    with concurrent.futures.ProcessPoolExecutor(
+        max_workers=n_workers, mp_context=ctx
+    ) as pool:
+        futures = [
+            pool.submit(_write_shard_process, spec) for spec in shard_specs
+        ]
         done = 0
         for future in concurrent.futures.as_completed(futures):
             done += future.result()
