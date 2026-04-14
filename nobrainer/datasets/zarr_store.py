@@ -502,9 +502,7 @@ def write_zarr_shard(
             local_i, img_data, lbl_data = pending.result()
             # Submit next read before writing current
             if i + 1 < len(image_label_pairs):
-                pending = reader.submit(
-                    _load, (i + 1, image_label_pairs[i + 1])
-                )
+                pending = reader.submit(_load, (i + 1, image_label_pairs[i + 1]))
             _write_one(local_i, img_data, lbl_data)
 
     return len(image_label_pairs)
