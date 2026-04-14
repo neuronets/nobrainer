@@ -487,9 +487,7 @@ def write_zarr_shard(
         if nobrainer_dtype == "bfloat16":
             return encode_bfloat16(raw_data)
         elif scl_slope is not None:
-            encoded, _, _ = encode_scale_factor(
-                raw_data, str(img_dtype)
-            )
+            encoded, _, _ = encode_scale_factor(raw_data, str(img_dtype))
             return encoded
         else:
             return raw_data.astype(img_dtype)
