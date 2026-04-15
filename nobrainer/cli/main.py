@@ -104,6 +104,12 @@ def cli():
 @click.option(
     "-v", "--verbose", is_flag=True, help="Print progress messages.", **_option_kwds
 )
+@click.option(
+    "--skip-validate",
+    is_flag=True,
+    help="Skip preflight input-file validation.",
+    **_option_kwds,
+)
 def predict(
     *,
     infile,
@@ -117,11 +123,30 @@ def predict(
     n_samples,
     device,
     verbose,
+    skip_validate,
 ):
     """Predict labels from a NIfTI volume using a trained PyTorch model.
 
     The predictions are saved to OUTFILE.
     """
+    # Preflight validation
+    if not skip_validate:
+        from ..data.spec import FileStatus, check_file_presence
+
+        status = check_file_presence(infile)
+        if status == FileStatus.NOT_FOUND:
+            click.echo(click.style(f"ERROR: Input file not found: {infile}", fg="red"))
+            raise SystemExit(1)
+        if status == FileStatus.ANNEX_MISSING:
+            click.echo(
+                click.style(
+                    f"ERROR: Input is a git-annex symlink with missing content.\n"
+                    f"  Run: datalad get {infile}",
+                    fg="red",
+                )
+            )
+            raise SystemExit(1)
+
     if os.path.exists(outfile):
         raise FileExistsError(f"Output file already exists: {outfile}")
 
@@ -271,7 +296,14 @@ def convert_tfrecords(*, input_paths, output_dir, output_format, verbose):
 )
 @click.option("--no-conform", is_flag=True, help="Disable auto-conforming.")
 @click.option("-v", "--verbose", is_flag=True, help="Print progress.")
-def convert_to_zarr(*, output, images, labels, chunk_shape, no_conform, verbose):
+@click.option(
+    "--skip-validate",
+    is_flag=True,
+    help="Skip preflight input-file validation.",
+)
+def convert_to_zarr(
+    *, output, images, labels, chunk_shape, no_conform, verbose, skip_validate
+):
     """Convert NIfTI image+label pairs to a sharded Zarr3 store."""
     from ..datasets.zarr_store import create_zarr_store
 
@@ -282,6 +314,32 @@ def convert_to_zarr(*, output, images, labels, chunk_shape, no_conform, verbose)
             )
         )
         sys.exit(1)
+
+    # Preflight validation
+    if not skip_validate:
+        from ..data.spec import FileStatus, check_file_presence
+
+        missing: list[str] = []
+        annex_missing: list[str] = []
+        for path in (*images, *labels):
+            status = check_file_presence(path)
+            if status == FileStatus.NOT_FOUND:
+                missing.append(path)
+            elif status == FileStatus.ANNEX_MISSING:
+                annex_missing.append(path)
+        if missing:
+            click.echo(click.style("ERROR: Files not found:", fg="red"))
+            for p in missing:
+                click.echo(f"  {p}")
+            sys.exit(1)
+        if annex_missing:
+            click.echo(
+                click.style("ERROR: git-annex symlinks with missing content:", fg="red")
+            )
+            for p in annex_missing:
+                click.echo(f"  {p}")
+            click.echo(f"\n  Run: datalad get {' '.join(annex_missing)}")
+            sys.exit(1)
 
     pairs = list(zip(images, labels))
     chunks = tuple(int(x) for x in chunk_shape.split(","))
@@ -624,6 +682,126 @@ Timestamp: {datetime.datetime.utcnow().strftime('%Y/%m/%d %T')}"""
 
 
 # ---------------------------------------------------------------------------
+# validate / inspect
+# ---------------------------------------------------------------------------
+
+
+@cli.command()
+@click.argument("manifest", type=click.Path(exists=True))
+@click.option("--json", "as_json", is_flag=True, help="Output results as JSON.")
+@click.option("-v", "--verbose", is_flag=True, help="Show per-subject details.")
+def validate(*, manifest, as_json, verbose):
+    """Validate a dataset manifest against its DataSpec contract.
+
+    MANIFEST is the path to a JSON manifest file. Exits non-zero if any
+    errors are found. Warnings alone do not cause a non-zero exit.
+    """
+    import json as _json
+
+    from ..data.spec import DataSpec
+    from ..data.spec import Severity as _Sev
+    from ..data.spec import validate as _validate
+
+    spec = DataSpec.from_json(manifest)
+    findings = _validate(spec)
+
+    if as_json:
+        click.echo(_json.dumps([f.to_dict() for f in findings], indent=2))
+    else:
+        errs = [f for f in findings if f.severity == _Sev.ERROR]
+        warns = [f for f in findings if f.severity == _Sev.WARNING]
+
+        for f in errs:
+            click.echo(click.style(f"ERROR  {f.field}: {f.message}", fg="red"))
+        for f in warns:
+            click.echo(click.style(f"WARN   {f.field}: {f.message}", fg="yellow"))
+
+        if not findings:
+            click.echo(click.style("Validation passed.", fg="green"))
+        else:
+            click.echo(f"\n{len(errs)} error(s), {len(warns)} warning(s).")
+
+    has_errors = any(f.severity == _Sev.ERROR for f in findings)
+    sys.exit(1 if has_errors else 0)
+
+
+@cli.command()
+@click.argument("path", type=click.Path(exists=True))
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON.")
+def inspect(*, path, as_json):
+    """Inspect NIfTI / Zarr files or a dataset manifest.
+
+    PATH may be a JSON manifest, a single NIfTI file, a .zarr store,
+    or a directory containing NIfTI / Zarr files.
+    """
+    import json as _json
+    from pathlib import Path as _Path
+
+    from ..data.spec import inspect_entry
+
+    target = _Path(path)
+    entries: list[dict] = []
+
+    if target.suffix == ".json":
+        with open(target) as fh:
+            manifest = _json.load(fh)
+        base_dir = target.parent
+        for entry in manifest.get("entries", []):
+            for key in ("image", "label"):
+                if key in entry:
+                    p = _Path(entry[key])
+                    if not p.is_absolute():
+                        p = base_dir / p
+                    entries.append(inspect_entry(p))
+    elif target.is_dir():
+        for child in sorted(target.iterdir()):
+            if child.suffix in (".gz", ".nii", ".zarr") or child.suffixes == [
+                ".nii",
+                ".gz",
+            ]:
+                entries.append(inspect_entry(child))
+    else:
+        entries.append(inspect_entry(target))
+
+    if as_json:
+        click.echo(_json.dumps(entries, indent=2))
+    else:
+        counts = {"present": 0, "annex_missing": 0, "not_found": 0}
+        for e in entries:
+            status = e["file_status"]
+            counts[status] = counts.get(status, 0) + 1
+            if status == "present":
+                shape = tuple(e["shape"]) if e["shape"] else "?"
+                spacing = tuple(e["spacing"]) if e["spacing"] else "?"
+                orient = e["orientation"] or "?"
+                size_mb = (
+                    f"{e['file_size_bytes'] / 1_048_576:.1f}MB"
+                    if e["file_size_bytes"]
+                    else "?"
+                )
+                click.echo(
+                    f"{e['path']}  PRESENT  shape={shape}  "
+                    f"spacing={spacing}  orient={orient}  {size_mb}"
+                )
+            elif status == "annex_missing":
+                click.echo(
+                    click.style(
+                        f"{e['path']}  ANNEX_MISSING  "
+                        f"(run: datalad get {e['path']})",
+                        fg="yellow",
+                    )
+                )
+            else:
+                click.echo(click.style(f"{e['path']}  NOT_FOUND", fg="red"))
+        click.echo("---")
+        click.echo(
+            f"{len(entries)} entries: {counts['present']} present, "
+            f"{counts['annex_missing']} annex_missing, "
+            f"{counts['not_found']} not_found"
+        )
+
+
+# ---------------------------------------------------------------------------
 # zarr subcommands
 # ---------------------------------------------------------------------------
 
@@ -666,6 +844,79 @@ def zarr_suggest_shards(n_volumes, volume_shape, dtype, n_input_files, levels):
     # Convert tuple to list for JSON serialization
     result["shard_shape"] = list(result["shard_shape"])
     click.echo(json.dumps(result, indent=2))
+
+
+# ---------------------------------------------------------------------------
+# qc subcommands
+# ---------------------------------------------------------------------------
+
+
+@cli.group()
+def qc():
+    """Quality control tools for brain MRI."""
+
+
+@qc.command()
+@click.option(
+    "--input-dir",
+    required=True,
+    type=click.Path(exists=True),
+    help="Directory containing reference .nii.gz files.",
+)
+@click.option(
+    "--output-dir",
+    required=True,
+    type=click.Path(),
+    help="Root directory for corrupted outputs.",
+)
+@click.option(
+    "--corruptions",
+    default=None,
+    help="Comma-separated corruption names (default: all).",
+)
+@click.option(
+    "--severities",
+    default="1,2,3,4,5",
+    help="Comma-separated severity levels.",
+    **_option_kwds,
+)
+@click.option("--resume/--no-resume", default=True, **_option_kwds)
+@click.option("--dry-run", is_flag=True, help="Print plan without writing files.")
+def corrupt(*, input_dir, output_dir, corruptions, severities, resume, dry_run):
+    """Generate corrupted brain MRI scans for QC benchmarking."""
+    from pathlib import Path
+
+    from ..qc.corrupt import generate_corrupted_dataset
+
+    corruption_list = corruptions.split(",") if corruptions else None
+    severity_list = [int(s) for s in severities.split(",")]
+
+    metadata = generate_corrupted_dataset(
+        input_dir=Path(input_dir),
+        output_dir=Path(output_dir),
+        corruptions=corruption_list,
+        severities=severity_list,
+        resume=resume,
+        dry_run=dry_run,
+    )
+    click.echo(f"Generated {len(metadata)} corrupted scans.")
+
+
+@qc.command()
+@click.argument("scan_path", type=click.Path(exists=True))
+@click.option(
+    "--seg-path",
+    default=None,
+    type=click.Path(exists=True),
+    help="Path to SynthSeg segmentation for CNR/CJV metrics.",
+)
+def iqms(scan_path, seg_path):
+    """Extract image quality metrics from a scan."""
+    from ..qc.metrics import extract_iqms
+
+    result = extract_iqms(scan_path, seg_path=seg_path)
+    for key, val in result.items():
+        click.echo(f"  {key}: {val:.4f}" if val == val else f"  {key}: NaN")
 
 
 # For debugging only.
