@@ -36,7 +36,7 @@ jobs:
       - name: Install dependencies
         run: |
           uv pip install \
-                ".[bayesian,generative,zarr,dev,qc]" \
+            ".[bayesian,generative,zarr,qc,dev]" \
             monai \
             pyro-ppl
 
