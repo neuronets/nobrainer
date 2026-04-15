@@ -8,6 +8,44 @@ import json
 from pathlib import Path
 from typing import Any
 
+CROISSANT_CONTEXT = {
+    "@language": "en",
+    "@vocab": "https://schema.org/",
+    "citeAs": "cr:citeAs",
+    "column": "cr:column",
+    "conformsTo": "dct:conformsTo",
+    "cr": "http://mlcommons.org/croissant/",
+    "rai": "http://mlcommons.org/croissant/RAI/",
+    "data": {"@id": "cr:data", "@type": "@json"},
+    "dataType": {"@id": "cr:dataType", "@type": "@vocab"},
+    "dct": "http://purl.org/dc/terms/",
+    "examples": {"@id": "cr:examples", "@type": "@json"},
+    "extract": "cr:extract",
+    "field": "cr:field",
+    "fileProperty": "cr:fileProperty",
+    "fileObject": "cr:fileObject",
+    "fileSet": "cr:fileSet",
+    "format": "cr:format",
+    "includes": "cr:includes",
+    "isLiveDataset": "cr:isLiveDataset",
+    "jsonPath": "cr:jsonPath",
+    "key": "cr:key",
+    "md5": "cr:md5",
+    "parentField": "cr:parentField",
+    "path": "cr:path",
+    "recordSet": "cr:recordSet",
+    "references": "cr:references",
+    "regex": "cr:regex",
+    "repeated": "cr:repeated",
+    "replace": "cr:replace",
+    "samplingRate": "cr:samplingRate",
+    "sc": "https://schema.org/",
+    "separator": "cr:separator",
+    "source": "cr:source",
+    "subField": "cr:subField",
+    "transform": "cr:transform",
+}
+
 
 def _sha256(path: str | Path) -> str:
     """Compute SHA-256 hex digest of a file."""
@@ -53,8 +91,9 @@ def write_model_croissant(
     loss_name = getattr(estimator, "_loss_name", "unknown")
 
     metadata = {
-        "@context": {"@vocab": "http://mlcommons.org/croissant/"},
-        "@type": "cr:Dataset",
+        "@context": CROISSANT_CONTEXT,
+        "@type": "sc:Dataset",
+        "conformsTo": "http://mlcommons.org/croissant/1.0",
         "name": f"nobrainer-{getattr(estimator, 'base_model', 'model')}",
         "description": (
             f"Trained {getattr(estimator, 'base_model', 'model')} model "
@@ -66,6 +105,11 @@ def write_model_croissant(
                 "name": "model.pth",
                 "contentUrl": "model.pth",
                 "encodingFormat": "application/x-pytorch",
+                "sha256": (
+                    _sha256(save_dir / "model.pth")
+                    if (save_dir / "model.pth").exists()
+                    else ""
+                ),
             }
         ],
         "nobrainer:provenance": {
@@ -123,8 +167,9 @@ def write_checkpoint_croissant(
     checkpoint_dir = Path(checkpoint_dir)
 
     metadata = {
-        "@context": {"@vocab": "http://mlcommons.org/croissant/"},
-        "@type": "cr:Dataset",
+        "@context": CROISSANT_CONTEXT,
+        "@type": "sc:Dataset",
+        "conformsTo": "http://mlcommons.org/croissant/1.0",
         "name": f"nobrainer-{type(model).__name__}",
         "description": f"Trained {type(model).__name__} checkpoint via nobrainer",
         "distribution": [
@@ -133,6 +178,11 @@ def write_checkpoint_croissant(
                 "name": "best_model.pth",
                 "contentUrl": "best_model.pth",
                 "encodingFormat": "application/x-pytorch",
+                "sha256": (
+                    _sha256(checkpoint_dir / "best_model.pth")
+                    if (checkpoint_dir / "best_model.pth").exists()
+                    else ""
+                ),
             }
         ],
         "nobrainer:provenance": {
@@ -172,8 +222,9 @@ def write_dataset_croissant(
 ) -> Path:
     """Write Croissant-ML JSON-LD for a Dataset."""
     metadata = {
-        "@context": {"@vocab": "http://mlcommons.org/croissant/"},
-        "@type": "cr:Dataset",
+        "@context": CROISSANT_CONTEXT,
+        "@type": "sc:Dataset",
+        "conformsTo": "http://mlcommons.org/croissant/1.0",
         "name": "nobrainer-dataset",
         "description": "Brain MRI dataset for nobrainer",
         "distribution": [],
