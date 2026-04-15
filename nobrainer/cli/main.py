@@ -846,6 +846,79 @@ def zarr_suggest_shards(n_volumes, volume_shape, dtype, n_input_files, levels):
     click.echo(json.dumps(result, indent=2))
 
 
+# ---------------------------------------------------------------------------
+# qc subcommands
+# ---------------------------------------------------------------------------
+
+
+@cli.group()
+def qc():
+    """Quality control tools for brain MRI."""
+
+
+@qc.command()
+@click.option(
+    "--input-dir",
+    required=True,
+    type=click.Path(exists=True),
+    help="Directory containing reference .nii.gz files.",
+)
+@click.option(
+    "--output-dir",
+    required=True,
+    type=click.Path(),
+    help="Root directory for corrupted outputs.",
+)
+@click.option(
+    "--corruptions",
+    default=None,
+    help="Comma-separated corruption names (default: all).",
+)
+@click.option(
+    "--severities",
+    default="1,2,3,4,5",
+    help="Comma-separated severity levels.",
+    **_option_kwds,
+)
+@click.option("--resume/--no-resume", default=True, **_option_kwds)
+@click.option("--dry-run", is_flag=True, help="Print plan without writing files.")
+def corrupt(*, input_dir, output_dir, corruptions, severities, resume, dry_run):
+    """Generate corrupted brain MRI scans for QC benchmarking."""
+    from pathlib import Path
+
+    from ..qc.corrupt import generate_corrupted_dataset
+
+    corruption_list = corruptions.split(",") if corruptions else None
+    severity_list = [int(s) for s in severities.split(",")]
+
+    metadata = generate_corrupted_dataset(
+        input_dir=Path(input_dir),
+        output_dir=Path(output_dir),
+        corruptions=corruption_list,
+        severities=severity_list,
+        resume=resume,
+        dry_run=dry_run,
+    )
+    click.echo(f"Generated {len(metadata)} corrupted scans.")
+
+
+@qc.command()
+@click.argument("scan_path", type=click.Path(exists=True))
+@click.option(
+    "--seg-path",
+    default=None,
+    type=click.Path(exists=True),
+    help="Path to SynthSeg segmentation for CNR/CJV metrics.",
+)
+def iqms(scan_path, seg_path):
+    """Extract image quality metrics from a scan."""
+    from ..qc.metrics import extract_iqms
+
+    result = extract_iqms(scan_path, seg_path=seg_path)
+    for key, val in result.items():
+        click.echo(f"  {key}: {val:.4f}" if val == val else f"  {key}: NaN")
+
+
 # For debugging only.
 if __name__ == "__main__":
     cli()
