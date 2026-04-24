@@ -15,11 +15,25 @@ import torch
 
 logger = logging.getLogger(__name__)
 
-# Key FreeSurfer structures and their label IDs
-# Consistent with nobrainer.data.tissue_classes
+# Key FreeSurfer structures and their label IDs.
+#
+# Cortex is the union of the coarse FreeSurfer labels (3 lh, 42 rh) AND the
+# Desikan-Killiany parcellation labels (1001-1035 lh, 2001-2035 rh). SynthSeg
+# with ``--parc`` REPLACES the coarse cortex labels with DK; without ``--parc``
+# only 3/42 are emitted. Taking the union makes cortex_dice defined in either
+# mode — a seg that has any cortical voxel gets a value, not NaN.
+#
+# Subcortical structures stay as single-label pairs. On scans with limited
+# FOV (e.g. FastMRI axial slabs that miss brainstem/cerebellum) those Dice
+# values are NaN, which is correct — absent-from-seg is not a zero-overlap
+# failure, it's a "structure not in the image" statement. mean_dice collapses
+# to the average over structures that were present on both sides.
+_DK_LH_LABELS: list[int] = list(range(1001, 1036))
+_DK_RH_LABELS: list[int] = list(range(2001, 2036))
+
 STRUCTURE_LABELS: dict[str, list[int]] = {
     "hippocampus": [17, 53],
-    "cortex": [3, 42],
+    "cortex": [3, 42, *_DK_LH_LABELS, *_DK_RH_LABELS],
     "ventricle": [4, 43],
     "thalamus": [10, 49],
     "caudate": [11, 50],
