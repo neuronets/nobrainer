@@ -14,10 +14,21 @@ import torch
 
 logger = logging.getLogger(__name__)
 
-# FreeSurfer label IDs for tissue classification
-# (matches nobrainer.data.tissue_classes definitions)
+# FreeSurfer label IDs for tissue classification.
+#
+# GM is the union of the coarse FreeSurfer cortex labels (3 lh, 42 rh) AND
+# the Desikan-Killiany parcellation labels (1001-1035 lh, 2001-2035 rh).
+# SynthSeg run with ``--parc`` REPLACES the coarse cortex labels with DK;
+# without ``--parc`` only 3/42 are emitted. Taking the union keeps CNR and
+# CJV defined in either mode — a seg that has any cortical voxel gets a GM
+# mask, which both metrics require. Parallel to the cortex-label widening
+# in nobrainer.qc.preference.
+#
+# WM labels are not affected by ``--parc``.
 _WM_LABELS = {2, 41}
-_GM_LABELS = {3, 42}
+_DK_LH_LABELS = set(range(1001, 1036))
+_DK_RH_LABELS = set(range(2001, 2036))
+_GM_LABELS = {3, 42} | _DK_LH_LABELS | _DK_RH_LABELS
 
 
 def _get_tissue_masks(
