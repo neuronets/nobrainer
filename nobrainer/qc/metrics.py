@@ -10,6 +10,7 @@ import logging
 from pathlib import Path
 
 import nibabel as nib
+import nibabel.processing
 import torch
 
 logger = logging.getLogger(__name__)
@@ -107,6 +108,14 @@ def extract_iqms(
     seg = None
     if seg_path is not None:
         seg_nii = nib.load(str(seg_path))
+        # SynthSeg writes at 1 mm isotropic even when the input scan is
+        # anisotropic (e.g. FastMRI 0.6875 x 0.6875 x 5 mm), so seg and scan
+        # frequently have different shapes. Resample the seg *into the scan's
+        # space* with nearest-neighbour so downstream mask indexing works and
+        # scan intensity statistics (SNR, CNR, FBER, CJV) are computed at
+        # native resolution without interpolation smoothing the noise floor.
+        if seg_nii.shape != nii.shape:
+            seg_nii = nibabel.processing.resample_from_to(seg_nii, nii, order=0)
         seg = torch.from_numpy(seg_nii.get_fdata()).long()
 
     masks = _get_tissue_masks(volume, seg)
