@@ -1,9 +1,6 @@
 """VLM-based quality evaluation wrapper.
 
-Thin wrapper around VLM inference for quality scoring.
-Model loading and inference logic lives in the experiment scripts
-(code/08a_eval_3d_vlms.py, code/08b_eval_2d_vlms.py,
-code/09_finetune_lora.py). This module provides the shared prompts and
+Thin wrapper around VLM inference for quality scoring. This module provides the shared prompts and
 response parsers.
 """
 
