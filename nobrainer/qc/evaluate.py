@@ -1,7 +1,18 @@
 """VLM-based quality evaluation wrapper.
 
-Thin wrapper around VLM inference for quality scoring. This module provides the shared prompts and
-response parsers.
+Shared prompts and response parsers for quality scoring with
+vision-language models. Model loading and per-architecture inference
+logic intentionally lives in caller code, not in this module — the
+prompts and parsers here are stable across consumers, while the HF /
+PEFT / quantisation surface those consumers depend on changes more
+frequently. Two prompt + parser pairs are provided:
+
+* ``QC_PROMPT`` and ``parse_qc_response`` — single-head Likert score
+  in the format ``"SCORE: N\\nREASON: ..."``.
+* ``QC_DUAL_PROMPT`` and ``parse_dual_qc_response`` — two-head Likert
+  scores in the format ``"Quality: N Thickness: M"``, suitable for
+  any downstream task that wants a dual-axis quality assessment in a
+  single forward pass.
 """
 
 from __future__ import annotations
@@ -76,11 +87,11 @@ def parse_qc_response(text: str) -> dict[str, int | str | bool]:
 def parse_dual_qc_response(text: str) -> dict[str, int | None | bool]:
     """Parse dual-head QC output ``Quality: N Thickness: M`` into bucket scores.
 
-    Used by ``code/09_finetune_lora.py`` for two-head VLM fine-tuning. The
-    fine-tuned model is trained to emit a joint output string with integer
-    scores 1-5 on both quality (Dice-based) and thickness (cortical-thickness-
-    shift-based) axes; this parser extracts the two integers for downstream
-    SRCC computation against ground-truth ``mean_dice``.
+    Pairs with :data:`QC_DUAL_PROMPT`. A two-head Likert assessment of a
+    brain MRI scan: one integer 1-5 for segmentation quality, one for
+    cortical-thickness reliability, emitted in a single forward pass.
+    The parser extracts both integers; downstream code uses them as
+    bucketed labels, regression targets, or whatever the consumer needs.
 
     Tolerant to: case variation (``quality`` / ``Quality`` / ``QUALITY``),
     whitespace and punctuation between key and value (``Quality: 4`` /

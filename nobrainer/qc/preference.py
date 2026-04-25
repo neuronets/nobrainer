@@ -1,8 +1,10 @@
 """Machine preference scoring via downstream task degradation.
 
 Computes per-structure Dice scores between reference and corrupted
-SynthSeg segmentations. The Dice degradation IS the machine
-preference ground truth for the NeuroQC project.
+SynthSeg segmentations. The Dice degradation between the two
+segmentations serves as a machine-derived preference signal: where the
+downstream pipeline's output disagrees most with itself under
+corruption is a measure of how much the corruption damaged the inputs.
 """
 
 from __future__ import annotations
