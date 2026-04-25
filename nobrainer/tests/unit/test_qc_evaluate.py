@@ -63,3 +63,76 @@ class TestParseQcResponse:
         assert isinstance(QC_PROMPT, str)
         assert "SCORE" in QC_PROMPT
         assert "REASON" in QC_PROMPT
+
+
+class TestParseDualQcResponse:
+    def test_structured_format(self):
+        from nobrainer.qc.evaluate import parse_dual_qc_response
+
+        result = parse_dual_qc_response("Quality: 4 Thickness: 3")
+        assert result["quality"] == 4
+        assert result["thickness"] == 3
+        assert result["parse_success"] is True
+
+    def test_case_insensitive(self):
+        from nobrainer.qc.evaluate import parse_dual_qc_response
+
+        result = parse_dual_qc_response("quality: 5 thickness: 2")
+        assert result["quality"] == 5
+        assert result["thickness"] == 2
+        assert result["parse_success"] is True
+
+    def test_decimal_values_truncated(self):
+        from nobrainer.qc.evaluate import parse_dual_qc_response
+
+        result = parse_dual_qc_response("Quality: 4.0 Thickness: 3.5")
+        assert result["quality"] == 4
+        assert result["thickness"] == 3
+        assert result["parse_success"] is True
+
+    def test_multiline_format(self):
+        from nobrainer.qc.evaluate import parse_dual_qc_response
+
+        result = parse_dual_qc_response("Quality: 2\nThickness: 4")
+        assert result["quality"] == 2
+        assert result["thickness"] == 4
+        assert result["parse_success"] is True
+
+    def test_quality_out_of_range_rejected(self):
+        from nobrainer.qc.evaluate import parse_dual_qc_response
+
+        result = parse_dual_qc_response("Quality: 9 Thickness: 3")
+        assert result["quality"] is None
+        assert result["thickness"] == 3
+        assert result["parse_success"] is False
+
+    def test_thickness_out_of_range_rejected(self):
+        from nobrainer.qc.evaluate import parse_dual_qc_response
+
+        result = parse_dual_qc_response("Quality: 4 Thickness: 0")
+        assert result["quality"] == 4
+        assert result["thickness"] is None
+        assert result["parse_success"] is False
+
+    def test_only_quality_present(self):
+        from nobrainer.qc.evaluate import parse_dual_qc_response
+
+        result = parse_dual_qc_response("Quality: 4")
+        assert result["quality"] == 4
+        assert result["thickness"] is None
+        assert result["parse_success"] is False
+
+    def test_no_match(self):
+        from nobrainer.qc.evaluate import parse_dual_qc_response
+
+        result = parse_dual_qc_response("Unable to assess this scan.")
+        assert result["quality"] is None
+        assert result["thickness"] is None
+        assert result["parse_success"] is False
+
+    def test_qc_dual_prompt_constant(self):
+        from nobrainer.qc.evaluate import QC_DUAL_PROMPT
+
+        assert isinstance(QC_DUAL_PROMPT, str)
+        assert "Quality:" in QC_DUAL_PROMPT
+        assert "Thickness:" in QC_DUAL_PROMPT
