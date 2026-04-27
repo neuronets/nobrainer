@@ -71,9 +71,13 @@ def generate_corrupted_scan(
     transform = config.get_transform(severity)
     try:
         corrupted = transform(subject)
-    except (RuntimeError, NotImplementedError) as exc:
-        # Some TorchIO transforms (e.g. bias_field's polynomial fit) are
-        # CPU-only; retry on CPU rather than failing the run.
+    except (RuntimeError, NotImplementedError, TypeError) as exc:
+        # Some TorchIO transforms drop to SimpleITK internally
+        # (RandomMotion's rigid-body resampling) or NumPy-only paths
+        # (bias_field's polynomial fit) and can't accept CUDA tensors.
+        # Retry on CPU rather than failing the run. TypeError is the
+        # specific failure mode for the SITK path: "can't convert
+        # cuda:0 device type tensor to numpy".
         if resolved_device != "cpu":
             logger.warning(
                 "Transform %s failed on %s (%s); retrying on CPU",
