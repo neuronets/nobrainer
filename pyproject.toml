@@ -64,9 +64,10 @@ zarr = ["zarr >= 3.0", "nifti-zarr", "ome-zarr >= 0.14.0", "dask[array]", "scipy
 croissant = ["mlcroissant"]
 versioning = ["datalad >= 0.19"]
 tfrecord = ["tfrecord >= 1.14"]
+qc = ["torchio >= 1.0"]
 dev = ["pre-commit", "pytest", "pytest-cov", "scipy"]
 all = [
-    "nobrainer[bayesian,generative,zarr,croissant,versioning,tfrecord,dev]",
+    "nobrainer[bayesian,generative,zarr,croissant,versioning,tfrecord,qc,dev]",
 ]
 
 [tool.hatch.version]
