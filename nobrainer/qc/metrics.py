@@ -1,7 +1,15 @@
 """Signal-based image quality metric extraction.
 
-Computes mriqc-style IQMs using PyTorch without requiring
-the full mriqc BIDS-app pipeline.
+Computes mriqc-style IQMs (SNR, CNR, EFC, FBER, CJV) using PyTorch
+without requiring the full mriqc BIDS-app pipeline.
+
+Performance (2026-04-27 patch):
+    Pre-patch ``_get_tissue_masks`` iterated ``_GM_LABELS`` (72 labels under
+    ``--parc``) in Python with full-volume OR-merging — same bottleneck
+    pattern as :mod:`nobrainer.qc.preference`. The current implementation
+    uses :func:`torch.isin` (single C++ vectorised call) and moves volume +
+    seg to CUDA when available. Numerics may differ at float32 ULP level
+    between CPU and GPU; the algebraic definitions are unchanged.
 """
 
 from __future__ import annotations
@@ -23,13 +31,13 @@ logger = logging.getLogger(__name__)
 # without ``--parc`` only 3/42 are emitted. Taking the union keeps CNR and
 # CJV defined in either mode — a seg that has any cortical voxel gets a GM
 # mask, which both metrics require. Parallel to the cortex-label widening
-# in nobrainer.qc.preference.
+# in :mod:`nobrainer.qc.preference`.
 #
 # WM labels are not affected by ``--parc``.
-_WM_LABELS = {2, 41}
-_DK_LH_LABELS = set(range(1001, 1036))
-_DK_RH_LABELS = set(range(2001, 2036))
-_GM_LABELS = {3, 42} | _DK_LH_LABELS | _DK_RH_LABELS
+_WM_LABELS: list[int] = [2, 41]
+_DK_LH_LABELS: list[int] = list(range(1001, 1036))
+_DK_RH_LABELS: list[int] = list(range(2001, 2036))
+_GM_LABELS: list[int] = [3, 42, *_DK_LH_LABELS, *_DK_RH_LABELS]
 
 
 def _get_tissue_masks(
@@ -38,28 +46,32 @@ def _get_tissue_masks(
 ) -> dict[str, torch.Tensor]:
     """Derive brain/background/WM/GM masks.
 
+    Vectorised: a single :func:`torch.isin` per tissue class replaces the
+    per-label Python OR-loop. Operates on whichever device the input
+    tensors live on.
+
     Parameters:
         volume: 3D intensity volume.
-        seg: SynthSeg segmentation (integer labels). If None, uses Otsu
+        seg: SynthSeg segmentation (integer labels). If ``None``, uses Otsu
             thresholding as fallback for brain/background only.
 
     Returns:
-        Boolean masks: "brain", "background", and optionally "wm", "gm".
+        Boolean masks: ``"brain"``, ``"background"``, and (when ``seg`` is
+        provided) ``"wm"``, ``"gm"``.
     """
     masks: dict[str, torch.Tensor] = {}
 
     if seg is not None:
         masks["brain"] = seg > 0
         masks["background"] = seg == 0
-        masks["wm"] = torch.zeros_like(seg, dtype=torch.bool)
-        for label in _WM_LABELS:
-            masks["wm"] = masks["wm"] | (seg == label)
-        masks["gm"] = torch.zeros_like(seg, dtype=torch.bool)
-        for label in _GM_LABELS:
-            masks["gm"] = masks["gm"] | (seg == label)
+        wm_t = torch.tensor(_WM_LABELS, dtype=seg.dtype, device=seg.device)
+        gm_t = torch.tensor(_GM_LABELS, dtype=seg.dtype, device=seg.device)
+        masks["wm"] = torch.isin(seg, wm_t)
+        masks["gm"] = torch.isin(seg, gm_t)
         return masks
 
-    # Otsu fallback (pure PyTorch)
+    # Otsu fallback (kept identical to pre-patch; runs on whatever device
+    # ``volume`` is on).
     flat = volume[volume > 0].flatten()
     if flat.numel() < 10:
         masks["brain"] = volume > 0
@@ -67,7 +79,9 @@ def _get_tissue_masks(
         return masks
 
     hist = torch.histc(flat, bins=256)
-    bin_edges = torch.linspace(flat.min().item(), flat.max().item(), 257)
+    bin_edges = torch.linspace(
+        flat.min().item(), flat.max().item(), 257, device=volume.device
+    )
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
     total = hist.sum()
@@ -93,44 +107,52 @@ def extract_iqms(
 ) -> dict[str, float]:
     """Extract image quality metrics from a single scan.
 
+    Auto-uses CUDA when available — uploads volume + seg once, runs all
+    metrics on GPU. Falls back to CPU otherwise.
+
     Parameters:
         scan_path: Path to NIfTI scan.
         seg_path: Path to SynthSeg segmentation. If provided, used for tissue
-            classification. If None, falls back to Otsu thresholding
+            classification. If ``None``, falls back to Otsu thresholding
             (only brain/background available; CNR and CJV will be NaN).
 
     Returns:
-        Keys: "snr", "cnr", "efc", "fber", "cjv".
+        Keys: ``"snr"``, ``"cnr"``, ``"efc"``, ``"fber"``, ``"cjv"``.
     """
     nii = nib.load(str(scan_path))
-    volume = torch.from_numpy(nii.get_fdata()).float()
 
-    seg = None
+    seg_nii = None
     if seg_path is not None:
         seg_nii = nib.load(str(seg_path))
         # SynthSeg writes at 1 mm isotropic even when the input scan is
         # anisotropic (e.g. FastMRI 0.6875 x 0.6875 x 5 mm), so seg and scan
-        # frequently have different shapes. Resample the seg *into the scan's
-        # space* with nearest-neighbour so downstream mask indexing works and
+        # frequently have different shapes. Resample the seg into the scan's
+        # space with nearest-neighbour so downstream mask indexing works and
         # scan intensity statistics (SNR, CNR, FBER, CJV) are computed at
         # native resolution without interpolation smoothing the noise floor.
         if seg_nii.shape != nii.shape:
             seg_nii = nibabel.processing.resample_from_to(seg_nii, nii, order=0)
-        seg = torch.from_numpy(seg_nii.get_fdata()).long()
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    volume = torch.from_numpy(nii.get_fdata()).float().to(device)
+
+    seg = None
+    if seg_nii is not None:
+        seg = torch.from_numpy(seg_nii.get_fdata()).long().to(device)
 
     masks = _get_tissue_masks(volume, seg)
 
     brain = volume[masks["brain"]]
     bg = volume[masks["background"]]
 
-    bg_std = bg.std() if bg.numel() > 1 else torch.tensor(1e-8)
+    bg_std = bg.std() if bg.numel() > 1 else torch.tensor(1e-8, device=device)
 
     # SNR: mean(brain) / std(background)
     snr = (brain.mean() / (bg_std + 1e-8)).item()
 
     # FBER: mean(foreground_energy) / mean(background_energy)
     fg_energy = (brain**2).mean()
-    bg_energy = (bg**2).mean() if bg.numel() > 0 else torch.tensor(1e-8)
+    bg_energy = (bg**2).mean() if bg.numel() > 0 else torch.tensor(1e-8, device=device)
     fber = (fg_energy / (bg_energy + 1e-8)).item()
 
     # EFC: entropy focus criterion
@@ -160,8 +182,8 @@ def extract_iqms(
         wm = volume[masks["wm"]]
         gm = volume[masks["gm"]]
         if wm.numel() > 1 and gm.numel() > 1:
-            cnr = ((wm.mean() - gm.mean()).abs() / (bg_std + 1e-8)).item()
             mean_diff = (wm.mean() - gm.mean()).abs()
+            cnr = (mean_diff / (bg_std + 1e-8)).item()
             cjv = ((wm.std() + gm.std()) / (mean_diff + 1e-8)).item()
 
     return {"snr": snr, "cnr": cnr, "efc": efc, "fber": fber, "cjv": cjv}
